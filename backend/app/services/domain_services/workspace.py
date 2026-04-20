@@ -511,6 +511,12 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
             if widget.grinder_run_remaining_ms <= 0:
                 complete_grinder_cycle(experiment, widget.id)
 
+        if widget.vortex_run_remaining_ms > 0:
+            vortex_elapsed_ms = min(elapsed_ms, widget.vortex_run_remaining_ms)
+            widget.vortex_run_remaining_ms = round_volume(max(widget.vortex_run_remaining_ms - vortex_elapsed_ms, 0.0))
+            if widget.vortex_run_remaining_ms <= 0:
+                _complete_vortex_cycle(experiment, widget)
+
         if remaining_seconds > 0:
             physical_simulation_service.advance_widget(
                 widget,
@@ -604,6 +610,15 @@ def _discard_jammed_grinder_contents(
     widget.liquids = []
     sync_canonical_produce_model(experiment)
     experiment.audit_log.append(f"{produce_lot.label} jammed {widget.label} motor and became waste.")
+
+
+def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> None:
+    widget.vortex_run_duration_ms = 0.0
+    widget.vortex_run_remaining_ms = 0.0
+    if widget.tool is None:
+        return
+    widget.tool.is_mixed = True
+    experiment.audit_log.append(f"{widget.tool.label} successfully vortexed on {widget.label}.")
 
 
 def _remove_widget_produce_lot(widget: WorkspaceWidget, produce_lot_id: str) -> ProduceLot:

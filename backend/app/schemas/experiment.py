@@ -13,6 +13,8 @@ def _get_tool_allowed_drop_targets(tool_type: str) -> list[str]:
         targets.insert(1, "rack_slot")
     if tool_type not in {"cutting_board", "sample_bag"}:
         targets.append("analytical_balance_widget")
+    if tool_type in {"centrifuge_tube", "cleanup_tube"}:
+        targets.append("vortex_widget")
 
     return targets
 
@@ -29,7 +31,7 @@ def _get_produce_lot_allowed_drop_targets() -> list[str]:
     return ["workbench_slot", "grinder_widget", "trash_bin", "gross_balance_widget"]
 
 
-_STORABLE_WIDGET_IDS = {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance"}
+_STORABLE_WIDGET_IDS = {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}
 
 
 def _tool_exposes_sample_bag_label_target(tool: WorkbenchToolSchema | None) -> bool:
@@ -179,6 +181,7 @@ class WorkbenchToolSchema(BaseModel):
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0
     field_label_text: str | None = None
+    is_mixed: bool = False
     labels: list[ContainerLabelSchema] = Field(default_factory=list)
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
@@ -278,6 +281,8 @@ class WorkspaceWidgetSchema(BaseModel):
     grinder_run_duration_ms: float = 0.0
     grinder_run_remaining_ms: float = 0.0
     grinder_fault: str | None = None
+    vortex_run_duration_ms: float = 0.0
+    vortex_run_remaining_ms: float = 0.0
     tool: WorkbenchToolSchema | None = None
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
@@ -291,6 +296,8 @@ class WorkspaceWidgetSchema(BaseModel):
             targets.append("gross_balance_widget")
         if self.widget_type == "analytical_balance":
             targets.append("analytical_balance_widget")
+        if self.widget_type == "vortex_mixer":
+            targets.append("vortex_widget")
         return targets
 
     @computed_field

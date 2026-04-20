@@ -165,6 +165,7 @@ export function BenchToolCard({
                 accent={tool.accent}
                 className="h-22 w-16 shrink-0"
                 closureFault={tool.closureFault}
+                containsSlurry={containsSlurry}
                 fillRatio={fillRatio}
                 fillSegments={liquidSegments}
                 isSealed={tool.isSealed}
@@ -192,7 +193,7 @@ export function BenchToolCard({
                         ? "Powder reservoir loaded"
                         : "Ready for spatula loading"
                       : containsSlurry
-                        ? "Slurry present"
+                        ? (tool.isMixed ? "Slurry mixed" : "Slurry present")
                       : powderMassG > 0
                         ? "Powder deposit present"
                         : "Ready for powder dosing"

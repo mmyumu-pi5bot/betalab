@@ -44,6 +44,11 @@ const liquidAccentPalette: Record<ToolbarAccent, LiquidVisualPalette> = {
     glow: "#e0f2fe",
     stroke: "#0c4a6e",
   },
+  violet: {
+    liquid: "#a78bfa",
+    glow: "#ede9fe",
+    stroke: "#4c1d95",
+  },
 };
 
 export const neutralLiquidPalette: LiquidVisualPalette = {

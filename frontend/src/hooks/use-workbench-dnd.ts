@@ -32,6 +32,7 @@ import type {
   ProduceDragPayload,
   RackToolDragPayload,
   TrashToolDragPayload,
+  VortexToolDragPayload,
 } from "@/types/workbench";
 
 import type {
@@ -42,6 +43,7 @@ import type {
   MoveGrossBalanceToolToWorkbenchPayload,
   MoveProduceLotBetweenWorkbenchToolsPayload,
   MoveToolBetweenWorkbenchSlotsPayload,
+  MoveVortexToolToWorkbenchPayload,
   MoveWidgetProduceLotToWorkbenchToolPayload,
   PlaceReceivedBagOnWorkbenchPayload,
   RemoveRackToolToWorkbenchSlotPayload,
@@ -55,6 +57,7 @@ type WorkbenchDndExperimentApi = {
   moveAnalyticalBalanceToolToWorkbench: (payload: MoveAnalyticalBalanceToolToWorkbenchPayload) => void;
   moveGrossBalanceProduceLotToWorkbench: (payload: MoveGrossBalanceProduceLotToWorkbenchPayload) => void;
   moveGrossBalanceToolToWorkbench: (payload: MoveGrossBalanceToolToWorkbenchPayload) => void;
+  moveVortexToolToWorkbench: (payload: MoveVortexToolToWorkbenchPayload) => void;
   moveProduceLotBetweenWorkbenchTools: (payload: MoveProduceLotBetweenWorkbenchToolsPayload) => void;
   moveToolBetweenWorkbenchSlots: (payload: MoveToolBetweenWorkbenchSlotsPayload) => void;
   moveWidgetProduceLotToWorkbenchTool: (payload: MoveWidgetProduceLotToWorkbenchToolPayload) => void;
@@ -90,6 +93,7 @@ export type WorkbenchDndApi = {
       | RackToolDragPayload
       | GrossBalanceToolDragPayload
       | AnalyticalBalanceToolDragPayload
+      | VortexToolDragPayload
       | TrashToolDragPayload,
   ) => void;
   handleDebugProducePresetDragStart: (
@@ -171,6 +175,7 @@ export function useWorkbenchDnd({
       | RackToolDragPayload
       | GrossBalanceToolDragPayload
       | AnalyticalBalanceToolDragPayload
+      | VortexToolDragPayload
       | TrashToolDragPayload,
   ) => {
     clearDropTargets();

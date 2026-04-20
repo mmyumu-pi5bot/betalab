@@ -15,6 +15,9 @@ export function getToolDropTargets(toolType: ToolType): DropTargetType[] {
   if (toolType !== "cutting_board" && toolType !== "sample_bag") {
     targets.push("analytical_balance_widget");
   }
+  if (toolType === "centrifuge_tube" || toolType === "cleanup_tube") {
+    targets.push("vortex_widget");
+  }
 
   return targets;
 }
@@ -68,7 +71,8 @@ export function canWorkspaceWidgetBeStored(widgetId: ExperimentWorkspaceWidgetId
       widgetId === "instrument" ||
       widgetId === "grinder" ||
       widgetId === "gross_balance" ||
-      widgetId === "analytical_balance"
+      widgetId === "analytical_balance" ||
+      widgetId === "vortex"
   );
 }
 

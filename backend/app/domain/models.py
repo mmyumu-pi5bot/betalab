@@ -103,6 +103,7 @@ class WorkbenchTool:
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0
     field_label_text: str | None = None
+    is_mixed: bool = False
     labels: list[ContainerLabel] = field(default_factory=list)
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
@@ -200,6 +201,8 @@ class WorkspaceWidget:
     grinder_run_duration_ms: float = 0.0
     grinder_run_remaining_ms: float = 0.0
     grinder_fault: str | None = None
+    vortex_run_duration_ms: float = 0.0
+    vortex_run_remaining_ms: float = 0.0
     tool: WorkbenchTool | None = None
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)

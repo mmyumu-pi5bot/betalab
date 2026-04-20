@@ -15,6 +15,7 @@ import { ProduceBasketWidget } from "@/components/produce-basket-widget";
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import { RackWidget } from "@/components/rack-widget";
 import { TrashWidget } from "@/components/trash-widget";
+import { VortexWidget } from "@/components/vortex-widget";
 import { WorkbenchPanel } from "@/components/workbench-panel";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 import type { AnalyticalBalanceDndApi } from "@/hooks/use-analytical-balance-dnd";
@@ -23,6 +24,7 @@ import type { GrinderDndApi } from "@/hooks/use-grinder-dnd";
 import type { GrossBalanceDndApi } from "@/hooks/use-gross-balance-dnd";
 import type { RackDndApi } from "@/hooks/use-rack-dnd";
 import type { TrashDndApi } from "@/hooks/use-trash-dnd";
+import type { VortexDndApi } from "@/hooks/use-vortex-dnd";
 import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
 import { canStoreWorkspaceWidget, canWorkspaceWidgetBeStored } from "@/lib/tool-drop-targets";
@@ -70,6 +72,7 @@ type LabSceneWorkspaceCanvasProps = {
     setActiveDragItem: (item: DragDescriptor | null) => void;
     showDropTargets: (targets: readonly DropTargetType[]) => void;
     trash: TrashDndApi;
+    vortex: VortexDndApi;
     workbench: WorkbenchDndApi;
   };
   dropDraft: {
@@ -146,6 +149,7 @@ type LabSceneWorkspaceCanvasProps = {
       measured_sample_mass_g: number | null;
       orchard_name: string;
     }) => void;
+    onStartVortex: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
@@ -183,6 +187,15 @@ export function LabSceneWorkspaceCanvas({
     experiment.workspace.widgets.find((w) => w.id === "gross_balance")?.produceLots?.[0] ?? null;
   const displayAnalyticalBalanceTool =
     experiment.workspace.widgets.find((w) => w.id === "analytical_balance")?.tool ?? null;
+  const vortexWidget = experiment.workspace.widgets.find((w) => w.id === "vortex") ?? null;
+  const vortexTool = vortexWidget?.tool ?? null;
+  const vortexRunRemainingMs = vortexWidget?.vortexRunRemainingMs ?? 0;
+  const vortexRunDurationMs = vortexWidget?.vortexRunDurationMs ?? 0;
+  const isVortexRunning = vortexRunRemainingMs > 0;
+  const vortexProgressPercent =
+    vortexRunDurationMs > 0
+      ? Math.round((1 - vortexRunRemainingMs / vortexRunDurationMs) * 100)
+      : 0;
   const renderStoreWidgetAction = (widget: ExperimentWorkspaceWidget) => {
     if (!canWorkspaceWidgetBeStored(widget.id) || !widget.isPresent) {
       return undefined;
@@ -325,6 +338,24 @@ export function LabSceneWorkspaceCanvas({
     </div>
   ) : null;
 
+  const vortexStagedContent = vortexTool ? (
+    <div
+      data-testid="vortex-staged-item"
+      onDragOver={dnd.vortex.handleVortexDragOver}
+      onDrop={dnd.vortex.handleVortexDrop}
+    >
+      <BenchToolCard
+        draggable
+        onDragEnd={dnd.clearDropTargets}
+        onDragStart={(event) => dnd.vortex.handleVortexItemDragStart(event.dataTransfer)}
+        onDragOver={dnd.vortex.handleVortexDragOver}
+        onDrop={dnd.vortex.handleVortexDrop}
+        onRemoveLiquid={() => {}}
+        tool={{ ...vortexTool, id: `vortex-${vortexTool.id}` }}
+      />
+    </div>
+  ) : undefined;
+
   return (
     <section className="overflow-hidden rounded-[2.25rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.75),rgba(255,255,255,0.55))] p-4 shadow-[0_28px_60px_rgba(15,23,42,0.08)] backdrop-blur xl:p-6">
       <div className="rounded-[1.6rem] border border-white/70 bg-white/65 px-4 py-3 shadow-sm">
@@ -412,6 +443,7 @@ export function LabSceneWorkspaceCanvas({
               (target) => target === "analytical_balance_widget",
             );
             const grinderTargetType = widgetDropTargets.find((target) => target === "grinder_widget");
+            const vortexTargetType = widgetDropTargets.find((target) => target === "vortex_widget");
 
             return (
             <FloatingWidget
@@ -429,7 +461,9 @@ export function LabSceneWorkspaceCanvas({
                         ? "Grinder Widget"
                         : widgetId === "gross_balance"
                           ? "Gross Balance Widget"
-                          : "Produce Basket Widget"
+                          : widgetId === "vortex"
+                            ? "Vortex Widget"
+                            : "Produce Basket Widget"
               }
               onDragStart={(id, event) => {
                 if (dnd.dndDisabledByAction) return;
@@ -529,6 +563,20 @@ export function LabSceneWorkspaceCanvas({
                     testId="lc-msms-instrument-illustration"
                   />
                 </WorkspaceEquipmentWidget>
+              ) : widgetId === "vortex" ? (
+                <VortexWidget
+                  headerAction={renderStoreWidgetAction(widget)}
+                  isCommandPending={ui.isCommandPending}
+                  isDropHighlighted={
+                    vortexTargetType ? dnd.isDropTargetHighlighted(vortexTargetType) : false
+                  }
+                  isRunning={isVortexRunning}
+                  onDragOver={dnd.vortex.handleVortexDragOver}
+                  onDrop={dnd.vortex.handleVortexDrop}
+                  onStart={workspaceActions.onStartVortex}
+                  progressPercent={vortexProgressPercent}
+                  stagedContent={vortexStagedContent}
+                />
               ) : (
                 <WorkspaceEquipmentWidget
                   dataDropHighlighted={

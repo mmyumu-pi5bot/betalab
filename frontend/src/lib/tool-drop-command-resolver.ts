@@ -9,8 +9,12 @@ import type {
   MoveRackToolBetweenSlotsPayload,
   MoveRackToolToAnalyticalBalancePayload,
   MoveRackToolToGrossBalancePayload,
+  MoveRackToolToVortexPayload,
+  MoveVortexToolToWorkbenchPayload,
   MoveWorkbenchToolToAnalyticalBalancePayload,
   MoveWorkbenchToolToGrossBalancePayload,
+  MoveWorkbenchToolToVortexPayload,
+  PlaceToolOnVortexPayload,
   MoveToolBetweenWorkbenchSlotsPayload,
   PlaceReceivedBagOnWorkbenchPayload,
   PlaceToolInRackSlotPayload,
@@ -19,6 +23,7 @@ import type {
   RestoreTrashedToolToAnalyticalBalancePayload,
   RestoreTrashedToolToGrossBalancePayload,
   RestoreTrashedToolToRackSlotPayload,
+  RestoreTrashedToolToVortexPayload,
   RestoreTrashedToolToWorkbenchSlotPayload,
 } from "@/types/api-payloads";
 import type {
@@ -29,6 +34,7 @@ import type {
   RackToolDragPayload,
   ToolbarDragPayload,
   TrashToolDragPayload,
+  VortexToolDragPayload,
 } from "@/types/workbench";
 
 type SupportedToolDropPayload =
@@ -38,13 +44,15 @@ type SupportedToolDropPayload =
   | GrossBalanceToolDragPayload
   | RackToolDragPayload
   | ToolbarDragPayload
-  | TrashToolDragPayload;
+  | TrashToolDragPayload
+  | VortexToolDragPayload;
 
 type ToolDropTarget =
   | { kind: "analytical_balance" }
   | { kind: "gross_balance" }
   | { kind: "rack_slot"; rackSlotId: string }
   | { kind: "trash_bin" }
+  | { kind: "vortex" }
   | { kind: "workbench_slot"; slotId: string };
 
 export type ToolDropCommand =
@@ -75,7 +83,13 @@ export type ToolDropCommand =
   | { kind: "restore_trashed_tool_to_analytical_balance"; payload: RestoreTrashedToolToAnalyticalBalancePayload }
   | { kind: "restore_trashed_tool_to_gross_balance"; payload: RestoreTrashedToolToGrossBalancePayload }
   | { kind: "restore_trashed_tool_to_rack_slot"; payload: RestoreTrashedToolToRackSlotPayload }
-  | { kind: "restore_trashed_tool_to_workbench"; payload: RestoreTrashedToolToWorkbenchSlotPayload };
+  | { kind: "restore_trashed_tool_to_workbench"; payload: RestoreTrashedToolToWorkbenchSlotPayload }
+  | { kind: "discard_vortex_tool" }
+  | { kind: "move_vortex_tool_to_workbench"; payload: MoveVortexToolToWorkbenchPayload }
+  | { kind: "move_workbench_tool_to_vortex"; payload: MoveWorkbenchToolToVortexPayload }
+  | { kind: "move_rack_tool_to_vortex"; payload: MoveRackToolToVortexPayload }
+  | { kind: "place_tool_on_vortex"; payload: PlaceToolOnVortexPayload }
+  | { kind: "restore_trashed_tool_to_vortex"; payload: RestoreTrashedToolToVortexPayload };
 
 function isToolbarToolPayload(payload: SupportedToolDropPayload): payload is ToolbarDragPayload & { itemType: "tool" } {
   return "itemType" in payload && payload.itemType === "tool";
@@ -132,6 +146,12 @@ export function resolveToolDropCommand(
     if (payload.sourceKind === "analytical_balance") {
       return {
         kind: "move_analytical_balance_tool_to_workbench",
+        payload: { target_slot_id: target.slotId },
+      };
+    }
+    if (payload.sourceKind === "vortex") {
+      return {
+        kind: "move_vortex_tool_to_workbench",
         payload: { target_slot_id: target.slotId },
       };
     }
@@ -297,6 +317,37 @@ export function resolveToolDropCommand(
     if (payload.sourceKind === "analytical_balance") {
       return { kind: "discard_analytical_balance_tool" };
     }
+    if (payload.sourceKind === "vortex") {
+      return { kind: "discard_vortex_tool" };
+    }
+  }
+
+  if (target.kind === "vortex") {
+    if (isToolbarToolPayload(payload)) {
+      if (payload.toolType === "centrifuge_tube" || payload.toolType === "cleanup_tube") {
+        return { kind: "place_tool_on_vortex", payload: { tool_id: payload.itemId } };
+      }
+      return null;
+    }
+    if ("sourceSlotId" in payload) {
+      return {
+        kind: "move_workbench_tool_to_vortex",
+        payload: { source_slot_id: payload.sourceSlotId },
+      };
+    }
+    if ("rackSlotId" in payload) {
+      return {
+        kind: "move_rack_tool_to_vortex",
+        payload: { rack_slot_id: payload.rackSlotId },
+      };
+    }
+    if ("trashToolId" in payload) {
+      return {
+        kind: "restore_trashed_tool_to_vortex",
+        payload: { trash_tool_id: payload.trashToolId },
+      };
+    }
+    return null;
   }
 
   return null;

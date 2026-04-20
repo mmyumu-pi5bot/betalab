@@ -15,6 +15,7 @@ import type { GrinderDndApi } from "@/hooks/use-grinder-dnd";
 import type { GrossBalanceDndApi } from "@/hooks/use-gross-balance-dnd";
 import type { RackDndApi } from "@/hooks/use-rack-dnd";
 import type { TrashDndApi } from "@/hooks/use-trash-dnd";
+import type { VortexDndApi } from "@/hooks/use-vortex-dnd";
 import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
 import type { Experiment } from "@/types/experiment";
@@ -67,6 +68,7 @@ type LabSceneViewProps = {
     setActiveDragItem: (item: DragDescriptor | null) => void;
     showDropTargets: (targets: readonly DropTargetType[]) => void;
     trash: TrashDndApi;
+    vortex: VortexDndApi;
     workbench: WorkbenchDndApi;
   };
   dropDraft: {
@@ -148,6 +150,7 @@ type LabSceneViewProps = {
       measured_sample_mass_g: number | null;
       orchard_name: string;
     }) => void;
+    onStartVortex: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;

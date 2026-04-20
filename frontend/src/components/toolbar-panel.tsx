@@ -23,6 +23,7 @@ const accentClasses: Record<ToolbarAccent, string> = {
     "from-emerald-500/20 via-emerald-100 to-white text-emerald-900 ring-emerald-200",
   rose: "from-rose-500/20 via-rose-100 to-white text-rose-900 ring-rose-200",
   sky: "from-sky-500/20 via-sky-100 to-white text-sky-900 ring-sky-200",
+  violet: "from-violet-500/20 via-violet-100 to-white text-violet-900 ring-violet-200",
 };
 
 const neutralToolClasses =

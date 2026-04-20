@@ -58,6 +58,7 @@ export type DndTargetId =
   | "analytical-balance-dropzone"
   | "inventory-dropzone"
   | "rack-illustration-slot-1"
+  | "vortex-dropzone"
   | "widget-workspace"
   | "trash-dropzone";
 
@@ -142,6 +143,7 @@ export const dndTargetCases: {
   { id: "analytical-balance-dropzone", label: "analytical balance", assertDragOver: true },
   { id: "inventory-dropzone", label: "inventory", assertDragOver: true },
   { id: "rack-illustration-slot-1", label: "rack slot", assertDragOver: true },
+  { id: "vortex-dropzone", label: "vortex", assertDragOver: true },
   { id: "widget-workspace", label: "workspace canvas", assertDragOver: false },
   { id: "trash-dropzone", label: "trash", assertDragOver: true },
 ];
@@ -306,9 +308,20 @@ function makeWorkspaceWidgets(
       isPresent: true,
       isTrashed: false,
     },
+    {
+      id: "vortex",
+      widgetType: "vortex_mixer",
+      label: "Vortex mixer",
+      dropTargetTypes: ["vortex_widget"],
+      anchor: "top-left",
+      offsetX: 1444,
+      offsetY: 886,
+      isPresent: true,
+      isTrashed: false,
+    },
   ];
 
-  const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance"]);
+  const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"]);
 
   return baseWidgets.map((widget, index) => {
     const merged = { ...widget, ...(normalizedOverrides[index] ?? {}) };
@@ -2095,6 +2108,52 @@ function getAnalyticalBalanceTargetExpectation(sourceCase: DndSourceCase) {
   return { compatible: false, command: null };
 }
 
+const vortexCompatibleToolTypes = new Set(["centrifuge_tube", "cleanup_tube"]);
+
+function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: boolean; command: null | { type: string; payload: unknown } } {
+  if (sourceCase.id.startsWith("palette-")) {
+    const toolId = sourceCase.id.replace("palette-", "");
+    const item = toolItems.find((t) => t.id === toolId);
+    if (item && vortexCompatibleToolTypes.has(item.toolType)) {
+      return {
+        compatible: true,
+        command: { type: "place_tool_on_vortex", payload: { tool_id: toolId } },
+      };
+    }
+    return { compatible: false, command: null };
+  }
+
+  if (sourceCase.id.startsWith("workbench-")) {
+    const toolId = sourceCase.id.replace("workbench-", "");
+    const item = toolItems.find((t) => t.id === toolId);
+    if (item && vortexCompatibleToolTypes.has(item.toolType)) {
+      return {
+        compatible: true,
+        command: { type: "move_workbench_tool_to_vortex", payload: { source_slot_id: "station_1" } },
+      };
+    }
+    return { compatible: false, command: null };
+  }
+
+  if (sourceCase.id.startsWith("trash-tool-")) {
+    const toolId = sourceCase.id.replace("trash-tool-", "");
+    const item = toolItems.find((t) => t.id === toolId);
+    if (item && vortexCompatibleToolTypes.has(item.toolType)) {
+      return {
+        compatible: true,
+        command: { type: "restore_trashed_tool_to_vortex", payload: { trash_tool_id: "trash_tool_1" } },
+      };
+    }
+    return { compatible: false, command: null };
+  }
+
+  if (sourceCase.id === "rack-sample_vial") {
+    return { compatible: false, command: null };
+  }
+
+  return { compatible: false, command: null };
+}
+
 export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCase) => ({
   ...sourceCase,
   availableTargets: [
@@ -2102,6 +2161,7 @@ export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCas
       ? sourceCase.availableTargets
       : [...sourceCase.availableTargets, "gross-balance-dropzone"]),
     "analytical-balance-dropzone",
+    "vortex-dropzone",
   ],
   targetExpectations: {
     ...sourceCase.targetExpectations,
@@ -2111,6 +2171,9 @@ export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCas
     "analytical-balance-dropzone":
       sourceCase.targetExpectations["analytical-balance-dropzone"] ??
       getAnalyticalBalanceTargetExpectation(sourceCase),
+    "vortex-dropzone":
+      sourceCase.targetExpectations["vortex-dropzone"] ??
+      getVortexTargetExpectation(sourceCase),
   },
 }));
 

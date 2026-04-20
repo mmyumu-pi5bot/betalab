@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from app.domain.models import Experiment, TrashToolEntry, WorkbenchTool, WorkspaceWidget, new_id
+from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
+from app.services.helpers.lookups import (
+    find_rack_slot,
+    find_trash_tool,
+    find_workbench_slot,
+    find_workspace_widget,
+)
+from app.services.helpers.workbench import build_workbench_tool
+
+_VORTEX_CYCLE_DURATION_MS = 3000.0
+
+
+@dataclass(frozen=True, slots=True)
+class EmptyRequest:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceToolOnVortexRequest:
+    tool_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class MoveWorkbenchToolToVortexRequest:
+    source_slot_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class MoveVortexToolToWorkbenchRequest:
+    target_slot_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class MoveRackToolToVortexRequest:
+    rack_slot_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreTrashedToolToVortexRequest:
+    trash_tool_id: str
+
+
+class VortexServiceBase(WriteDomainService[object]):
+    def __init__(self, runtime: ExperimentRuntime) -> None:
+        super().__init__(runtime)
+
+    def _find_vortex_widget(self, experiment: Experiment) -> WorkspaceWidget:
+        widget = find_workspace_widget(experiment.workspace, "vortex")
+        if widget.widget_type != "vortex_mixer":
+            raise ValueError(f"{widget.label} is not a vortex mixer.")
+        return widget
+
+    def _validate_vortex_empty(self, widget: WorkspaceWidget) -> None:
+        if widget.tool is not None:
+            raise ValueError(f"{widget.label} already contains a tool.")
+
+    def _require_vortex_tool(self, experiment: Experiment) -> WorkbenchTool:
+        widget = self._find_vortex_widget(experiment)
+        if widget.tool is None:
+            raise ValueError(f"{widget.label} does not contain a tube.")
+        return widget.tool
+
+    def _validate_compatible_tool(self, tool: WorkbenchTool) -> None:
+        if tool.tool_type not in {"centrifuge_tube", "cleanup_tube"}:
+            raise ValueError(f"{tool.label} cannot be vortexed (only centrifuge or cleanup tubes).")
+
+    def _place_tool_on_vortex(
+        self,
+        experiment: Experiment,
+        tool: WorkbenchTool,
+        *,
+        action_verb: str = "placed on",
+    ) -> None:
+        self._validate_compatible_tool(tool)
+        widget = self._find_vortex_widget(experiment)
+        self._validate_vortex_empty(widget)
+        widget.tool = tool
+        experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
+
+    def _take_tool_from_vortex(self, experiment: Experiment) -> WorkbenchTool:
+        widget = self._find_vortex_widget(experiment)
+        if widget.tool is None:
+            raise ValueError(f"{widget.label} does not contain a tube.")
+        removed_tool = widget.tool
+        widget.tool = None
+        widget.vortex_run_duration_ms = 0.0
+        widget.vortex_run_remaining_ms = 0.0
+        return removed_tool
+
+
+class PlaceToolOnVortexService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: PlaceToolOnVortexRequest) -> None:
+        new_tool = build_workbench_tool(request.tool_id)
+        self._place_tool_on_vortex(experiment, new_tool, action_verb="placed on")
+
+
+class MoveWorkbenchToolToVortexService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveWorkbenchToolToVortexRequest) -> None:
+        source_slot = find_workbench_slot(experiment.workbench, request.source_slot_id)
+        if source_slot.tool is None:
+            raise ValueError(f"Place a tool on {source_slot.label} before moving it.")
+        moved_tool = source_slot.tool
+        source_slot.tool = None
+        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+
+
+class MoveRackToolToVortexService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveRackToolToVortexRequest) -> None:
+        rack_slot = find_rack_slot(experiment.rack, request.rack_slot_id)
+        if rack_slot.tool is None:
+            raise ValueError(f"{rack_slot.label} does not contain a tool.")
+        moved_tool = rack_slot.tool
+        rack_slot.tool = None
+        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+
+
+class RestoreTrashedToolToVortexService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: RestoreTrashedToolToVortexRequest) -> None:
+        trashed_tool = find_trash_tool(experiment.trash, request.trash_tool_id)
+        self._place_tool_on_vortex(experiment, trashed_tool.tool, action_verb="restored to")
+        experiment.trash.tools = [entry for entry in experiment.trash.tools if entry.id != trashed_tool.id]
+
+
+class MoveVortexToolToWorkbenchService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveVortexToolToWorkbenchRequest) -> None:
+        target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
+        if target_slot.tool is not None or target_slot.surface_produce_lots:
+            raise ValueError(f"{target_slot.label} already contains a tool.")
+        moved_tool = self._take_tool_from_vortex(experiment)
+        target_slot.tool = moved_tool
+        experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to {target_slot.label}.")
+
+
+class DiscardVortexToolService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
+        discarded_tool = self._take_tool_from_vortex(experiment)
+        experiment.trash.tools.append(
+            TrashToolEntry(
+                id=new_id("trash_tool"),
+                origin_label="Vortex mixer",
+                tool=discarded_tool,
+            )
+        )
+        experiment.audit_log.append(f"{discarded_tool.label} discarded from Vortex mixer.")
+
+
+class StartVortexCycleService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
+        widget = self._find_vortex_widget(experiment)
+        if widget.tool is None:
+            raise ValueError(f"Place a tube on {widget.label} before starting it.")
+        if widget.vortex_run_remaining_ms > 0:
+            raise ValueError(f"{widget.label} is already running.")
+        widget.vortex_run_duration_ms = _VORTEX_CYCLE_DURATION_MS
+        widget.vortex_run_remaining_ms = _VORTEX_CYCLE_DURATION_MS
+        experiment.audit_log.append(f"Vortex mixer started with {widget.tool.label}.")

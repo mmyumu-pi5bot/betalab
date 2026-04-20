@@ -13,6 +13,7 @@ import type {
   TrashToolDragPayload,
   ToolbarDragPayload,
   ToolbarItem,
+  VortexToolDragPayload,
   WorkspaceLiquidDragPayload,
   WorkspaceWidgetDragPayload,
 } from "@/types/workbench";
@@ -23,6 +24,7 @@ const BASKET_TOOL_DRAG_MIME = "application/x-betalab-basket-tool-item";
 const RACK_TOOL_DRAG_MIME = "application/x-betalab-rack-tool-item";
 const GROSS_BALANCE_TOOL_DRAG_MIME = "application/x-betalab-gross-balance-tool-item";
 const ANALYTICAL_BALANCE_TOOL_DRAG_MIME = "application/x-betalab-analytical-balance-tool-item";
+const VORTEX_TOOL_DRAG_MIME = "application/x-betalab-vortex-tool-item";
 const TRASH_TOOL_DRAG_MIME = "application/x-betalab-trash-tool-item";
 const WORKSPACE_WIDGET_DRAG_MIME = "application/x-betalab-workspace-widget-item";
 const WORKSPACE_LIQUID_DRAG_MIME = "application/x-betalab-workspace-liquid-item";
@@ -163,6 +165,20 @@ export function writeAnalyticalBalanceToolDragPayload(
   const serialized = JSON.stringify(payload);
 
   dataTransfer.setData(ANALYTICAL_BALANCE_TOOL_DRAG_MIME, serialized);
+  dataTransfer.setData("text/plain", serialized);
+  payload.allowedDropTargets.forEach((targetType) => {
+    dataTransfer.setData(getDropTargetMime(targetType), payload.sourceId);
+  });
+  dataTransfer.effectAllowed = "move";
+}
+
+export function writeVortexToolDragPayload(
+  dataTransfer: DataTransfer,
+  payload: VortexToolDragPayload,
+) {
+  const serialized = JSON.stringify(payload);
+
+  dataTransfer.setData(VORTEX_TOOL_DRAG_MIME, serialized);
   dataTransfer.setData("text/plain", serialized);
   payload.allowedDropTargets.forEach((targetType) => {
     dataTransfer.setData(getDropTargetMime(targetType), payload.sourceId);
@@ -414,6 +430,43 @@ export function readAnalyticalBalanceToolDragPayload(
         entityKind: "tool",
         sourceId: parsed.sourceId,
         sourceKind: "analytical_balance",
+        toolId: parsed.toolId,
+        toolType: parsed.toolType,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function readVortexToolDragPayload(
+  dataTransfer: DataTransfer,
+): VortexToolDragPayload | null {
+  const rawPayload =
+    dataTransfer.getData(VORTEX_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
+
+  if (!rawPayload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawPayload) as Partial<VortexToolDragPayload>;
+    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
+
+    if (
+      parsed.entityKind === "tool" &&
+      parsed.sourceKind === "vortex" &&
+      typeof parsed.sourceId === "string" &&
+      typeof parsed.toolId === "string" &&
+      typeof parsed.toolType === "string"
+    ) {
+      return {
+        allowedDropTargets,
+        entityKind: "tool",
+        sourceId: parsed.sourceId,
+        sourceKind: "vortex",
         toolId: parsed.toolId,
         toolType: parsed.toolType,
       };
@@ -793,6 +846,7 @@ export function toDragDescriptor(
     | RackToolDragPayload
     | GrossBalanceToolDragPayload
     | AnalyticalBalanceToolDragPayload
+    | VortexToolDragPayload
     | TrashToolDragPayload
     | WorkspaceWidgetDragPayload
     | WorkspaceLiquidDragPayload
@@ -933,6 +987,17 @@ export function toDragDescriptor(
     };
   }
 
+  if ("toolId" in payload && payload.sourceKind === "vortex") {
+    return {
+      allowedDropTargets: payload.allowedDropTargets,
+      entityKind: "tool",
+      sourceId: payload.sourceId,
+      sourceKind: payload.sourceKind,
+      toolId: payload.toolId,
+      toolType: payload.toolType,
+    };
+  }
+
   if ("sourceSlotId" in payload || "rackSlotId" in payload || "trashToolId" in payload) {
     return {
       allowedDropTargets: payload.allowedDropTargets,
@@ -983,6 +1048,11 @@ export function readDragDescriptor(dataTransfer: DataTransfer): DragDescriptor |
   const analyticalBalanceToolPayload = readAnalyticalBalanceToolDragPayload(dataTransfer);
   if (analyticalBalanceToolPayload) {
     return toDragDescriptor(analyticalBalanceToolPayload);
+  }
+
+  const vortexToolPayload = readVortexToolDragPayload(dataTransfer);
+  if (vortexToolPayload) {
+    return toDragDescriptor(vortexToolPayload);
   }
 
   const trashToolPayload = readTrashToolDragPayload(dataTransfer);

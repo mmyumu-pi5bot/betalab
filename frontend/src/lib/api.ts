@@ -1336,6 +1336,83 @@ export async function restoreTrashedSampleLabelToAnalyticalBalance(
   });
 }
 
+export async function placeToolOnVortex(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/place?tool_id=${requireString(body, "tool_id")}`,
+  });
+}
+
+export async function moveWorkbenchToolToVortex(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/workbench?source_slot_id=${requireString(body, "source_slot_id")}`,
+  });
+}
+
+export async function moveRackToolToVortex(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/rack?rack_slot_id=${requireString(body, "rack_slot_id")}`,
+  });
+}
+
+export async function restoreTrashedToolToVortex(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/trash?trash_tool_id=${requireString(body, "trash_tool_id")}`,
+  });
+}
+
+export async function moveVortexToolToWorkbench(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/move-to-workbench?target_slot_id=${requireString(body, "target_slot_id")}`,
+  });
+}
+
+export async function discardVortexTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/discard`,
+  });
+}
+
+export async function startVortexCycle(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/start`,
+  });
+}
+
 function normalizeExperiment(experiment: Experiment): Experiment {
   const rawTrash = experiment.trash as Experiment["trash"] & Record<string, unknown>;
   const rawWorkspace = experiment.workspace as Experiment["workspace"] & Record<string, unknown>;
@@ -1493,6 +1570,7 @@ function normalizeBenchTool(
     toolType: String(tool.toolType ?? tool.tool_type) as BenchToolInstance["toolType"],
     capacity_ml: Number(tool.capacity_ml),
     contactImpurityMgPerG: Number(tool.contactImpurityMgPerG ?? tool.contact_impurity_mg_per_g ?? 0),
+    isMixed: Boolean(tool.isMixed ?? tool.is_mixed ?? false),
     isSealed: Boolean(tool.isSealed ?? tool.is_sealed ?? false),
     closureFault:
       tool.closureFault !== undefined
@@ -1818,6 +1896,8 @@ function normalizeWorkspaceWidget(
         : widget.grinder_fault !== undefined && widget.grinder_fault !== null
           ? String(widget.grinder_fault)
           : null,
+    vortexRunDurationMs: Number(widget.vortexRunDurationMs ?? widget.vortex_run_duration_ms ?? 0),
+    vortexRunRemainingMs: Number(widget.vortexRunRemainingMs ?? widget.vortex_run_remaining_ms ?? 0),
     offsetX: Number(widget.offsetX ?? widget.offset_x),
     offsetY: Number(widget.offsetY ?? widget.offset_y),
     isPresent: Boolean(widget.isPresent ?? widget.is_present),

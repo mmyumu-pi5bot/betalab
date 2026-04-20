@@ -18,6 +18,7 @@ type LabAssetIconProps = {
   accent: ToolbarAccent;
   className?: string;
   closureFault?: string | null;
+  containsSlurry?: boolean;
   fillRatio?: number;
   fillSegments?: Array<{ accent: ToolbarAccent; ratio: number }>;
   isSealed?: boolean;
@@ -141,6 +142,7 @@ function VolumetricFlaskIcon({
 
 function CentrifugeTubeIcon({
   closureFault,
+  containsSlurry = false,
   fillRatio,
   glow,
   isSealed = false,
@@ -151,6 +153,7 @@ function CentrifugeTubeIcon({
   stroke,
 }: {
   closureFault?: string | null;
+  containsSlurry?: boolean;
   fillRatio: number;
   glow: string;
   isSealed?: boolean;
@@ -184,7 +187,7 @@ function CentrifugeTubeIcon({
         stroke="none"
       />
       <path d={`M33 ${liquidTop}C39 ${liquidTop - 2} 49 ${liquidTop + 2} 55 ${liquidTop}`} opacity="0.65" />
-      {powderHeight > 0 ? (
+      {!containsSlurry && powderHeight > 0 ? (
         fillRatio > 0 ? (
           <PowderLayer
             bodyPath={`M34 ${liquidTop - powderHeight}C38 ${liquidTop - powderHeight - 3} 50 ${liquidTop - powderHeight - 3} 54 ${liquidTop - powderHeight}L54 ${liquidTop + 2}L34 ${liquidTop + 2}Z`}
@@ -205,6 +208,7 @@ function CentrifugeTubeIcon({
 
 function CleanupTubeIcon({
   closureFault,
+  containsSlurry = false,
   fillRatio,
   glow,
   isSealed = false,
@@ -215,6 +219,7 @@ function CleanupTubeIcon({
   stroke,
 }: {
   closureFault?: string | null;
+  containsSlurry?: boolean;
   fillRatio: number;
   glow: string;
   isSealed?: boolean;
@@ -248,7 +253,7 @@ function CleanupTubeIcon({
         stroke="none"
       />
       <path d={`M35 ${liquidTop}C40 ${liquidTop - 1} 48 ${liquidTop + 2} 53 ${liquidTop}`} opacity="0.65" />
-      {powderHeight > 0 ? (
+      {!containsSlurry && powderHeight > 0 ? (
         fillRatio > 0 ? (
           <PowderLayer
             bodyPath={`M36 ${liquidTop - powderHeight}C40 ${liquidTop - powderHeight - 3} 48 ${liquidTop - powderHeight - 3} 52 ${liquidTop - powderHeight}L52 ${liquidTop + 2}L36 ${liquidTop + 2}Z`}
@@ -269,6 +274,7 @@ function CleanupTubeIcon({
 
 function SampleVialIcon({
   closureFault,
+  containsSlurry = false,
   fillRatio,
   glow,
   isSealed = false,
@@ -279,6 +285,7 @@ function SampleVialIcon({
   stroke,
 }: {
   closureFault?: string | null;
+  containsSlurry?: boolean;
   fillRatio: number;
   glow: string;
   isSealed?: boolean;
@@ -312,7 +319,7 @@ function SampleVialIcon({
         stroke="none"
       />
       <path d={`M34 ${liquidTop}C40 ${liquidTop - 2} 48 ${liquidTop + 2} 54 ${liquidTop}`} opacity="0.65" />
-      {powderHeight > 0 ? (
+      {!containsSlurry && powderHeight > 0 ? (
         fillRatio > 0 ? (
           <PowderLayer
             bodyPath={`M35 ${liquidTop - powderHeight}C39 ${liquidTop - powderHeight - 3} 49 ${liquidTop - powderHeight - 3} 53 ${liquidTop - powderHeight}L53 ${liquidTop + 2}L35 ${liquidTop + 2}Z`}
@@ -692,6 +699,7 @@ export function LabAssetIcon({
   accent,
   className,
   closureFault,
+  containsSlurry = false,
   fillRatio,
   fillSegments,
   isSealed = false,
@@ -713,9 +721,9 @@ export function LabAssetIcon({
   );
   const displaySegments =
     normalizedSegments.length > 0 ? normalizedSegments : [{ color: palette.liquid, ratio: 1 }];
-  const liquidFill =
+  const baseLiquidFill =
     displaySegments.length === 1 ? displaySegments[0].color : `url(#${gradientId})`;
-  const liquidDefs =
+  const baseLiquidDefs =
     displaySegments.length > 1 ? (
       <linearGradient id={gradientId} x1="0%" x2="0%" y1="100%" y2="0%">
         {displaySegments.flatMap((segment, index) => {
@@ -741,6 +749,24 @@ export function LabAssetIcon({
       </linearGradient>
     ) : null;
 
+  const slurryPatternId = `${gradientId}sp`;
+  const slurryLiquidColor = displaySegments[0].color;
+  const slurryDefs = containsSlurry ? (
+    <pattern
+      height="10"
+      id={slurryPatternId}
+      patternTransform="rotate(45)"
+      patternUnits="userSpaceOnUse"
+      width="10"
+    >
+      <rect fill={slurryLiquidColor} height="10" width="5" />
+      <rect fill="#d6c6a8" height="10" width="5" x="5" />
+    </pattern>
+  ) : null;
+
+  const liquidFill = containsSlurry ? `url(#${slurryPatternId})` : baseLiquidFill;
+  const liquidDefs = containsSlurry ? slurryDefs : baseLiquidDefs;
+
   const sharedProps = {
     fillRatio: normalizedFill,
     glow: palette.glow,
@@ -761,6 +787,7 @@ export function LabAssetIcon({
         <CentrifugeTubeIcon
           {...sharedProps}
           closureFault={closureFault}
+          containsSlurry={containsSlurry}
           isSealed={isSealed}
           powderMassG={powderMassG}
         />
@@ -771,13 +798,14 @@ export function LabAssetIcon({
         <CleanupTubeIcon
           {...sharedProps}
           closureFault={closureFault}
+          containsSlurry={containsSlurry}
           isSealed={isSealed}
           powderMassG={powderMassG}
         />
       );
       break;
     case "sample_vial":
-      icon = <SampleVialIcon {...sharedProps} closureFault={closureFault} isSealed={isSealed} powderMassG={powderMassG} />;
+      icon = <SampleVialIcon {...sharedProps} closureFault={closureFault} containsSlurry={containsSlurry} isSealed={isSealed} powderMassG={powderMassG} />;
       break;
     case "beaker":
       icon = <BeakerIcon {...sharedProps} />;

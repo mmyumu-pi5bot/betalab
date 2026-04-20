@@ -1,4 +1,4 @@
-export type ToolbarAccent = "amber" | "emerald" | "rose" | "sky";
+export type ToolbarAccent = "amber" | "emerald" | "rose" | "sky" | "violet";
 export type DropTargetType =
   | "workbench_slot"
   | "workspace_canvas"
@@ -7,7 +7,8 @@ export type DropTargetType =
   | "trash_bin"
   | "grinder_widget"
   | "gross_balance_widget"
-  | "analytical_balance_widget";
+  | "analytical_balance_widget"
+  | "vortex_widget";
 
 type ToolbarBaseItem = {
   allowedDropTargets: DropTargetType[];
@@ -45,7 +46,8 @@ export type WorkspaceWidgetType =
   | "produce_basket"
   | "lims_terminal"
   | "gross_balance"
-  | "analytical_balance";
+  | "analytical_balance"
+  | "vortex_mixer";
 export type ExperimentWorkspaceWidgetId =
   | "workbench"
   | "trash"
@@ -55,7 +57,8 @@ export type ExperimentWorkspaceWidgetId =
   | "basket"
   | "lims"
   | "gross_balance"
-  | "analytical_balance";
+  | "analytical_balance"
+  | "vortex";
 export type ExperimentWorkspaceWidgetType = "workbench" | "trash" | WorkspaceWidgetType;
 export type WidgetAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type ProduceLotType = "apple";
@@ -77,6 +80,7 @@ type DragSourceKind =
   | "grinder"
   | "gross_balance"
   | "analytical_balance"
+  | "vortex"
   | "lims";
 
 export type DebugProducePresetId = "apple_powder_residual_co2";
@@ -247,6 +251,14 @@ export type AnalyticalBalanceToolDragPayload = BaseDragPayload & {
   toolType: ToolType;
 };
 
+export type VortexToolDragPayload = BaseDragPayload & {
+  entityKind: "tool";
+  sourceId: string;
+  sourceKind: "vortex";
+  toolId: string;
+  toolType: ToolType;
+};
+
 export type TrashToolDragPayload = BaseDragPayload & {
   entityKind: "tool";
   sourceId: string;
@@ -325,6 +337,7 @@ export type BenchToolInstance = {
   isSealed?: boolean;
   closureFault?: string | null;
   fieldLabelText?: string | null;
+  isMixed?: boolean;
   isDraggable: boolean;
   allowedDropTargets: DropTargetType[];
   labels?: BenchLabel[];
@@ -439,6 +452,8 @@ export type ExperimentWorkspaceWidget = {
   grinderRunDurationMs?: number;
   grinderRunRemainingMs?: number;
   grinderFault?: string | null;
+  vortexRunDurationMs?: number;
+  vortexRunRemainingMs?: number;
   isPresent: boolean;
   isTrashed: boolean;
   tool?: BenchToolInstance | null;

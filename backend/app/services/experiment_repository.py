@@ -321,6 +321,8 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                 grinder_run_duration_ms=widget.grinder_run_duration_ms,
                 grinder_run_remaining_ms=widget.grinder_run_remaining_ms,
                 grinder_fault=widget.grinder_fault,
+                vortex_run_duration_ms=widget.vortex_run_duration_ms,
+                vortex_run_remaining_ms=widget.vortex_run_remaining_ms,
                 tool=_deserialize_workbench_tool(widget.tool),
                 produce_lots=[_deserialize_produce_lot(lot) for lot in widget.produce_lots],
                 liquids=[WorkbenchLiquid(**liquid.model_dump()) for liquid in widget.liquids],

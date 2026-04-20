@@ -715,6 +715,7 @@ def test_create_experiment_starts_with_received_bag_and_empty_workbench() -> Non
         "instrument",
         "basket",
         "grinder",
+        "vortex",
     ]
     widgets_by_id = {widget.id: widget for widget in experiment.workspace.widgets}
     assert widgets_by_id["lims"].is_present is True
@@ -1780,7 +1781,7 @@ def test_start_grinder_cycle_marks_the_grinder_as_running() -> None:
             "volume_ml": 400,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -75.0
 
     started = apply_command(
@@ -1859,7 +1860,7 @@ def test_start_grinder_cycle_rejects_produce_above_minus_twenty_c() -> None:
             "produce_lot_id": produce_lot_id,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -15.0
 
     with pytest.raises(ValueError, match=r"not cold enough"):
@@ -1944,7 +1945,7 @@ def test_active_grinder_cycle_warms_the_sample_and_consumes_dry_ice_until_comple
             "volume_ml": 400,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -75.0
 
     apply_command(
@@ -2051,7 +2052,7 @@ def test_active_grinder_cycle_scores_warmer_runs_as_coarser_results() -> None:
             "volume_ml": 400,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -30.0
 
     apply_command(
@@ -2144,7 +2145,7 @@ def test_active_grinder_cycle_jams_if_the_sample_warms_above_minus_ten_c() -> No
             "volume_ml": 10,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -20.0
 
     apply_command(
@@ -2245,7 +2246,7 @@ def test_jammed_grinder_waste_can_be_moved_to_a_workbench_tool() -> None:
             "volume_ml": 10,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -20.0
 
     apply_command(
@@ -3112,7 +3113,7 @@ def test_move_grinder_produce_lot_to_workbench_tool() -> None:
             "produce_lot_id": produce_lot_id,
         },
     )
-    grinder_lot = service._experiments[experiment.id].workspace.widgets[-1].produce_lots[0]
+    grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
     _lot_state(service._experiments[experiment.id], grinder_lot.id).residual_co2_mass_g = 18.0
     apply_command(
         service,
@@ -3170,10 +3171,10 @@ def test_move_grinder_ground_produce_lot_to_open_storage_jar() -> None:
     experiment_state = service._experiments[experiment.id]
     set_material_state_name(
         experiment_state.produce_material_states,
-        experiment_state.workspace.widgets[-1].produce_lots[0].id,
+        experiment_state.workspace.widgets[-2].produce_lots[0].id,
         "ground",
     )
-    grinder_lot = experiment_state.workspace.widgets[-1].produce_lots[0]
+    grinder_lot = experiment_state.workspace.widgets[-2].produce_lots[0]
     _lot_state(experiment_state, grinder_lot.id).residual_co2_mass_g = 18.0
     apply_command(
         service,
@@ -3241,7 +3242,7 @@ def test_ground_lot_continues_degassing_after_transfer_out_of_grinder() -> None:
     )
 
     experiment_state = service._experiments[experiment.id]
-    grinder = experiment_state.workspace.widgets[-1]
+    grinder = experiment_state.workspace.widgets[-2]
     set_material_state_name(experiment_state.produce_material_states, grinder.produce_lots[0].id, "ground")
     _lot_state(experiment_state, grinder.produce_lots[0].id).residual_co2_mass_g = 2.0
 

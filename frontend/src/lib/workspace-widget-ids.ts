@@ -6,6 +6,7 @@ const workspaceEquipmentWidgetIds = [
   "grinder",
   "gross_balance",
   "analytical_balance",
+  "vortex",
 ] as const;
 
 export type WorkspaceEquipmentWidgetId = (typeof workspaceEquipmentWidgetIds)[number];
@@ -18,6 +19,7 @@ const workspaceEquipmentItemToWidgetId = {
   lims_terminal_widget: "lims",
   gross_balance_widget: "gross_balance",
   analytical_balance_widget: "analytical_balance",
+  vortex_mixer_widget: "vortex",
 } as const satisfies Record<string, WorkspaceEquipmentWidgetId>;
 
 export function isWorkspaceEquipmentWidgetId(value: string): value is WorkspaceEquipmentWidgetId {

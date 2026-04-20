@@ -10,20 +10,26 @@ import type {
   MoveRackToolBetweenSlotsPayload,
   MoveRackToolToAnalyticalBalancePayload,
   MoveRackToolToGrossBalancePayload,
+  MoveRackToolToVortexPayload,
+  MoveVortexToolToWorkbenchPayload,
+  MoveWorkbenchToolToVortexPayload,
   MoveToolBetweenWorkbenchSlotsPayload,
   PlaceToolInRackSlotPayload,
   PlaceReceivedBagOnWorkbenchPayload,
   PlaceToolOnAnalyticalBalancePayload,
   PlaceToolOnGrossBalancePayload,
+  PlaceToolOnVortexPayload,
   RestoreTrashedToolToAnalyticalBalancePayload,
   RestoreTrashedToolToGrossBalancePayload,
   RestoreTrashedToolToRackSlotPayload,
+  RestoreTrashedToolToVortexPayload,
   RestoreTrashedToolToWorkbenchSlotPayload,
 } from "@/types/api-payloads";
 
 type WorkbenchToolDropApi = {
   moveAnalyticalBalanceToolToWorkbench: (payload: MoveAnalyticalBalanceToolToWorkbenchPayload) => void;
   moveGrossBalanceToolToWorkbench: (payload: MoveGrossBalanceToolToWorkbenchPayload) => void;
+  moveVortexToolToWorkbench: (payload: MoveVortexToolToWorkbenchPayload) => void;
   moveToolBetweenWorkbenchSlots: (payload: MoveToolBetweenWorkbenchSlotsPayload) => void;
   placeReceivedBagOnWorkbench: (payload: PlaceReceivedBagOnWorkbenchPayload) => void;
   removeRackToolToWorkbenchSlot: (payload: { rack_slot_id: string; target_slot_id: string }) => void;
@@ -83,6 +89,10 @@ export function executeWorkbenchToolDropCommand(command: ToolDropCommand, api: W
   }
   if (command.kind === "move_analytical_balance_tool_to_workbench") {
     void api.moveAnalyticalBalanceToolToWorkbench(command.payload);
+    return true;
+  }
+  if (command.kind === "move_vortex_tool_to_workbench") {
+    void api.moveVortexToolToWorkbench(command.payload);
     return true;
   }
   if (command.kind === "move_rack_tool_to_workbench") {
@@ -194,6 +204,38 @@ export function executeTrashToolDropCommand(command: ToolDropCommand, api: Trash
   }
   if (command.kind === "discard_analytical_balance_tool") {
     void api.discardAnalyticalBalanceTool();
+    return true;
+  }
+  return false;
+}
+
+type VortexToolDropApi = {
+  moveWorkbenchToolToVortex: (payload: MoveWorkbenchToolToVortexPayload) => void;
+  moveRackToolToVortex: (payload: MoveRackToolToVortexPayload) => void;
+  placeToolOnVortex: (payload: PlaceToolOnVortexPayload) => void;
+  restoreTrashedToolToVortex: (payload: RestoreTrashedToolToVortexPayload) => void;
+  discardVortexTool: () => void;
+};
+
+export function executeVortexToolDropCommand(command: ToolDropCommand, api: VortexToolDropApi): boolean {
+  if (command.kind === "place_tool_on_vortex") {
+    void api.placeToolOnVortex(command.payload);
+    return true;
+  }
+  if (command.kind === "move_workbench_tool_to_vortex") {
+    void api.moveWorkbenchToolToVortex(command.payload);
+    return true;
+  }
+  if (command.kind === "move_rack_tool_to_vortex") {
+    void api.moveRackToolToVortex(command.payload);
+    return true;
+  }
+  if (command.kind === "restore_trashed_tool_to_vortex") {
+    void api.restoreTrashedToolToVortex(command.payload);
+    return true;
+  }
+  if (command.kind === "discard_vortex_tool") {
+    void api.discardVortexTool();
     return true;
   }
   return false;

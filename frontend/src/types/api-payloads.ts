@@ -330,3 +330,23 @@ export type CreateDebugProduceLotToWidgetPayload = {
   temperature_c?: number;
   residual_co2_mass_g?: number;
 };
+
+export type PlaceToolOnVortexPayload = {
+  tool_id: string;
+};
+
+export type MoveWorkbenchToolToVortexPayload = {
+  source_slot_id: string;
+};
+
+export type MoveRackToolToVortexPayload = {
+  rack_slot_id: string;
+};
+
+export type RestoreTrashedToolToVortexPayload = {
+  trash_tool_id: string;
+};
+
+export type MoveVortexToolToWorkbenchPayload = {
+  target_slot_id: string;
+};

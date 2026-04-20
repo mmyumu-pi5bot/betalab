@@ -13,6 +13,7 @@ import { useLabExperiment } from "@/hooks/use-lab-experiment";
 import { useRackDnd } from "@/hooks/use-rack-dnd";
 import { useActionMode } from "@/hooks/use-action-mode";
 import { useTrashDnd } from "@/hooks/use-trash-dnd";
+import { useVortexDnd } from "@/hooks/use-vortex-dnd";
 import { useWorkbenchDnd } from "@/hooks/use-workbench-dnd";
 import { useWorkbenchHandlers } from "@/hooks/use-workbench-handlers";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
@@ -166,6 +167,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     state.status === "ready"
       ? (state.experiment.workspace.widgets.find((w) => w.id === "grinder") ?? null)
       : null;
+  const vortexTool =
+    state.status === "ready"
+      ? (state.experiment.workspace.widgets.find((w) => w.id === "vortex")?.tool ?? null)
+      : null;
 
   const rackDnd = useRackDnd({
     dndDisabledByAction,
@@ -218,6 +223,13 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     experimentApi,
     isKnifeMode,
     setPendingDropDraft,
+  });
+
+  const vortexDnd = useVortexDnd({
+    vortexTool,
+    dndDisabledByAction,
+    dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
+    experimentApi,
   });
 
   const { handleWorkspaceDragOver, handleWorkspaceDrop } = useWorkspaceDrop({
@@ -375,6 +387,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         setActiveDragItem,
         showDropTargets,
         trash: trashDnd,
+        vortex: vortexDnd,
         workbench: workbenchDnd,
       }}
       dropDraft={{
@@ -448,6 +461,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       }}
       workspaceActions={{
         ...workspaceActions,
+        onStartVortex: () => { void experimentApi.startVortexCycle(); },
         onStoreWorkspaceWidget: (widgetId) => {
           clearDropTargets();
           void experimentApi.storeWorkspaceWidget({ widget_id: widgetId });

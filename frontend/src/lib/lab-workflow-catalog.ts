@@ -151,6 +151,16 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         widgetType: "cryogenic_grinder",
       },
       {
+        id: "vortex_mixer_widget",
+        allowedDropTargets: ["workspace_canvas"],
+        itemType: "workspace_widget",
+        name: "Vortex mixer",
+        subtitle: "Tube agitation",
+        description: "Benchtop vortex used to mix centrifuge and cleanup tubes.",
+        accent: "violet",
+        widgetType: "vortex_mixer",
+      },
+      {
         id: "lims_terminal_widget",
         allowedDropTargets: ["workspace_canvas"],
         itemType: "workspace_widget",
