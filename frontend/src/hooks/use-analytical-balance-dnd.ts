@@ -4,29 +4,24 @@ import { resolveLabelDropCommand } from "@/lib/label-drop-command-resolver";
 import { canResolveLabelDropOnTool, readLabelDragPayload } from "@/lib/label-drop-resolver";
 import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
 import { executeAnalyticalBalanceLabelDropCommand } from "@/lib/label-drop-command-executor";
-import { executeAnalyticalBalanceToolDropCommand } from "@/lib/tool-drop-command-executor";
+import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { canResolveDropOnTool } from "@/lib/tool-drop-resolver";
 import {
   hasCompatibleDropTarget,
-  readAnalyticalBalanceToolDragPayload,
-  readBenchToolDragPayload,
-  readGrossBalanceToolDragPayload,
-  readRackToolDragPayload,
+  readEquipmentToolDragPayload,
   readToolbarDragPayload,
-  readTrashToolDragPayload,
   toDragDescriptor,
-  writeAnalyticalBalanceToolDragPayload,
+  writeEquipmentToolDragPayload,
 } from "@/lib/workbench-dnd";
 import type { DropDraft } from "@/hooks/use-drop-draft";
-import type { AnalyticalBalanceToolDragPayload, BenchToolInstance } from "@/types/workbench";
+import type { BenchToolInstance } from "@/types/workbench";
+import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
-  MoveRackToolToAnalyticalBalancePayload,
-  MoveWorkbenchToolToAnalyticalBalancePayload,
-  PlaceToolOnAnalyticalBalancePayload,
-  RestoreTrashedToolToAnalyticalBalancePayload,
+  MoveToolPayload,
+  PlaceToolFromPalettePayload,
 } from "@/types/api-payloads";
 
 type AnalyticalBalanceDndExperimentApi = {
@@ -34,17 +29,15 @@ type AnalyticalBalanceDndExperimentApi = {
   applyPrintedLimsLabelToAnalyticalBalanceTool: () => void;
   applySampleLabelToAnalyticalBalanceTool: () => void;
   moveGrossBalanceToolToAnalyticalBalance: () => void;
-  moveRackToolToAnalyticalBalance: (payload: MoveRackToolToAnalyticalBalancePayload) => void;
+  moveTool: (payload: MoveToolPayload) => void;
   moveWorkbenchSampleLabelToAnalyticalBalance: (payload: {
     source_slot_id: string;
     label_id: string;
   }) => void;
-  moveWorkbenchToolToAnalyticalBalance: (payload: MoveWorkbenchToolToAnalyticalBalancePayload) => void;
-  placeToolOnAnalyticalBalance: (payload: PlaceToolOnAnalyticalBalancePayload) => void;
+  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
   restoreTrashedSampleLabelToAnalyticalBalance: (payload: {
     trash_sample_label_id: string;
   }) => void;
-  restoreTrashedToolToAnalyticalBalance: (payload: RestoreTrashedToolToAnalyticalBalancePayload) => void;
   updateAnalyticalBalanceToolSampleLabelText: (payload: {
     label_id: string;
     sample_label_text: string;
@@ -163,11 +156,7 @@ export function useAnalyticalBalanceDnd({
 
     const toolPayload =
       (toolbarPayload?.itemType === "tool" ? toolbarPayload : null) ??
-      readBenchToolDragPayload(event.dataTransfer) ??
-      readGrossBalanceToolDragPayload(event.dataTransfer) ??
-      readRackToolDragPayload(event.dataTransfer) ??
-      readTrashToolDragPayload(event.dataTransfer) ??
-      readAnalyticalBalanceToolDragPayload(event.dataTransfer);
+      readEquipmentToolDragPayload(event.dataTransfer);
 
     if (!toolPayload) {
       return;
@@ -181,7 +170,7 @@ export function useAnalyticalBalanceDnd({
     if (!command) {
       return;
     }
-    executeAnalyticalBalanceToolDropCommand(command, experimentApi);
+    executeToolDropCommand(command, experimentApi);
   };
 
   const handleAnalyticalBalanceItemDragStart = (dataTransfer: DataTransfer) => {
@@ -193,7 +182,7 @@ export function useAnalyticalBalanceDnd({
     }
 
     const allowedDropTargets = analyticalBalanceTool.allowedDropTargets ?? [];
-    const payload: AnalyticalBalanceToolDragPayload = {
+    const payload: EquipmentToolDragPayload = {
       allowedDropTargets,
       entityKind: "tool",
       sourceId: "analytical_balance",
@@ -202,7 +191,7 @@ export function useAnalyticalBalanceDnd({
       toolType: analyticalBalanceTool.toolType,
     };
 
-    writeAnalyticalBalanceToolDragPayload(dataTransfer, payload);
+    writeEquipmentToolDragPayload(dataTransfer, payload);
     showDropTargets(allowedDropTargets);
     setActiveDragItem(toDragDescriptor(payload));
   };

@@ -87,7 +87,7 @@ def test_create_and_fetch_experiment_over_http() -> None:
     assert fetched.json()["snapshot_version"] >= 1
     assert fetched.json()["workbench"]["slots"][0]["tool"] is None
     assert fetched.json()["rack"]["slots"][0]["tool"] is None
-    assert fetched.json()["trash"]["tools"] == []
+    assert fetched.json()["trash"]["children"] == []
     assert any(widget["id"] == "workbench" for widget in fetched.json()["workspace"]["widgets"])
     assert fetched.json()["basket_tools"][0]["tool_type"] == "sample_bag"
     assert fetched.json()["lims_reception"]["status"] == "awaiting_reception"
@@ -468,8 +468,9 @@ def test_received_bag_can_be_discarded_from_basket_over_http() -> None:
 
     assert discarded.status_code == 200
     assert discarded.json()["basket_tools"] == []
-    assert len(discarded.json()["trash"]["tools"]) == 1
-    assert discarded.json()["trash"]["tools"][0]["origin_label"] == "Produce basket"
+    assert len(discarded.json()["trash"]["children"]) == 1
+    child_id = discarded.json()["trash"]["children"][0]["id"]
+    assert discarded.json()["trash"]["discarded_from"][child_id] == "Produce basket"
 
 
 def test_printed_lims_ticket_can_be_discarded_over_http() -> None:
@@ -864,7 +865,8 @@ def test_palette_and_rack_routes_round_trip_over_http() -> None:
         )
 
     assert discarded_from_palette.status_code == 200
-    assert discarded_from_palette.json()["trash"]["tools"][0]["origin_label"] == "Palette"
+    palette_child_id = discarded_from_palette.json()["trash"]["children"][0]["id"]
+    assert discarded_from_palette.json()["trash"]["discarded_from"][palette_child_id] == "Palette"
     assert discarded_label.status_code == 200
     assert len(discarded_label.json()["trash"]["sample_labels"]) == 1
     assert placed_in_rack.status_code == 200
@@ -887,14 +889,14 @@ def test_trash_tool_restore_routes_round_trip_over_http() -> None:
         )
         tool_id = placed.json()["workbench"]["slots"][0]["tool"]["id"]
         discarded = client.post(f"/experiments/{experiment_id}/workbench/tools/{tool_id}/discard")
-        trash_entry_id = discarded.json()["trash"]["tools"][0]["id"]
+        trash_entry_id = discarded.json()["trash"]["children"][0]["id"]
         restored_to_bench = client.post(
             f"/experiments/{experiment_id}/trash/tools/{trash_entry_id}/restore-to-workbench",
             json={"target_slot_id": "station_2"},
         )
         restored_tool_id = restored_to_bench.json()["workbench"]["slots"][1]["tool"]["id"]
         discarded_again = client.post(f"/experiments/{experiment_id}/workbench/tools/{restored_tool_id}/discard")
-        second_entry_id = discarded_again.json()["trash"]["tools"][0]["id"]
+        second_entry_id = discarded_again.json()["trash"]["children"][0]["id"]
         restored_to_rack = client.post(
             f"/experiments/{experiment_id}/trash/tools/{second_entry_id}/restore-to-rack",
             json={"rack_slot_id": "rack_slot_1"},
@@ -904,7 +906,7 @@ def test_trash_tool_restore_routes_round_trip_over_http() -> None:
     assert restored_to_bench.json()["workbench"]["slots"][1]["tool"]["label"] == "Autosampler vial"
     assert restored_to_rack.status_code == 200
     assert restored_to_rack.json()["rack"]["slots"][0]["tool"]["label"] == "Autosampler vial"
-    assert restored_to_rack.json()["trash"]["tools"] == []
+    assert restored_to_rack.json()["trash"]["children"] == []
 
 
 def test_workspace_routes_round_trip_over_http() -> None:

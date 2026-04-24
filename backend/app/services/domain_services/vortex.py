@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, TrashToolEntry, WorkbenchTool, WorkspaceWidget, new_id
+from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
     find_rack_slot,
@@ -43,6 +43,26 @@ class MoveRackToolToVortexRequest:
 @dataclass(frozen=True, slots=True)
 class RestoreTrashedToolToVortexRequest:
     trash_tool_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class MoveAnalyticalBalanceToolToVortexRequest:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class MoveGrossBalanceToolToVortexRequest:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class MoveVortexToolToAnalyticalBalanceRequest:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class MoveVortexToolToGrossBalanceRequest:
+    pass
 
 
 class VortexServiceBase(WriteDomainService[object]):
@@ -121,9 +141,10 @@ class MoveRackToolToVortexService(VortexServiceBase):
 
 class RestoreTrashedToolToVortexService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: RestoreTrashedToolToVortexRequest) -> None:
-        trashed_tool = find_trash_tool(experiment.trash, request.trash_tool_id)
-        self._place_tool_on_vortex(experiment, trashed_tool.tool, action_verb="restored to")
-        experiment.trash.tools = [entry for entry in experiment.trash.tools if entry.id != trashed_tool.id]
+        tool = find_trash_tool(experiment.trash, request.trash_tool_id)
+        self._place_tool_on_vortex(experiment, tool, action_verb="restored to")
+        experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
+        experiment.trash.discarded_from.pop(tool.id, None)
 
 
 class MoveVortexToolToWorkbenchService(VortexServiceBase):
@@ -139,14 +160,49 @@ class MoveVortexToolToWorkbenchService(VortexServiceBase):
 class DiscardVortexToolService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         discarded_tool = self._take_tool_from_vortex(experiment)
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=new_id("trash_tool"),
-                origin_label="Vortex mixer",
-                tool=discarded_tool,
-            )
-        )
+        experiment.trash.children.append(discarded_tool)
+        experiment.trash.discarded_from[discarded_tool.id] = "Vortex mixer"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Vortex mixer.")
+
+
+class MoveAnalyticalBalanceToolToVortexService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveAnalyticalBalanceToolToVortexRequest) -> None:
+        analytical_balance = find_workspace_widget(experiment.workspace, "analytical_balance")
+        if analytical_balance.tool is None:
+            raise ValueError("Analytical balance does not contain a tool.")
+        moved_tool = analytical_balance.tool
+        analytical_balance.tool = None
+        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+
+
+class MoveGrossBalanceToolToVortexService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveGrossBalanceToolToVortexRequest) -> None:
+        gross_balance = find_workspace_widget(experiment.workspace, "gross_balance")
+        if gross_balance.tool is None:
+            raise ValueError("Gross balance does not contain a tool.")
+        moved_tool = gross_balance.tool
+        gross_balance.tool = None
+        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+
+
+class MoveVortexToolToAnalyticalBalanceService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveVortexToolToAnalyticalBalanceRequest) -> None:
+        analytical_balance = find_workspace_widget(experiment.workspace, "analytical_balance")
+        if analytical_balance.tool is not None:
+            raise ValueError("Analytical balance already contains a tool.")
+        moved_tool = self._take_tool_from_vortex(experiment)
+        analytical_balance.tool = moved_tool
+        experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to Analytical balance.")
+
+
+class MoveVortexToolToGrossBalanceService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: MoveVortexToolToGrossBalanceRequest) -> None:
+        gross_balance = find_workspace_widget(experiment.workspace, "gross_balance")
+        if gross_balance.tool is not None:
+            raise ValueError("Gross balance already contains a tool.")
+        moved_tool = self._take_tool_from_vortex(experiment)
+        gross_balance.tool = moved_tool
+        experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to Gross balance.")
 
 
 class StartVortexCycleService(VortexServiceBase):

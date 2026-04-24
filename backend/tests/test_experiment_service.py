@@ -704,7 +704,7 @@ def test_create_experiment_starts_with_received_bag_and_empty_workbench() -> Non
     ]
     assert all(slot.tool is None for slot in experiment.workbench.slots)
     assert all(slot.tool is None for slot in experiment.rack.slots)
-    assert experiment.trash.tools == []
+    assert experiment.trash.children == []
     assert [widget.id for widget in experiment.workspace.widgets] == [
         "lims",
         "gross_balance",
@@ -1111,9 +1111,9 @@ def test_discard_basket_tool_moves_received_sampling_bag_to_trash() -> None:
     updated = apply_command(service, experiment.id, "discard_basket_tool", {})
 
     assert updated.basket_tools == []
-    assert len(updated.trash.tools) == 1
-    assert updated.trash.tools[0].origin_label == "Produce basket"
-    assert updated.trash.tools[0].tool.tool_type == "sample_bag"
+    assert len(updated.trash.children) == 1
+    assert updated.trash.discarded_from[updated.trash.children[0].id] == "Produce basket"
+    assert updated.trash.children[0].tool_type == "sample_bag"
     assert updated.audit_log[-1] == "Sealed sampling bag discarded from Produce basket."
 
 
@@ -3763,14 +3763,14 @@ def test_restore_trashed_tool_to_gross_balance_restores_tool_and_clears_trash() 
     experiment = service.create_experiment()
 
     discard_tool_from_palette(service, experiment.id, "sample_vial_lcms")
-    trash_tool_id = service.get_experiment(experiment.id).trash.tools[0].id
+    trash_tool_id = service.get_experiment(experiment.id).trash.children[0].id
 
     updated = restore_trashed_tool_to_gross_balance(service, experiment.id, trash_tool_id)
 
     gross_balance = next(widget for widget in updated.workspace.widgets if widget.id == "gross_balance")
     assert gross_balance.tool is not None
     assert gross_balance.tool.tool_type == "sample_vial"
-    assert updated.trash.tools == []
+    assert updated.trash.children == []
     assert updated.audit_log[-1] == "Autosampler vial restored onto Gross balance."
 
 
@@ -3826,8 +3826,8 @@ def test_discard_gross_balance_tool_moves_tool_to_trash() -> None:
 
     gross_balance = next(widget for widget in updated.workspace.widgets if widget.id == "gross_balance")
     assert gross_balance.tool is None
-    assert updated.trash.tools[0].tool.tool_type == "sample_vial"
-    assert updated.trash.tools[0].origin_label == "Gross balance"
+    assert updated.trash.children[0].tool_type == "sample_vial"
+    assert updated.trash.discarded_from[updated.trash.children[0].id] == "Gross balance"
     assert updated.audit_log[-1] == "Autosampler vial discarded from Gross balance."
 
 
@@ -4233,9 +4233,9 @@ def test_discard_tool_from_palette_adds_it_to_trash() -> None:
         },
     )
 
-    assert len(updated.trash.tools) == 1
-    assert updated.trash.tools[0].origin_label == "Palette"
-    assert updated.trash.tools[0].tool.tool_type == "sample_bag"
+    assert len(updated.trash.children) == 1
+    assert updated.trash.discarded_from[updated.trash.children[0].id] == "Palette"
+    assert updated.trash.children[0].tool_type == "sample_bag"
 
 
 def test_store_workspace_widget_from_palette_keeps_it_in_inventory() -> None:
@@ -4476,9 +4476,9 @@ def test_discard_workbench_tool_removes_it_from_station() -> None:
     )
 
     assert updated.workbench.slots[0].tool is None
-    assert len(updated.trash.tools) == 1
-    assert updated.trash.tools[0].origin_label == "Station 1"
-    assert updated.trash.tools[0].tool.label == "Autosampler vial"
+    assert len(updated.trash.children) == 1
+    assert updated.trash.discarded_from[updated.trash.children[0].id] == "Station 1"
+    assert updated.trash.children[0].label == "Autosampler vial"
     assert updated.audit_log[-1] == "Autosampler vial discarded from Station 1."
 
 
@@ -4816,7 +4816,7 @@ def test_restore_trashed_tool_to_workbench_slot_restores_saved_tool_state() -> N
         experiment.id,
         "restore_trashed_tool_to_workbench_slot",
         {
-            "trash_tool_id": discarded.trash.tools[0].id,
+            "trash_tool_id": discarded.trash.children[0].id,
             "target_slot_id": "station_2",
         },
     )
@@ -4824,7 +4824,7 @@ def test_restore_trashed_tool_to_workbench_slot_restores_saved_tool_state() -> N
     assert restored.workbench.slots[1].tool is not None
     assert restored.workbench.slots[1].tool.label == "Autosampler vial"
     assert restored.workbench.slots[1].tool.liquids[0].volume_ml == 2.0
-    assert restored.trash.tools == []
+    assert restored.trash.children == []
     assert restored.audit_log[-1] == "Autosampler vial restored from trash to Station 2."
 
 
@@ -4969,9 +4969,9 @@ def test_discard_rack_tool_removes_it_from_rack() -> None:
     )
 
     assert updated.rack.slots[0].tool is None
-    assert len(updated.trash.tools) == 1
-    assert updated.trash.tools[0].origin_label == "Position 1"
-    assert updated.trash.tools[0].tool.label == "Autosampler vial"
+    assert len(updated.trash.children) == 1
+    assert updated.trash.discarded_from[updated.trash.children[0].id] == "Position 1"
+    assert updated.trash.children[0].label == "Autosampler vial"
     assert updated.audit_log[-1] == "Autosampler vial discarded from Position 1."
 
 
@@ -5011,14 +5011,14 @@ def test_restore_trashed_tool_to_rack_slot_restores_vial_to_rack() -> None:
         experiment.id,
         "restore_trashed_tool_to_rack_slot",
         {
-            "trash_tool_id": discarded.trash.tools[0].id,
+            "trash_tool_id": discarded.trash.children[0].id,
             "rack_slot_id": "rack_slot_2",
         },
     )
 
     assert restored.rack.slots[1].tool is not None
     assert restored.rack.slots[1].tool.label == "Autosampler vial"
-    assert restored.trash.tools == []
+    assert restored.trash.children == []
     assert restored.audit_log[-1] == "Autosampler vial restored from trash to Position 2."
 
 

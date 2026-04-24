@@ -32,7 +32,6 @@ import type {
   ToolbarDragPayload,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
 } from "@/types/workbench";
 
 type LabSceneViewProps = {
@@ -49,10 +48,11 @@ type LabSceneViewProps = {
   display: {
     basketProduceLots: ExperimentProduceLot[];
     basketTools: BenchToolInstance[];
+    discardedFrom: Record<string, string>;
     rackSlots: RackSlot[];
     slots: BenchSlot[];
     trashProduceLots: TrashProduceLotEntry[];
-    trashTools: TrashToolEntry[];
+    trashTools: BenchToolInstance[];
     trashedSampleLabels: TrashSampleLabelEntry[];
     trashedWidgets: ExperimentWorkspaceWidget[];
   };

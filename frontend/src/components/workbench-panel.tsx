@@ -12,40 +12,24 @@ import { readLabelDragPayload } from "@/lib/label-drop-resolver";
 import { canResolveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
 import {
   hasCompatibleDropTarget,
-  readAnalyticalBalanceToolDragPayload,
-  readBasketToolDragPayload,
   readDragDescriptor,
-  readBenchToolDragPayload,
-  readGrossBalanceToolDragPayload,
+  readEquipmentToolDragPayload,
   readProduceDragPayload,
-  readRackToolDragPayload,
-  readTrashToolDragPayload,
   readToolbarDragPayload,
 } from "@/lib/workbench-dnd";
+import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type {
-  AnalyticalBalanceToolDragPayload,
   BenchLabel,
-  BasketToolDragPayload,
   BenchSlot,
-  BenchToolDragPayload,
   BenchToolInstance,
   ExperimentProduceLot,
-  GrossBalanceToolDragPayload,
   LimsLabelTicketDragPayload,
   ProduceDragPayload,
-  RackToolDragPayload,
   SampleLabelDragPayload,
-  TrashToolDragPayload,
   ToolbarDragPayload,
 } from "@/types/workbench";
 
-type ToolDropPayload =
-  | BenchToolDragPayload
-  | BasketToolDragPayload
-  | AnalyticalBalanceToolDragPayload
-  | GrossBalanceToolDragPayload
-  | RackToolDragPayload
-  | TrashToolDragPayload;
+type ToolDropPayload = EquipmentToolDragPayload;
 
 function formatProduceLotMetadata(produceLot: ExperimentProduceLot) {
   return produceLot.unitCount === null
@@ -181,39 +165,9 @@ export function WorkbenchPanel({
 
     event.preventDefault();
 
-    const benchToolPayload = readBenchToolDragPayload(event.dataTransfer);
-    if (benchToolPayload) {
-      onBenchToolDrop?.(slot.id, benchToolPayload);
-      return;
-    }
-
-    const basketToolPayload = readBasketToolDragPayload(event.dataTransfer);
-    if (basketToolPayload) {
-      onBenchToolDrop?.(slot.id, basketToolPayload);
-      return;
-    }
-
-    const rackToolPayload = readRackToolDragPayload(event.dataTransfer);
-    if (rackToolPayload) {
-      onBenchToolDrop?.(slot.id, rackToolPayload);
-      return;
-    }
-
-    const grossBalanceToolPayload = readGrossBalanceToolDragPayload(event.dataTransfer);
-    if (grossBalanceToolPayload) {
-      onBenchToolDrop?.(slot.id, grossBalanceToolPayload);
-      return;
-    }
-
-    const analyticalBalanceToolPayload = readAnalyticalBalanceToolDragPayload(event.dataTransfer);
-    if (analyticalBalanceToolPayload) {
-      onBenchToolDrop?.(slot.id, analyticalBalanceToolPayload);
-      return;
-    }
-
-    const trashToolPayload = readTrashToolDragPayload(event.dataTransfer);
-    if (trashToolPayload) {
-      onBenchToolDrop?.(slot.id, trashToolPayload);
+    const equipmentToolPayload = readEquipmentToolDragPayload(event.dataTransfer);
+    if (equipmentToolPayload) {
+      onBenchToolDrop?.(slot.id, equipmentToolPayload);
       return;
     }
 

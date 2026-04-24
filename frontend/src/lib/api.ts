@@ -16,7 +16,6 @@ import type {
   SpatulaState,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
   WidgetAnchor,
 } from "@/types/workbench";
 
@@ -320,6 +319,71 @@ export async function moveToolBetweenWorkbenchSlots(experimentId: string, payloa
     path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "source_slot_id"))}/move-to-slot`,
     body: { target_slot_id: requireString(body, "target_slot_id") },
   });
+}
+
+export async function moveTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/dnd/tool`,
+    body: {
+      source_kind: requireString(body, "source_kind"),
+      source_id: requireString(body, "source_id"),
+      destination_kind: requireString(body, "destination_kind"),
+      destination_id: requireString(body, "destination_id"),
+    },
+  });
+}
+
+export async function placeToolFromPalette(experimentId: string, payload: MutationPayload): Promise<Experiment> {
+  const body = requirePayload(payload);
+  const destinationKind = requireString(body, "destination_kind");
+  const destinationId = requireString(body, "destination_id");
+  const toolId = requireString(body, "tool_id");
+
+  if (destinationKind === "workbench_slot") {
+    return sendMutationRequest(experimentId, {
+      method: "POST",
+      path: `/experiments/${experimentId}/workbench/slots/${destinationId}/place-tool`,
+      body: { tool_id: toolId },
+    });
+  }
+  if (destinationKind === "rack_slot") {
+    return sendMutationRequest(experimentId, {
+      method: "POST",
+      path: `/experiments/${experimentId}/rack/slots/${destinationId}/place-tool-from-palette`,
+      body: { tool_id: toolId },
+    });
+  }
+  if (destinationKind === "gross_balance") {
+    return sendMutationRequest(experimentId, {
+      method: "POST",
+      path: `/experiments/${experimentId}/gross-balance/place-tool`,
+      body: { tool_id: toolId },
+    });
+  }
+  if (destinationKind === "analytical_balance") {
+    return sendMutationRequest(experimentId, {
+      method: "POST",
+      path: `/experiments/${experimentId}/analytical-balance/place-tool`,
+      body: { tool_id: toolId },
+    });
+  }
+  if (destinationKind === "vortex") {
+    return sendMutationRequest(experimentId, {
+      method: "POST",
+      path: `/experiments/${experimentId}/vortex/tool/place?tool_id=${encodeURIComponent(toolId)}`,
+    });
+  }
+  if (destinationKind === "trash_bin") {
+    return sendMutationRequest(experimentId, {
+      method: "POST",
+      path: `/experiments/${experimentId}/palette/tools/discard`,
+      body: { tool_id: toolId },
+    });
+  }
+
+  throw new Error(`Unsupported palette tool destination: ${destinationKind}`);
 }
 
 export async function discardWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
@@ -1391,6 +1455,50 @@ export async function moveVortexToolToWorkbench(
   });
 }
 
+export async function moveAnalyticalBalanceToolToVortex(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/analytical-balance`,
+  });
+}
+
+export async function moveGrossBalanceToolToVortex(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/gross-balance`,
+  });
+}
+
+export async function moveVortexToolToAnalyticalBalance(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/move-to-analytical-balance`,
+  });
+}
+
+export async function moveVortexToolToGrossBalance(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/move-to-gross-balance`,
+  });
+}
+
 export async function discardVortexTool(
   experimentId: string,
   payload?: MutationPayload,
@@ -1447,6 +1555,12 @@ function normalizeExperiment(experiment: Experiment): Experiment {
       slots: experiment.rack.slots.map((slot) => normalizeRackSlot(slot, materialStates)),
     },
     trash: {
+      children: (
+        experiment.trash.children ??
+        rawTrash.children ??
+        []
+      ).map((tool) => normalizeBenchTool(tool as BenchToolInstance & Record<string, unknown>, materialStates)),
+      discardedFrom: (experiment.trash.discardedFrom ?? rawTrash.discarded_from ?? {}) as Record<string, string>,
       produceLots: (
         experiment.trash.produceLots ??
         rawTrash.produce_lots ??
@@ -1461,7 +1575,6 @@ function normalizeExperiment(experiment: Experiment): Experiment {
       ).map(
           normalizeTrashSampleLabel,
         ),
-      tools: experiment.trash.tools.map((entry) => normalizeTrashTool(entry, materialStates)),
     },
     workspace: {
       produceBasketLots: (
@@ -1828,17 +1941,6 @@ function normalizeBenchLiquid(liquid: BenchLiquidPortion & Record<string, unknow
     name: liquid.name,
     volume_ml: Number(liquid.volume_ml),
     accent: liquid.accent,
-  };
-}
-
-function normalizeTrashTool(
-  entry: TrashToolEntry & Record<string, unknown>,
-  materialStates: ProduceMaterialState[] = [],
-): TrashToolEntry {
-  return {
-    id: entry.id,
-    originLabel: String(entry.originLabel ?? entry.origin_label),
-    tool: normalizeBenchTool(entry.tool as BenchToolInstance & Record<string, unknown>, materialStates),
   };
 }
 

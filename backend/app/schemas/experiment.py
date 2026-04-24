@@ -239,12 +239,6 @@ class RackSchema(BaseModel):
     slots: list[RackSlotSchema]
 
 
-class TrashToolEntrySchema(BaseModel):
-    id: str
-    origin_label: str
-    tool: WorkbenchToolSchema
-
-
 class TrashProduceLotEntrySchema(BaseModel):
     id: str
     origin_label: str
@@ -264,9 +258,10 @@ class TrashSampleLabelEntrySchema(BaseModel):
 
 
 class TrashSchema(BaseModel):
-    tools: list[TrashToolEntrySchema]
-    produce_lots: list[TrashProduceLotEntrySchema]
-    sample_labels: list[TrashSampleLabelEntrySchema]
+    children: list[WorkbenchToolSchema] = Field(default_factory=list)
+    discarded_from: dict[str, str] = Field(default_factory=dict)
+    produce_lots: list[TrashProduceLotEntrySchema] = Field(default_factory=list)
+    sample_labels: list[TrashSampleLabelEntrySchema] = Field(default_factory=list)
 
 
 class WorkspaceWidgetSchema(BaseModel):
@@ -433,6 +428,13 @@ class TrashToolRestoreToRackSchema(BaseModel):
 
 class RackSlotReferenceSchema(BaseModel):
     rack_slot_id: str
+
+
+class DndMoveToolSchema(BaseModel):
+    source_kind: str
+    source_id: str
+    destination_kind: str
+    destination_id: str
 
 
 class TrashProduceLotRestoreToWorkbenchSchema(BaseModel):

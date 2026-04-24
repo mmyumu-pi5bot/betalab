@@ -21,7 +21,6 @@ import type {
   TrashSampleLabelEntry,
   ToolbarItem,
   ToolCatalogItem,
-  TrashToolEntry,
   WorkspaceWidgetType,
 } from "@/types/workbench";
 import { expect } from "vitest";
@@ -378,12 +377,8 @@ function makeTool(item: ToolCatalogItem, overrides: Partial<BenchToolInstance> =
   };
 }
 
-function makeTrashToolEntry(item: ToolCatalogItem): TrashToolEntry {
-  return {
-    id: "trash_tool_1",
-    originLabel: "Station 1",
-    tool: makeTool(item),
-  };
+function makeTrashToolEntry(item: ToolCatalogItem): BenchToolInstance {
+  return makeTool(item);
 }
 
 function makeTrashProduceLotEntry(): TrashProduceLotEntry {
@@ -427,7 +422,7 @@ function makeExperiment({
   rackSlots?: RackSlot[];
   trashProduceLots?: TrashProduceLotEntry[];
   trashSampleLabels?: TrashSampleLabelEntry[];
-  trashTools?: TrashToolEntry[];
+  trashTools?: BenchToolInstance[];
   produceBasketLots?: Experiment["workspace"]["produceBasketLots"];
   workspaceWidgets?: ExperimentWorkspaceWidget[];
 } = {}): Experiment {
@@ -438,7 +433,7 @@ function makeExperiment({
     snapshot_version: 1,
     workbench: { slots },
     rack: { slots: rackSlots },
-    trash: { produceLots: trashProduceLots, sampleLabels: trashSampleLabels, tools: trashTools },
+    trash: { children: trashTools, discardedFrom: {}, produceLots: trashProduceLots, sampleLabels: trashSampleLabels },
     workspace: { produceBasketLots, widgets: workspaceWidgets },
     basketTools,
     spatula: {
@@ -536,10 +531,11 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
         command:
           item.itemType === "tool" && item.toolType === "sample_vial"
             ? {
-                type: "place_tool_in_rack_slot",
+                type: "place_tool_from_palette",
                 payload: {
-                  rack_slot_id: "rack_slot_1",
                   tool_id: item.id,
+                  destination_kind: "rack_slot",
+                  destination_id: "rack_slot_1",
                 },
               }
             : null,
@@ -555,14 +551,15 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
             : null,
       },
       "trash-dropzone": {
-        compatible:
-          item.itemType === "tool",
+        compatible: item.itemType === "tool",
         command:
           item.itemType === "tool"
             ? {
-                type: "discard_tool_from_palette",
+                type: "place_tool_from_palette",
                 payload: {
                   tool_id: item.id,
+                  destination_kind: "trash_bin",
+                  destination_id: "trash_bin",
                 },
               }
             : null,
@@ -736,10 +733,12 @@ function createWorkbenchToolSourceCase(item: ToolCatalogItem): DndSourceCase {
       "bench-slot-station_2": {
         compatible: true,
         command: {
-          type: "move_tool_between_workbench_slots",
+          type: "move_tool",
           payload: {
-            source_slot_id: "station_1",
-            target_slot_id: "station_2",
+            source_kind: "workbench",
+            source_id: "station_1",
+            destination_kind: "workbench_slot",
+            destination_id: "station_2",
           },
         },
       },
@@ -752,10 +751,12 @@ function createWorkbenchToolSourceCase(item: ToolCatalogItem): DndSourceCase {
         command:
           item.toolType === "sample_vial"
             ? {
-                type: "place_workbench_tool_in_rack_slot",
+                type: "move_tool",
                 payload: {
-                  source_slot_id: "station_1",
-                  rack_slot_id: "rack_slot_1",
+                  source_kind: "workbench",
+                  source_id: "station_1",
+                  destination_kind: "rack_slot",
+                  destination_id: "rack_slot_1",
                 },
               }
             : null,
@@ -767,9 +768,12 @@ function createWorkbenchToolSourceCase(item: ToolCatalogItem): DndSourceCase {
       "trash-dropzone": {
         compatible: true,
         command: {
-          type: "discard_workbench_tool",
+          type: "move_tool",
           payload: {
-            slot_id: "station_1",
+            source_kind: "workbench",
+            source_id: "station_1",
+            destination_kind: "trash_bin",
+            destination_id: "trash_bin",
           },
         },
       },
@@ -806,10 +810,12 @@ function createRackSourceCase(): DndSourceCase {
       "bench-slot-station_2": {
         compatible: true,
         command: {
-          type: "remove_rack_tool_to_workbench_slot",
+          type: "move_tool",
           payload: {
-            rack_slot_id: "rack_slot_1",
-            target_slot_id: "station_2",
+            source_kind: "rack",
+            source_id: "rack_slot_1",
+            destination_kind: "workbench_slot",
+            destination_id: "station_2",
           },
         },
       },
@@ -828,9 +834,12 @@ function createRackSourceCase(): DndSourceCase {
       "trash-dropzone": {
         compatible: true,
         command: {
-          type: "discard_rack_tool",
+          type: "move_tool",
           payload: {
-            rack_slot_id: "rack_slot_1",
+            source_kind: "rack",
+            source_id: "rack_slot_1",
+            destination_kind: "trash_bin",
+            destination_id: "trash_bin",
           },
         },
       },
@@ -842,7 +851,7 @@ function createTrashToolSourceCase(item: ToolCatalogItem): DndSourceCase {
   return {
     id: `trash-tool-${item.id}`,
     label: `trash ${item.name}`,
-    sourceTestId: "trash-tool-trash_tool_1",
+    sourceTestId: "trash-tool-bench_tool_1",
     openBasket: false,
     openTrash: true,
     expectRackWidget: true,
@@ -867,10 +876,12 @@ function createTrashToolSourceCase(item: ToolCatalogItem): DndSourceCase {
       "bench-slot-station_2": {
         compatible: true,
         command: {
-          type: "restore_trashed_tool_to_workbench_slot",
+          type: "move_tool",
           payload: {
-            target_slot_id: "station_2",
-            trash_tool_id: "trash_tool_1",
+            source_kind: "trash",
+            source_id: "bench_tool_1",
+            destination_kind: "workbench_slot",
+            destination_id: "station_2",
           },
         },
       },
@@ -883,10 +894,12 @@ function createTrashToolSourceCase(item: ToolCatalogItem): DndSourceCase {
         command:
           item.toolType === "sample_vial"
             ? {
-                type: "restore_trashed_tool_to_rack_slot",
+                type: "move_tool",
                 payload: {
-                  rack_slot_id: "rack_slot_1",
-                  trash_tool_id: "trash_tool_1",
+                  source_kind: "trash",
+                  source_id: "bench_tool_1",
+                  destination_kind: "rack_slot",
+                  destination_id: "rack_slot_1",
                 },
               }
             : null,
@@ -1085,10 +1098,12 @@ function createBasketReceivedBagSourceCase(): DndSourceCase {
       "bench-slot-station_2": {
         compatible: true,
         command: {
-          type: "place_received_bag_on_workbench",
+          type: "move_tool",
           payload: {
-            target_slot_id: "station_2",
-            tool_id: "basket_bag_1",
+            source_kind: "basket",
+            source_id: "basket_bag_1",
+            destination_kind: "workbench_slot",
+            destination_id: "station_2",
           },
         },
       },
@@ -1098,8 +1113,13 @@ function createBasketReceivedBagSourceCase(): DndSourceCase {
       "trash-dropzone": {
         compatible: true,
         command: {
-          type: "discard_basket_tool",
-          payload: { tool_id: "basket_bag_1" },
+          type: "move_tool",
+          payload: {
+            source_kind: "basket",
+            source_id: "basket_bag_1",
+            destination_kind: "trash_bin",
+            destination_id: "trash_bin",
+          },
         },
       },
     },
@@ -1761,9 +1781,12 @@ function createGrossBalanceToolSourceCase(): DndSourceCase {
       "bench-slot-station_2": {
         compatible: true,
         command: {
-          type: "move_gross_balance_tool_to_workbench",
+          type: "move_tool",
           payload: {
-            target_slot_id: "station_2",
+            source_kind: "gross_balance",
+            source_id: "gross_balance",
+            destination_kind: "workbench_slot",
+            destination_id: "station_2",
           },
         },
       },
@@ -1772,9 +1795,12 @@ function createGrossBalanceToolSourceCase(): DndSourceCase {
       "rack-illustration-slot-1": {
         compatible: true,
         command: {
-          type: "move_gross_balance_tool_to_rack",
+          type: "move_tool",
           payload: {
-            rack_slot_id: "rack_slot_1",
+            source_kind: "gross_balance",
+            source_id: "gross_balance",
+            destination_kind: "rack_slot",
+            destination_id: "rack_slot_1",
           },
         },
       },
@@ -1782,8 +1808,13 @@ function createGrossBalanceToolSourceCase(): DndSourceCase {
       "trash-dropzone": {
         compatible: true,
         command: {
-          type: "discard_gross_balance_tool",
-          payload: {},
+          type: "move_tool",
+          payload: {
+            source_kind: "gross_balance",
+            source_id: "gross_balance",
+            destination_kind: "trash_bin",
+            destination_id: "trash_bin",
+          },
         },
       },
     },
@@ -1903,9 +1934,11 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
     return {
       compatible: true,
       command: {
-        type: "place_tool_on_gross_balance",
+        type: "place_tool_from_palette",
         payload: {
           tool_id: toolId,
+          destination_kind: "gross_balance",
+          destination_id: "gross_balance",
         },
       },
     };
@@ -1931,9 +1964,12 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
     return {
       compatible: true,
       command: {
-        type: "move_workbench_tool_to_gross_balance",
+        type: "move_tool",
         payload: {
-          source_slot_id: "station_1",
+          source_kind: "workbench",
+          source_id: "station_1",
+          destination_kind: "gross_balance",
+          destination_id: "gross_balance",
         },
       },
     };
@@ -1943,9 +1979,12 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
     return {
       compatible: true,
       command: {
-        type: "restore_trashed_tool_to_gross_balance",
+        type: "move_tool",
         payload: {
-          trash_tool_id: "trash_tool_1",
+          source_kind: "trash",
+          source_id: "bench_tool_1",
+          destination_kind: "gross_balance",
+          destination_id: "gross_balance",
         },
       },
     };
@@ -1955,8 +1994,13 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
     return {
       compatible: true,
       command: {
-        type: "move_basket_tool_to_gross_balance",
-        payload: { tool_id: "basket_bag_1" },
+        type: "move_tool",
+        payload: {
+          source_kind: "basket",
+          source_id: "basket_bag_1",
+          destination_kind: "gross_balance",
+          destination_id: "gross_balance",
+        },
       },
     };
   }
@@ -2001,9 +2045,12 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
     return {
       compatible: true,
       command: {
-        type: "move_rack_tool_to_gross_balance",
+        type: "move_tool",
         payload: {
-          rack_slot_id: "rack_slot_1",
+          source_kind: "rack",
+          source_id: "rack_slot_1",
+          destination_kind: "gross_balance",
+          destination_id: "gross_balance",
         },
       },
     };
@@ -2073,35 +2120,50 @@ function getAnalyticalBalanceTargetExpectation(sourceCase: DndSourceCase) {
     const toolId = sourceCase.id.replace("palette-", "");
     return {
       compatible: true,
-      command: { type: "place_tool_on_analytical_balance", payload: { tool_id: toolId } },
+      command: {
+        type: "place_tool_from_palette",
+        payload: { tool_id: toolId, destination_kind: "analytical_balance", destination_id: "analytical_balance" },
+      },
     };
   }
 
   if (sourceCase.id.startsWith("workbench-")) {
     return {
       compatible: true,
-      command: { type: "move_workbench_tool_to_analytical_balance", payload: { source_slot_id: "station_1" } },
+      command: {
+        type: "move_tool",
+        payload: { source_kind: "workbench", source_id: "station_1", destination_kind: "analytical_balance", destination_id: "analytical_balance" },
+      },
     };
   }
 
   if (sourceCase.id.startsWith("trash-tool-")) {
     return {
       compatible: true,
-      command: { type: "restore_trashed_tool_to_analytical_balance", payload: { trash_tool_id: "trash_tool_1" } },
+      command: {
+        type: "move_tool",
+        payload: { source_kind: "trash", source_id: "bench_tool_1", destination_kind: "analytical_balance", destination_id: "analytical_balance" },
+      },
     };
   }
 
   if (sourceCase.id === "rack-sample_vial") {
     return {
       compatible: true,
-      command: { type: "move_rack_tool_to_analytical_balance", payload: { rack_slot_id: "rack_slot_1" } },
+      command: {
+        type: "move_tool",
+        payload: { source_kind: "rack", source_id: "rack_slot_1", destination_kind: "analytical_balance", destination_id: "analytical_balance" },
+      },
     };
   }
 
   if (sourceCase.id === "gross-balance-sample-vial") {
     return {
       compatible: true,
-      command: { type: "move_gross_balance_tool_to_analytical_balance", payload: {} },
+      command: {
+        type: "move_tool",
+        payload: { source_kind: "gross_balance", source_id: "gross_balance", destination_kind: "analytical_balance", destination_id: "analytical_balance" },
+      },
     };
   }
 
@@ -2117,7 +2179,10 @@ function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: bo
     if (item && vortexCompatibleToolTypes.has(item.toolType)) {
       return {
         compatible: true,
-        command: { type: "place_tool_on_vortex", payload: { tool_id: toolId } },
+        command: {
+          type: "place_tool_from_palette",
+          payload: { tool_id: toolId, destination_kind: "vortex", destination_id: "vortex" },
+        },
       };
     }
     return { compatible: false, command: null };
@@ -2129,7 +2194,10 @@ function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: bo
     if (item && vortexCompatibleToolTypes.has(item.toolType)) {
       return {
         compatible: true,
-        command: { type: "move_workbench_tool_to_vortex", payload: { source_slot_id: "station_1" } },
+        command: {
+          type: "move_tool",
+          payload: { source_kind: "workbench", source_id: "station_1", destination_kind: "vortex", destination_id: "vortex" },
+        },
       };
     }
     return { compatible: false, command: null };
@@ -2141,7 +2209,10 @@ function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: bo
     if (item && vortexCompatibleToolTypes.has(item.toolType)) {
       return {
         compatible: true,
-        command: { type: "restore_trashed_tool_to_vortex", payload: { trash_tool_id: "trash_tool_1" } },
+        command: {
+          type: "move_tool",
+          payload: { source_kind: "trash", source_id: "bench_tool_1", destination_kind: "vortex", destination_id: "vortex" },
+        },
       };
     }
     return { compatible: false, command: null };

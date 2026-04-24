@@ -27,7 +27,6 @@ from app.domain.models import (
     Trash,
     TrashProduceLotEntry,
     TrashSampleLabelEntry,
-    TrashToolEntry,
     Workbench,
     WorkbenchLiquid,
     WorkbenchSlot,
@@ -249,14 +248,11 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             ]
         ),
         trash=Trash(
-            tools=[
-                TrashToolEntry(
-                    id=entry.id,
-                    origin_label=entry.origin_label,
-                    tool=_deserialize_non_null_workbench_tool(entry.tool),
-                )
-                for entry in schema.trash.tools
+            children=[
+                _deserialize_non_null_workbench_tool(tool_schema)
+                for tool_schema in schema.trash.children
             ],
+            discarded_from=dict(schema.trash.discarded_from),
             produce_lots=[
                 TrashProduceLotEntry(
                     id=entry.id,

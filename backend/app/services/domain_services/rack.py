@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, TrashToolEntry, new_id
+from app.domain.models import Experiment
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
     find_rack_slot,
@@ -131,13 +131,8 @@ class DiscardRackToolService(WriteDomainService[DiscardRackToolRequest]):
 
         discarded_tool = rack_slot.tool
         rack_slot.tool = None
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=new_id("trash_tool"),
-                origin_label=rack_slot.label,
-                tool=discarded_tool,
-            )
-        )
+        experiment.trash.children.append(discarded_tool)
+        experiment.trash.discarded_from[discarded_tool.id] = rack_slot.label
         experiment.audit_log.append(f"{discarded_tool.label} discarded from {rack_slot.label}.")
 
 
@@ -146,14 +141,15 @@ class RestoreTrashedToolToRackSlotService(WriteDomainService[RestoreTrashedToolT
         super().__init__(runtime)
 
     def _run(self, experiment: Experiment, request: RestoreTrashedToolToRackSlotRequest) -> None:
-        trashed_tool = find_trash_tool(experiment.trash, request.trash_tool_id)
+        tool = find_trash_tool(experiment.trash, request.trash_tool_id)
         rack_slot = find_rack_slot(experiment.rack, request.rack_slot_id)
 
-        if trashed_tool.tool.tool_type != "sample_vial":
+        if tool.tool_type != "sample_vial":
             raise ValueError("Only autosampler vials can be restored into the rack.")
         if rack_slot.tool is not None:
             raise ValueError(f"{rack_slot.label} already contains a vial")
 
-        rack_slot.tool = trashed_tool.tool
-        experiment.trash.tools = [entry for entry in experiment.trash.tools if entry.id != trashed_tool.id]
+        rack_slot.tool = tool
+        experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
+        experiment.trash.discarded_from.pop(tool.id, None)
         experiment.audit_log.append(f"{rack_slot.tool.label} restored from trash to {rack_slot.label}.")

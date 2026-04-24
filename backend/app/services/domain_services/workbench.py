@@ -7,7 +7,6 @@ from app.domain.models import (
     Experiment,
     TrashProduceLotEntry,
     TrashSampleLabelEntry,
-    TrashToolEntry,
     WorkbenchSlot,
     WorkbenchTool,
     new_id,
@@ -247,13 +246,8 @@ class DiscardWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
 
         discarded_tool = slot.tool
         slot.tool = None
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=new_id("trash_tool"),
-                origin_label=slot.label,
-                tool=discarded_tool,
-            )
-        )
+        experiment.trash.children.append(discarded_tool)
+        experiment.trash.discarded_from[discarded_tool.id] = slot.label
         experiment.audit_log.append(f"{discarded_tool.label} discarded from {slot.label}.")
 
 
@@ -263,13 +257,8 @@ class DiscardToolFromPaletteService(WriteDomainService[DiscardToolFromPaletteReq
 
     def _run(self, experiment: Experiment, request: DiscardToolFromPaletteRequest) -> None:
         discarded_tool = build_workbench_tool(request.tool_id)
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=new_id("trash_tool"),
-                origin_label="Palette",
-                tool=discarded_tool,
-            )
-        )
+        experiment.trash.children.append(discarded_tool)
+        experiment.trash.discarded_from[discarded_tool.id] = "Palette"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Palette.")
 
 
@@ -293,14 +282,15 @@ class RestoreTrashedToolToWorkbenchSlotService(WriteDomainService[RestoreTrashed
         super().__init__(runtime)
 
     def _run(self, experiment: Experiment, request: RestoreTrashedToolToWorkbenchSlotRequest) -> None:
-        trashed_tool = find_trash_tool(experiment.trash, request.trash_tool_id)
+        tool = find_trash_tool(experiment.trash, request.trash_tool_id)
         target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
 
         if target_slot.tool is not None or target_slot.surface_produce_lots:
             raise ValueError(f"{target_slot.label} already contains a tool")
 
-        target_slot.tool = trashed_tool.tool
-        experiment.trash.tools = [entry for entry in experiment.trash.tools if entry.id != trashed_tool.id]
+        target_slot.tool = tool
+        experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
+        experiment.trash.discarded_from.pop(tool.id, None)
         experiment.audit_log.append(f"{target_slot.tool.label} restored from trash to {target_slot.label}.")
 
 

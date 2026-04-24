@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, TrashToolEntry, new_id
+from app.domain.models import Experiment
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 
 
@@ -29,11 +29,6 @@ class DiscardBasketToolService(WriteDomainService[DiscardBasketToolRequest]):
             raise ValueError("The specified bag is not in the produce basket.")
 
         discarded_tool = experiment.basket_tools.pop(tool_index)
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=new_id("trash_tool"),
-                origin_label="Produce basket",
-                tool=discarded_tool,
-            )
-        )
+        experiment.trash.children.append(discarded_tool)
+        experiment.trash.discarded_from[discarded_tool.id] = "Produce basket"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Produce basket.")

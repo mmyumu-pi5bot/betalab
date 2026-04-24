@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, TrashToolEntry, WorkbenchTool, WorkspaceWidget, new_id
+from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
@@ -195,9 +195,10 @@ class MoveRackToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
 
 class RestoreTrashedToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: RestoreTrashedToolToAnalyticalBalanceRequest) -> None:
-        trashed_tool = find_trash_tool(experiment.trash, request.trash_tool_id)
-        self._place_tool_on_balance(experiment, trashed_tool.tool, action_verb="restored to")
-        experiment.trash.tools = [entry for entry in experiment.trash.tools if entry.id != trashed_tool.id]
+        tool = find_trash_tool(experiment.trash, request.trash_tool_id)
+        experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
+        experiment.trash.discarded_from.pop(tool.id, None)
+        self._place_tool_on_balance(experiment, tool, action_verb="restored to")
 
 
 class MoveGrossBalanceToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -234,13 +235,8 @@ class MoveAnalyticalBalanceToolToRackService(AnalyticalBalanceServiceBase):
 class DiscardAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         discarded_tool = self._take_tool_from_balance(experiment)
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=new_id("trash_tool"),
-                origin_label="Analytical balance",
-                tool=discarded_tool,
-            )
-        )
+        experiment.trash.children.append(discarded_tool)
+        experiment.trash.discarded_from[discarded_tool.id] = "Analytical balance"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Analytical balance.")
 
 

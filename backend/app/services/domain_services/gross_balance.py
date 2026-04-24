@@ -7,7 +7,6 @@ from app.domain.models import (
     Experiment,
     ProduceLot,
     TrashProduceLotEntry,
-    TrashToolEntry,
     WorkbenchTool,
     WorkspaceWidget,
 )
@@ -383,12 +382,12 @@ class RestoreTrashedToolToGrossBalanceService(GrossBalanceServiceBase):
         experiment: Experiment,
         request: RestoreTrashedToolToGrossBalanceRequest,
     ) -> None:
-        trashed_tool = find_trash_tool(experiment.trash, request.trash_tool_id)
-        restored_tool = trashed_tool.tool
-        experiment.trash.tools = [entry for entry in experiment.trash.tools if entry.id != trashed_tool.id]
+        tool = find_trash_tool(experiment.trash, request.trash_tool_id)
+        experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
+        experiment.trash.discarded_from.pop(tool.id, None)
         self._place_tool_on_balance(
             experiment,
-            restored_tool,
+            tool,
             action_verb="restored onto",
         )
 
@@ -441,13 +440,8 @@ class DiscardGrossBalanceToolService(GrossBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         widget = self._find_gross_balance_widget(experiment)
         removed_tool = self._take_tool_from_balance(experiment)
-        experiment.trash.tools.append(
-            TrashToolEntry(
-                id=f"trash_tool_{removed_tool.id}",
-                origin_label=widget.label,
-                tool=removed_tool,
-            )
-        )
+        experiment.trash.children.append(removed_tool)
+        experiment.trash.discarded_from[removed_tool.id] = widget.label
         experiment.audit_log.append(f"{removed_tool.label} discarded from {widget.label}.")
 
 

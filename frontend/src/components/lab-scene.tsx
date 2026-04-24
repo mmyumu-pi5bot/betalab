@@ -303,7 +303,8 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const basketTools = state.experiment.basketTools;
   const trashedProduceLots = state.experiment.trash.produceLots;
   const trashedSampleLabels = state.experiment.trash.sampleLabels;
-  const trashedTools = state.experiment.trash.tools;
+  const trashedTools = state.experiment.trash.children;
+  const discardedFrom = state.experiment.trash.discardedFrom;
   const trashedWidgets = state.experiment.workspace.widgets.filter(
     (widget) => canWorkspaceWidgetBeStored(widget.id) && widget.isTrashed,
   );
@@ -370,6 +371,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         basketTools,
         rackSlots,
         slots,
+        discardedFrom,
         trashProduceLots: trashedProduceLots,
         trashTools: trashedTools,
         trashedSampleLabels,

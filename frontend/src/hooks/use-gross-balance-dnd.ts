@@ -5,19 +5,15 @@ import { canResolveActiveLabelDragOnTool, canResolveLabelDropOnTool, readLabelDr
 import { executeGrossBalanceLabelDropCommand } from "@/lib/label-drop-command-executor";
 import { executeGrossBalanceProduceDropCommand } from "@/lib/produce-drop-command-executor";
 import { resolveProduceDropCommand } from "@/lib/produce-drop-command-resolver";
-import { executeGrossBalanceToolDropCommand } from "@/lib/tool-drop-command-executor";
+import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import {
   hasCompatibleDropTarget,
-  readAnalyticalBalanceToolDragPayload,
-  readBasketToolDragPayload,
-  readBenchToolDragPayload,
+  readEquipmentToolDragPayload,
   readProduceDragPayload,
-  readRackToolDragPayload,
   readToolbarDragPayload,
-  readTrashToolDragPayload,
   toDragDescriptor,
-  writeGrossBalanceToolDragPayload,
+  writeEquipmentToolDragPayload,
   writeProduceDragPayload,
 } from "@/lib/workbench-dnd";
 import type {
@@ -29,38 +25,31 @@ import type { DragStateApi } from "@/hooks/use-drag-state";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type {
-  BasketToolReferencePayload,
-  MoveRackToolToGrossBalancePayload,
+  MoveToolPayload,
   MoveWidgetProduceLotToGrossBalancePayload,
   MoveWorkbenchProduceLotToGrossBalancePayload,
-  MoveWorkbenchToolToGrossBalancePayload,
   MoveWorkspaceProduceLotToGrossBalancePayload,
-  PlaceToolOnGrossBalancePayload,
+  PlaceToolFromPalettePayload,
   RestoreTrashedProduceLotToGrossBalancePayload,
-  RestoreTrashedToolToGrossBalancePayload,
 } from "@/types/api-payloads";
 
 type GrossBalanceDndExperimentApi = {
   applyPrintedLimsLabelToGrossBalanceBag: () => void;
   applySampleLabelToGrossBalanceTool: () => void;
-  moveAnalyticalBalanceToolToGrossBalance: () => void;
-  moveBasketToolToGrossBalance: (payload: BasketToolReferencePayload) => void;
   moveGrossBalanceToolToAnalyticalBalance: () => void;
-  moveRackToolToGrossBalance: (payload: MoveRackToolToGrossBalancePayload) => void;
+  moveTool: (payload: MoveToolPayload) => void;
   moveWorkbenchSampleLabelToGrossBalance: (payload: {
     source_slot_id: string;
     label_id: string;
   }) => void;
   moveWidgetProduceLotToGrossBalance: (payload: MoveWidgetProduceLotToGrossBalancePayload) => void;
   moveWorkbenchProduceLotToGrossBalance: (payload: MoveWorkbenchProduceLotToGrossBalancePayload) => void;
-  moveWorkbenchToolToGrossBalance: (payload: MoveWorkbenchToolToGrossBalancePayload) => void;
   moveWorkspaceProduceLotToGrossBalance: (payload: MoveWorkspaceProduceLotToGrossBalancePayload) => void;
-  placeToolOnGrossBalance: (payload: PlaceToolOnGrossBalancePayload) => void;
+  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
   restoreTrashedProduceLotToGrossBalance: (payload: RestoreTrashedProduceLotToGrossBalancePayload) => void;
   restoreTrashedSampleLabelToGrossBalance: (payload: {
     trash_sample_label_id: string;
   }) => void;
-  restoreTrashedToolToGrossBalance: (payload: RestoreTrashedToolToGrossBalancePayload) => void;
 };
 
 type GrossBalanceDndOptions = {
@@ -168,11 +157,7 @@ export function useGrossBalanceDnd({
     const toolbarPayload = readToolbarDragPayload(event.dataTransfer);
     const toolPayload =
       (toolbarPayload?.itemType === "tool" ? toolbarPayload : null) ??
-      readBenchToolDragPayload(event.dataTransfer) ??
-      readBasketToolDragPayload(event.dataTransfer) ??
-      readRackToolDragPayload(event.dataTransfer) ??
-      readAnalyticalBalanceToolDragPayload(event.dataTransfer) ??
-      readTrashToolDragPayload(event.dataTransfer);
+      readEquipmentToolDragPayload(event.dataTransfer);
     const producePayload = readProduceDragPayload(event.dataTransfer);
 
     event.preventDefault();
@@ -181,7 +166,7 @@ export function useGrossBalanceDnd({
 
     if (toolPayload) {
       const command = resolveToolDropCommand(toolPayload, { kind: "gross_balance" });
-      if (command && executeGrossBalanceToolDropCommand(command, experimentApi)) {
+      if (command && executeToolDropCommand(command, experimentApi)) {
         return;
       }
     }
@@ -203,7 +188,7 @@ export function useGrossBalanceDnd({
         return;
       }
       const allowedDropTargets = grossBalanceTool.allowedDropTargets ?? [];
-      writeGrossBalanceToolDragPayload(dataTransfer, {
+      writeEquipmentToolDragPayload(dataTransfer, {
         allowedDropTargets,
         entityKind: "tool",
         sourceId: "gross_balance",

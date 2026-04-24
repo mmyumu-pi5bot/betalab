@@ -3,7 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Generic, TypeVar
 from uuid import uuid4
+
+T = TypeVar("T")
+
+
+@dataclass
+class Container(Generic[T]):
+    children: list[T] = field(default_factory=list)
+
+
+@dataclass
+class SingleContainer(Container[T]):
+    pass
 
 
 class ExperimentStatus(StrEnum):
@@ -150,13 +163,6 @@ class Rack:
 
 
 @dataclass
-class TrashToolEntry:
-    id: str
-    origin_label: str
-    tool: WorkbenchTool
-
-
-@dataclass
 class EntityOrigin:
     kind: str
     location_id: str | None = None
@@ -183,7 +189,8 @@ class TrashSampleLabelEntry:
 
 @dataclass
 class Trash:
-    tools: list[TrashToolEntry] = field(default_factory=list)
+    children: list[WorkbenchTool] = field(default_factory=list)
+    discarded_from: dict[str, str] = field(default_factory=dict)
     produce_lots: list[TrashProduceLotEntry] = field(default_factory=list)
     sample_labels: list[TrashSampleLabelEntry] = field(default_factory=list)
 

@@ -19,7 +19,6 @@ import type {
   RackSlot,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
 } from "@/types/workbench";
 
 vi.mock("@/lib/api", async () => await import("@/test-support/api-mock"));
@@ -328,7 +327,7 @@ function makeWorkbenchExperiment({
   slots?: BenchSlot[];
   trashProduceLots?: TrashProduceLotEntry[];
   trashSampleLabels?: TrashSampleLabelEntry[];
-  trashTools?: TrashToolEntry[];
+  trashTools?: BenchToolInstance[];
   workspaceWidgets?: ExperimentWorkspaceWidget[];
 } = {}): Experiment {
   return {
@@ -338,7 +337,7 @@ function makeWorkbenchExperiment({
     snapshot_version: snapshotVersion,
     workbench: { slots },
     rack: { slots: rackSlots },
-    trash: { produceLots: trashProduceLots, sampleLabels: trashSampleLabels, tools: trashTools },
+    trash: { children: trashTools ?? [], discardedFrom: {}, produceLots: trashProduceLots, sampleLabels: trashSampleLabels },
     workspace: { produceBasketLots: basketProduceLots, widgets: workspaceWidgets },
     basketTools,
       spatula: {
@@ -396,13 +395,8 @@ function makeSampleBagTool(overrides: Partial<BenchToolInstance> = {}): BenchToo
   });
 }
 
-function makeTrashToolEntry(overrides: Partial<TrashToolEntry> = {}): TrashToolEntry {
-  return {
-    id: "trash_tool_1",
-    originLabel: "Station 1",
-    tool: makeTool(),
-    ...overrides,
-  };
+function makeTrashToolEntry(overrides: Partial<BenchToolInstance> = {}): BenchToolInstance {
+  return makeTool(overrides);
 }
 
 function makeTrashProduceLotEntry(
@@ -1241,8 +1235,8 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "discard_workbench_tool",
-      { slot_id: "station_1" },
+      "move_tool",
+      { source_kind: "workbench", source_id: "station_1", destination_kind: "trash_bin", destination_id: "trash_bin" },
     );
   });
 
@@ -1280,8 +1274,8 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "discard_rack_tool",
-      { rack_slot_id: "rack_slot_1" },
+      "move_tool",
+      { source_kind: "rack", source_id: "rack_slot_1", destination_kind: "trash_bin", destination_id: "trash_bin" },
     );
   });
 
@@ -1452,9 +1446,7 @@ describe("LabScene", () => {
           },
         ],
         trashTools: [
-          makeTrashToolEntry({
-            tool: makeTool({ liquids: [{ accent: "amber", id: "liq_1", liquidId: "acetonitrile", name: "Acetonitrile", volume_ml: 1 }] }),
-          }),
+          makeTrashToolEntry({ liquids: [{ accent: "amber", id: "liq_1", liquidId: "acetonitrile", name: "Acetonitrile", volume_ml: 1 }] }),
         ],
         workspaceWidgets: makeWorkspaceWidgets([
           {},
@@ -1482,7 +1474,7 @@ describe("LabScene", () => {
     const dialog = await screen.findByRole("dialog");
     expect(screen.getByTestId("trash-dialog-overlay")).toHaveClass("absolute");
     expect(screen.getByTestId("trash-dialog-overlay")).toHaveClass("top-full");
-    expect(within(dialog).getByTestId("trash-tool-trash_tool_1")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("trash-tool-bench_tool_1")).toBeInTheDocument();
     expect(within(dialog).getByTestId("trash-produce-lot-trash_produce_lot_1")).toBeInTheDocument();
     expect(within(dialog).getByTestId("trash-widget-rack")).toBeInTheDocument();
     expect(within(dialog).getByTestId("trash-widget-instrument")).toBeInTheDocument();
@@ -2545,8 +2537,8 @@ describe("LabScene", () => {
     expect(dragOverEvent.defaultPrevented).toBe(true);
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "place_received_bag_on_workbench",
-      { target_slot_id: "station_1", tool_id: "received_bag_1" },
+      "move_tool",
+      { source_kind: "basket", source_id: "received_bag_1", destination_kind: "workbench_slot", destination_id: "station_1" },
     );
   });
 
@@ -2604,8 +2596,8 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "move_workbench_tool_to_gross_balance",
-        { source_slot_id: "station_1" },
+        "move_tool",
+        { source_kind: "workbench", source_id: "station_1", destination_kind: "gross_balance", destination_id: "gross_balance" },
       );
     });
     expect(screen.getByTestId("gross-balance-staged-item")).toBeInTheDocument();
@@ -2786,14 +2778,10 @@ describe("LabScene", () => {
       makeWorkbenchExperiment({
         basketTools: [],
         trashTools: [
-          {
-            id: "trash_tool_1",
-            originLabel: "Produce basket",
-            tool: makeSampleBagTool({
-              id: "basket_bag_1",
-              fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
-            }),
-          },
+          makeSampleBagTool({
+            id: "basket_bag_1",
+            fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
+          }),
         ],
       }),
     );
@@ -2814,8 +2802,8 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "discard_basket_tool",
-        { tool_id: "basket_bag_1" },
+        "move_tool",
+        { source_kind: "basket", source_id: "basket_bag_1", destination_kind: "trash_bin", destination_id: "trash_bin" },
       );
     });
   });
@@ -3071,7 +3059,7 @@ describe("LabScene", () => {
       }),
     );
     vi.mocked(sendExperimentCommand).mockImplementation(async (_experimentId, type) => {
-      if (type === "move_workbench_tool_to_gross_balance") {
+      if (type === "move_tool") {
         return makeWorkbenchExperiment({
           slots: makeSlots([
             {
@@ -3168,7 +3156,7 @@ describe("LabScene", () => {
       }),
     );
     vi.mocked(sendExperimentCommand).mockImplementation(async (_experimentId, type) => {
-      if (type === "move_basket_tool_to_gross_balance") {
+      if (type === "move_tool") {
         return makeWorkbenchExperiment({
           basketTools: [],
           limsReception: makeLimsReception({
@@ -3845,12 +3833,7 @@ describe("LabScene", () => {
     vi.mocked(sendExperimentCommand).mockResolvedValue(
       makeWorkbenchExperiment({
         trashTools: [
-          makeTrashToolEntry({
-            originLabel: "Palette",
-            tool: makeSampleBagTool({
-              id: "bench_tool_bag",
-            }),
-          }),
+          makeSampleBagTool({ id: "bench_tool_bag" }),
         ],
       }),
     );
@@ -3870,11 +3853,11 @@ describe("LabScene", () => {
 
     fireEvent.click(screen.getByTestId("trash-dropzone"));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByTestId("trash-tool-trash_tool_1")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("trash-tool-bench_tool_bag")).toBeInTheDocument();
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "discard_tool_from_palette",
-      { tool_id: "sealed_sampling_bag" },
+      "place_tool_from_palette",
+      { tool_id: "sealed_sampling_bag", destination_kind: "trash_bin", destination_id: "trash_bin" },
     );
   });
 
@@ -3898,7 +3881,7 @@ describe("LabScene", () => {
 
     fireEvent.click(screen.getByTestId("trash-dropzone"));
 
-    const trashTool = await screen.findByTestId("trash-tool-trash_tool_1");
+    const trashTool = await screen.findByTestId("trash-tool-bench_tool_1");
     const transfer = createDataTransfer();
 
     fireEvent.dragStart(trashTool, { dataTransfer: transfer });
@@ -3913,8 +3896,8 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "restore_trashed_tool_to_workbench_slot",
-      { target_slot_id: "station_1", trash_tool_id: "trash_tool_1" },
+      "move_tool",
+      { source_kind: "trash", source_id: "bench_tool_1", destination_kind: "workbench_slot", destination_id: "station_1" },
     );
   });
 
@@ -4051,11 +4034,8 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "move_tool_between_workbench_slots",
-      {
-        source_slot_id: "station_1",
-        target_slot_id: "station_2",
-      },
+      "move_tool",
+      { source_kind: "workbench", source_id: "station_1", destination_kind: "workbench_slot", destination_id: "station_2" },
     );
   });
 
@@ -4139,11 +4119,8 @@ describe("LabScene", () => {
     expect(within(screen.getByTestId("bench-slot-station_1")).getByText("Empty station")).toBeInTheDocument();
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "place_workbench_tool_in_rack_slot",
-      {
-        source_slot_id: "station_1",
-        rack_slot_id: "rack_slot_1",
-      },
+      "move_tool",
+      { source_kind: "workbench", source_id: "station_1", destination_kind: "rack_slot", destination_id: "rack_slot_1" },
     );
   });
 
@@ -4194,11 +4171,8 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "place_tool_in_rack_slot",
-      {
-        rack_slot_id: "rack_slot_1",
-        tool_id: "sample_vial_lcms",
-      },
+      "place_tool_from_palette",
+      { tool_id: "sample_vial_lcms", destination_kind: "rack_slot", destination_id: "rack_slot_1" },
     );
   });
 
@@ -4242,11 +4216,8 @@ describe("LabScene", () => {
     expect(within(screen.getByTestId("rack-summary")).getByText("No vial staged yet.")).toBeInTheDocument();
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "remove_rack_tool_to_workbench_slot",
-      {
-        rack_slot_id: "rack_slot_1",
-        target_slot_id: "station_1",
-      },
+      "move_tool",
+      { source_kind: "rack", source_id: "rack_slot_1", destination_kind: "workbench_slot", destination_id: "station_1" },
     );
   });
 
@@ -4293,11 +4264,8 @@ describe("LabScene", () => {
     expect(within(screen.getByTestId("rack-summary")).getByText("No vial staged yet.")).toBeInTheDocument();
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "remove_rack_tool_to_workbench_slot",
-      {
-        rack_slot_id: "rack_slot_1",
-        target_slot_id: "station_2",
-      },
+      "move_tool",
+      { source_kind: "rack", source_id: "rack_slot_1", destination_kind: "workbench_slot", destination_id: "station_2" },
     );
   });
 
@@ -4336,11 +4304,8 @@ describe("LabScene", () => {
     expect(screen.queryByTestId("rack-slot-summary-1")).not.toBeInTheDocument();
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "move_rack_tool_between_slots",
-      {
-        source_rack_slot_id: "rack_slot_1",
-        target_rack_slot_id: "rack_slot_2",
-      },
+      "move_tool",
+      { source_kind: "rack", source_id: "rack_slot_1", destination_kind: "rack_slot", destination_id: "rack_slot_2" },
     );
   });
 

@@ -10,7 +10,6 @@ from app.domain.models import (
     Trash,
     TrashProduceLotEntry,
     TrashSampleLabelEntry,
-    TrashToolEntry,
     Workbench,
     WorkbenchLiquid,
     WorkbenchSlot,
@@ -35,8 +34,8 @@ def find_rack_slot(rack: Rack, slot_id: str) -> RackSlot:
     return slot
 
 
-def find_trash_tool(trash: Trash, trash_tool_id: str) -> TrashToolEntry:
-    tool = next((entry for entry in trash.tools if entry.id == trash_tool_id), None)
+def find_trash_tool(trash: Trash, tool_id: str) -> WorkbenchTool:
+    tool = next((t for t in trash.children if t.id == tool_id), None)
     if tool is None:
         raise ValueError("Unknown trash tool")
     return tool

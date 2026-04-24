@@ -394,11 +394,6 @@ export type RackSlot = {
   tool: BenchToolInstance | null;
 };
 
-export type TrashToolEntry = {
-  id: string;
-  originLabel: string;
-  tool: BenchToolInstance;
-};
 
 export type PrintedLabelTicket = {
   id: string;

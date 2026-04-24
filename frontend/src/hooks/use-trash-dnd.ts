@@ -2,60 +2,50 @@ import type { DragEvent } from "react";
 
 import {
   hasCompatibleDropTarget,
-  readAnalyticalBalanceToolDragPayload,
-  readBasketToolDragPayload,
-  readBenchToolDragPayload,
-  readGrossBalanceToolDragPayload,
+  readEquipmentToolDragPayload,
   readProduceDragPayload,
-  readRackToolDragPayload,
   readToolbarDragPayload,
   readWorkspaceLiquidDragPayload,
+  writeEquipmentToolDragPayload,
   writeProduceDragPayload,
   writeSampleLabelDragPayload,
-  writeTrashToolDragPayload,
   writeWorkspaceWidgetDragPayload,
 } from "@/lib/workbench-dnd";
 import { executeTrashLabelDropCommand } from "@/lib/label-drop-command-executor";
 import { resolveLabelDropCommand } from "@/lib/label-drop-command-resolver";
 import { executeTrashDropCommand } from "@/lib/trash-drop-command-executor";
 import { resolveTrashDropCommand } from "@/lib/trash-drop-command-resolver";
-import { executeTrashToolDropCommand } from "@/lib/tool-drop-command-executor";
+import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { readLabelDragPayload } from "@/lib/label-drop-resolver";
 import type {
+  BenchToolInstance,
   ExperimentWorkspaceWidget,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
 } from "@/types/workbench";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type {
-  BasketToolReferencePayload,
   DiscardGrossBalanceProduceLotPayload,
   DiscardProduceLotFromWorkbenchToolPayload,
-  DiscardRackToolPayload,
   DiscardSampleLabelFromWorkbenchToolPayload,
-  DiscardToolFromPalettePayload,
   DiscardWidgetProduceLotPayload,
-  DiscardWorkbenchToolPayload,
   DiscardWorkspaceProduceLotPayload,
+  MoveToolPayload,
+  PlaceToolFromPalettePayload,
   RemoveLiquidFromWorkspaceWidgetPayload,
 } from "@/types/api-payloads";
 
 type TrashDndExperimentApi = {
-  discardAnalyticalBalanceTool: () => void;
-  discardBasketTool: (payload: BasketToolReferencePayload) => void;
   discardGrossBalanceProduceLot: (payload: DiscardGrossBalanceProduceLotPayload) => void;
-  discardGrossBalanceTool: () => void;
   discardPrintedLimsLabel: () => void;
   discardProduceLotFromWorkbenchTool: (payload: DiscardProduceLotFromWorkbenchToolPayload) => void;
-  discardRackTool: (payload: DiscardRackToolPayload) => void;
   discardSampleLabelFromPalette: () => void;
   discardSampleLabelFromWorkbenchTool: (payload: DiscardSampleLabelFromWorkbenchToolPayload) => void;
-  discardToolFromPalette: (payload: DiscardToolFromPalettePayload) => void;
   discardWidgetProduceLot: (payload: DiscardWidgetProduceLotPayload) => void;
-  discardWorkbenchTool: (payload: DiscardWorkbenchToolPayload) => void;
   discardWorkspaceProduceLot: (payload: DiscardWorkspaceProduceLotPayload) => void;
+  moveTool: (payload: MoveToolPayload) => void;
+  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
   removeLiquidFromWorkspaceWidget: (payload: RemoveLiquidFromWorkspaceWidgetPayload) => void;
 };
 
@@ -77,7 +67,7 @@ export type TrashDndApi = {
     trashSampleLabel: TrashSampleLabelEntry,
     dataTransfer: DataTransfer,
   ) => void;
-  handleTrashToolDragStart: (trashTool: TrashToolEntry, dataTransfer: DataTransfer) => void;
+  handleTrashToolDragStart: (tool: BenchToolInstance, dataTransfer: DataTransfer) => void;
   handleTrashedWidgetDragStart: (
     widget: ExperimentWorkspaceWidget,
     dataTransfer: DataTransfer,
@@ -120,11 +110,7 @@ export function useTrashDnd({
 
     const toolPayload =
       (toolbarPayload?.itemType === "tool" ? toolbarPayload : null) ??
-      readBenchToolDragPayload(event.dataTransfer) ??
-      readBasketToolDragPayload(event.dataTransfer) ??
-      readRackToolDragPayload(event.dataTransfer) ??
-      readGrossBalanceToolDragPayload(event.dataTransfer) ??
-      readAnalyticalBalanceToolDragPayload(event.dataTransfer);
+      readEquipmentToolDragPayload(event.dataTransfer);
     if (toolPayload) {
       event.preventDefault();
       event.stopPropagation();
@@ -134,7 +120,7 @@ export function useTrashDnd({
       if (!command) {
         return;
       }
-      executeTrashToolDropCommand(command, experimentApi);
+      executeToolDropCommand(command, experimentApi);
       return;
     }
 
@@ -178,32 +164,32 @@ export function useTrashDnd({
     executeTrashDropCommand(command, experimentApi);
   };
 
-  const handleTrashToolDragStart = (trashTool: TrashToolEntry, dataTransfer: DataTransfer) => {
+  const handleTrashToolDragStart = (tool: BenchToolInstance, dataTransfer: DataTransfer) => {
     if (dndDisabledByAction) {
       return;
     }
-    if (trashTool.tool.isDraggable === false) {
+    if (tool.isDraggable === false) {
       return;
     }
-    const allowedDropTargets = trashTool.tool.allowedDropTargets ?? [];
+    const allowedDropTargets = tool.allowedDropTargets ?? [];
 
-    writeTrashToolDragPayload(dataTransfer, {
+    writeEquipmentToolDragPayload(dataTransfer, {
       allowedDropTargets,
       entityKind: "tool",
-      sourceId: trashTool.id,
+      sourceId: tool.id,
       sourceKind: "trash",
-      toolId: trashTool.tool.toolId,
-      toolType: trashTool.tool.toolType,
-      trashToolId: trashTool.id,
+      toolId: tool.toolId,
+      toolType: tool.toolType,
+      trashToolId: tool.id,
     });
     showDropTargets(allowedDropTargets);
     setActiveDragItem({
       allowedDropTargets,
       entityKind: "tool",
-      sourceId: trashTool.id,
+      sourceId: tool.id,
       sourceKind: "trash",
-      toolId: trashTool.tool.toolId,
-      toolType: trashTool.tool.toolType,
+      toolId: tool.toolId,
+      toolType: tool.toolType,
     });
   };
 

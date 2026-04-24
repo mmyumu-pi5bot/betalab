@@ -69,6 +69,7 @@ import {
   openGrossBalanceTool,
   moveSampleLabelBetweenWorkbenchTools,
   moveToolBetweenWorkbenchSlots,
+  moveTool,
   moveWidgetProduceLotToWorkbenchTool,
   moveWorkbenchProduceLotToWidget,
   moveWorkspaceWidget,
@@ -78,6 +79,7 @@ import {
   placeToolInRackSlot,
   placeReceivedBagOnWorkbench,
   placeToolOnWorkbench,
+  placeToolFromPalette,
   placeWorkbenchToolInRackSlot,
   printLimsLabel,
   pourSpatulaIntoWorkbenchTool,
@@ -103,7 +105,11 @@ import {
   startGrinderCycle,
   startVortexCycle,
   discardVortexTool,
+  moveAnalyticalBalanceToolToVortex,
+  moveGrossBalanceToolToVortex,
   moveRackToolToVortex,
+  moveVortexToolToAnalyticalBalance,
+  moveVortexToolToGrossBalance,
   moveVortexToolToWorkbench,
   moveWorkbenchToolToVortex,
   placeToolOnVortex,
@@ -157,6 +163,7 @@ import type {
   MoveWorkbenchSampleLabelToAnalyticalBalancePayload,
   MoveSampleLabelBetweenWorkbenchToolsPayload,
   MoveToolBetweenWorkbenchSlotsPayload,
+  MoveToolPayload,
   MoveWidgetProduceLotToGrossBalancePayload,
   MoveWidgetProduceLotToWorkbenchToolPayload,
   MoveWorkbenchProduceLotToGrossBalancePayload,
@@ -171,6 +178,7 @@ import type {
   PlaceToolOnAnalyticalBalancePayload,
   PlaceToolOnGrossBalancePayload,
   PlaceToolOnWorkbenchPayload,
+  PlaceToolFromPalettePayload,
   PlaceWorkbenchToolInRackSlotPayload,
   PourSpatulaIntoWorkbenchToolPayload,
   PourSpatulaIntoAnalyticalBalanceToolPayload,
@@ -278,6 +286,7 @@ const mutationFns = {
   openGrossBalanceTool,
   moveSampleLabelBetweenWorkbenchTools,
   moveToolBetweenWorkbenchSlots,
+  moveTool,
   moveWidgetProduceLotToWorkbenchTool,
   moveWorkbenchProduceLotToWidget,
   moveWorkspaceWidget,
@@ -288,6 +297,7 @@ const mutationFns = {
   placeToolInRackSlot,
   placeReceivedBagOnWorkbench,
   placeToolOnWorkbench,
+  placeToolFromPalette,
   placeWorkbenchToolInRackSlot,
   printLimsLabel,
   pourSpatulaIntoWorkbenchTool,
@@ -312,7 +322,11 @@ const mutationFns = {
   startGrinderCycle,
   startVortexCycle,
   discardVortexTool,
+  moveAnalyticalBalanceToolToVortex,
+  moveGrossBalanceToolToVortex,
   moveRackToolToVortex,
+  moveVortexToolToAnalyticalBalance,
+  moveVortexToolToGrossBalance,
   moveVortexToolToWorkbench,
   moveWorkbenchToolToVortex,
   placeToolOnVortex,
@@ -594,6 +608,8 @@ export function useLabExperiment({
       executeMutation(mutationFns.moveSampleLabelBetweenWorkbenchTools, payload),
     moveToolBetweenWorkbenchSlots: (payload: MoveToolBetweenWorkbenchSlotsPayload) =>
       executeMutation(mutationFns.moveToolBetweenWorkbenchSlots, payload),
+    moveTool: (payload: MoveToolPayload) =>
+      executeMutation(mutationFns.moveTool, payload),
     moveWorkbenchProduceLotToGrossBalance: (payload: MoveWorkbenchProduceLotToGrossBalancePayload) =>
       executeMutation(mutationFns.moveWorkbenchProduceLotToGrossBalance, payload),
     moveWorkbenchToolToAnalyticalBalance: (payload: MoveWorkbenchToolToAnalyticalBalancePayload) =>
@@ -628,6 +644,8 @@ export function useLabExperiment({
       executeMutation(mutationFns.placeReceivedBagOnWorkbench, payload),
     placeToolOnWorkbench: (payload: PlaceToolOnWorkbenchPayload) =>
       executeMutation(mutationFns.placeToolOnWorkbench, payload),
+    placeToolFromPalette: (payload: PlaceToolFromPalettePayload) =>
+      executeMutation(mutationFns.placeToolFromPalette, payload),
     placeWorkbenchToolInRackSlot: (payload: PlaceWorkbenchToolInRackSlotPayload) =>
       executeMutation(mutationFns.placeWorkbenchToolInRackSlot, payload),
     printLimsLabel: (payload?: PrintLimsLabelPayload) =>
@@ -676,8 +694,12 @@ export function useLabExperiment({
       executeMutation(mutationFns.restoreTrashedToolToWorkbenchSlot, payload),
     startVortexCycle: () => executeMutation(mutationFns.startVortexCycle),
     discardVortexTool: () => executeMutation(mutationFns.discardVortexTool),
+    moveAnalyticalBalanceToolToVortex: () => executeMutation(mutationFns.moveAnalyticalBalanceToolToVortex),
+    moveGrossBalanceToolToVortex: () => executeMutation(mutationFns.moveGrossBalanceToolToVortex),
     moveRackToolToVortex: (payload: MoveRackToolToVortexPayload) =>
       executeMutation(mutationFns.moveRackToolToVortex, payload),
+    moveVortexToolToAnalyticalBalance: () => executeMutation(mutationFns.moveVortexToolToAnalyticalBalance),
+    moveVortexToolToGrossBalance: () => executeMutation(mutationFns.moveVortexToolToGrossBalance),
     moveVortexToolToWorkbench: (payload: MoveVortexToolToWorkbenchPayload) =>
       executeMutation(mutationFns.moveVortexToolToWorkbench, payload),
     moveWorkbenchToolToVortex: (payload: MoveWorkbenchToolToVortexPayload) =>

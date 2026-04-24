@@ -10,7 +10,6 @@ import type {
   SpatulaState,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
 } from "@/types/workbench";
 
 export type ExperimentWorkbench = {
@@ -22,9 +21,10 @@ export type ExperimentRack = {
 };
 
 export type ExperimentTrash = {
+  children: BenchToolInstance[];
+  discardedFrom: Record<string, string>;
   produceLots: TrashProduceLotEntry[];
   sampleLabels: TrashSampleLabelEntry[];
-  tools: TrashToolEntry[];
 };
 
 export type ExperimentWorkspace = {

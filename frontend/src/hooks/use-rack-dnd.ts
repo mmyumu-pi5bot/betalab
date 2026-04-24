@@ -2,32 +2,23 @@ import type { DragEvent } from "react";
 
 import {
   hasCompatibleDropTarget,
-  readBenchToolDragPayload,
-  readGrossBalanceToolDragPayload,
-  readRackToolDragPayload,
+  readEquipmentToolDragPayload,
   readToolbarDragPayload,
-  readTrashToolDragPayload,
-  writeRackToolDragPayload,
+  writeEquipmentToolDragPayload,
 } from "@/lib/workbench-dnd";
 import { labToolCatalog } from "@/lib/lab-workflow-catalog";
-import { executeRackToolDropCommand } from "@/lib/tool-drop-command-executor";
+import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type {
-  MoveGrossBalanceToolToRackPayload,
-  MoveRackToolBetweenSlotsPayload,
-  PlaceToolInRackSlotPayload,
-  PlaceWorkbenchToolInRackSlotPayload,
-  RestoreTrashedToolToRackSlotPayload,
+  MoveToolPayload,
+  PlaceToolFromPalettePayload,
 } from "@/types/api-payloads";
 
 type RackDndExperimentApi = {
-  moveGrossBalanceToolToRack: (payload: MoveGrossBalanceToolToRackPayload) => void;
-  moveRackToolBetweenSlots: (payload: MoveRackToolBetweenSlotsPayload) => void;
-  placeToolInRackSlot: (payload: PlaceToolInRackSlotPayload) => void;
-  placeWorkbenchToolInRackSlot: (payload: PlaceWorkbenchToolInRackSlotPayload) => void;
-  restoreTrashedToolToRackSlot: (payload: RestoreTrashedToolToRackSlotPayload) => void;
+  moveTool: (payload: MoveToolPayload) => void;
+  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
 };
 
 type RackDndOptions = {
@@ -82,10 +73,7 @@ export function useRackDnd({
       : null;
     const toolPayload =
       (toolbarPayload?.itemType === "tool" ? toolbarPayload : null) ??
-      readBenchToolDragPayload(event.dataTransfer) ??
-      readGrossBalanceToolDragPayload(event.dataTransfer) ??
-      readRackToolDragPayload(event.dataTransfer) ??
-      readTrashToolDragPayload(event.dataTransfer);
+      readEquipmentToolDragPayload(event.dataTransfer);
 
     if (!toolPayload) {
       return;
@@ -107,7 +95,7 @@ export function useRackDnd({
     if (!command) {
       return;
     }
-    executeRackToolDropCommand(command, experimentApi);
+    executeToolDropCommand(command, experimentApi);
   };
 
   const handleRackToolDragStart = (
@@ -122,7 +110,7 @@ export function useRackDnd({
       return;
     }
     const allowedDropTargets = tool.allowedDropTargets ?? [];
-    writeRackToolDragPayload(dataTransfer, {
+    writeEquipmentToolDragPayload(dataTransfer, {
       allowedDropTargets,
       entityKind: "tool",
       rackSlotId: rackSlot.id,

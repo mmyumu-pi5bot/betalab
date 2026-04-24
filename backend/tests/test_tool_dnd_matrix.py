@@ -165,7 +165,7 @@ def _prepare_source(service: ExperimentRuntimeService, experiment_id: str, sourc
     if source.startswith("trash_"):
         PlaceToolOnWorkbenchService(service).run(experiment_id, PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id=tool_id))
         discarded = DiscardWorkbenchToolService(service).run(experiment_id, WorkbenchSlotRequest(slot_id="station_1"))
-        return discarded.trash.tools[0].id
+        return discarded.trash.children[0].id
     if source == "gross_balance_vial":
         PlaceToolOnGrossBalanceService(service).run(experiment_id, PlaceToolOnGrossBalanceRequest(tool_id=tool_id))
         return None
@@ -291,4 +291,4 @@ def test_tool_dnd_matrix(source: ToolSource, target: ToolTarget, allowed: bool) 
         assert gross_balance.tool is not None
         return
     if target == "trash":
-        assert updated.trash.tools
+        assert updated.trash.children

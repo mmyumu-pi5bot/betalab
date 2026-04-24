@@ -26,9 +26,10 @@ const makeExperiment = (): Experiment => ({
     slots: [],
   },
   trash: {
+    children: [],
+    discardedFrom: {},
     produceLots: [],
     sampleLabels: [],
-    tools: [],
   },
   workspace: {
     produceBasketLots: [],
@@ -637,22 +638,19 @@ describe("api client", () => {
               },
             },
           ],
-          tools: [
+          children: [
             {
-              id: "trash_tool_1",
-              origin_label: "Station 1",
-              tool: {
-                id: "bench_tool_3",
-                tool_id: "sample_vial_lcms",
-                label: "Autosampler vial",
-                subtitle: "Injection ready",
-                accent: "sky",
-                tool_type: "sample_vial",
-                capacity_ml: 2,
-                liquids: [],
-              },
+              id: "bench_tool_3",
+              tool_id: "sample_vial_lcms",
+              label: "Autosampler vial",
+              subtitle: "Injection ready",
+              accent: "sky",
+              tool_type: "sample_vial",
+              capacity_ml: 2,
+              liquids: [],
             },
           ],
+          discarded_from: { "bench_tool_3": "Station 1" },
         },
         workspace: {
           produce_basket_lots: [
@@ -692,7 +690,7 @@ describe("api client", () => {
       "acetonitrile_extraction",
     );
     expect(experiment.rack.slots[0].tool?.toolId).toBe("sample_vial_lcms");
-    expect(experiment.trash.tools[0]?.originLabel).toBe("Station 1");
+    expect(experiment.trash.discardedFrom["bench_tool_3"]).toBe("Station 1");
     expect(experiment.trash.produceLots[0]?.originLabel).toBe("Sealed sampling bag");
     expect(experiment.trash.produceLots[0]?.produceLot.label).toBe("Apple lot 1");
     expect(experiment.workspace.widgets[0]?.widgetType).toBe("autosampler_rack");

@@ -6,21 +6,22 @@ import { DraggableInventoryItem } from "@/components/draggable-inventory-item";
 import { InventoryWidget } from "@/components/inventory-widget";
 import { getProduceLotDisplayName } from "@/lib/produce-lot-display";
 import type {
+  BenchToolInstance,
   ExperimentWorkspaceWidget,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
 } from "@/types/workbench";
 
 type TrashWidgetProps = {
   dndDisabled?: boolean;
+  discardedFrom: Record<string, string>;
   formatProduceLotMetadata: (trashProduceLot: TrashProduceLotEntry["produceLot"]) => string;
   isDropHighlighted: boolean;
   isEmpty: boolean;
   isOpen: boolean;
   onDragOver: (event: DragEvent<HTMLButtonElement>) => void;
   onDrop: (event: DragEvent<HTMLButtonElement>) => void;
-  onToolDragStart: (trashTool: TrashToolEntry, dataTransfer: DataTransfer) => void;
+  onToolDragStart: (tool: BenchToolInstance, dataTransfer: DataTransfer) => void;
   onToggle: () => void;
   onTrashedWidgetDragStart: (
     widget: ExperimentWorkspaceWidget,
@@ -38,7 +39,7 @@ type TrashWidgetProps = {
   ) => void;
   trashedProduceLots: TrashProduceLotEntry[];
   trashedSampleLabels: TrashSampleLabelEntry[];
-  trashedTools: TrashToolEntry[];
+  trashedTools: BenchToolInstance[];
   trashedWidgets: ExperimentWorkspaceWidget[];
 };
 
@@ -69,6 +70,7 @@ function TrashIcon() {
 
 export function TrashWidget({
   dndDisabled = false,
+  discardedFrom,
   formatProduceLotMetadata,
   isDropHighlighted,
   isEmpty,
@@ -113,29 +115,30 @@ export function TrashWidget({
       title="Trash"
     >
       <div className="space-y-2">
-        {trashedTools.map((trashTool) => {
-          const totalVolume = trashTool.tool.liquids.reduce(
+        {trashedTools.map((tool) => {
+          const totalVolume = tool.liquids.reduce(
             (sum, liquid) => sum + liquid.volume_ml,
             0,
           );
+          const originLabel = discardedFrom[tool.id] ?? "";
 
           return (
             <DraggableInventoryItem
-              dataTestId={`trash-tool-${trashTool.id}`}
-              key={trashTool.id}
+              dataTestId={`trash-tool-${tool.id}`}
+              key={tool.id}
               onDragEnd={dndDisabled ? undefined : onItemDragEnd}
               onDragStart={
-                dndDisabled ? undefined : (dataTransfer) => onToolDragStart(trashTool, dataTransfer)
+                dndDisabled ? undefined : (dataTransfer) => onToolDragStart(tool, dataTransfer)
               }
               subtitle={
                 <p className="truncate text-xs text-slate-500">
-                  {trashTool.originLabel}
+                  {originLabel}
                   {totalVolume > 0 ? ` • ${totalVolume} mL` : ""}
                 </p>
               }
               title={
                 <p className="truncate text-sm font-semibold text-slate-900">
-                  {trashTool.tool.label}
+                  {tool.label}
                 </p>
               }
             />

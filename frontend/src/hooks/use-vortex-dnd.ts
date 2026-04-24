@@ -2,35 +2,26 @@
 
 import type { DragEvent } from "react";
 
-import { executeVortexToolDropCommand } from "@/lib/tool-drop-command-executor";
+import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import {
   hasCompatibleDropTarget,
-  readBenchToolDragPayload,
-  readRackToolDragPayload,
+  readEquipmentToolDragPayload,
   readToolbarDragPayload,
-  readTrashToolDragPayload,
-  readVortexToolDragPayload,
   toDragDescriptor,
-  writeVortexToolDragPayload,
+  writeEquipmentToolDragPayload,
 } from "@/lib/workbench-dnd";
 import type {
-  MoveRackToolToVortexPayload,
-  MoveVortexToolToWorkbenchPayload,
-  MoveWorkbenchToolToVortexPayload,
-  PlaceToolOnVortexPayload,
-  RestoreTrashedToolToVortexPayload,
+  MoveToolPayload,
+  PlaceToolFromPalettePayload,
 } from "@/types/api-payloads";
-import type { BenchToolInstance, VortexToolDragPayload } from "@/types/workbench";
+import type { BenchToolInstance } from "@/types/workbench";
+import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 
 type VortexDndExperimentApi = {
-  moveWorkbenchToolToVortex: (payload: MoveWorkbenchToolToVortexPayload) => void;
-  moveRackToolToVortex: (payload: MoveRackToolToVortexPayload) => void;
-  placeToolOnVortex: (payload: PlaceToolOnVortexPayload) => void;
-  restoreTrashedToolToVortex: (payload: RestoreTrashedToolToVortexPayload) => void;
-  moveVortexToolToWorkbench: (payload: MoveVortexToolToWorkbenchPayload) => void;
-  discardVortexTool: () => void;
+  moveTool: (payload: MoveToolPayload) => void;
+  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
 };
 
 type VortexDndOptions = {
@@ -71,12 +62,10 @@ export function useVortexDnd({
       return;
     }
 
+    const toolbarPayload = readToolbarDragPayload(event.dataTransfer);
     const toolPayload =
-      readToolbarDragPayload(event.dataTransfer) ??
-      readBenchToolDragPayload(event.dataTransfer) ??
-      readRackToolDragPayload(event.dataTransfer) ??
-      readTrashToolDragPayload(event.dataTransfer) ??
-      readVortexToolDragPayload(event.dataTransfer);
+      (toolbarPayload?.itemType === "tool" ? toolbarPayload : null) ??
+      readEquipmentToolDragPayload(event.dataTransfer);
 
     if (!toolPayload) {
       return;
@@ -90,7 +79,7 @@ export function useVortexDnd({
     if (!command) {
       return;
     }
-    executeVortexToolDropCommand(command, experimentApi);
+    executeToolDropCommand(command, experimentApi);
   };
 
   const handleVortexItemDragStart = (dataTransfer: DataTransfer) => {
@@ -102,7 +91,7 @@ export function useVortexDnd({
     }
 
     const allowedDropTargets = vortexTool.allowedDropTargets ?? [];
-    const payload: VortexToolDragPayload = {
+    const payload: EquipmentToolDragPayload = {
       allowedDropTargets,
       entityKind: "tool",
       sourceId: "vortex",
@@ -111,7 +100,7 @@ export function useVortexDnd({
       toolType: vortexTool.toolType,
     };
 
-    writeVortexToolDragPayload(dataTransfer, payload);
+    writeEquipmentToolDragPayload(dataTransfer, payload);
     showDropTargets(allowedDropTargets);
     setActiveDragItem(toDragDescriptor(payload));
   };

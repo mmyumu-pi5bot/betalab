@@ -66,6 +66,19 @@ export type MoveToolBetweenWorkbenchSlotsPayload = {
   target_slot_id: string;
 };
 
+export type MoveToolPayload = {
+  source_kind: string;
+  source_id: string;
+  destination_kind: string;
+  destination_id: string;
+};
+
+export type PlaceToolFromPalettePayload = {
+  tool_id: string;
+  destination_kind: string;
+  destination_id: string;
+};
+
 export type MoveWidgetProduceLotToWorkbenchToolPayload = {
   widget_id: string;
   produce_lot_id: string;

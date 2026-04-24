@@ -42,7 +42,6 @@ import type {
   ToolbarDragPayload,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
-  TrashToolEntry,
 } from "@/types/workbench";
 
 type LabSceneWorkspaceCanvasProps = {
@@ -54,10 +53,11 @@ type LabSceneWorkspaceCanvasProps = {
   display: {
     basketProduceLots: ExperimentProduceLot[];
     basketTools: BenchToolInstance[];
+    discardedFrom: Record<string, string>;
     rackSlots: RackSlot[];
     slots: BenchSlot[];
     trashProduceLots: TrashProduceLotEntry[];
-    trashTools: TrashToolEntry[];
+    trashTools: BenchToolInstance[];
     trashedSampleLabels: TrashSampleLabelEntry[];
     trashedWidgets: ExperimentWorkspaceWidget[];
   };
@@ -423,6 +423,7 @@ export function LabSceneWorkspaceCanvas({
             onTrashedWidgetDragStart={dnd.trash.handleTrashedWidgetDragStart}
             onTrashProduceLotDragStart={dnd.trash.handleTrashProduceLotDragStart}
             onTrashSampleLabelDragStart={dnd.trash.handleTrashSampleLabelDragStart}
+            discardedFrom={display.discardedFrom}
             trashedProduceLots={display.trashProduceLots}
             trashedSampleLabels={display.trashedSampleLabels}
             trashedTools={display.trashTools}

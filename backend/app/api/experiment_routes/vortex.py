@@ -2,8 +2,16 @@ from app.schemas.experiment import ExperimentSchema
 from app.services.domain_services.vortex import (
     DiscardVortexToolService,
     EmptyRequest,
+    MoveAnalyticalBalanceToolToVortexRequest,
+    MoveAnalyticalBalanceToolToVortexService,
+    MoveGrossBalanceToolToVortexRequest,
+    MoveGrossBalanceToolToVortexService,
     MoveRackToolToVortexRequest,
     MoveRackToolToVortexService,
+    MoveVortexToolToAnalyticalBalanceRequest,
+    MoveVortexToolToAnalyticalBalanceService,
+    MoveVortexToolToGrossBalanceRequest,
+    MoveVortexToolToGrossBalanceService,
     MoveVortexToolToWorkbenchRequest,
     MoveVortexToolToWorkbenchService,
     MoveWorkbenchToolToVortexRequest,
@@ -78,6 +86,58 @@ def restore_trashed_tool_to_vortex(
         lambda: RestoreTrashedToolToVortexService(experiment_service).run(
             experiment_id,
             RestoreTrashedToolToVortexRequest(trash_tool_id=trash_tool_id),
+        )
+    )
+
+
+@router.post(
+    "/{experiment_id}/vortex/tool/analytical-balance",
+    response_model=ExperimentSchema,
+)
+def move_analytical_balance_tool_to_vortex(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: MoveAnalyticalBalanceToolToVortexService(experiment_service).run(
+            experiment_id,
+            MoveAnalyticalBalanceToolToVortexRequest(),
+        )
+    )
+
+
+@router.post(
+    "/{experiment_id}/vortex/tool/gross-balance",
+    response_model=ExperimentSchema,
+)
+def move_gross_balance_tool_to_vortex(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: MoveGrossBalanceToolToVortexService(experiment_service).run(
+            experiment_id,
+            MoveGrossBalanceToolToVortexRequest(),
+        )
+    )
+
+
+@router.post(
+    "/{experiment_id}/vortex/tool/move-to-analytical-balance",
+    response_model=ExperimentSchema,
+)
+def move_vortex_tool_to_analytical_balance(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: MoveVortexToolToAnalyticalBalanceService(experiment_service).run(
+            experiment_id,
+            MoveVortexToolToAnalyticalBalanceRequest(),
+        )
+    )
+
+
+@router.post(
+    "/{experiment_id}/vortex/tool/move-to-gross-balance",
+    response_model=ExperimentSchema,
+)
+def move_vortex_tool_to_gross_balance(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: MoveVortexToolToGrossBalanceService(experiment_service).run(
+            experiment_id,
+            MoveVortexToolToGrossBalanceRequest(),
         )
     )
 

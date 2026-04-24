@@ -13,19 +13,23 @@ import type {
   TrashToolDragPayload,
   ToolbarDragPayload,
   ToolbarItem,
+  ToolType,
   VortexToolDragPayload,
   WorkspaceLiquidDragPayload,
   WorkspaceWidgetDragPayload,
 } from "@/types/workbench";
 
+export type EquipmentToolDragPayload =
+  | BenchToolDragPayload
+  | BasketToolDragPayload
+  | RackToolDragPayload
+  | GrossBalanceToolDragPayload
+  | AnalyticalBalanceToolDragPayload
+  | VortexToolDragPayload
+  | TrashToolDragPayload;
+
 const WORKBENCH_DRAG_MIME = "application/x-betalab-workbench-item";
-const BENCH_TOOL_DRAG_MIME = "application/x-betalab-bench-tool-item";
-const BASKET_TOOL_DRAG_MIME = "application/x-betalab-basket-tool-item";
-const RACK_TOOL_DRAG_MIME = "application/x-betalab-rack-tool-item";
-const GROSS_BALANCE_TOOL_DRAG_MIME = "application/x-betalab-gross-balance-tool-item";
-const ANALYTICAL_BALANCE_TOOL_DRAG_MIME = "application/x-betalab-analytical-balance-tool-item";
-const VORTEX_TOOL_DRAG_MIME = "application/x-betalab-vortex-tool-item";
-const TRASH_TOOL_DRAG_MIME = "application/x-betalab-trash-tool-item";
+const EQUIPMENT_TOOL_DRAG_MIME = "application/x-betalab-tool-item";
 const WORKSPACE_WIDGET_DRAG_MIME = "application/x-betalab-workspace-widget-item";
 const WORKSPACE_LIQUID_DRAG_MIME = "application/x-betalab-workspace-liquid-item";
 const PRODUCE_DRAG_MIME = "application/x-betalab-produce-item";
@@ -46,7 +50,8 @@ function isDropTargetType(targetType: unknown): targetType is DropTargetType {
     targetType === "trash_bin" ||
     targetType === "grinder_widget" ||
     targetType === "gross_balance_widget" ||
-    targetType === "analytical_balance_widget"
+    targetType === "analytical_balance_widget" ||
+    targetType === "vortex_widget"
   );
 }
 
@@ -108,91 +113,15 @@ export function createToolbarDragPayload(item: ToolbarItem): ToolbarDragPayload 
   };
 }
 
-export function writeBenchToolDragPayload(dataTransfer: DataTransfer, payload: BenchToolDragPayload) {
-  const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(BENCH_TOOL_DRAG_MIME, serialized);
-  dataTransfer.setData("text/plain", serialized);
-  payload.allowedDropTargets.forEach((targetType) => {
-    dataTransfer.setData(getDropTargetMime(targetType), payload.sourceSlotId);
-  });
-  dataTransfer.effectAllowed = "move";
-}
-
-export function writeBasketToolDragPayload(
+export function writeEquipmentToolDragPayload(
   dataTransfer: DataTransfer,
-  payload: BasketToolDragPayload,
+  payload: EquipmentToolDragPayload,
 ) {
   const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(BASKET_TOOL_DRAG_MIME, serialized);
+  dataTransfer.setData(EQUIPMENT_TOOL_DRAG_MIME, serialized);
   dataTransfer.setData("text/plain", serialized);
   payload.allowedDropTargets.forEach((targetType) => {
     dataTransfer.setData(getDropTargetMime(targetType), payload.sourceId);
-  });
-  dataTransfer.effectAllowed = "move";
-}
-
-export function writeRackToolDragPayload(dataTransfer: DataTransfer, payload: RackToolDragPayload) {
-  const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(RACK_TOOL_DRAG_MIME, serialized);
-  dataTransfer.setData("text/plain", serialized);
-  payload.allowedDropTargets.forEach((targetType) => {
-    dataTransfer.setData(getDropTargetMime(targetType), payload.rackSlotId);
-  });
-  dataTransfer.effectAllowed = "move";
-}
-
-export function writeGrossBalanceToolDragPayload(
-  dataTransfer: DataTransfer,
-  payload: GrossBalanceToolDragPayload,
-) {
-  const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(GROSS_BALANCE_TOOL_DRAG_MIME, serialized);
-  dataTransfer.setData("text/plain", serialized);
-  payload.allowedDropTargets.forEach((targetType) => {
-    dataTransfer.setData(getDropTargetMime(targetType), payload.sourceId);
-  });
-  dataTransfer.effectAllowed = "move";
-}
-
-export function writeAnalyticalBalanceToolDragPayload(
-  dataTransfer: DataTransfer,
-  payload: AnalyticalBalanceToolDragPayload,
-) {
-  const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(ANALYTICAL_BALANCE_TOOL_DRAG_MIME, serialized);
-  dataTransfer.setData("text/plain", serialized);
-  payload.allowedDropTargets.forEach((targetType) => {
-    dataTransfer.setData(getDropTargetMime(targetType), payload.sourceId);
-  });
-  dataTransfer.effectAllowed = "move";
-}
-
-export function writeVortexToolDragPayload(
-  dataTransfer: DataTransfer,
-  payload: VortexToolDragPayload,
-) {
-  const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(VORTEX_TOOL_DRAG_MIME, serialized);
-  dataTransfer.setData("text/plain", serialized);
-  payload.allowedDropTargets.forEach((targetType) => {
-    dataTransfer.setData(getDropTargetMime(targetType), payload.sourceId);
-  });
-  dataTransfer.effectAllowed = "move";
-}
-
-export function writeTrashToolDragPayload(dataTransfer: DataTransfer, payload: TrashToolDragPayload) {
-  const serialized = JSON.stringify(payload);
-
-  dataTransfer.setData(TRASH_TOOL_DRAG_MIME, serialized);
-  dataTransfer.setData("text/plain", serialized);
-  payload.allowedDropTargets.forEach((targetType) => {
-    dataTransfer.setData(getDropTargetMime(targetType), payload.trashToolId);
   });
   dataTransfer.effectAllowed = "move";
 }
@@ -367,115 +296,90 @@ export function readToolbarDragPayload(dataTransfer: DataTransfer): ToolbarDragP
   return null;
 }
 
-export function readBasketToolDragPayload(
+
+export function readEquipmentToolDragPayload(
   dataTransfer: DataTransfer,
-): BasketToolDragPayload | null {
+): EquipmentToolDragPayload | null {
   const rawPayload =
-    dataTransfer.getData(BASKET_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
+    dataTransfer.getData(EQUIPMENT_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
 
   if (!rawPayload) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(rawPayload) as Partial<BasketToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
+    const parsed = JSON.parse(rawPayload) as {
+      entityKind?: unknown;
+      sourceKind?: unknown;
+      sourceId?: unknown;
+      toolId?: unknown;
+      toolType?: unknown;
+      allowedDropTargets?: unknown[];
+      sourceSlotId?: unknown;
+      rackSlotId?: unknown;
+      trashToolId?: unknown;
+    };
 
     if (
-      parsed.entityKind === "tool" &&
-      parsed.sourceKind === "basket" &&
-      typeof parsed.sourceId === "string" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string"
+      parsed.entityKind !== "tool" ||
+      typeof parsed.sourceId !== "string" ||
+      typeof parsed.toolId !== "string" ||
+      typeof parsed.toolType !== "string"
     ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        sourceId: parsed.sourceId,
-        sourceKind: "basket",
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
+      return null;
+    }
+
+    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
+    const base = {
+      allowedDropTargets,
+      entityKind: "tool" as const,
+      sourceId: parsed.sourceId,
+      toolId: parsed.toolId,
+      toolType: parsed.toolType as ToolType,
+    };
+
+    switch (parsed.sourceKind) {
+      case "workbench":
+        if (typeof parsed.sourceSlotId !== "string") return null;
+        return { ...base, sourceKind: "workbench", sourceSlotId: parsed.sourceSlotId };
+      case "basket":
+        return { ...base, sourceKind: "basket" };
+      case "rack":
+        if (typeof parsed.rackSlotId !== "string") return null;
+        return { ...base, sourceKind: "rack", rackSlotId: parsed.rackSlotId };
+      case "gross_balance":
+        return { ...base, sourceKind: "gross_balance" };
+      case "analytical_balance":
+        return { ...base, sourceKind: "analytical_balance" };
+      case "vortex":
+        return { ...base, sourceKind: "vortex" };
+      case "trash":
+        if (typeof parsed.trashToolId !== "string") return null;
+        return { ...base, sourceKind: "trash", trashToolId: parsed.trashToolId };
+      default:
+        return null;
     }
   } catch {
     return null;
   }
-
-  return null;
 }
 
-export function readAnalyticalBalanceToolDragPayload(
-  dataTransfer: DataTransfer,
-): AnalyticalBalanceToolDragPayload | null {
-  const rawPayload =
-    dataTransfer.getData(ANALYTICAL_BALANCE_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
-
-  if (!rawPayload) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(rawPayload) as Partial<AnalyticalBalanceToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
-
-    if (
-      parsed.entityKind === "tool" &&
-      parsed.sourceKind === "analytical_balance" &&
-      typeof parsed.sourceId === "string" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string"
-    ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        sourceId: parsed.sourceId,
-        sourceKind: "analytical_balance",
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
+export function writeBenchToolDragPayload(dataTransfer: DataTransfer, payload: BenchToolDragPayload) {
+  writeEquipmentToolDragPayload(dataTransfer, payload);
 }
 
-export function readVortexToolDragPayload(
-  dataTransfer: DataTransfer,
-): VortexToolDragPayload | null {
-  const rawPayload =
-    dataTransfer.getData(VORTEX_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
+export function readBenchToolDragPayload(dataTransfer: DataTransfer): BenchToolDragPayload | null {
+  const payload = readEquipmentToolDragPayload(dataTransfer);
+  return payload?.sourceKind === "workbench" ? payload : null;
+}
 
-  if (!rawPayload) {
-    return null;
-  }
+export function writeRackToolDragPayload(dataTransfer: DataTransfer, payload: RackToolDragPayload) {
+  writeEquipmentToolDragPayload(dataTransfer, payload);
+}
 
-  try {
-    const parsed = JSON.parse(rawPayload) as Partial<VortexToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
-
-    if (
-      parsed.entityKind === "tool" &&
-      parsed.sourceKind === "vortex" &&
-      typeof parsed.sourceId === "string" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string"
-    ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        sourceId: parsed.sourceId,
-        sourceKind: "vortex",
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
+export function readRackToolDragPayload(dataTransfer: DataTransfer): RackToolDragPayload | null {
+  const payload = readEquipmentToolDragPayload(dataTransfer);
+  return payload?.sourceKind === "rack" ? payload : null;
 }
 
 export function readLimsLabelTicketDragPayload(
@@ -516,156 +420,9 @@ export function readLimsLabelTicketDragPayload(
   return null;
 }
 
-export function readBenchToolDragPayload(dataTransfer: DataTransfer): BenchToolDragPayload | null {
-  const rawPayload =
-    dataTransfer.getData(BENCH_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
 
-  if (!rawPayload) {
-    return null;
-  }
 
-  try {
-    const parsed = JSON.parse(rawPayload) as Partial<BenchToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
 
-    if (
-      parsed.entityKind === "tool" &&
-      typeof parsed.sourceSlotId === "string" &&
-      typeof parsed.sourceId === "string" &&
-      parsed.sourceKind === "workbench" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string" &&
-      allowedDropTargets.length > 0
-    ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        sourceId: parsed.sourceId,
-        sourceKind: "workbench",
-        sourceSlotId: parsed.sourceSlotId,
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-export function readRackToolDragPayload(dataTransfer: DataTransfer): RackToolDragPayload | null {
-  const rawPayload = dataTransfer.getData(RACK_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
-
-  if (!rawPayload) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(rawPayload) as Partial<RackToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
-
-    if (
-      parsed.entityKind === "tool" &&
-      typeof parsed.rackSlotId === "string" &&
-      typeof parsed.sourceId === "string" &&
-      parsed.sourceKind === "rack" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string" &&
-      allowedDropTargets.length > 0
-    ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        rackSlotId: parsed.rackSlotId,
-        sourceId: parsed.sourceId,
-        sourceKind: "rack",
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-export function readGrossBalanceToolDragPayload(
-  dataTransfer: DataTransfer,
-): GrossBalanceToolDragPayload | null {
-  const rawPayload =
-    dataTransfer.getData(GROSS_BALANCE_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
-
-  if (!rawPayload) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(rawPayload) as Partial<GrossBalanceToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
-
-    if (
-      parsed.entityKind === "tool" &&
-      parsed.sourceKind === "gross_balance" &&
-      typeof parsed.sourceId === "string" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string" &&
-      allowedDropTargets.length > 0
-    ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        sourceId: parsed.sourceId,
-        sourceKind: "gross_balance",
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-export function readTrashToolDragPayload(dataTransfer: DataTransfer): TrashToolDragPayload | null {
-  const rawPayload =
-    dataTransfer.getData(TRASH_TOOL_DRAG_MIME) || dataTransfer.getData("text/plain");
-
-  if (!rawPayload) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(rawPayload) as Partial<TrashToolDragPayload>;
-    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
-
-    if (
-      parsed.entityKind === "tool" &&
-      typeof parsed.trashToolId === "string" &&
-      typeof parsed.sourceId === "string" &&
-      parsed.sourceKind === "trash" &&
-      typeof parsed.toolId === "string" &&
-      typeof parsed.toolType === "string" &&
-      allowedDropTargets.length > 0
-    ) {
-      return {
-        allowedDropTargets,
-        entityKind: "tool",
-        sourceId: parsed.sourceId,
-        sourceKind: "trash",
-        trashToolId: parsed.trashToolId,
-        toolId: parsed.toolId,
-        toolType: parsed.toolType,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
 
 export function readWorkspaceWidgetDragPayload(
   dataTransfer: DataTransfer,
@@ -841,13 +598,7 @@ export function readSampleLabelDragPayload(
 export function toDragDescriptor(
   payload:
     | ToolbarDragPayload
-    | BenchToolDragPayload
-    | BasketToolDragPayload
-    | RackToolDragPayload
-    | GrossBalanceToolDragPayload
-    | AnalyticalBalanceToolDragPayload
-    | VortexToolDragPayload
-    | TrashToolDragPayload
+    | EquipmentToolDragPayload
     | WorkspaceWidgetDragPayload
     | WorkspaceLiquidDragPayload
     | ProduceDragPayload
@@ -954,68 +705,26 @@ export function toDragDescriptor(
     };
   }
 
-  if ("toolId" in payload && payload.sourceKind === "basket") {
+  if ("toolId" in payload) {
+    const p = payload as EquipmentToolDragPayload;
     return {
-      allowedDropTargets: payload.allowedDropTargets,
+      allowedDropTargets: p.allowedDropTargets,
       entityKind: "tool",
-      sourceId: payload.sourceId,
-      sourceKind: payload.sourceKind,
-      toolId: payload.toolId,
-      toolType: payload.toolType,
+      sourceId: p.sourceId,
+      sourceKind: p.sourceKind,
+      toolId: p.toolId,
+      toolType: p.toolType,
     };
   }
 
-  if ("toolId" in payload && payload.sourceKind === "gross_balance") {
-    return {
-      allowedDropTargets: payload.allowedDropTargets,
-      entityKind: "tool",
-      sourceId: payload.sourceId,
-      sourceKind: payload.sourceKind,
-      toolId: payload.toolId,
-      toolType: payload.toolType,
-    };
-  }
-
-  if ("toolId" in payload && payload.sourceKind === "analytical_balance") {
-    return {
-      allowedDropTargets: payload.allowedDropTargets,
-      entityKind: "tool",
-      sourceId: payload.sourceId,
-      sourceKind: payload.sourceKind,
-      toolId: payload.toolId,
-      toolType: payload.toolType,
-    };
-  }
-
-  if ("toolId" in payload && payload.sourceKind === "vortex") {
-    return {
-      allowedDropTargets: payload.allowedDropTargets,
-      entityKind: "tool",
-      sourceId: payload.sourceId,
-      sourceKind: payload.sourceKind,
-      toolId: payload.toolId,
-      toolType: payload.toolType,
-    };
-  }
-
-  if ("sourceSlotId" in payload || "rackSlotId" in payload || "trashToolId" in payload) {
-    return {
-      allowedDropTargets: payload.allowedDropTargets,
-      entityKind: "tool",
-      sourceId: payload.sourceId,
-      sourceKind: payload.sourceKind,
-      toolId: payload.toolId,
-      toolType: payload.toolType,
-    };
-  }
-
+  const p = payload as WorkspaceWidgetDragPayload;
   return {
-    allowedDropTargets: payload.allowedDropTargets,
+    allowedDropTargets: p.allowedDropTargets,
     entityKind: "workspace_widget",
-    sourceId: payload.sourceId,
-    sourceKind: payload.sourceKind,
-    widgetId: payload.widgetId,
-    widgetType: payload.widgetType,
+    sourceId: p.sourceId,
+    sourceKind: p.sourceKind,
+    widgetId: p.widgetId,
+    widgetType: p.widgetType,
   };
 }
 
@@ -1025,39 +734,9 @@ export function readDragDescriptor(dataTransfer: DataTransfer): DragDescriptor |
     return toDragDescriptor(toolbarPayload);
   }
 
-  const benchToolPayload = readBenchToolDragPayload(dataTransfer);
-  if (benchToolPayload) {
-    return toDragDescriptor(benchToolPayload);
-  }
-
-  const basketToolPayload = readBasketToolDragPayload(dataTransfer);
-  if (basketToolPayload) {
-    return toDragDescriptor(basketToolPayload);
-  }
-
-  const rackToolPayload = readRackToolDragPayload(dataTransfer);
-  if (rackToolPayload) {
-    return toDragDescriptor(rackToolPayload);
-  }
-
-  const grossBalanceToolPayload = readGrossBalanceToolDragPayload(dataTransfer);
-  if (grossBalanceToolPayload) {
-    return toDragDescriptor(grossBalanceToolPayload);
-  }
-
-  const analyticalBalanceToolPayload = readAnalyticalBalanceToolDragPayload(dataTransfer);
-  if (analyticalBalanceToolPayload) {
-    return toDragDescriptor(analyticalBalanceToolPayload);
-  }
-
-  const vortexToolPayload = readVortexToolDragPayload(dataTransfer);
-  if (vortexToolPayload) {
-    return toDragDescriptor(vortexToolPayload);
-  }
-
-  const trashToolPayload = readTrashToolDragPayload(dataTransfer);
-  if (trashToolPayload) {
-    return toDragDescriptor(trashToolPayload);
+  const equipmentToolPayload = readEquipmentToolDragPayload(dataTransfer);
+  if (equipmentToolPayload) {
+    return toDragDescriptor(equipmentToolPayload);
   }
 
   const workspaceWidgetPayload = readWorkspaceWidgetDragPayload(dataTransfer);
