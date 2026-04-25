@@ -73,6 +73,21 @@ export type MoveToolPayload = {
   destination_id: string;
 };
 
+export type MoveObjectPayload = {
+  entity: {
+    kind: string;
+    id: string;
+  };
+  source: {
+    kind: string;
+    id: string;
+  };
+  destination: {
+    kind: string;
+    id: string;
+  };
+};
+
 export type PlaceToolFromPalettePayload = {
   tool_id: string;
   destination_kind: string;

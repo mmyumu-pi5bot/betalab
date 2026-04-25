@@ -430,6 +430,17 @@ class RackSlotReferenceSchema(BaseModel):
     rack_slot_id: str
 
 
+class DndObjectRefSchema(BaseModel):
+    kind: str
+    id: str
+
+
+class DndMoveObjectSchema(BaseModel):
+    entity: DndObjectRefSchema
+    source: DndObjectRefSchema
+    destination: DndObjectRefSchema
+
+
 class DndMoveToolSchema(BaseModel):
     source_kind: str
     source_id: str

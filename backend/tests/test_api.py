@@ -7,6 +7,7 @@ import app.api.experiments as experiments_api
 from app.api.experiment_routes import analytical_balance as experiment_routes_analytical_balance
 from app.api.experiment_routes import common as experiment_routes_common
 from app.api.experiment_routes import core as experiment_routes_core
+from app.api.experiment_routes import dnd as experiment_routes_dnd
 from app.api.experiment_routes import gross_balance as experiment_routes_gross_balance
 from app.api.experiment_routes import rack as experiment_routes_rack
 from app.api.experiment_routes import reception as experiment_routes_reception
@@ -28,6 +29,7 @@ def isolated_api_experiment_service(tmp_path, monkeypatch):
     monkeypatch.setattr(experiment_routes_common, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_analytical_balance, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_core, "experiment_service", isolated_service)
+    monkeypatch.setattr(experiment_routes_dnd, "experiment_service", isolated_service)
     monkeypatch.setattr(
         experiment_routes_gross_balance,
         "experiment_service",
@@ -211,6 +213,60 @@ def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
 
 def _find_slot(payload: dict, slot_id: str) -> dict:
     return next(s for s in payload["workbench"]["slots"] if s["id"] == slot_id)
+
+
+def test_dnd_move_places_palette_tool_on_workbench_over_http() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        moved = client.post(
+            f"/experiments/{experiment_id}/dnd/move",
+            json={
+                "entity": {"kind": "tool", "id": "cutting_board_hdpe"},
+                "source": {"kind": "palette", "id": "lab_tools"},
+                "destination": {"kind": "workbench_slot", "id": "station_1"},
+            },
+        )
+
+    assert moved.status_code == 200
+    assert _find_slot(moved.json(), "station_1")["tool"]["tool_type"] == "cutting_board"
+
+
+def test_dnd_move_moves_produce_lot_between_workbench_tools_over_http() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        created_lot = client.post(f"/experiments/{experiment_id}/workspace/produce-lots", json={"produce_type": "apple"})
+        placed_bag = client.post(
+            f"/experiments/{experiment_id}/workbench/slots/station_1/place-tool",
+            json={"tool_id": "sealed_sampling_bag"},
+        )
+        client.post(f"/experiments/{experiment_id}/workbench/slots")
+        client.post(
+            f"/experiments/{experiment_id}/workbench/slots/station_2/place-tool",
+            json={"tool_id": "cutting_board_hdpe"},
+        )
+        produce_lot_id = created_lot.json()["basket_tools"][-1]["produce_lots"][0]["id"]
+        added_to_bag = client.post(
+            f"/experiments/{experiment_id}/dnd/move",
+            json={
+                "entity": {"kind": "produce_lot", "id": produce_lot_id},
+                "source": {"kind": "basket", "id": "produce_basket"},
+                "destination": {"kind": "workbench_tool", "id": "station_1"},
+            },
+        )
+        moved_to_board = client.post(
+            f"/experiments/{experiment_id}/dnd/move",
+            json={
+                "entity": {"kind": "produce_lot", "id": produce_lot_id},
+                "source": {"kind": "workbench", "id": "station_1"},
+                "destination": {"kind": "workbench_tool", "id": "station_2"},
+            },
+        )
+
+    assert placed_bag.status_code == 200
+    assert added_to_bag.status_code == 200
+    assert moved_to_board.status_code == 200
+    assert _find_slot(moved_to_board.json(), "station_1")["tool"]["produce_lots"] == []
+    assert _find_slot(moved_to_board.json(), "station_2")["tool"]["produce_lots"][0]["id"] == produce_lot_id
 
 
 def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
