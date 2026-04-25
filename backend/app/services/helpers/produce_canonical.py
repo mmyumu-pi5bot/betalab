@@ -15,7 +15,6 @@ from app.domain.models import (
 )
 from app.services.helpers.produce_material_states import (
     PARTICULATE_MATERIAL_STATES,
-    ensure_material_state,
     find_material_state,
     get_material_state_name,
 )
@@ -77,12 +76,11 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
 
         state_id = new_id("produce_material_state")
         state_ids_by_signature[signature] = state_id
-        material_state_record = ensure_material_state(
-            material_states,
-            produce_lot.id,
+        material_state_record = ProduceMaterialState(
+            id=state_id,
+            produce_lot_id=produce_lot.id,
             material_state=state_name,
         )
-        material_state_record.id = state_id
         if existing_state is not None:
             material_state_record.temperature_c = existing_state.temperature_c
             material_state_record.grind_quality_label = existing_state.grind_quality_label
@@ -90,6 +88,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             material_state_record.residual_co2_mass_g = existing_state.residual_co2_mass_g
             material_state_record.grinding_elapsed_seconds = existing_state.grinding_elapsed_seconds
             material_state_record.grinding_temperature_integral = existing_state.grinding_temperature_integral
+        material_states.append(material_state_record)
         material_state_ids_added.add(state_id)
         return state_id
 

@@ -1532,6 +1532,7 @@ function normalizeExperiment(experiment: Experiment): Experiment {
     normalizeProduceMaterialState(state as ProduceMaterialState & Record<string, unknown>),
   );
   const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
+  const statesById = new Map(materialStates.map((state) => [state.id, state]));
   const basketFractions = normalizeProduceFractions(
     rawWorkspace.produceBasketFractions ?? rawWorkspace.produce_basket_fractions,
   );
@@ -1585,7 +1586,7 @@ function normalizeExperiment(experiment: Experiment): Experiment {
           (lot) =>
             normalizeProduceLot(
               lot as ExperimentProduceLot & Record<string, unknown>,
-              buildProduceLotNormalizationContext(statesByLotId, basketFractions),
+              buildProduceLotNormalizationContext(statesByLotId, statesById, basketFractions),
             ),
         ),
       widgets: experiment.workspace.widgets.map((widget) => normalizeWorkspaceWidget(widget, materialStates)),
@@ -1637,6 +1638,7 @@ function normalizeBenchSlot(slot: BenchSlot, materialStates: ProduceMaterialStat
     []
   ) as unknown[];
   const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
+  const statesById = new Map(materialStates.map((state) => [state.id, state]));
   const surfaceFractions = normalizeProduceFractions(
     rawSlot.surfaceProduceFractions ?? rawSlot.surface_produce_fractions,
   );
@@ -1648,7 +1650,7 @@ function normalizeBenchSlot(slot: BenchSlot, materialStates: ProduceMaterialStat
     surfaceProduceLots: rawSurfaceProduceLots.map((lot) =>
       normalizeProduceLot(
         lot as ExperimentProduceLot & Record<string, unknown>,
-        buildProduceLotNormalizationContext(statesByLotId, surfaceFractions),
+        buildProduceLotNormalizationContext(statesByLotId, statesById, surfaceFractions),
       ),
     ),
     tool: slot.tool
@@ -1662,14 +1664,14 @@ function normalizeBenchTool(
   materialStates: ProduceMaterialState[],
 ): BenchToolInstance {
   const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
+  const statesById = new Map(materialStates.map((state) => [state.id, state]));
   const rawProduceLots = (tool.produceLots ?? tool.produce_lots ?? []) as unknown[];
   const produceFractions = normalizeProduceFractions(tool.produceFractions ?? tool.produce_fractions);
-  const produceLotContext = buildProduceLotNormalizationContext(statesByLotId, produceFractions);
+  const produceLotContext = buildProduceLotNormalizationContext(statesByLotId, statesById, produceFractions);
   const produceLots = rawProduceLots.map((lot) =>
     normalizeProduceLot(lot as ExperimentProduceLot & Record<string, unknown>, produceLotContext),
   );
   const powderMassG = getGroundProduceMassG(produceFractions, materialStates);
-  const statesById = new Map(materialStates.map((state) => [state.id, state]));
   const containsSlurry =
     produceLots.some((lot) => lot.materialState === "slurry") ||
     produceFractions.some((fraction) => statesById.get(fraction.produceMaterialStateId)?.materialState === "slurry");
@@ -1956,7 +1958,7 @@ function normalizeTrashProduceLot(entry: TrashProduceLotEntry & Record<string, u
     originLabel: String(entry.originLabel ?? entry.origin_label),
     produceLot: normalizeProduceLot(
       (entry.produceLot ?? entry.produce_lot) as ExperimentProduceLot & Record<string, unknown>,
-      buildProduceLotNormalizationContext(new Map(), produceFractions),
+      buildProduceLotNormalizationContext(new Map(), new Map(), produceFractions),
     ),
   };
 }
@@ -1974,9 +1976,10 @@ function normalizeWorkspaceWidget(
   materialStates: ProduceMaterialState[] = [],
 ): ExperimentWorkspaceWidget {
   const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
+  const statesById = new Map(materialStates.map((state) => [state.id, state]));
   const rawProduceLots = (widget.produceLots ?? widget.produce_lots ?? []) as unknown[];
   const produceFractions = normalizeProduceFractions(widget.produceFractions ?? widget.produce_fractions);
-  const produceLotContext = buildProduceLotNormalizationContext(statesByLotId, produceFractions);
+  const produceLotContext = buildProduceLotNormalizationContext(statesByLotId, statesById, produceFractions);
   const rawTool = (widget.tool ?? (widget as Record<string, unknown>).tool) as
     | (BenchToolInstance & Record<string, unknown>)
     | null
@@ -2022,14 +2025,17 @@ function normalizeWorkspaceWidget(
 
 type ProduceLotNormalizationContext = {
   fractionsByLotId: Map<string, ProduceFraction>;
+  statesById: Map<string, ProduceMaterialState>;
   statesByLotId: Map<string, ProduceMaterialState>;
 };
 
 function buildProduceLotNormalizationContext(
   statesByLotId: Map<string, ProduceMaterialState>,
+  statesById: Map<string, ProduceMaterialState>,
   fractions: ProduceFraction[] = [],
 ): ProduceLotNormalizationContext {
   return {
+    statesById,
     statesByLotId,
     fractionsByLotId: new Map(fractions.map((fraction) => [fraction.produceLotId, fraction])),
   };
@@ -2041,8 +2047,10 @@ function normalizeProduceLot(
 ): ExperimentProduceLot {
   const unitCountValue = lot.unitCount ?? lot.unit_count;
   const lotId = String(lot.id);
-  const stateRecord = context.statesByLotId.get(lotId);
   const fractionRecord = context.fractionsByLotId.get(lotId);
+  const stateRecord =
+    (fractionRecord ? context.statesById.get(fractionRecord.produceMaterialStateId) : undefined) ??
+    context.statesByLotId.get(lotId);
   const derivedState = stateRecord?.materialState;
 
   return {

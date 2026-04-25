@@ -104,6 +104,13 @@ pnpm install
 pnpm dev
 ```
 
+Notes de dev frontend:
+
+- `pnpm dev` est le serveur de reference pour le frontend local et pour les tests E2E.
+- Eviter de lancer plusieurs serveurs `next dev` differents en parallele dans `frontend/`, car ils partagent `frontend/.next`.
+- Les tests E2E doivent reutiliser le serveur existant quand il tourne deja.
+- Si le frontend tombe dans un etat incoherent avec des erreurs `ENOENT` dans `.next`, supprimer `frontend/.next` puis relancer `pnpm dev`.
+
 ## Prochaines Etapes
 
 1. Brancher le frontend sur l'API backend

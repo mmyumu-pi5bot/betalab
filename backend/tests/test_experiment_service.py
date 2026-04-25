@@ -91,6 +91,7 @@ from app.services.domain_services.workbench import (
     DiscardToolFromPaletteService,
     DiscardWorkbenchToolService,
     EmptyWorkbenchRequest,
+    LoadSpatulaFromWorkbenchToolService,
     MoveProduceLotBetweenWorkbenchToolsRequest,
     MoveProduceLotBetweenWorkbenchToolsService,
     MoveSampleLabelBetweenWorkbenchToolsRequest,
@@ -100,6 +101,8 @@ from app.services.domain_services.workbench import (
     OpenWorkbenchToolService,
     PlaceToolOnWorkbenchRequest,
     PlaceToolOnWorkbenchService,
+    PourSpatulaIntoWorkbenchToolRequest,
+    PourSpatulaIntoWorkbenchToolService,
     RemoveLiquidFromWorkbenchToolService,
     RemoveWorkbenchSlotService,
     RestoreTrashedProduceLotToWorkbenchToolRequest,
@@ -1323,6 +1326,129 @@ def test_adding_liquid_to_canonical_only_powder_turns_fraction_state_into_slurry
     assert slot.tool.liquids[0].volume_ml == 12.0
     assert slot.tool.produce_fractions[0].produce_material_state_id == "state_powder"
     assert any(state.id == "state_powder" and state.material_state == "slurry" for state in updated.produce_material_states)
+
+
+def test_adding_liquid_to_tube_does_not_turn_source_jar_fraction_into_slurry(monkeypatch) -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id="hdpe_storage_jar_2l"),
+    )
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_2", tool_id="centrifuge_tube_50ml"),
+    )
+
+    runtime_experiment = service._require_experiment(experiment.id)
+    runtime_experiment.produce_material_states = [
+        ProduceMaterialState(
+            id="state_powder",
+            produce_lot_id="lot_1",
+            material_state="ground",
+            grind_quality_label="powder_fine",
+        )
+    ]
+    source_tool = runtime_experiment.workbench.slots[0].tool
+    target_tool = runtime_experiment.workbench.slots[1].tool
+    assert source_tool is not None
+    assert target_tool is not None
+    source_tool.produce_lots = []
+    source_tool.produce_fractions = [
+        ProduceFraction(
+            id="jar_fraction",
+            produce_lot_id="lot_1",
+            produce_material_state_id="state_powder",
+            mass_g=10.0,
+            location_kind="workbench_tool",
+            location_id="station_1",
+            container_id=source_tool.id,
+            container_label=source_tool.label,
+        )
+    ]
+
+    monkeypatch.setattr("app.services.domain_services.workbench.random.gauss", lambda mu, sigma: 1.0)
+    LoadSpatulaFromWorkbenchToolService(service).run(experiment.id, WorkbenchSlotRequest(slot_id="station_1"))
+    PourSpatulaIntoWorkbenchToolService(service).run(
+        experiment.id,
+        PourSpatulaIntoWorkbenchToolRequest(slot_id="station_2", delta_mass_g=2.5),
+    )
+
+    updated = AddLiquidToWorkbenchToolService(service).run(
+        experiment.id,
+        AddLiquidToWorkbenchToolRequest(
+            slot_id="station_2",
+            liquid_id="acetonitrile_extraction",
+            volume_ml=10.0,
+        ),
+    )
+
+    source_tool = updated.workbench.slots[0].tool
+    target_tool = updated.workbench.slots[1].tool
+    assert source_tool is not None
+    assert target_tool is not None
+    assert source_tool.produce_fractions
+    assert target_tool.produce_fractions
+    assert source_tool.produce_fractions[0].produce_material_state_id == "state_powder"
+    assert target_tool.produce_fractions[0].produce_material_state_id != "state_powder"
+
+    states_by_id = {state.id: state for state in updated.produce_material_states}
+    assert states_by_id["state_powder"].material_state == "ground"
+    assert states_by_id[target_tool.produce_fractions[0].produce_material_state_id].material_state == "slurry"
+
+
+def test_debug_powder_source_jar_keeps_fraction_state_after_liquid_and_physics_tick(monkeypatch) -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id="hdpe_storage_jar_2l"),
+    )
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_2", tool_id="centrifuge_tube_50ml"),
+    )
+    OpenWorkbenchToolService(service).run(experiment.id, WorkbenchSlotRequest(slot_id="station_1"))
+    CreateDebugProduceLotOnWorkbenchService(service).run(
+        experiment.id,
+        CreateDebugProduceLotOnWorkbenchRequest(
+            preset_id="apple_powder_residual_co2",
+            target_slot_id="station_1",
+            total_mass_g=100.0,
+        ),
+    )
+
+    monkeypatch.setattr("app.services.domain_services.workbench.random.gauss", lambda mu, sigma: 1.0)
+    LoadSpatulaFromWorkbenchToolService(service).run(experiment.id, WorkbenchSlotRequest(slot_id="station_1"))
+    PourSpatulaIntoWorkbenchToolService(service).run(
+        experiment.id,
+        PourSpatulaIntoWorkbenchToolRequest(slot_id="station_2", delta_mass_g=0.1),
+    )
+    AddLiquidToWorkbenchToolService(service).run(
+        experiment.id,
+        AddLiquidToWorkbenchToolRequest(
+            slot_id="station_2",
+            liquid_id="acetonitrile_extraction",
+            volume_ml=10.0,
+        ),
+    )
+
+    runtime_experiment = service._require_experiment(experiment.id)
+    runtime_experiment.last_simulation_at = runtime_experiment.last_simulation_at - timedelta(seconds=1)
+    updated = service.get_experiment(experiment.id)
+
+    source_tool = updated.workbench.slots[0].tool
+    target_tool = updated.workbench.slots[1].tool
+    assert source_tool is not None
+    assert target_tool is not None
+    assert source_tool.produce_fractions
+    assert target_tool.produce_fractions
+
+    states_by_id = {state.id: state for state in updated.produce_material_states}
+    assert states_by_id[source_tool.produce_fractions[0].produce_material_state_id].material_state == "ground"
+    assert states_by_id[target_tool.produce_fractions[0].produce_material_state_id].material_state == "slurry"
 
 
 def test_place_sealed_sampling_bag_on_workbench() -> None:

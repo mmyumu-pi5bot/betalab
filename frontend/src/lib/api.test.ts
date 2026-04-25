@@ -490,6 +490,71 @@ describe("api client", () => {
     ]);
   });
 
+  it("prefers the fraction material state over the lot-level state when normalizing produce lots", async () => {
+    const experiment = {
+      ...makeExperiment(),
+      produceMaterialStates: [
+        {
+          id: "state_ground",
+          produceLotId: "lot_1",
+          materialState: "ground",
+        },
+        {
+          id: "state_slurry",
+          produceLotId: "lot_1",
+          materialState: "slurry",
+        },
+      ],
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              id: "bench_tool_1",
+              tool_id: "hdpe_storage_jar_2l",
+              label: "Wide-neck HDPE jar",
+              subtitle: "Bulk powder storage",
+              accent: "slate",
+              tool_type: "storage_jar",
+              capacity_ml: 180,
+              produce_lots: [
+                {
+                  id: "lot_1",
+                  label: "Apple powder lot",
+                  produce_type: "apple",
+                  total_mass_g: 8,
+                },
+              ],
+              produce_fractions: [
+                {
+                  id: "produce_fraction_1",
+                  produce_lot_id: "lot_1",
+                  produce_material_state_id: "state_ground",
+                  mass_g: 8,
+                },
+              ],
+              liquids: [],
+              labels: [],
+            },
+          },
+        ],
+      },
+    } satisfies Experiment;
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const normalized = await getExperiment("experiment_123");
+    expect(normalized.workbench.slots[0].tool?.produceLots[0]?.materialState).toBe("ground");
+    expect(normalized.workbench.slots[0].tool?.powderMassG).toBe(8);
+    expect(normalized.workbench.slots[0].tool?.containsSlurry).toBe(false);
+  });
+
   it("sends debug produce overrides when spawning on the workbench", async () => {
     const experiment = makeExperiment();
     const fetchMock = vi.fn().mockResolvedValue({

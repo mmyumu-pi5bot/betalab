@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.domain.models import (
     Experiment,
+    ProduceMaterialState,
     TrashProduceLotEntry,
     TrashSampleLabelEntry,
     WorkbenchSlot,
@@ -382,21 +383,79 @@ def _raise_if_tool_contains_slurry(
 
 def _convert_ground_produce_to_slurry(experiment: Experiment, tool: WorkbenchTool) -> None:
     converted_any = False
+    cloned_state_ids_by_original_id: dict[str, str] = {}
+    tool_fraction_object_ids = {id(fraction) for fraction in tool.produce_fractions}
+    states_by_id = {state.id: state for state in experiment.produce_material_states}
+
+    def state_is_shared_outside_tool(state_id: str) -> bool:
+        return any(
+            fraction.produce_material_state_id == state_id and id(fraction) not in tool_fraction_object_ids
+            for fraction in _iter_experiment_produce_fractions(experiment)
+        )
+
     for produce_lot in tool.produce_lots:
+        if any(fraction.produce_lot_id == produce_lot.id for fraction in tool.produce_fractions):
+            continue
         if get_material_state_name(experiment.produce_material_states, produce_lot.id) != "ground":
             continue
         set_material_state_name(experiment.produce_material_states, produce_lot.id, "slurry")
         converted_any = True
-    state_ids = {fraction.produce_material_state_id for fraction in tool.produce_fractions}
-    for state in experiment.produce_material_states:
-        if state.id not in state_ids or state.material_state != "ground":
+
+    for fraction in tool.produce_fractions:
+        state = states_by_id.get(fraction.produce_material_state_id)
+        if state is None or state.material_state != "ground":
             continue
+        cloned_state_id = cloned_state_ids_by_original_id.get(state.id)
+        if cloned_state_id is not None:
+            fraction.produce_material_state_id = cloned_state_id
+            state = states_by_id[cloned_state_id]
+        elif state_is_shared_outside_tool(state.id):
+            cloned_state = _clone_material_state(state)
+            experiment.produce_material_states.append(cloned_state)
+            states_by_id[cloned_state.id] = cloned_state
+            cloned_state_ids_by_original_id[state.id] = cloned_state.id
+            fraction.produce_material_state_id = cloned_state.id
+            state = cloned_state
         state.material_state = "slurry"
         converted_any = True
     if not converted_any:
         return
-    if tool.produce_lots:
-        sync_canonical_produce_model(experiment)
+    sync_canonical_produce_model(experiment)
+
+
+def _clone_material_state(state: ProduceMaterialState) -> ProduceMaterialState:
+    return ProduceMaterialState(
+        id=new_id("produce_material_state"),
+        produce_lot_id=state.produce_lot_id,
+        material_state=state.material_state,
+        temperature_c=state.temperature_c,
+        grind_quality_label=state.grind_quality_label,
+        homogeneity_score=state.homogeneity_score,
+        residual_co2_mass_g=state.residual_co2_mass_g,
+        grinding_elapsed_seconds=state.grinding_elapsed_seconds,
+        grinding_temperature_integral=state.grinding_temperature_integral,
+    )
+
+
+def _iter_experiment_produce_fractions(experiment: Experiment):
+    for basket_tool in experiment.basket_tools:
+        yield from basket_tool.produce_fractions
+    yield from experiment.spatula.produce_fractions
+    yield from experiment.workspace.produce_basket_fractions
+    for slot in experiment.workbench.slots:
+        yield from slot.surface_produce_fractions
+        if slot.tool is not None:
+            yield from slot.tool.produce_fractions
+    for slot in experiment.rack.slots:
+        if slot.tool is not None:
+            yield from slot.tool.produce_fractions
+    for widget in experiment.workspace.widgets:
+        yield from widget.produce_fractions
+        if widget.tool is not None:
+            yield from widget.tool.produce_fractions
+    for entry in experiment.trash.produce_lots:
+        if entry.produce_fraction is not None:
+            yield entry.produce_fraction
 
 
 class AddProduceLotToWorkbenchToolService(WriteDomainService[AddProduceLotToWorkbenchToolRequest]):
