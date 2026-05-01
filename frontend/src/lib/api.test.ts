@@ -7,6 +7,7 @@ import {
   createExperiment,
   deleteExperiment,
   getExperiment,
+  getToolbarCatalog,
   listExperiments,
   moveProduceLotBetweenWorkbenchTools,
   moveTool,
@@ -114,6 +115,56 @@ describe("api client", () => {
 
     await expect(listExperiments()).resolves.toEqual(experiments);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/experiments");
+  });
+
+  it("fetches and normalizes the toolbar catalog", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: "prep_tools",
+          label: "Containers",
+          description: "Bench containers",
+          items: [
+            {
+              id: "sample_vial_lcms",
+              item_type: "tool",
+              name: "Autosampler vial",
+              subtitle: "Injection ready",
+              description: "Injection vial",
+              accent: "sky",
+              tool_type: "sample_vial",
+              capacity_ml: 2,
+              allowed_drop_targets: ["workbench_slot", "rack_slot"],
+            },
+          ],
+        },
+      ],
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getToolbarCatalog()).resolves.toEqual([
+      {
+        id: "prep_tools",
+        label: "Containers",
+        description: "Bench containers",
+        items: [
+          {
+            id: "sample_vial_lcms",
+            itemType: "tool",
+            name: "Autosampler vial",
+            subtitle: "Injection ready",
+            description: "Injection vial",
+            accent: "sky",
+            toolType: "sample_vial",
+            capacity_ml: 2,
+            allowedDropTargets: ["workbench_slot", "rack_slot"],
+          },
+        ],
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/experiments/catalog/toolbar");
   });
 
   it("normalizes DnD contract fields from the experiment snapshot", async () => {

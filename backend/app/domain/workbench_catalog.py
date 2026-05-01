@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.dnd_rules import (
+    get_liquid_allowed_drop_targets,
+    get_sample_label_allowed_drop_targets,
+    get_tool_allowed_drop_targets,
+)
+
 
 @dataclass(frozen=True)
 class WorkbenchToolDefinition:
@@ -109,6 +115,142 @@ WORKBENCH_LIQUIDS = {
 }
 
 
+_TOOL_DESCRIPTIONS = {
+    "centrifuge_tube_50ml": "Receives apple sample and extraction solvent before salts and centrifugation.",
+    "cleanup_tube_dspe": "Collects the supernatant for dispersive SPE cleanup before final vialing.",
+    "sample_vial_lcms": "Standard autosampler vial used to load the final extract into the chromatograph.",
+    "beaker_rinse": "Open vessel for rinse, discard, or intermediate handling on the bench.",
+    "hdpe_storage_jar_2l": "Wide-mouth 2 L HDPE storage jar with a thick screw cap for cold, sealed bulk homogenate handling.",
+    "sealed_sampling_bag": "Tamper-evident sample collection bag for sealed produce or field intake.",
+    "cutting_board_hdpe": "Clean prep board used to stage apples before cutting.",
+}
+
+_LIQUID_DETAILS = {
+    "acetonitrile_extraction": {
+        "description": "Primary extraction solvent used in the QuEChERS workflow.",
+        "liquid_type": "acetonitrile",
+        "subtitle": "Extraction solvent",
+    },
+    "apple_extract": {
+        "description": "Cryogenic apple homogenate represented as the incoming sample matrix.",
+        "liquid_type": "apple_extract",
+        "subtitle": "Homogenized sample",
+    },
+    "ultrapure_water_rinse": {
+        "description": "Support liquid for rinsing or simple dilution during setup.",
+        "liquid_type": "ultrapure_water",
+        "subtitle": "Rinse / dilution",
+    },
+    "dry_ice_pellets": {
+        "description": "Solid CO2 pellets used for chilled handling and cold-chain prep in the cryogenic grinder.",
+        "liquid_type": "dry_ice_pellets",
+        "subtitle": "Cryogenic cooling",
+    },
+}
+
+_WORKSPACE_WIDGET_ITEMS = {
+    "autosampler_rack_widget": {
+        "accent": "sky",
+        "description": "Rack widget used to organize injection-ready vials before an LC-MS/MS run.",
+        "name": "Autosampler rack",
+        "subtitle": "Sequence staging",
+        "widget_type": "autosampler_rack",
+    },
+    "lc_msms_instrument_widget": {
+        "accent": "emerald",
+        "description": "Pedagogical LC-MS/MS system widget with separate LC and MS/MS visual modules.",
+        "name": "LC-MS/MS",
+        "subtitle": "Instrument system",
+        "widget_type": "lc_msms_instrument",
+    },
+    "cryogenic_grinder_widget": {
+        "accent": "amber",
+        "description": "Benchtop grinder used to homogenize chilled produce before extraction.",
+        "name": "Cryogenic grinder",
+        "subtitle": "Cold homogenization",
+        "widget_type": "cryogenic_grinder",
+    },
+    "vortex_mixer_widget": {
+        "accent": "violet",
+        "description": "Benchtop vortex used to mix centrifuge and cleanup tubes.",
+        "name": "Vortex mixer",
+        "subtitle": "Tube agitation",
+        "widget_type": "vortex_mixer",
+    },
+    "lims_terminal_widget": {
+        "accent": "emerald",
+        "description": "Terminal used to register the sample and print the lab label.",
+        "name": "LIMS terminal",
+        "subtitle": "Sample login",
+        "widget_type": "lims_terminal",
+    },
+    "gross_balance_widget": {
+        "accent": "rose",
+        "description": "Bench balance used to record the incoming bag gross mass.",
+        "name": "Gross balance",
+        "subtitle": "Receiving weight",
+        "widget_type": "gross_balance",
+    },
+    "analytical_balance_widget": {
+        "accent": "emerald",
+        "description": "Precision balance used to tare the Falcon tube and capture the 10.000 g QuEChERS test portion.",
+        "name": "Analytical balance",
+        "subtitle": "Sample intake",
+        "widget_type": "analytical_balance",
+    },
+}
+
+_TOOLBAR_CATEGORY_DEFINITIONS = (
+    {
+        "description": "Bench containers used from extraction to cleanup before injection.",
+        "id": "prep_tools",
+        "item_ids": (
+            "centrifuge_tube_50ml",
+            "cleanup_tube_dspe",
+            "sample_vial_lcms",
+            "beaker_rinse",
+            "hdpe_storage_jar_2l",
+        ),
+        "item_source": "tools",
+        "label": "Containers",
+    },
+    {
+        "description": "Starting liquids for the first pesticide extraction simulation.",
+        "id": "workflow_liquids",
+        "item_ids": (
+            "acetonitrile_extraction",
+            "apple_extract",
+            "ultrapure_water_rinse",
+            "dry_ice_pellets",
+        ),
+        "item_source": "liquids",
+        "label": "Liquids",
+    },
+    {
+        "description": "Large lab systems that can be dropped onto the open workspace canvas.",
+        "id": "workspace_equipment",
+        "item_ids": (
+            "autosampler_rack_widget",
+            "lc_msms_instrument_widget",
+            "cryogenic_grinder_widget",
+            "vortex_mixer_widget",
+            "lims_terminal_widget",
+            "gross_balance_widget",
+            "analytical_balance_widget",
+        ),
+        "item_source": "workspace_widgets",
+        "label": "Workspace equipment",
+    },
+    {
+        "description": "Temporary catch-all for supporting lab items not yet grouped elsewhere.",
+        "id": "misc",
+        "item_ids": ("sealed_sampling_bag", "sampling_bag_label", "cutting_board_hdpe"),
+        "item_source": "mixed",
+        "label": "MISC",
+    },
+)
+
+
 def get_workbench_tool_definition(tool_id: str) -> WorkbenchToolDefinition:
     try:
         return WORKBENCH_TOOLS[tool_id]
@@ -121,3 +263,85 @@ def get_workbench_liquid_definition(liquid_id: str) -> WorkbenchLiquidDefinition
         return WORKBENCH_LIQUIDS[liquid_id]
     except KeyError as exc:
         raise ValueError("Unknown workbench liquid") from exc
+
+
+def _build_tool_toolbar_item(tool_id: str) -> dict[str, object]:
+    tool = get_workbench_tool_definition(tool_id)
+    return {
+        "accent": tool.accent,
+        "allowed_drop_targets": get_tool_allowed_drop_targets(tool.tool_type),
+        "capacity_ml": tool.capacity_ml,
+        "description": _TOOL_DESCRIPTIONS[tool_id],
+        "id": tool.id,
+        "item_type": "tool",
+        "name": tool.name,
+        "subtitle": tool.subtitle,
+        "tool_type": tool.tool_type,
+    }
+
+
+def _build_liquid_toolbar_item(liquid_id: str) -> dict[str, object]:
+    liquid = get_workbench_liquid_definition(liquid_id)
+    details = _LIQUID_DETAILS[liquid_id]
+    liquid_type = str(details["liquid_type"])
+    return {
+        "accent": liquid.accent,
+        "allowed_drop_targets": get_liquid_allowed_drop_targets(liquid_type),
+        "description": details["description"],
+        "id": liquid.id,
+        "item_type": "liquid",
+        "liquid_type": liquid_type,
+        "name": liquid.name,
+        "subtitle": details["subtitle"],
+        "transfer_volume_ml": liquid.transfer_volume_ml,
+    }
+
+
+def _build_workspace_widget_toolbar_item(widget_id: str) -> dict[str, object]:
+    widget = _WORKSPACE_WIDGET_ITEMS[widget_id]
+    return {
+        "accent": widget["accent"],
+        "allowed_drop_targets": ["workspace_canvas"],
+        "description": widget["description"],
+        "id": widget_id,
+        "item_type": "workspace_widget",
+        "name": widget["name"],
+        "subtitle": widget["subtitle"],
+        "widget_type": widget["widget_type"],
+    }
+
+
+def _build_sample_label_toolbar_item() -> dict[str, object]:
+    return {
+        "accent": "sky",
+        "allowed_drop_targets": get_sample_label_allowed_drop_targets(),
+        "description": "Manual adhesive label with editable free text.",
+        "id": "sampling_bag_label",
+        "item_type": "sample_label",
+        "name": "Label",
+        "subtitle": "Free note",
+    }
+
+
+def _build_toolbar_item(item_id: str, item_source: str) -> dict[str, object]:
+    if item_id == "sampling_bag_label":
+        return _build_sample_label_toolbar_item()
+    if item_source == "tools" or item_id in WORKBENCH_TOOLS:
+        return _build_tool_toolbar_item(item_id)
+    if item_source == "liquids" or item_id in WORKBENCH_LIQUIDS:
+        return _build_liquid_toolbar_item(item_id)
+    if item_source == "workspace_widgets":
+        return _build_workspace_widget_toolbar_item(item_id)
+    raise ValueError(f"Unknown toolbar item: {item_id}")
+
+
+def get_toolbar_categories() -> list[dict[str, object]]:
+    return [
+        {
+            "description": category["description"],
+            "id": category["id"],
+            "items": [_build_toolbar_item(str(item_id), str(category["item_source"])) for item_id in category["item_ids"]],
+            "label": category["label"],
+        }
+        for category in _TOOLBAR_CATEGORY_DEFINITIONS
+    ]

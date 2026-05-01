@@ -5,9 +5,8 @@ import type { RefObject } from "react";
 import { DebugProducePalette, type DebugProducePreset } from "@/components/debug-produce-palette";
 import { ToolbarPanel } from "@/components/toolbar-panel";
 import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
-import { labWorkflowCategories } from "@/lib/lab-workflow-catalog";
 import { createToolbarDragPayload, toDragDescriptor } from "@/lib/workbench-dnd";
-import type { DragDescriptor, DropTargetType } from "@/types/workbench";
+import type { DragDescriptor, DropTargetType, ToolbarCategory } from "@/types/workbench";
 
 type LabSceneInventoryPanelProps = {
   debug: {
@@ -23,9 +22,10 @@ type LabSceneInventoryPanelProps = {
     showDropTargets: (targets: readonly DropTargetType[]) => void;
     workbench: Pick<WorkbenchDndApi, "handleDebugProducePresetDragStart">;
   };
+  toolbarCategories: ToolbarCategory[];
 };
 
-export function LabSceneInventoryPanel({ debug, dnd }: LabSceneInventoryPanelProps) {
+export function LabSceneInventoryPanel({ debug, dnd, toolbarCategories }: LabSceneInventoryPanelProps) {
   return (
     <div className="space-y-4 xl:sticky xl:top-6 xl:self-start" data-testid="widget-inventory">
       <div
@@ -38,7 +38,7 @@ export function LabSceneInventoryPanel({ debug, dnd }: LabSceneInventoryPanelPro
       >
         <div>
           <ToolbarPanel
-            categories={labWorkflowCategories}
+            categories={toolbarCategories}
             dragDisabled={dnd.dndDisabledByAction}
             onItemDragEnd={dnd.clearDropTargets}
             onItemDragStart={(item, allowedDropTargets) => {

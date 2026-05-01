@@ -2,7 +2,8 @@ import asyncio
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
-from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
+from app.domain.workbench_catalog import get_toolbar_categories
+from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema, ToolbarCategorySchema
 from app.services.experiment_service import ExperimentNotFoundError
 
 from .common import (
@@ -29,6 +30,11 @@ def delete_experiment(experiment_id: str) -> None:
         experiment_service.delete_experiment(experiment_id)
     except ExperimentNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Experiment not found") from exc
+
+
+@router.get("/catalog/toolbar", response_model=list[ToolbarCategorySchema])
+def get_toolbar_catalog() -> list[dict[str, object]]:
+    return get_toolbar_categories()
 
 
 @router.get("/{experiment_id}", response_model=ExperimentSchema)

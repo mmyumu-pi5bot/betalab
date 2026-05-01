@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { LabSceneView } from "@/components/lab-scene-view";
 import { DropDraftCard } from "@/components/drop-draft-card";
@@ -34,7 +34,9 @@ import {
   roundMass,
   type LabSceneWidgetId,
 } from "@/lib/lab-scene-config";
+import { getToolbarCatalog } from "@/lib/api";
 import { canWorkspaceWidgetBeStored } from "@/lib/tool-drop-targets";
+import type { ToolbarCategory } from "@/types/workbench";
 
 const defaultStatusMessage = "Start by dragging an extraction tool onto the bench.";
 const defaultErrorMessage = "Unable to load lab scene";
@@ -68,12 +70,33 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   } = useDragState();
   const [isBasketOpen, setIsBasketOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [toolbarCategories, setToolbarCategories] = useState<ToolbarCategory[]>([]);
   const inventoryDropRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const spatula =
     state.status === "ready"
       ? state.experiment.spatula
       : { isLoaded: false, produceFractions: [], sourceToolId: null };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getToolbarCatalog()
+      .then((categories) => {
+        if (isMounted) {
+          setToolbarCategories(categories);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setToolbarCategories([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const {
     activeActionId,
@@ -365,6 +388,9 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       debug={{
         debugInventoryEnabled,
         debugProducePresets,
+      }}
+      inventory={{
+        toolbarCategories,
       }}
       display={{
         basketProduceLots: state.experiment.workspace.produceBasketLots,

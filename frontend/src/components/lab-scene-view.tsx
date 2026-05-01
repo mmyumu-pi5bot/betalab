@@ -29,6 +29,7 @@ import type {
   ExperimentWorkspaceWidget,
   RackSlot,
   SpatulaState,
+  ToolbarCategory,
   ToolbarDragPayload,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
@@ -44,6 +45,9 @@ type LabSceneViewProps = {
   debug: {
     debugInventoryEnabled: boolean;
     debugProducePresets: DebugProducePreset[];
+  };
+  inventory: {
+    toolbarCategories: ToolbarCategory[];
   };
   display: {
     basketProduceLots: ExperimentProduceLot[];
@@ -165,6 +169,7 @@ export function LabSceneView({
   dnd,
   dropDraft,
   experiment,
+  inventory,
   rack,
   spatula,
   ui,
@@ -202,6 +207,7 @@ export function LabSceneView({
               showDropTargets: dnd.showDropTargets,
               workbench: dnd.workbench,
             }}
+            toolbarCategories={inventory.toolbarCategories}
           />
 
           <LabSceneWorkspaceCanvas

@@ -1,4 +1,3 @@
-import { getLiquidDropTargets, getSampleLabelDropTargets, getToolDropTargets } from "@/lib/tool-drop-targets";
 import type { LiquidCatalogItem, ToolCatalogItem, ToolbarCategory } from "@/types/workbench";
 
 export const labWorkflowCategories: ToolbarCategory[] = [
@@ -9,7 +8,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
     items: [
       {
         id: "centrifuge_tube_50ml",
-        allowedDropTargets: getToolDropTargets("centrifuge_tube"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "50 mL centrifuge tube",
         subtitle: "QuEChERS extraction",
@@ -20,7 +19,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "cleanup_tube_dspe",
-        allowedDropTargets: getToolDropTargets("cleanup_tube"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "d-SPE cleanup tube",
         subtitle: "Matrix cleanup",
@@ -31,7 +30,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "sample_vial_lcms",
-        allowedDropTargets: getToolDropTargets("sample_vial"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "Autosampler vial",
         subtitle: "Injection ready",
@@ -42,7 +41,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "beaker_rinse",
-        allowedDropTargets: getToolDropTargets("beaker"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "Bench beaker",
         subtitle: "Temporary holding",
@@ -53,7 +52,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "hdpe_storage_jar_2l",
-        allowedDropTargets: getToolDropTargets("storage_jar"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "Wide-neck HDPE jar",
         subtitle: "Bulk powder storage",
@@ -71,7 +70,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
     items: [
       {
         id: "acetonitrile_extraction",
-        allowedDropTargets: getLiquidDropTargets("acetonitrile"),
+        allowedDropTargets: [],
         itemType: "liquid",
         name: "Acetonitrile",
         subtitle: "Extraction solvent",
@@ -82,7 +81,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "apple_extract",
-        allowedDropTargets: getLiquidDropTargets("apple_extract"),
+        allowedDropTargets: [],
         itemType: "liquid",
         name: "Apple extract",
         subtitle: "Homogenized sample",
@@ -93,7 +92,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "ultrapure_water_rinse",
-        allowedDropTargets: getLiquidDropTargets("ultrapure_water"),
+        allowedDropTargets: [],
         itemType: "liquid",
         name: "Ultrapure water",
         subtitle: "Rinse / dilution",
@@ -104,7 +103,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "dry_ice_pellets",
-        allowedDropTargets: getLiquidDropTargets("dry_ice_pellets"),
+        allowedDropTargets: [],
         itemType: "liquid",
         name: "Dry ice pellets (CO2)",
         subtitle: "Cryogenic cooling",
@@ -199,7 +198,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
     items: [
       {
         id: "sealed_sampling_bag",
-        allowedDropTargets: getToolDropTargets("sample_bag"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "Sealed sampling bag",
         subtitle: "Field collection",
@@ -210,7 +209,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "sampling_bag_label",
-        allowedDropTargets: getSampleLabelDropTargets(),
+        allowedDropTargets: [],
         itemType: "sample_label",
         name: "Label",
         subtitle: "Free note",
@@ -219,7 +218,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
       },
       {
         id: "cutting_board_hdpe",
-        allowedDropTargets: getToolDropTargets("cutting_board"),
+        allowedDropTargets: [],
         itemType: "tool",
         name: "Cutting board",
         subtitle: "Prep surface",

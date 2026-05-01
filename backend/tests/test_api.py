@@ -211,6 +211,35 @@ def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
     assert grinder_widget["drop_target_types"] == ["grinder_widget"]
 
 
+def test_toolbar_catalog_exposes_backend_dnd_targets_over_http() -> None:
+    with TestClient(app) as client:
+        response = client.get("/experiments/catalog/toolbar")
+
+    assert response.status_code == 200
+    categories = response.json()
+    sample_vial = next(item for category in categories for item in category["items"] if item["id"] == "sample_vial_lcms")
+    dry_ice = next(item for category in categories for item in category["items"] if item["id"] == "dry_ice_pellets")
+    label = next(item for category in categories for item in category["items"] if item["id"] == "sampling_bag_label")
+
+    assert sample_vial["item_type"] == "tool"
+    assert sample_vial["allowed_drop_targets"] == [
+        "workbench_slot",
+        "rack_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+    ]
+    assert dry_ice["item_type"] == "liquid"
+    assert dry_ice["allowed_drop_targets"] == ["grinder_widget"]
+    assert label["item_type"] == "sample_label"
+    assert label["allowed_drop_targets"] == [
+        "workbench_slot",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+        "trash_bin",
+    ]
+
+
 def _find_slot(payload: dict, slot_id: str) -> dict:
     return next(s for s in payload["workbench"]["slots"] if s["id"] == slot_id)
 
@@ -229,6 +258,28 @@ def test_dnd_move_places_palette_tool_on_workbench_over_http() -> None:
 
     assert moved.status_code == 200
     assert _find_slot(moved.json(), "station_1")["tool"]["tool_type"] == "cutting_board"
+
+
+def test_dnd_move_moves_workbench_tool_to_gross_balance_over_http() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        placed = client.post(
+            f"/experiments/{experiment_id}/workbench/slots/station_1/place-tool",
+            json={"tool_id": "sealed_sampling_bag"},
+        )
+        moved = client.post(
+            f"/experiments/{experiment_id}/dnd/move",
+            json={
+                "entity": {"kind": "tool", "id": "station_1"},
+                "source": {"kind": "workbench", "id": "station_1"},
+                "destination": {"kind": "gross_balance", "id": "gross_balance"},
+            },
+        )
+
+    assert placed.status_code == 200
+    assert moved.status_code == 200
+    assert _find_slot(moved.json(), "station_1")["tool"] is None
+    assert _find_widget(moved.json(), "gross_balance")["tool"]["tool_type"] == "sample_bag"
 
 
 def test_dnd_move_moves_produce_lot_between_workbench_tools_over_http() -> None:

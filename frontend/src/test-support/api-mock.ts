@@ -1,8 +1,13 @@
 import { vi } from "vitest";
 
+import { toolbarCatalogFixture } from "@/test-support/toolbar-catalog-fixture";
 import type { Experiment } from "@/types/experiment";
+import type { ToolbarCategory } from "@/types/workbench";
 
 export const createExperiment = vi.fn<() => Promise<Experiment>>();
+export const getToolbarCatalog = vi.fn<() => Promise<ToolbarCategory[]>>(() =>
+  Promise.resolve(toolbarCatalogFixture),
+);
 export const sendExperimentCommand = vi.fn<
   (experimentId: string, type: string, payload: Record<string, unknown>) => Promise<Experiment>
 >();
@@ -198,5 +203,6 @@ export function emitExperimentSnapshot(experimentId: string, experiment: Experim
 
 export function resetApiMocks() {
   vi.clearAllMocks();
+  getToolbarCatalog.mockResolvedValue(toolbarCatalogFixture);
   streamSubscriptions.clear();
 }

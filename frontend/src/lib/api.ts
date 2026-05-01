@@ -14,6 +14,8 @@ import type {
   PrintedLabelTicket,
   RackSlot,
   SpatulaState,
+  ToolbarCategory,
+  ToolbarItem,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
   WidgetAnchor,
@@ -126,6 +128,64 @@ export async function listExperiments(): Promise<ExperimentListEntry[]> {
       entry.last_audit_entry === null || entry.last_audit_entry === undefined
         ? null
         : String(entry.last_audit_entry),
+  }));
+}
+
+function normalizeToolbarItem(rawItem: Record<string, unknown>): ToolbarItem {
+  const itemType = String(rawItem.itemType ?? rawItem.item_type);
+  const base = {
+    accent: String(rawItem.accent) as ToolbarItem["accent"],
+    allowedDropTargets: normalizeAllowedDropTargets(rawItem.allowedDropTargets ?? rawItem.allowed_drop_targets),
+    description: String(rawItem.description ?? ""),
+    id: String(rawItem.id),
+    name: String(rawItem.name),
+    subtitle: String(rawItem.subtitle ?? ""),
+  };
+
+  if (itemType === "tool") {
+    return {
+      ...base,
+      capacity_ml: Number(rawItem.capacity_ml ?? 0),
+      itemType: "tool",
+      toolType: String(rawItem.toolType ?? rawItem.tool_type) as Extract<ToolbarItem, { itemType: "tool" }>["toolType"],
+    };
+  }
+  if (itemType === "liquid") {
+    return {
+      ...base,
+      itemType: "liquid",
+      liquidType: String(rawItem.liquidType ?? rawItem.liquid_type) as Extract<ToolbarItem, { itemType: "liquid" }>["liquidType"],
+      transfer_volume_ml: Number(rawItem.transfer_volume_ml ?? 0),
+    };
+  }
+  if (itemType === "workspace_widget") {
+    return {
+      ...base,
+      itemType: "workspace_widget",
+      widgetType: String(rawItem.widgetType ?? rawItem.widget_type) as Extract<ToolbarItem, { itemType: "workspace_widget" }>["widgetType"],
+    };
+  }
+  return {
+    ...base,
+    itemType: "sample_label",
+  };
+}
+
+export async function getToolbarCatalog(): Promise<ToolbarCategory[]> {
+  const response = await fetch(`${API_BASE_URL}/experiments/catalog/toolbar`);
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to fetch toolbar catalog");
+  }
+
+  const payload = (await response.json()) as Array<Record<string, unknown>>;
+  return payload.map((category) => ({
+    description: String(category.description ?? ""),
+    id: String(category.id),
+    items: ((category.items ?? []) as Array<Record<string, unknown>>).map((item) =>
+      normalizeToolbarItem(item),
+    ),
+    label: String(category.label ?? ""),
   }));
 }
 

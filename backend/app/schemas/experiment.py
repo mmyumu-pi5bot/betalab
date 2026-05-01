@@ -5,31 +5,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
-
-def _get_tool_allowed_drop_targets(tool_type: str) -> list[str]:
-    targets = ["workbench_slot", "trash_bin", "gross_balance_widget"]
-
-    if tool_type == "sample_vial":
-        targets.insert(1, "rack_slot")
-    if tool_type not in {"cutting_board", "sample_bag"}:
-        targets.append("analytical_balance_widget")
-    if tool_type in {"centrifuge_tube", "cleanup_tube"}:
-        targets.append("vortex_widget")
-
-    return targets
-
-
-def _get_sample_label_allowed_drop_targets() -> list[str]:
-    return ["workbench_slot", "gross_balance_widget", "analytical_balance_widget", "trash_bin"]
-
-
-def _get_lims_label_ticket_allowed_drop_targets() -> list[str]:
-    return _get_sample_label_allowed_drop_targets()
-
-
-def _get_produce_lot_allowed_drop_targets() -> list[str]:
-    return ["workbench_slot", "grinder_widget", "trash_bin", "gross_balance_widget"]
-
+from app.domain.dnd_rules import (
+    get_lims_label_ticket_allowed_drop_targets,
+    get_produce_lot_allowed_drop_targets,
+    get_sample_label_allowed_drop_targets,
+    get_tool_allowed_drop_targets,
+)
 
 _STORABLE_WIDGET_IDS = {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}
 
@@ -97,7 +78,7 @@ class ProduceLotSchema(BaseModel):
 
     @computed_field
     def allowed_drop_targets(self) -> list[str]:
-        return _get_produce_lot_allowed_drop_targets()
+        return get_produce_lot_allowed_drop_targets()
 
 
 class PrintedLabelTicketSchema(BaseModel):
@@ -112,7 +93,7 @@ class PrintedLabelTicketSchema(BaseModel):
 
     @computed_field
     def allowed_drop_targets(self) -> list[str]:
-        return _get_lims_label_ticket_allowed_drop_targets()
+        return get_lims_label_ticket_allowed_drop_targets()
 
 
 class ContainerLabelSchema(BaseModel):
@@ -128,7 +109,7 @@ class ContainerLabelSchema(BaseModel):
 
     @computed_field
     def allowed_drop_targets(self) -> list[str]:
-        return _get_sample_label_allowed_drop_targets()
+        return get_sample_label_allowed_drop_targets()
 
 
 class EntityOriginSchema(BaseModel):
@@ -202,11 +183,11 @@ class WorkbenchToolSchema(BaseModel):
 
     @computed_field
     def allowed_drop_targets(self) -> list[str]:
-        return _get_tool_allowed_drop_targets(self.tool_type)
+        return get_tool_allowed_drop_targets(self.tool_type)
 
     @computed_field
     def is_draggable(self) -> bool:
-        return len(_get_tool_allowed_drop_targets(self.tool_type)) > 0
+        return len(get_tool_allowed_drop_targets(self.tool_type)) > 0
 
 
 class WorkbenchSlotSchema(BaseModel):
@@ -342,6 +323,28 @@ class ExperimentListEntrySchema(BaseModel):
     snapshot_version: int
     updated_at: datetime
     last_audit_entry: str | None = None
+
+
+class ToolbarItemSchema(BaseModel):
+    id: str
+    item_type: str
+    name: str
+    subtitle: str
+    description: str
+    accent: str
+    allowed_drop_targets: list[str]
+    tool_type: str | None = None
+    capacity_ml: float | None = None
+    liquid_type: str | None = None
+    transfer_volume_ml: float | None = None
+    widget_type: str | None = None
+
+
+class ToolbarCategorySchema(BaseModel):
+    id: str
+    label: str
+    description: str
+    items: list[ToolbarItemSchema]
 
 
 class LayoutPositionSchema(BaseModel):
