@@ -248,10 +248,7 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             ]
         ),
         trash=Trash(
-            children=[
-                _deserialize_non_null_workbench_tool(tool_schema)
-                for tool_schema in schema.trash.children
-            ],
+            children=[_deserialize_non_null_workbench_tool(tool_schema) for tool_schema in schema.trash.children],
             discarded_from=dict(schema.trash.discarded_from),
             produce_lots=[
                 TrashProduceLotEntry(

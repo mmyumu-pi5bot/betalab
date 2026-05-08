@@ -193,6 +193,7 @@ describe("ToolbarPanel", () => {
                 accent: "sky",
                 toolType: "sample_vial",
                 capacity_ml: 2,
+                canSeal: true,
               },
               {
                 id: "hdpe_storage_jar_2l",
@@ -204,6 +205,7 @@ describe("ToolbarPanel", () => {
                 accent: "sky",
                 toolType: "storage_jar",
                 capacity_ml: 2000,
+                canSeal: true,
               },
             ],
           },

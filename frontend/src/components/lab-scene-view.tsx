@@ -85,7 +85,6 @@ type LabSceneViewProps = {
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
     instrumentStatus: "idle" | "ready";
-    isRackSlotHighlighted: boolean;
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
@@ -137,6 +136,7 @@ type LabSceneViewProps = {
     handleWorkspaceDragOver: (event: DragEvent<HTMLDivElement>) => void;
     handleWorkspaceDrop: (event: DragEvent<HTMLDivElement>) => void;
     liveWidgetIds: string[];
+    registerWidgetNode: (widgetId: string, node: HTMLDivElement | null) => void;
     widgetLayout: Record<string, WidgetLayout>;
     widgetOrder: string[];
     workspaceCursor: string | undefined;

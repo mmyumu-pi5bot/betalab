@@ -35,7 +35,6 @@ import {
   type LabSceneWidgetId,
 } from "@/lib/lab-scene-config";
 import { getToolbarCatalog } from "@/lib/api";
-import { canWorkspaceWidgetBeStored } from "@/lib/tool-drop-targets";
 import type { ToolbarCategory } from "@/types/workbench";
 
 const defaultStatusMessage = "Start by dragging an extraction tool onto the bench.";
@@ -127,6 +126,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     activeWidgetId,
     handleWidgetDragStart,
     handleWidgetHeightChange,
+    registerWidgetNode,
     widgetHeights,
     widgetLayout,
     widgetOrder,
@@ -150,7 +150,16 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       });
     },
     onWidgetDragStateChange: (widgetId, activeDropTarget) => {
-      setActiveDropTargets(activeDropTarget && widgetId ? [activeDropTarget] : []);
+      const nextDropTargets = activeDropTarget && widgetId ? [activeDropTarget] : [];
+      setActiveDropTargets((currentDropTargets) => {
+        if (
+          currentDropTargets.length === nextDropTargets.length &&
+          currentDropTargets.every((target, index) => target === nextDropTargets[index])
+        ) {
+          return currentDropTargets;
+        }
+        return nextDropTargets;
+      });
     },
     presentWidgetIds: liveWidgetIds,
     syncKey:
@@ -197,7 +206,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
 
   const rackDnd = useRackDnd({
     dndDisabledByAction,
-    dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
+    dragState: { activeDragItem, activeDropTargets, clearDropTargets, setActiveDragItem, showDropTargets },
     experimentApi,
     rackSlots,
   });
@@ -227,7 +236,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const analyticalBalanceDnd = useAnalyticalBalanceDnd({
     analyticalBalanceTool,
     dndDisabledByAction,
-    dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
+    dragState: { activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets },
     experimentApi,
     setPendingDropDraft,
   });
@@ -329,7 +338,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const trashedTools = state.experiment.trash.children;
   const discardedFrom = state.experiment.trash.discardedFrom;
   const trashedWidgets = state.experiment.workspace.widgets.filter(
-    (widget) => canWorkspaceWidgetBeStored(widget.id) && widget.isTrashed,
+    (widget) => widget.isTrashed && widget.isStorable,
   );
   const analyticalBalanceMeasuredMassG = analyticalBalanceTool
     ? getApproximateToolMassG(analyticalBalanceTool, 3)
@@ -429,7 +438,6 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       rack={{
         getRackIllustrationSlotPosition,
         instrumentStatus,
-        isRackSlotHighlighted: workbenchHandlers.isRackSlotHighlighted,
         rackLoadedCount,
         rackOccupiedSlotLiquids,
         rackOccupiedSlots,
@@ -481,6 +489,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         handleWorkspaceDragOver,
         handleWorkspaceDrop,
         liveWidgetIds,
+        registerWidgetNode,
         widgetLayout,
         widgetOrder,
         workspaceCursor,

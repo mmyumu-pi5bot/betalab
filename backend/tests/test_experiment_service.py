@@ -4746,7 +4746,11 @@ def test_rack_with_loaded_vials_cannot_be_stored() -> None:
             "offset_y": 886,
         },
     )
-    place_tool_in_rack_slot(service, experiment.id, "rack_slot_1", "sample_vial_lcms")
+    loaded = place_tool_in_rack_slot(service, experiment.id, "rack_slot_1", "sample_vial_lcms")
+    rack_widget = next(widget for widget in loaded.workspace.widgets if widget.id == "rack")
+    assert rack_widget.is_storable is True
+    assert rack_widget.can_store is False
+    assert rack_widget.allowed_drop_targets == []
 
     with pytest.raises(ValueError, match=r"Empty Autosampler rack before storing it."):
         apply_command(

@@ -6,13 +6,31 @@ from typing import Literal
 from pydantic import BaseModel, Field, computed_field
 
 from app.domain.dnd_rules import (
+    can_tool_receive_contents,
+    can_tool_receive_liquids,
+    can_tool_receive_produce,
+    can_tool_seal,
     get_lims_label_ticket_allowed_drop_targets,
     get_produce_lot_allowed_drop_targets,
     get_sample_label_allowed_drop_targets,
     get_tool_allowed_drop_targets,
 )
+from app.domain.rules import can_workspace_widget_be_stored
+from app.domain.spatula_rules import (
+    SPATULA_CLICK_INCREMENT_MU_G,
+    SPATULA_CLICK_INCREMENT_SIGMA_G,
+    SPATULA_HOLD_INITIAL_RATE_G,
+    SPATULA_HOLD_INTERVAL_MS,
+    SPATULA_HOLD_LIFT_RATE_G_PER_PX,
+    SPATULA_HOLD_MAX_RATE_G,
+    SPATULA_HOLD_THRESHOLD_MS,
+    SPATULA_LOAD_SOURCE_TOOL_TYPES,
+    SPATULA_POUR_TARGET_TOOL_TYPES,
+)
+from app.services.physical_simulation_service import PhysicalSimulationService
 
-_STORABLE_WIDGET_IDS = {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}
+GRINDER_AMBIENT_TEMPERATURE_C = PhysicalSimulationService.ambient_temperature_c
+GRINDER_START_THRESHOLD_C = PhysicalSimulationService.grinder_start_threshold_c
 
 
 def _tool_exposes_sample_bag_label_target(tool: WorkbenchToolSchema | None) -> bool:
@@ -54,10 +72,73 @@ class ProduceFractionSchema(BaseModel):
     container_label: str | None = None
 
 
+class ContainedEntitySchema(BaseModel):
+    entity_kind: str
+    id: str
+    tool_type: str | None = None
+    liquid_type: str | None = None
+    produce_type: str | None = None
+
+
+class ContainmentRuleSchema(BaseModel):
+    entity_kind: str
+    tool_type: str | None = None
+    liquid_type: str | None = None
+
+
+class ContainmentSchema(BaseModel):
+    children: list[ContainedEntitySchema] = Field(default_factory=list)
+    capacity: int
+    remaining_capacity: int
+    accepts: list[ContainmentRuleSchema] = Field(default_factory=list)
+    can_receive: bool
+    blocked_reason: str | None = None
+
+
 class SpatulaStateSchema(BaseModel):
     is_loaded: bool = False
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
     source_tool_id: str | None = None
+
+    @computed_field
+    def allowed_load_source_tool_types(self) -> list[str]:
+        return list(SPATULA_LOAD_SOURCE_TOOL_TYPES)
+
+    @computed_field
+    def allowed_pour_target_tool_types(self) -> list[str]:
+        return list(SPATULA_POUR_TARGET_TOOL_TYPES)
+
+    @computed_field
+    def can_discard(self) -> bool:
+        return self.is_loaded
+
+    @computed_field
+    def click_increment_mu_g(self) -> float:
+        return SPATULA_CLICK_INCREMENT_MU_G
+
+    @computed_field
+    def click_increment_sigma_g(self) -> float:
+        return SPATULA_CLICK_INCREMENT_SIGMA_G
+
+    @computed_field
+    def hold_threshold_ms(self) -> int:
+        return SPATULA_HOLD_THRESHOLD_MS
+
+    @computed_field
+    def hold_interval_ms(self) -> int:
+        return SPATULA_HOLD_INTERVAL_MS
+
+    @computed_field
+    def hold_initial_rate_g(self) -> float:
+        return SPATULA_HOLD_INITIAL_RATE_G
+
+    @computed_field
+    def hold_max_rate_g(self) -> float:
+        return SPATULA_HOLD_MAX_RATE_G
+
+    @computed_field
+    def hold_lift_rate_g_per_px(self) -> float:
+        return SPATULA_HOLD_LIFT_RATE_G_PER_PX
 
 
 class AnalyticalBalanceStateSchema(BaseModel):
@@ -186,6 +267,86 @@ class WorkbenchToolSchema(BaseModel):
         return get_tool_allowed_drop_targets(self.tool_type)
 
     @computed_field
+    def can_seal(self) -> bool:
+        return can_tool_seal(self.tool_type)
+
+    @computed_field
+    def can_receive_liquids(self) -> bool:
+        return can_tool_receive_liquids(self.tool_type)
+
+    @computed_field
+    def can_receive_produce(self) -> bool:
+        return can_tool_receive_produce(self.tool_type)
+
+    @computed_field
+    def can_receive_contents(self) -> bool:
+        return can_tool_receive_contents(self.tool_type, self.is_sealed)
+
+    @computed_field
+    def children(self) -> list[ContainedEntitySchema]:
+        return self._contained_entities()
+
+    def _contained_entities(self) -> list[ContainedEntitySchema]:
+        children: list[ContainedEntitySchema] = []
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="liquid",
+                id=liquid.id,
+                liquid_type=liquid.liquid_id,
+            )
+            for liquid in self.liquids
+        )
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="produce",
+                id=produce_lot.id,
+                produce_type=produce_lot.produce_type,
+            )
+            for produce_lot in self.produce_lots
+        )
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="produce",
+                id=produce_fraction.id,
+            )
+            for produce_fraction in self.produce_fractions
+        )
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="sample_label",
+                id=label.id,
+            )
+            for label in self.labels
+        )
+        return children
+
+    @computed_field
+    def containment(self) -> ContainmentSchema:
+        accepts: list[ContainmentRuleSchema] = []
+        can_receive_contents = can_tool_receive_contents(self.tool_type, self.is_sealed)
+        has_produce = len(self.produce_lots) > 0 or len(self.produce_fractions) > 0
+        has_lims_label = any(label.label_kind == "lims" for label in self.labels)
+
+        if can_receive_contents and can_tool_receive_liquids(self.tool_type):
+            accepts.append(ContainmentRuleSchema(entity_kind="liquid"))
+        if can_receive_contents and can_tool_receive_produce(self.tool_type) and not has_produce:
+            accepts.append(ContainmentRuleSchema(entity_kind="produce"))
+
+        accepts.append(ContainmentRuleSchema(entity_kind="sample_label"))
+        if not has_lims_label:
+            accepts.append(ContainmentRuleSchema(entity_kind="lims_label_ticket"))
+
+        children = self._contained_entities()
+        return ContainmentSchema(
+            children=children,
+            capacity=max(len(children) + len(accepts), 1),
+            remaining_capacity=len(accepts),
+            accepts=accepts,
+            can_receive=len(accepts) > 0,
+            blocked_reason=None if len(accepts) > 0 else "no_accepted_entities",
+        )
+
+    @computed_field
     def is_draggable(self) -> bool:
         return len(get_tool_allowed_drop_targets(self.tool_type)) > 0
 
@@ -201,6 +362,46 @@ class WorkbenchSlotSchema(BaseModel):
     def drop_target_types(self) -> list[str]:
         return ["workbench_slot"]
 
+    @computed_field
+    def children(self) -> list[ContainedEntitySchema]:
+        return self._contained_entities()
+
+    def _contained_entities(self) -> list[ContainedEntitySchema]:
+        children: list[ContainedEntitySchema] = []
+        if self.tool is not None:
+            children.append(
+                ContainedEntitySchema(
+                    entity_kind="tool",
+                    id=self.tool.id,
+                    tool_type=self.tool.tool_type,
+                )
+            )
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="produce",
+                id=produce_lot.id,
+                produce_type=produce_lot.produce_type,
+            )
+            for produce_lot in self.surface_produce_lots
+        )
+        return children
+
+    @computed_field
+    def containment(self) -> ContainmentSchema:
+        children = self._contained_entities()
+        remaining_capacity = max(1 - len(children), 0)
+        return ContainmentSchema(
+            children=children,
+            capacity=1,
+            remaining_capacity=remaining_capacity,
+            accepts=[
+                ContainmentRuleSchema(entity_kind="tool"),
+                ContainmentRuleSchema(entity_kind="produce"),
+            ],
+            can_receive=remaining_capacity > 0,
+            blocked_reason=None if remaining_capacity > 0 else "occupied",
+        )
+
 
 class WorkbenchSchema(BaseModel):
     slots: list[WorkbenchSlotSchema]
@@ -214,6 +415,34 @@ class RackSlotSchema(BaseModel):
     @computed_field
     def drop_target_types(self) -> list[str]:
         return ["rack_slot"]
+
+    @computed_field
+    def children(self) -> list[ContainedEntitySchema]:
+        return self._contained_entities()
+
+    def _contained_entities(self) -> list[ContainedEntitySchema]:
+        if self.tool is None:
+            return []
+        return [
+            ContainedEntitySchema(
+                entity_kind="tool",
+                id=self.tool.id,
+                tool_type=self.tool.tool_type,
+            )
+        ]
+
+    @computed_field
+    def containment(self) -> ContainmentSchema:
+        children = self._contained_entities()
+        remaining_capacity = max(1 - len(children), 0)
+        return ContainmentSchema(
+            children=children,
+            capacity=1,
+            remaining_capacity=remaining_capacity,
+            accepts=[ContainmentRuleSchema(entity_kind="tool", tool_type="sample_vial")],
+            can_receive=remaining_capacity > 0,
+            blocked_reason=None if remaining_capacity > 0 else "occupied",
+        )
 
 
 class RackSchema(BaseModel):
@@ -262,6 +491,8 @@ class WorkspaceWidgetSchema(BaseModel):
     tool: WorkbenchToolSchema | None = None
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
+    store_allowed_override: bool | None = Field(default=None, exclude=True)
+    produce_material_states: list[ProduceMaterialStateSchema] = Field(default_factory=list, exclude=True)
 
     @computed_field
     def drop_target_types(self) -> list[str]:
@@ -278,15 +509,154 @@ class WorkspaceWidgetSchema(BaseModel):
 
     @computed_field
     def is_draggable(self) -> bool:
-        if self.id not in _STORABLE_WIDGET_IDS:
-            return False
-        if self.is_trashed:
-            return True
-        return self.tool is None and len(self.produce_lots) == 0 and len(self.liquids) == 0
+        return self._can_store()
 
     @computed_field
     def allowed_drop_targets(self) -> list[str]:
         return ["workspace_canvas"] if self.is_draggable else []
+
+    @computed_field
+    def is_storable(self) -> bool:
+        return can_workspace_widget_be_stored(self.id)
+
+    @computed_field
+    def can_store(self) -> bool:
+        return self._can_store()
+
+    @computed_field
+    def children(self) -> list[ContainedEntitySchema]:
+        return self._contained_entities()
+
+    def _contained_entities(self) -> list[ContainedEntitySchema]:
+        children: list[ContainedEntitySchema] = []
+        if self.tool is not None:
+            children.append(
+                ContainedEntitySchema(
+                    entity_kind="tool",
+                    id=self.tool.id,
+                    tool_type=self.tool.tool_type,
+                )
+            )
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="produce",
+                id=produce_lot.id,
+                produce_type=produce_lot.produce_type,
+            )
+            for produce_lot in self.produce_lots
+        )
+        children.extend(
+            ContainedEntitySchema(
+                entity_kind="liquid",
+                id=liquid.id,
+                liquid_type=liquid.liquid_id,
+            )
+            for liquid in self.liquids
+        )
+        return children
+
+    @computed_field
+    def containment(self) -> ContainmentSchema | None:
+        children = self._contained_entities()
+        if self.widget_type == "cryogenic_grinder":
+            produce_count = len(self.produce_lots)
+            remaining_capacity = max(1 - produce_count, 0)
+            return ContainmentSchema(
+                children=children,
+                capacity=1,
+                remaining_capacity=remaining_capacity,
+                accepts=[
+                    ContainmentRuleSchema(entity_kind="produce"),
+                    ContainmentRuleSchema(entity_kind="liquid", liquid_type="dry_ice_pellets"),
+                ],
+                can_receive=remaining_capacity > 0,
+                blocked_reason=None if remaining_capacity > 0 else "occupied",
+            )
+        if self.widget_type in {"gross_balance", "analytical_balance", "vortex_mixer"}:
+            remaining_capacity = max(1 - (1 if self.tool is not None else 0), 0)
+            return ContainmentSchema(
+                children=children,
+                capacity=1,
+                remaining_capacity=remaining_capacity,
+                accepts=[ContainmentRuleSchema(entity_kind="tool")],
+                can_receive=remaining_capacity > 0,
+                blocked_reason=None if remaining_capacity > 0 else "occupied",
+            )
+        return None
+
+    @computed_field
+    def grinder_can_start(self) -> bool:
+        if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
+            return False
+        return self.grinder_start_block_reason is None
+
+    @computed_field
+    def grinder_start_block_reason(self) -> str | None:
+        if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
+            return "not_grinder"
+        if self.grinder_run_remaining_ms > 0:
+            return "running"
+        if not self.produce_lots:
+            return "empty"
+        produce_lot = self.produce_lots[0]
+        material_state = self._get_produce_material_state_name(produce_lot.id)
+        if material_state == "whole":
+            return "must_be_cut"
+        if material_state == "ground":
+            return "already_ground"
+        if material_state == "waste":
+            return "waste"
+        temperature_c = self._get_produce_temperature_c(produce_lot.id)
+        if temperature_c > GRINDER_START_THRESHOLD_C:
+            return "not_cold_enough"
+        return None
+
+    @computed_field
+    def grinder_display_mode(self) -> str | None:
+        if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
+            return None
+        if self.produce_lots:
+            material_state = self._get_produce_material_state_name(self.produce_lots[0].id)
+            temperature_c = self._get_produce_temperature_c(self.produce_lots[0].id)
+        else:
+            material_state = "whole"
+            temperature_c = GRINDER_AMBIENT_TEMPERATURE_C
+        if material_state == "ground":
+            return "complete"
+        if self.grinder_fault == "motor_jammed" or self.grinder_start_block_reason == "not_cold_enough":
+            return "jammed"
+        if self.grinder_run_remaining_ms > 0 and temperature_c > GRINDER_START_THRESHOLD_C:
+            return "warning"
+        if self.grinder_run_remaining_ms > 0:
+            return "running"
+        if self.grinder_can_start:
+            return "ready"
+        if self.grinder_start_block_reason == "must_be_cut":
+            return "overload"
+        return "idle"
+
+    def _get_produce_material_state_name(self, produce_lot_id: str) -> str:
+        state = next(
+            (state for state in self.produce_material_states if state.produce_lot_id == produce_lot_id),
+            None,
+        )
+        return state.material_state if state is not None else "whole"
+
+    def _get_produce_temperature_c(self, produce_lot_id: str) -> float:
+        state = next(
+            (state for state in self.produce_material_states if state.produce_lot_id == produce_lot_id),
+            None,
+        )
+        return state.temperature_c if state is not None else GRINDER_AMBIENT_TEMPERATURE_C
+
+    def _can_store(self) -> bool:
+        if self.store_allowed_override is not None:
+            return self.store_allowed_override
+        if not self.is_storable:
+            return False
+        if self.is_trashed:
+            return True
+        return self.tool is None and len(self.produce_lots) == 0 and len(self.liquids) == 0
 
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
 
@@ -333,6 +703,9 @@ class ToolbarItemSchema(BaseModel):
     description: str
     accent: str
     allowed_drop_targets: list[str]
+    can_receive_liquids: bool | None = None
+    can_receive_produce: bool | None = None
+    can_seal: bool | None = None
     tool_type: str | None = None
     capacity_ml: float | None = None
     liquid_type: str | None = None

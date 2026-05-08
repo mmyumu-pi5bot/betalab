@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 
 import type { WidgetAnchor } from "@/types/workbench";
@@ -181,6 +181,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
   );
   const widgetLayoutRef = useRef(widgetLayout);
   const widgetHeightsRef = useRef(widgetHeights);
+  const widgetNodesRef = useRef<Partial<Record<WidgetId, HTMLDivElement>>>({});
   const widgetsRef = useRef(widgets);
   const [workspaceSize, setWorkspaceSize] = useState<WorkspaceSize | null>(null);
   const dragStateRef = useRef<{
@@ -190,6 +191,11 @@ export function useWorkspaceLayout<WidgetId extends string>({
   } | null>(null);
   const dragAnimationFrameRef = useRef<number | null>(null);
   const pendingDragPositionRef = useRef<{
+    widgetId: WidgetId;
+    x: number;
+    y: number;
+  } | null>(null);
+  const latestDragPositionRef = useRef<{
     widgetId: WidgetId;
     x: number;
     y: number;
@@ -210,6 +216,20 @@ export function useWorkspaceLayout<WidgetId extends string>({
   useEffect(() => {
     widgetsRef.current = widgets;
   }, [widgets]);
+
+  const registerWidgetNode = useCallback((widgetId: string, node: HTMLDivElement | null) => {
+    if (!(widgetId in initialLayout)) {
+      return;
+    }
+
+    const typedWidgetId = widgetId as WidgetId;
+    if (node) {
+      widgetNodesRef.current[typedWidgetId] = node;
+      return;
+    }
+
+    delete widgetNodesRef.current[typedWidgetId];
+  }, [initialLayout]);
 
   useEffect(() => {
     return () => {
@@ -419,16 +439,27 @@ export function useWorkspaceLayout<WidgetId extends string>({
       dragAnimationFrameRef.current = null;
     }
     pendingDragPositionRef.current = null;
+    latestDragPositionRef.current = null;
 
     const workspaceRect = workspaceRef.current?.getBoundingClientRect();
     const workspaceLeft = workspaceRect?.left ?? 0;
     const workspaceTop = workspaceRect?.top ?? 0;
     const currentPosition = widgetLayoutRef.current[typedWidgetId];
+    const draggedWidgetNode = widgetNodesRef.current[typedWidgetId];
+
+    if (draggedWidgetNode) {
+      draggedWidgetNode.style.willChange = "transform";
+    }
 
     dragStateRef.current = {
       widgetId: typedWidgetId,
       pointerOffsetX: event.clientX - workspaceLeft - currentPosition.x,
       pointerOffsetY: event.clientY - workspaceTop - currentPosition.y,
+    };
+    latestDragPositionRef.current = {
+      widgetId: typedWidgetId,
+      x: currentPosition.x,
+      y: currentPosition.y,
     };
     setActiveWidgetId(typedWidgetId);
     setWidgetOrder((current) => [
@@ -445,6 +476,18 @@ export function useWorkspaceLayout<WidgetId extends string>({
 
       pendingDragPositionRef.current = null;
       dragAnimationFrameRef.current = null;
+
+      latestDragPositionRef.current = pendingPosition;
+
+      const currentDraggedLayout = widgetLayoutRef.current[pendingPosition.widgetId];
+      const draggedNode = widgetNodesRef.current[pendingPosition.widgetId];
+      if (draggedNode) {
+        const offsetX = pendingPosition.x - currentDraggedLayout.x;
+        const offsetY = pendingPosition.y - currentDraggedLayout.y;
+        draggedNode.style.transform =
+          offsetX === 0 && offsetY === 0 ? "" : `translate3d(${offsetX}px, ${offsetY}px, 0)`;
+        return;
+      }
 
       setWidgetLayout((current) => {
         const currentDraggedLayout = current[pendingPosition.widgetId];
@@ -494,7 +537,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
           : Number.POSITIVE_INFINITY;
       const nextX = Math.min(Math.max(unclampedX, 0), maxX);
       const nextY = Math.min(Math.max(unclampedY, 0), maxY);
-      const currentDraggedLayout = widgetLayoutRef.current[dragState.widgetId];
+      const currentPendingPosition = pendingDragPositionRef.current;
       const isOverInventoryDropZone =
         getIsWidgetStorable(dragState.widgetId) &&
         isPointInsideElement(
@@ -509,9 +552,10 @@ export function useWorkspaceLayout<WidgetId extends string>({
       );
 
       if (
-        currentDraggedLayout.x === nextX &&
-        currentDraggedLayout.y === nextY &&
-        pendingDragPositionRef.current === null
+        latestDragPositionRef.current?.widgetId === dragState.widgetId &&
+        latestDragPositionRef.current.x === nextX &&
+        latestDragPositionRef.current.y === nextY &&
+        currentPendingPosition === null
       ) {
         return;
       }
@@ -529,6 +573,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
 
     const handleMouseUp = (upEvent: MouseEvent) => {
       const finalPendingDragPosition = pendingDragPositionRef.current;
+      const finalLatestDragPosition = latestDragPositionRef.current;
 
       if (dragAnimationFrameRef.current !== null) {
         window.cancelAnimationFrame(dragAnimationFrameRef.current);
@@ -549,6 +594,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
 
       dragStateRef.current = null;
       pendingDragPositionRef.current = null;
+      latestDragPositionRef.current = null;
       setActiveWidgetId(null);
       onWidgetDragStateChange?.(null, null);
       window.removeEventListener("mousemove", handleMouseMove);
@@ -557,16 +603,22 @@ export function useWorkspaceLayout<WidgetId extends string>({
 
       if (draggedWidgetId) {
         const currentDraggedLayout = widgetLayoutRef.current[draggedWidgetId];
+        const draggedNode = widgetNodesRef.current[draggedWidgetId];
         const finalPosition =
           finalPendingDragPosition?.widgetId === draggedWidgetId
             ? {
                 x: finalPendingDragPosition.x,
                 y: finalPendingDragPosition.y,
               }
-            : {
-                x: currentDraggedLayout.x,
-                y: currentDraggedLayout.y,
-              };
+            : finalLatestDragPosition?.widgetId === draggedWidgetId
+              ? {
+                  x: finalLatestDragPosition.x,
+                  y: finalLatestDragPosition.y,
+                }
+              : {
+                  x: currentDraggedLayout.x,
+                  y: currentDraggedLayout.y,
+                };
         const nextLayout =
           finalPosition.x === currentDraggedLayout.x && finalPosition.y === currentDraggedLayout.y
             ? currentDraggedLayout
@@ -577,6 +629,10 @@ export function useWorkspaceLayout<WidgetId extends string>({
               };
 
         if (shouldStoreWidget) {
+          if (draggedNode) {
+            draggedNode.style.transform = "";
+            draggedNode.style.willChange = "";
+          }
           onStoreWidget(draggedWidgetId);
           return;
         }
@@ -618,6 +674,11 @@ export function useWorkspaceLayout<WidgetId extends string>({
           };
         });
 
+        if (draggedNode) {
+          draggedNode.style.transform = "";
+          draggedNode.style.willChange = "";
+        }
+
         if (fixedWidgetIds.includes(draggedWidgetId)) {
           return;
         }
@@ -630,6 +691,14 @@ export function useWorkspaceLayout<WidgetId extends string>({
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
     dragCleanupRef.current = () => {
+      const draggedWidgetId = dragStateRef.current?.widgetId;
+      if (draggedWidgetId) {
+        const draggedNode = widgetNodesRef.current[draggedWidgetId];
+        if (draggedNode) {
+          draggedNode.style.transform = "";
+          draggedNode.style.willChange = "";
+        }
+      }
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
@@ -648,6 +717,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
     activeWidgetId,
     handleWidgetDragStart,
     handleWidgetHeightChange,
+    registerWidgetNode,
     widgetHeights,
     widgetLayout,
     widgetOrder,

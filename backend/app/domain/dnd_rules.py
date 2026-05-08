@@ -14,6 +14,28 @@ def get_tool_allowed_drop_targets(tool_type: str) -> list[str]:
     return targets
 
 
+def can_tool_receive_liquids(tool_type: str) -> bool:
+    return tool_type not in {"sample_bag", "cutting_board", "storage_jar"}
+
+
+def can_tool_receive_produce(tool_type: str) -> bool:
+    return tool_type in {"sample_bag", "cutting_board", "storage_jar"}
+
+
+def can_tool_seal(tool_type: str) -> bool:
+    return tool_type in {
+        "sample_bag",
+        "storage_jar",
+        "centrifuge_tube",
+        "cleanup_tube",
+        "sample_vial",
+    }
+
+
+def can_tool_receive_contents(tool_type: str, is_sealed: bool = False) -> bool:
+    return not can_tool_seal(tool_type) or not is_sealed
+
+
 def get_sample_label_allowed_drop_targets() -> list[str]:
     return ["workbench_slot", "gross_balance_widget", "analytical_balance_widget", "trash_bin"]
 

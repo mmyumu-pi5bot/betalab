@@ -27,7 +27,6 @@ import type { TrashDndApi } from "@/hooks/use-trash-dnd";
 import type { VortexDndApi } from "@/hooks/use-vortex-dnd";
 import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
-import { canStoreWorkspaceWidget, canWorkspaceWidgetBeStored } from "@/lib/tool-drop-targets";
 import { isWorkspaceEquipmentWidgetId } from "@/lib/workspace-widget-ids";
 import type { Experiment } from "@/types/experiment";
 import type {
@@ -86,7 +85,6 @@ type LabSceneWorkspaceCanvasProps = {
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
     instrumentStatus: "idle" | "ready";
-    isRackSlotHighlighted: boolean;
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
@@ -132,6 +130,7 @@ type LabSceneWorkspaceCanvasProps = {
     handleWorkspaceDragOver: (event: DragEvent<HTMLDivElement>) => void;
     handleWorkspaceDrop: (event: DragEvent<HTMLDivElement>) => void;
     liveWidgetIds: string[];
+    registerWidgetNode: (widgetId: string, node: HTMLDivElement | null) => void;
     widgetLayout: Record<string, WidgetLayout>;
     widgetOrder: string[];
     workspaceCursor: string | undefined;
@@ -197,13 +196,11 @@ export function LabSceneWorkspaceCanvas({
       ? Math.round((1 - vortexRunRemainingMs / vortexRunDurationMs) * 100)
       : 0;
   const renderStoreWidgetAction = (widget: ExperimentWorkspaceWidget) => {
-    if (!canWorkspaceWidgetBeStored(widget.id) || !widget.isPresent) {
+    if (!widget.isStorable || !widget.isPresent) {
       return undefined;
     }
 
-    const isDisabled =
-      !canStoreWorkspaceWidget(widget) ||
-      (widget.id === "rack" && display.rackSlots.some((slot) => slot.tool !== null));
+    const isDisabled = !widget.canStore;
 
     return (
       <button
@@ -400,6 +397,7 @@ export function LabSceneWorkspaceCanvas({
             workspace.handleWidgetDragStart(widgetId, event);
           }}
           onHeightChange={workspace.handleWidgetHeightChange}
+          onNodeChange={workspace.registerWidgetNode}
           position={workspace.widgetLayout.trash}
           zIndex={10 + workspace.widgetOrder.indexOf("trash")}
         >
@@ -471,6 +469,7 @@ export function LabSceneWorkspaceCanvas({
                 workspace.handleWidgetDragStart(id, event);
               }}
               onHeightChange={workspace.handleWidgetHeightChange}
+              onNodeChange={workspace.registerWidgetNode}
               position={workspace.widgetLayout[widgetId]}
               zIndex={10 + workspace.widgetOrder.indexOf(widgetId)}
             >
@@ -537,7 +536,7 @@ export function LabSceneWorkspaceCanvas({
                   dndDisabled={dnd.dndDisabledByAction}
                   getSlotPosition={rack.getRackIllustrationSlotPosition}
                   headerAction={renderStoreWidgetAction(widget)}
-                  isSlotHighlighted={rack.isRackSlotHighlighted}
+                  isSlotHighlighted={dnd.rack.canDropOnRackSlotFromActiveDrag}
                   loadedCount={rack.rackLoadedCount}
                   occupiedSlotLiquids={rack.rackOccupiedSlotLiquids}
                   occupiedSlots={rack.rackOccupiedSlots}
@@ -613,6 +612,7 @@ export function LabSceneWorkspaceCanvas({
             workspace.handleWidgetDragStart(id, event);
           }}
           onHeightChange={workspace.handleWidgetHeightChange}
+          onNodeChange={workspace.registerWidgetNode}
           position={workspace.widgetLayout.workbench}
           zIndex={5}
         >

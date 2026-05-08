@@ -6,7 +6,7 @@ import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
 import { executeAnalyticalBalanceLabelDropCommand } from "@/lib/label-drop-command-executor";
 import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
-import { canResolveDropOnTool } from "@/lib/tool-drop-resolver";
+import { canResolveActiveDragOnTool, canResolveDropOnTool } from "@/lib/tool-drop-resolver";
 import {
   hasCompatibleDropTarget,
   readEquipmentToolDragPayload,
@@ -47,7 +47,7 @@ type AnalyticalBalanceDndExperimentApi = {
 type AnalyticalBalanceDndOptions = {
   analyticalBalanceTool: BenchToolInstance | null;
   dndDisabledByAction: boolean;
-  dragState: Pick<DragStateApi, "clearDropTargets" | "setActiveDragItem" | "showDropTargets">;
+  dragState: Pick<DragStateApi, "activeDragItem" | "clearDropTargets" | "setActiveDragItem" | "showDropTargets">;
   experimentApi: AnalyticalBalanceDndExperimentApi;
   setPendingDropDraft: (draft: DropDraft | null) => void;
 };
@@ -69,14 +69,14 @@ export function useAnalyticalBalanceDnd({
   experimentApi,
   setPendingDropDraft,
 }: AnalyticalBalanceDndOptions): AnalyticalBalanceDndApi {
-  const { clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
+  const { activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
 
   const handleAnalyticalBalanceDragOver = (event: DragEvent<HTMLElement>) => {
     if (dndDisabledByAction) {
       return;
     }
     if (
-      canResolveDropOnTool(event.dataTransfer, {
+      canResolveActiveDragOnTool(activeDragItem, {
         parentDropTargetTypes: ["analytical_balance_widget"],
         tool: analyticalBalanceTool,
       })

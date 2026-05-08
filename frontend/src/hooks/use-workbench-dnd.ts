@@ -4,9 +4,6 @@ import type { DebugProducePreset } from "@/components/debug-produce-palette";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { DragStateApi } from "@/hooks/use-drag-state";
-import {
-  getProduceLotDropTargets,
-} from "@/lib/tool-drop-targets";
 import { executeWorkbenchProduceDropCommand } from "@/lib/produce-drop-command-executor";
 import { resolveProduceDropCommand } from "@/lib/produce-drop-command-resolver";
 import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
@@ -284,7 +281,7 @@ export function useWorkbenchDnd({
     if (dndDisabledByAction) {
       return;
     }
-    const allowedDropTargets = getProduceLotDropTargets();
+    const allowedDropTargets = preset.produceLot.allowedDropTargets ?? [];
 
     writeProduceDragPayload(dataTransfer, {
       allowedDropTargets,

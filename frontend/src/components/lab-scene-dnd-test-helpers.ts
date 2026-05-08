@@ -7,7 +7,14 @@ import {
   getProduceLotDropTargets,
   getSampleLabelDropTargets,
   getToolDropTargets,
-} from "@/lib/tool-drop-targets";
+} from "@/test-support/drop-targets";
+import {
+  canToolAcceptLiquids,
+  canToolAcceptProduce,
+  canToolBeSealed,
+  canToolReceiveContents,
+  getOpenEmptyToolContainment,
+} from "@/test-support/tool-capabilities";
 import { getWorkspaceEquipmentWidgetId } from "@/lib/workspace-widget-ids";
 import type { Experiment } from "@/types/experiment";
 import type {
@@ -183,6 +190,26 @@ function makeSlots(overrides: Partial<BenchSlot>[] = [], count = Math.max(2, ove
         slot.dropTargetTypes && slot.dropTargetTypes.length > 0
           ? slot.dropTargetTypes
           : ["workbench_slot"],
+      containment: slot.containment ?? {
+        accepts: [{ entityKind: "tool" }, { entityKind: "produce" }],
+        blockedReason:
+          slot.tool !== null || (slot.surfaceProduceLots?.length ?? 0) > 0
+            ? "occupied"
+            : null,
+        canReceive: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0,
+        capacity: 1,
+        children: [
+          ...(slot.tool
+            ? [{ entityKind: "tool" as const, id: slot.tool.id, toolType: slot.tool.toolType }]
+            : []),
+          ...((slot.surfaceProduceLots ?? []).map((produceLot) => ({
+            entityKind: "produce" as const,
+            id: produceLot.id,
+            produceType: produceLot.produceType,
+          }))),
+        ],
+        remainingCapacity: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0 ? 1 : 0,
+      },
     }));
 }
 
@@ -197,6 +224,18 @@ function makeRackSlots(overrides: Partial<RackSlot>[] = []): RackSlot[] {
   return baseSlots.map((slot, index) => ({
     ...slot,
     ...(overrides[index] ?? {}),
+  })).map((slot) => ({
+    ...slot,
+    containment: slot.containment ?? {
+      accepts: [{ entityKind: "tool", toolType: "sample_vial" }],
+      blockedReason: slot.tool === null ? null : "occupied",
+      canReceive: slot.tool === null,
+      capacity: 1,
+      children: slot.tool
+        ? [{ entityKind: "tool", id: slot.tool.id, toolType: slot.tool.toolType }]
+        : [],
+      remainingCapacity: slot.tool === null ? 1 : 0,
+    },
   }));
 }
 
@@ -332,6 +371,8 @@ function makeWorkspaceWidgets(
           (merged.liquids?.length ?? 0) === 0));
     return {
       ...merged,
+      isStorable: storableWidgetIds.has(merged.id),
+      canStore: isDraggable,
       isDraggable,
       allowedDropTargets: isDraggable ? (["workspace_canvas"] as const) : [],
     };
@@ -339,6 +380,8 @@ function makeWorkspaceWidgets(
 }
 
 function makeTool(item: ToolCatalogItem, overrides: Partial<BenchToolInstance> = {}): BenchToolInstance {
+  const toolType = overrides.toolType ?? item.toolType;
+  const isSealed = overrides.isSealed ?? false;
   const sampleLabelText = (overrides as Partial<BenchToolInstance> & { sampleLabelText?: string | null })
     .sampleLabelText;
   const sampleLabelReceivedDate = (
@@ -360,20 +403,29 @@ function makeTool(item: ToolCatalogItem, overrides: Partial<BenchToolInstance> =
         ]
       : []);
 
-  return {
+  const tool = {
     id: "bench_tool_1",
     toolId: item.id,
     label: item.name,
     subtitle: item.subtitle,
     accent: item.accent,
-    toolType: item.toolType,
+    toolType,
     capacity_ml: item.capacity_ml,
+    canReceiveContents: canToolReceiveContents(toolType, isSealed),
+    canReceiveLiquids: canToolAcceptLiquids(toolType),
+    canReceiveProduce: canToolAcceptProduce(toolType),
+    canSeal: canToolBeSealed(toolType),
+    isSealed,
     isDraggable: true,
-    allowedDropTargets: getToolDropTargets(item.toolType),
+    allowedDropTargets: getToolDropTargets(toolType),
     labels: derivedLabels,
     produceLots: [],
     liquids: [],
     ...overrides,
+  };
+  return {
+    ...tool,
+    containment: tool.containment ?? getOpenEmptyToolContainment(toolType),
   };
 }
 
@@ -673,7 +725,7 @@ function createDebugProducePresetSourceCase(): DndSourceCase {
       }),
     targetExpectations: {
       "bench-slot-station_1": {
-        compatible: true,
+        compatible: false,
         command: null,
       },
       "bench-slot-station_2": {
@@ -824,7 +876,7 @@ function createRackSourceCase(): DndSourceCase {
         command: null,
       },
       "rack-illustration-slot-1": {
-        compatible: true,
+        compatible: false,
         command: null,
       },
       "widget-workspace": {
@@ -1149,6 +1201,14 @@ function createWorkbenchProduceLotSourceCase(): DndSourceCase {
             tool: makeTool(sampleBagItem, {
               id: "bench_tool_bag",
               produceLots: [makeProduceLot({ id: "produce_1" })],
+              containment: {
+                accepts: [{ entityKind: "sample_label" }, { entityKind: "lims_label_ticket" }],
+                blockedReason: null,
+                canReceive: true,
+                capacity: 3,
+                children: [{ entityKind: "produce", id: "produce_1", produceType: "apple" }],
+                remainingCapacity: 2,
+              },
             }),
           },
           { tool: makeTool(sampleBagItem, { id: "bench_tool_bag_2" }) },
@@ -1156,7 +1216,7 @@ function createWorkbenchProduceLotSourceCase(): DndSourceCase {
       }),
     targetExpectations: {
       "bench-slot-station_1": {
-        compatible: true,
+        compatible: false,
         command: null,
       },
       "bench-slot-station_2": {

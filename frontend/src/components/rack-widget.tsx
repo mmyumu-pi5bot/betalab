@@ -11,7 +11,7 @@ type RackWidgetProps = {
   dndDisabled?: boolean;
   getSlotPosition: (slotIndex: number) => { left: string; top: string };
   headerAction?: ReactNode;
-  isSlotHighlighted: boolean;
+  isSlotHighlighted: (rackSlot: RackSlot) => boolean;
   loadedCount: number;
   occupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
   occupiedSlots: number[];
@@ -61,13 +61,14 @@ export function RackWidget({
           {rackSlots.map((rackSlot, slotIndex) => {
             const position = getSlotPosition(slotIndex);
             const tool = rackSlot.tool;
+            const highlighted = isSlotHighlighted(rackSlot);
 
             return (
               <div
                 className={`absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors ${
-                  isSlotHighlighted ? "bg-sky-200/30 ring-2 ring-sky-300/75" : ""
+                  highlighted ? "bg-sky-200/30 ring-2 ring-sky-300/75" : ""
                 } ${tool && !dndDisabled ? dragAffordanceClassName : ""}`}
-                data-drop-highlighted={isSlotHighlighted ? "true" : "false"}
+                data-drop-highlighted={highlighted ? "true" : "false"}
                 data-testid={`rack-illustration-slot-${slotIndex + 1}`}
                 draggable={Boolean(tool) && !dndDisabled}
                 key={rackSlot.id}

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.domain.rules import can_tool_be_sealed
+from app.domain.spatula_rules import can_spatula_load_from_tool, can_spatula_pour_into_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
     build_manual_label,
@@ -341,7 +342,7 @@ class PourSpatulaIntoAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: PourSpatulaIntoAnalyticalBalanceToolRequest) -> None:
         widget = self._find_analytical_balance_widget(experiment)
         tool = self._require_balance_tool(experiment)
-        if tool.tool_type not in {"sample_vial", "centrifuge_tube"}:
+        if not can_spatula_pour_into_tool(tool.tool_type):
             raise ValueError("The spatula can only pour into an autosampler vial or centrifuge tube.")
         if tool.is_sealed:
             raise ValueError(f"Open {tool.label} before adding powder.")
@@ -381,7 +382,7 @@ class LoadSpatulaFromAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
         from app.services.domain_services.workbench import SPATULA_CAPACITY_G
 
         tool = self._require_balance_tool(experiment)
-        if tool.tool_type in {"cutting_board", "sample_vial", "cleanup_tube"}:
+        if not can_spatula_load_from_tool(tool.tool_type):
             raise ValueError("The spatula cannot be loaded from this container.")
         if tool.is_sealed:
             raise ValueError(f"Open {tool.label} before loading the spatula.")

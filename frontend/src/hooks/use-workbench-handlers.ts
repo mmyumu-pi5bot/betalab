@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import type { DropDraft } from "@/hooks/use-drop-draft";
+import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
 import { canResolveActiveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
 import type {
@@ -72,7 +73,6 @@ type WorkbenchHandlers = {
   handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;
   handleToolbarItemDrop: (slotId: string, payload: ToolbarDragPayload) => void;
   isBenchSlotHighlighted: (slot: BenchSlot) => boolean;
-  isRackSlotHighlighted: boolean;
 };
 
 export function useWorkbenchHandlers({
@@ -84,11 +84,19 @@ export function useWorkbenchHandlers({
   hasPrintedLabelTicket,
   setPendingDropDraft,
 }: UseWorkbenchHandlersOptions): WorkbenchHandlers {
-  const getToolHasLimsLabel = (tool: BenchToolInstance) =>
-    (tool.labels ?? []).some((label) => label.labelKind === "lims");
-
   const canApplyLimsTicketToSlot = (slot: BenchSlot): boolean => {
-    return slot.tool !== null && !getToolHasLimsLabel(slot.tool) && hasPrintedLabelTicket;
+    if (slot.tool === null || !hasPrintedLabelTicket) {
+      return false;
+    }
+    return containmentAcceptsDescriptor(slot.tool.containment, {
+      allowedDropTargets: [],
+      entityKind: "lims_label_ticket",
+      labelText: "",
+      sampleCode: "",
+      sourceId: "lims_label_ticket",
+      sourceKind: "palette",
+      ticketId: "lims_label_ticket",
+    });
   };
 
   const handleToolbarItemDrop = (slotId: string, payload: ToolbarDragPayload) => {
@@ -238,12 +246,6 @@ export function useWorkbenchHandlers({
     return false;
   };
 
-  const isRackSlotHighlighted =
-    !dndDisabledByAction &&
-    activeDropTargets.includes("rack_slot") &&
-    activeDragItem?.entityKind === "tool" &&
-    activeDragItem.toolType === "sample_vial";
-
   return {
     canApplyLimsLabelToSlot: canApplyLimsTicketToSlot,
     handleAddWorkbenchSlot,
@@ -257,6 +259,5 @@ export function useWorkbenchHandlers({
     handleToggleToolSeal,
     handleToolbarItemDrop,
     isBenchSlotHighlighted,
-    isRackSlotHighlighted,
   };
 }

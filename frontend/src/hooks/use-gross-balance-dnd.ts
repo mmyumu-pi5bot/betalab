@@ -110,7 +110,7 @@ export function useGrossBalanceDnd({
     if (dndDisabledByAction) {
       return;
     }
-    if (canResolveLabelDropOnTool(event.dataTransfer, {
+    if (canResolveActiveLabelDragOnTool(activeDragItem, {
       parentDropTargetTypes: ["gross_balance_widget"],
       tool: grossBalanceTool,
     })) {
@@ -243,7 +243,10 @@ export function useGrossBalanceDnd({
   };
 
   const handleBalanceStagedToolDragOver = (event: DragEvent<HTMLElement>) => {
-    if (canAcceptBalanceStagedToolDrop(event)) {
+    if (canResolveActiveLabelDragOnTool(activeDragItem, {
+      parentDropTargetTypes: ["gross_balance_widget"],
+      tool: grossBalanceTool,
+    })) {
       event.preventDefault();
       event.stopPropagation();
     }

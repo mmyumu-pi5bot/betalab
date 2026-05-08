@@ -141,19 +141,33 @@ describe("resolveToolDropCommand", () => {
     });
   });
 
-  it("rejects same-slot moves and unsupported rack/vortex placements", () => {
+  it("rejects same-origin moves but leaves target compatibility to backend-authored target state", () => {
     expect(resolveToolDropCommand(createWorkbenchToolPayload(), { kind: "workbench_slot", slotId: "station_1" })).toBeNull();
     expect(resolveToolDropCommand(createRackToolPayload(), { kind: "rack_slot", rackSlotId: "rack_a1" })).toBeNull();
 
     expect(resolveToolDropCommand(
       createToolbarToolPayload({ itemId: "beaker_250ml", toolType: "beaker" }),
       { kind: "rack_slot", rackSlotId: "rack_b2" },
-    )).toBeNull();
+    )).toEqual({
+      kind: "place_tool_from_palette",
+      payload: {
+        tool_id: "beaker_250ml",
+        destination_kind: "rack_slot",
+        destination_id: "rack_b2",
+      },
+    });
 
     expect(resolveToolDropCommand(
       createToolbarToolPayload({ itemId: "beaker_250ml", toolType: "beaker" }),
       { kind: "vortex" },
-    )).toBeNull();
+    )).toEqual({
+      kind: "place_tool_from_palette",
+      payload: {
+        tool_id: "beaker_250ml",
+        destination_kind: "vortex",
+        destination_id: "vortex",
+      },
+    });
 
     expect(resolveToolDropCommand(createVortexToolPayload(), { kind: "vortex" })).toEqual({
       kind: "move_tool",

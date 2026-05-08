@@ -63,7 +63,7 @@ export type ExperimentWorkspaceWidgetType = "workbench" | "trash" | WorkspaceWid
 export type WidgetAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type ProduceLotType = "apple";
 export type ProduceMaterialKind = "whole" | "cut" | "ground" | "slurry" | "waste";
-type DragEntityKind =
+export type DragEntityKind =
   | "tool"
   | "liquid"
   | "workspace_widget"
@@ -86,6 +86,9 @@ type DragSourceKind =
 export type DebugProducePresetId = "apple_powder_residual_co2";
 
 export type ToolCatalogItem = ToolbarBaseItem & {
+  canReceiveLiquids?: boolean;
+  canReceiveProduce?: boolean;
+  canSeal?: boolean;
   itemType: "tool";
   toolType: ToolType;
   capacity_ml: number;
@@ -317,6 +320,29 @@ export type DragDescriptor =
       trashProduceLotId?: string;
     });
 
+export type ContainedEntity = {
+  entityKind: DragEntityKind;
+  id: string;
+  liquidType?: LiquidType | null;
+  produceType?: ProduceLotType | null;
+  toolType?: ToolType | null;
+};
+
+export type ContainmentRule = {
+  entityKind: DragEntityKind;
+  liquidType?: LiquidType | null;
+  toolType?: ToolType | null;
+};
+
+export type Containment = {
+  accepts: ContainmentRule[];
+  blockedReason?: string | null;
+  canReceive: boolean;
+  capacity: number;
+  children: ContainedEntity[];
+  remainingCapacity: number;
+};
+
 export type BenchLiquidPortion = {
   id: string;
   liquidId: string;
@@ -333,6 +359,10 @@ export type BenchToolInstance = {
   accent: ToolbarAccent;
   toolType: ToolType;
   capacity_ml: number;
+  canReceiveContents: boolean;
+  canReceiveLiquids: boolean;
+  canReceiveProduce: boolean;
+  canSeal: boolean;
   contactImpurityMgPerG?: number;
   isSealed?: boolean;
   closureFault?: string | null;
@@ -340,6 +370,8 @@ export type BenchToolInstance = {
   isMixed?: boolean;
   isDraggable: boolean;
   allowedDropTargets: DropTargetType[];
+  children?: ContainedEntity[];
+  containment?: Containment | null;
   labels?: BenchLabel[];
   produceLots?: ExperimentProduceLot[];
   produceFractions?: ProduceFraction[];
@@ -349,6 +381,16 @@ export type BenchToolInstance = {
 };
 
 export type SpatulaState = {
+  allowedLoadSourceToolTypes?: ToolType[];
+  allowedPourTargetToolTypes?: ToolType[];
+  canDiscard?: boolean;
+  clickIncrementMuG?: number;
+  clickIncrementSigmaG?: number;
+  holdInitialRateG?: number;
+  holdIntervalMs?: number;
+  holdLiftRateGPerPx?: number;
+  holdMaxRateG?: number;
+  holdThresholdMs?: number;
   isLoaded: boolean;
   produceFractions?: ProduceFraction[];
   sourceToolId: string | null;
@@ -380,6 +422,8 @@ export type ProduceFraction = {
 };
 
 export type BenchSlot = {
+  children?: ContainedEntity[];
+  containment?: Containment | null;
   id: string;
   label: string;
   dropTargetTypes?: DropTargetType[];
@@ -388,6 +432,8 @@ export type BenchSlot = {
 };
 
 export type RackSlot = {
+  children?: ContainedEntity[];
+  containment?: Containment | null;
   id: string;
   label: string;
   dropTargetTypes?: DropTargetType[];
@@ -435,18 +481,25 @@ export type TrashSampleLabelEntry = {
 };
 
 export type ExperimentWorkspaceWidget = {
+  children?: ContainedEntity[];
+  containment?: Containment | null;
   id: ExperimentWorkspaceWidgetId;
   widgetType: ExperimentWorkspaceWidgetType;
   label: string;
   dropTargetTypes?: DropTargetType[];
   isDraggable: boolean;
   allowedDropTargets: DropTargetType[];
+  isStorable: boolean;
+  canStore: boolean;
   anchor: WidgetAnchor;
   offsetX: number;
   offsetY: number;
   grinderRunDurationMs?: number;
   grinderRunRemainingMs?: number;
   grinderFault?: string | null;
+  grinderCanStart?: boolean;
+  grinderStartBlockReason?: string | null;
+  grinderDisplayMode?: string | null;
   vortexRunDurationMs?: number;
   vortexRunRemainingMs?: number;
   isPresent: boolean;

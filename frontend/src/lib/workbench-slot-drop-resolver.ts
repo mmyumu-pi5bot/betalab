@@ -3,6 +3,7 @@ import {
   resolveDropTargetFromDataTransfer,
   type DropTargetNode,
 } from "@/lib/drop-target-resolver";
+import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import {
   resolveToolDropTargetFromActiveDrag,
   resolveToolDropTargetFromDataTransfer,
@@ -30,14 +31,14 @@ function canResolveOnWorkbenchSlot(
   }
 
   if (descriptor.entityKind === "tool") {
-    if ((slot.surfaceProduceLots?.length ?? 0) > 0 || slot.tool !== null) {
+    if (!containmentAcceptsDescriptor(slot.containment, descriptor)) {
       return false;
     }
     return descriptor.sourceKind !== "workbench" || descriptor.sourceId !== slot.id;
   }
 
   if (descriptor.entityKind === "produce") {
-    return (slot.surfaceProduceLots?.length ?? 0) === 0;
+    return containmentAcceptsDescriptor(slot.containment, descriptor);
   }
 
   return false;

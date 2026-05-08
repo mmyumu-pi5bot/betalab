@@ -1,9 +1,9 @@
 import type { DebugProducePreset } from "@/components/debug-produce-palette";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
-import { getProduceLotDropTargets } from "@/lib/tool-drop-targets";
 import type {
   BenchToolInstance,
+  DropTargetType,
   ExperimentProduceLot,
   ExperimentWorkspaceWidgetId,
   ToolType,
@@ -52,6 +52,13 @@ export const labSceneWidgetFrameSpecs: Record<LabSceneWidgetId, WidgetLayout> = 
 
 export const rackSlotCount = 12;
 
+const debugProduceAllowedDropTargets: DropTargetType[] = [
+  "workbench_slot",
+  "grinder_widget",
+  "trash_bin",
+  "gross_balance_widget",
+];
+
 export const debugProducePresets: DebugProducePreset[] = [
   {
     id: "apple_powder_residual_co2",
@@ -67,7 +74,7 @@ export const debugProducePresets: DebugProducePreset[] = [
       grindQualityLabel: "powder_fine",
       homogeneityScore: 0.96,
       isDraggable: true,
-      allowedDropTargets: getProduceLotDropTargets(),
+      allowedDropTargets: debugProduceAllowedDropTargets,
     },
   },
 ];

@@ -1,12 +1,12 @@
 import type { DragEvent } from "react";
 
 import {
-  hasCompatibleDropTarget,
+  readDragDescriptor,
   readEquipmentToolDragPayload,
   readToolbarDragPayload,
   writeEquipmentToolDragPayload,
 } from "@/lib/workbench-dnd";
-import { labToolCatalog } from "@/lib/lab-workflow-catalog";
+import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
@@ -23,12 +23,13 @@ type RackDndExperimentApi = {
 
 type RackDndOptions = {
   dndDisabledByAction: boolean;
-  dragState: Pick<DragStateApi, "clearDropTargets" | "setActiveDragItem" | "showDropTargets">;
+  dragState: Pick<DragStateApi, "activeDragItem" | "activeDropTargets" | "clearDropTargets" | "setActiveDragItem" | "showDropTargets">;
   experimentApi: RackDndExperimentApi;
   rackSlots: RackSlot[];
 };
 
 export type RackDndApi = {
+  canDropOnRackSlotFromActiveDrag: (rackSlot: RackSlot) => boolean;
   handleRackSlotDragOver: (event: DragEvent<HTMLDivElement>, targetRackSlot: RackSlot) => void;
   handleRackSlotDrop: (event: DragEvent<HTMLDivElement>, slotIndex: number) => void;
   handleRackToolDragStart: (
@@ -44,18 +45,26 @@ export function useRackDnd({
   experimentApi,
   rackSlots,
 }: RackDndOptions): RackDndApi {
-  const { clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
+  const { activeDragItem, activeDropTargets, clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
+
+  const canDropOnRackSlotFromActiveDrag = (rackSlot: RackSlot) => {
+    if (dndDisabledByAction || activeDragItem === null) {
+      return false;
+    }
+    if (!(rackSlot.dropTargetTypes ?? []).some((targetType) => (activeDropTargets ?? []).includes(targetType))) {
+      return false;
+    }
+    return containmentAcceptsDescriptor(rackSlot.containment, activeDragItem);
+  };
 
   const handleRackSlotDragOver = (
     event: DragEvent<HTMLDivElement>,
     targetRackSlot: RackSlot,
   ) => {
-    if (dndDisabledByAction) {
+    if (!canDropOnRackSlotFromActiveDrag(targetRackSlot)) {
       return;
     }
-    if ((targetRackSlot.dropTargetTypes ?? []).some((targetType) => hasCompatibleDropTarget(event.dataTransfer, targetType))) {
-      event.preventDefault();
-    }
+    event.preventDefault();
   };
 
   const handleRackSlotDrop = (event: DragEvent<HTMLDivElement>, slotIndex: number) => {
@@ -68,9 +77,6 @@ export function useRackDnd({
     }
 
     const toolbarPayload = readToolbarDragPayload(event.dataTransfer);
-    const toolbarTool = toolbarPayload?.itemType === "tool"
-      ? labToolCatalog[toolbarPayload.itemId]
-      : null;
     const toolPayload =
       (toolbarPayload?.itemType === "tool" ? toolbarPayload : null) ??
       readEquipmentToolDragPayload(event.dataTransfer);
@@ -79,8 +85,7 @@ export function useRackDnd({
       return;
     }
 
-    const toolType = toolbarTool?.toolType ?? toolPayload.toolType;
-    if (toolType !== "sample_vial") {
+    if (!containmentAcceptsDescriptor(targetRackSlot.containment, readDragDescriptor(event.dataTransfer))) {
       return;
     }
 
@@ -132,6 +137,7 @@ export function useRackDnd({
   };
 
   return {
+    canDropOnRackSlotFromActiveDrag,
     handleRackSlotDragOver,
     handleRackSlotDrop,
     handleRackToolDragStart,

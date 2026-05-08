@@ -5,7 +5,6 @@ import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
-import { canToolAcceptProduce, canToolBeSealed } from "@/lib/entity-rules";
 import {
   getContainerLiquidVisualState,
   getLiquidAccentPalette,
@@ -80,8 +79,8 @@ export function BenchToolCard({
     tool.toolType === "sample_vial" ||
     tool.toolType === "centrifuge_tube" ||
     tool.toolType === "cleanup_tube";
-  const isProduceSurface = canToolAcceptProduce(tool.toolType);
-  const isSealable = canToolBeSealed(tool.toolType);
+  const isProduceSurface = tool.canReceiveProduce;
+  const isSealable = tool.canSeal;
   const isSealed = tool.isSealed ?? false;
   const canDragContainedProduce = !isSealed;
   const labels = tool.labels ?? [];

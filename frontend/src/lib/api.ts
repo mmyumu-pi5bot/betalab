@@ -5,6 +5,10 @@ import type {
   BenchLiquidPortion,
   BenchSlot,
   BenchToolInstance,
+  ContainedEntity,
+  Containment,
+  ContainmentRule,
+  DragEntityKind,
   DropTargetType,
   ExperimentProduceLot,
   ExperimentWorkspaceWidget,
@@ -46,6 +50,96 @@ function normalizeAllowedDropTargets(raw: unknown): DropTargetType[] {
   }
 
   return raw.filter((target): target is DropTargetType => typeof target === "string");
+}
+
+function normalizeContainedEntity(raw: unknown): ContainedEntity | null {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  const entity = raw as Record<string, unknown>;
+  const entityKind = entity.entityKind ?? entity.entity_kind;
+  if (typeof entityKind !== "string") {
+    return null;
+  }
+  return {
+    entityKind: entityKind as DragEntityKind,
+    id: String(entity.id ?? ""),
+    liquidType:
+      entity.liquidType !== undefined
+        ? String(entity.liquidType) as ContainedEntity["liquidType"]
+        : entity.liquid_type !== undefined && entity.liquid_type !== null
+          ? String(entity.liquid_type) as ContainedEntity["liquidType"]
+          : null,
+    produceType:
+      entity.produceType !== undefined
+        ? String(entity.produceType) as ContainedEntity["produceType"]
+        : entity.produce_type !== undefined && entity.produce_type !== null
+          ? String(entity.produce_type) as ContainedEntity["produceType"]
+          : null,
+    toolType:
+      entity.toolType !== undefined
+        ? String(entity.toolType) as ContainedEntity["toolType"]
+        : entity.tool_type !== undefined && entity.tool_type !== null
+          ? String(entity.tool_type) as ContainedEntity["toolType"]
+          : null,
+  };
+}
+
+function normalizeContainmentRule(raw: unknown): ContainmentRule | null {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  const rule = raw as Record<string, unknown>;
+  const entityKind = rule.entityKind ?? rule.entity_kind;
+  if (typeof entityKind !== "string") {
+    return null;
+  }
+  return {
+    entityKind: entityKind as DragEntityKind,
+    liquidType:
+      rule.liquidType !== undefined
+        ? String(rule.liquidType) as ContainmentRule["liquidType"]
+        : rule.liquid_type !== undefined && rule.liquid_type !== null
+          ? String(rule.liquid_type) as ContainmentRule["liquidType"]
+          : null,
+    toolType:
+      rule.toolType !== undefined
+        ? String(rule.toolType) as ContainmentRule["toolType"]
+        : rule.tool_type !== undefined && rule.tool_type !== null
+          ? String(rule.tool_type) as ContainmentRule["toolType"]
+          : null,
+  };
+}
+
+function normalizeContainment(raw: unknown): Containment | null {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  const containment = raw as Record<string, unknown>;
+  return {
+    accepts: ((containment.accepts ?? []) as unknown[])
+      .map(normalizeContainmentRule)
+      .filter((rule): rule is ContainmentRule => rule !== null),
+    blockedReason:
+      containment.blockedReason !== undefined && containment.blockedReason !== null
+        ? String(containment.blockedReason)
+        : containment.blocked_reason !== undefined && containment.blocked_reason !== null
+          ? String(containment.blocked_reason)
+          : null,
+    canReceive: Boolean(containment.canReceive ?? containment.can_receive ?? false),
+    capacity: Number(containment.capacity ?? 0),
+    children: ((containment.children ?? []) as unknown[])
+      .map(normalizeContainedEntity)
+      .filter((child): child is ContainedEntity => child !== null),
+    remainingCapacity: Number(containment.remainingCapacity ?? containment.remaining_capacity ?? 0),
+  };
+}
+
+function normalizeContainedEntities(raw: unknown): ContainedEntity[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map(normalizeContainedEntity).filter((child): child is ContainedEntity => child !== null);
 }
 
 async function buildApiError(response: Response, fallbackMessage: string): Promise<Error> {
@@ -145,6 +239,9 @@ function normalizeToolbarItem(rawItem: Record<string, unknown>): ToolbarItem {
   if (itemType === "tool") {
     return {
       ...base,
+      canReceiveLiquids: Boolean(rawItem.canReceiveLiquids ?? rawItem.can_receive_liquids),
+      canReceiveProduce: Boolean(rawItem.canReceiveProduce ?? rawItem.can_receive_produce),
+      canSeal: Boolean(rawItem.canSeal ?? rawItem.can_seal),
       capacity_ml: Number(rawItem.capacity_ml ?? 0),
       itemType: "tool",
       toolType: String(rawItem.toolType ?? rawItem.tool_type) as Extract<ToolbarItem, { itemType: "tool" }>["toolType"],
@@ -1688,6 +1785,8 @@ function normalizeBenchSlot(slot: BenchSlot, materialStates: ProduceMaterialStat
   );
 
   return {
+    children: normalizeContainedEntities(rawSlot.children),
+    containment: normalizeContainment(rawSlot.containment),
     id: slot.id,
     label: slot.label,
     dropTargetTypes: normalizeAllowedDropTargets(slot.dropTargetTypes ?? rawSlot.drop_target_types),
@@ -1728,6 +1827,10 @@ function normalizeBenchTool(
     accent: tool.accent,
     toolType: String(tool.toolType ?? tool.tool_type) as BenchToolInstance["toolType"],
     capacity_ml: Number(tool.capacity_ml),
+    canReceiveContents: Boolean(tool.canReceiveContents ?? tool.can_receive_contents),
+    canReceiveLiquids: Boolean(tool.canReceiveLiquids ?? tool.can_receive_liquids),
+    canReceiveProduce: Boolean(tool.canReceiveProduce ?? tool.can_receive_produce),
+    canSeal: Boolean(tool.canSeal ?? tool.can_seal),
     contactImpurityMgPerG: Number(tool.contactImpurityMgPerG ?? tool.contact_impurity_mg_per_g ?? 0),
     isMixed: Boolean(tool.isMixed ?? tool.is_mixed ?? false),
     isSealed: Boolean(tool.isSealed ?? tool.is_sealed ?? false),
@@ -1747,6 +1850,8 @@ function normalizeBenchTool(
           : null,
     isDraggable: Boolean(tool.isDraggable ?? tool.is_draggable),
     allowedDropTargets: normalizeAllowedDropTargets(tool.allowedDropTargets ?? tool.allowed_drop_targets),
+    children: normalizeContainedEntities(tool.children),
+    containment: normalizeContainment(tool.containment),
     labels: ((tool.labels ?? []) as Array<BenchLabel & Record<string, unknown>>).map((label) =>
       normalizeBenchLabel(label),
     ),
@@ -1839,7 +1944,7 @@ function normalizeSpatulaState(
   spatula: SpatulaState & Record<string, unknown>,
 ): SpatulaState {
   const produceFractions = normalizeProduceFractions(spatula.produceFractions ?? spatula.produce_fractions);
-  return {
+  const normalized: SpatulaState = {
     isLoaded: Boolean(spatula.isLoaded ?? spatula.is_loaded ?? false),
     produceFractions,
     sourceToolId:
@@ -1849,6 +1954,39 @@ function normalizeSpatulaState(
           ? (spatula.source_tool_id as string | null)
           : null,
   };
+  const allowedLoadSourceToolTypes = spatula.allowedLoadSourceToolTypes ?? spatula.allowed_load_source_tool_types;
+  if (Array.isArray(allowedLoadSourceToolTypes)) {
+    normalized.allowedLoadSourceToolTypes = allowedLoadSourceToolTypes as SpatulaState["allowedLoadSourceToolTypes"];
+  }
+  const allowedPourTargetToolTypes = spatula.allowedPourTargetToolTypes ?? spatula.allowed_pour_target_tool_types;
+  if (Array.isArray(allowedPourTargetToolTypes)) {
+    normalized.allowedPourTargetToolTypes = allowedPourTargetToolTypes as SpatulaState["allowedPourTargetToolTypes"];
+  }
+  if (spatula.canDiscard !== undefined || spatula.can_discard !== undefined) {
+    normalized.canDiscard = Boolean(spatula.canDiscard ?? spatula.can_discard);
+  }
+  if (spatula.clickIncrementMuG !== undefined || spatula.click_increment_mu_g !== undefined) {
+    normalized.clickIncrementMuG = Number(spatula.clickIncrementMuG ?? spatula.click_increment_mu_g);
+  }
+  if (spatula.clickIncrementSigmaG !== undefined || spatula.click_increment_sigma_g !== undefined) {
+    normalized.clickIncrementSigmaG = Number(spatula.clickIncrementSigmaG ?? spatula.click_increment_sigma_g);
+  }
+  if (spatula.holdInitialRateG !== undefined || spatula.hold_initial_rate_g !== undefined) {
+    normalized.holdInitialRateG = Number(spatula.holdInitialRateG ?? spatula.hold_initial_rate_g);
+  }
+  if (spatula.holdIntervalMs !== undefined || spatula.hold_interval_ms !== undefined) {
+    normalized.holdIntervalMs = Number(spatula.holdIntervalMs ?? spatula.hold_interval_ms);
+  }
+  if (spatula.holdLiftRateGPerPx !== undefined || spatula.hold_lift_rate_g_per_px !== undefined) {
+    normalized.holdLiftRateGPerPx = Number(spatula.holdLiftRateGPerPx ?? spatula.hold_lift_rate_g_per_px);
+  }
+  if (spatula.holdMaxRateG !== undefined || spatula.hold_max_rate_g !== undefined) {
+    normalized.holdMaxRateG = Number(spatula.holdMaxRateG ?? spatula.hold_max_rate_g);
+  }
+  if (spatula.holdThresholdMs !== undefined || spatula.hold_threshold_ms !== undefined) {
+    normalized.holdThresholdMs = Number(spatula.holdThresholdMs ?? spatula.hold_threshold_ms);
+  }
+  return normalized;
 }
 
 function getGroundProduceMassG(
@@ -1967,12 +2105,15 @@ function normalizeLimsReception(
 }
 
 function normalizeRackSlot(slot: RackSlot, materialStates: ProduceMaterialState[] = []): RackSlot {
+  const rawSlot = slot as RackSlot & Record<string, unknown>;
   return {
+    children: normalizeContainedEntities(rawSlot.children),
+    containment: normalizeContainment(rawSlot.containment),
     id: slot.id,
     label: slot.label,
     dropTargetTypes: normalizeAllowedDropTargets(
-      (slot as RackSlot & Record<string, unknown>).dropTargetTypes ??
-      (slot as RackSlot & Record<string, unknown>).drop_target_types,
+      rawSlot.dropTargetTypes ??
+      rawSlot.drop_target_types,
     ),
     tool: slot.tool
       ? normalizeBenchTool(slot.tool as BenchToolInstance & Record<string, unknown>, materialStates)
@@ -2030,12 +2171,16 @@ function normalizeWorkspaceWidget(
     | undefined;
 
   return {
+    children: normalizeContainedEntities(widget.children),
+    containment: normalizeContainment(widget.containment),
     id: String(widget.id) as ExperimentWorkspaceWidget["id"],
     widgetType: String(widget.widgetType ?? widget.widget_type) as ExperimentWorkspaceWidget["widgetType"],
     label: String(widget.label),
     dropTargetTypes: normalizeAllowedDropTargets(widget.dropTargetTypes ?? widget.drop_target_types),
     isDraggable: Boolean(widget.isDraggable ?? widget.is_draggable ?? false),
     allowedDropTargets: normalizeAllowedDropTargets(widget.allowedDropTargets ?? widget.allowed_drop_targets),
+    isStorable: Boolean(widget.isStorable ?? widget.is_storable ?? false),
+    canStore: Boolean(widget.canStore ?? widget.can_store ?? widget.isDraggable ?? widget.is_draggable ?? false),
     anchor: String(widget.anchor ?? "top-left") as WidgetAnchor,
     grinderRunDurationMs: Number(widget.grinderRunDurationMs ?? widget.grinder_run_duration_ms ?? 0),
     grinderRunRemainingMs: Number(widget.grinderRunRemainingMs ?? widget.grinder_run_remaining_ms ?? 0),
@@ -2044,6 +2189,19 @@ function normalizeWorkspaceWidget(
         ? String(widget.grinderFault)
         : widget.grinder_fault !== undefined && widget.grinder_fault !== null
           ? String(widget.grinder_fault)
+          : null,
+    grinderCanStart: Boolean(widget.grinderCanStart ?? widget.grinder_can_start ?? false),
+    grinderStartBlockReason:
+      widget.grinderStartBlockReason !== undefined && widget.grinderStartBlockReason !== null
+        ? String(widget.grinderStartBlockReason)
+        : widget.grinder_start_block_reason !== undefined && widget.grinder_start_block_reason !== null
+          ? String(widget.grinder_start_block_reason)
+          : null,
+    grinderDisplayMode:
+      widget.grinderDisplayMode !== undefined && widget.grinderDisplayMode !== null
+        ? String(widget.grinderDisplayMode)
+        : widget.grinder_display_mode !== undefined && widget.grinder_display_mode !== null
+          ? String(widget.grinder_display_mode)
           : null,
     vortexRunDurationMs: Number(widget.vortexRunDurationMs ?? widget.vortex_run_duration_ms ?? 0),
     vortexRunRemainingMs: Number(widget.vortexRunRemainingMs ?? widget.vortex_run_remaining_ms ?? 0),

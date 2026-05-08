@@ -7,7 +7,14 @@ import {
   getProduceLotDropTargets,
   getSampleLabelDropTargets,
   getToolDropTargets,
-} from "@/lib/tool-drop-targets";
+} from "@/test-support/drop-targets";
+import {
+  canToolAcceptLiquids,
+  canToolAcceptProduce,
+  canToolBeSealed,
+  canToolReceiveContents,
+  getOpenEmptyToolContainment,
+} from "@/test-support/tool-capabilities";
 import type { Experiment } from "@/types/experiment";
 import type {
   BenchLabel,
@@ -111,24 +118,55 @@ function makeSlots(overrides: Partial<BenchSlot>[] = [], count = Math.max(2, ove
         slot.dropTargetTypes && slot.dropTargetTypes.length > 0
           ? slot.dropTargetTypes
           : ["workbench_slot"],
+      containment: slot.containment ?? {
+        accepts: [{ entityKind: "tool" }, { entityKind: "produce" }],
+        blockedReason:
+          slot.tool !== null || (slot.surfaceProduceLots?.length ?? 0) > 0
+            ? "occupied"
+            : null,
+        canReceive: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0,
+        capacity: 1,
+        children: [
+          ...(slot.tool
+            ? [{ entityKind: "tool" as const, id: slot.tool.id, toolType: slot.tool.toolType }]
+            : []),
+          ...((slot.surfaceProduceLots ?? []).map((produceLot) => ({
+            entityKind: "produce" as const,
+            id: produceLot.id,
+            produceType: produceLot.produceType,
+          }))),
+        ],
+        remainingCapacity: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0 ? 1 : 0,
+      },
     }));
 }
 
 function makeTool(overrides: Partial<BenchToolInstance> = {}): BenchToolInstance {
-  return {
+  const toolType = overrides.toolType ?? "sample_vial";
+  const isSealed = overrides.isSealed ?? false;
+  const tool = {
     id: "bench_tool_1",
     toolId: "sample_vial_lcms",
     label: "Autosampler vial",
     subtitle: "Injection ready",
     accent: "sky",
-    toolType: "sample_vial",
+    toolType,
     capacity_ml: 2,
+    canReceiveContents: canToolReceiveContents(toolType, isSealed),
+    canReceiveLiquids: canToolAcceptLiquids(toolType),
+    canReceiveProduce: canToolAcceptProduce(toolType),
+    canSeal: canToolBeSealed(toolType),
+    isSealed,
     isDraggable: true,
-    allowedDropTargets: getToolDropTargets("sample_vial"),
+    allowedDropTargets: getToolDropTargets(toolType),
     labels: [],
     produceLots: [],
     liquids: [],
     ...overrides,
+  };
+  return {
+    ...tool,
+    containment: tool.containment ?? getOpenEmptyToolContainment(toolType),
   };
 }
 
@@ -156,6 +194,18 @@ function makeRackSlots(overrides: Partial<RackSlot>[] = []): RackSlot[] {
   return baseSlots.map((slot, index) => ({
     ...slot,
     ...(overrides[index] ?? {}),
+  })).map((slot) => ({
+    ...slot,
+    containment: slot.containment ?? {
+      accepts: [{ entityKind: "tool", toolType: "sample_vial" }],
+      blockedReason: slot.tool === null ? null : "occupied",
+      canReceive: slot.tool === null,
+      capacity: 1,
+      children: slot.tool
+        ? [{ entityKind: "tool", id: slot.tool.id, toolType: slot.tool.toolType }]
+        : [],
+      remainingCapacity: slot.tool === null ? 1 : 0,
+    },
   }));
 }
 
@@ -268,7 +318,7 @@ function makeWorkspaceWidgets(
     },
   ];
 
-  const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance"]);
+  const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"]);
 
   return baseWidgets.map((widget, index) => {
     const merged = { ...widget, ...(normalizedOverrides[index] ?? {}) };
@@ -280,10 +330,56 @@ function makeWorkspaceWidgets(
           (merged.liquids?.length ?? 0) === 0));
     return {
       ...merged,
+      isStorable: storableWidgetIds.has(merged.id),
+      canStore: isDraggable,
       isDraggable,
       allowedDropTargets: isDraggable ? (["workspace_canvas"] as const) : [],
+      ...(merged.id === "grinder"
+        ? buildGrinderSnapshotFields(merged)
+        : {}),
     };
   });
+}
+
+function buildGrinderSnapshotFields(widget: ExperimentWorkspaceWidget): Partial<ExperimentWorkspaceWidget> {
+  const produceLot = widget.produceLots?.[0] ?? null;
+  const materialState = produceLot?.materialState ?? "whole";
+  const temperatureC = produceLot?.temperatureC ?? 20;
+  const isRunning = (widget.grinderRunRemainingMs ?? 0) > 0;
+  const startBlockReason =
+    isRunning
+      ? "running"
+      : produceLot === null
+        ? "empty"
+        : materialState === "whole"
+          ? "must_be_cut"
+          : materialState === "ground"
+            ? "already_ground"
+            : materialState === "waste"
+              ? "waste"
+              : temperatureC > -20
+                ? "not_cold_enough"
+                : null;
+  const displayMode =
+    widget.grinderDisplayMode ??
+    (materialState === "ground"
+      ? "complete"
+      : widget.grinderFault === "motor_jammed" || startBlockReason === "not_cold_enough"
+        ? "jammed"
+        : isRunning && temperatureC > -20
+          ? "warning"
+          : isRunning
+            ? "running"
+            : startBlockReason === null
+              ? "ready"
+              : startBlockReason === "must_be_cut"
+                ? "overload"
+                : "idle");
+  return {
+    grinderCanStart: widget.grinderCanStart ?? (startBlockReason === null),
+    grinderDisplayMode: displayMode,
+    grinderStartBlockReason: widget.grinderStartBlockReason ?? startBlockReason,
+  };
 }
 
 function makeProduceLot(overrides: Partial<ExperimentProduceLot> & { id: string }): ExperimentProduceLot {
@@ -326,20 +422,40 @@ function makeWorkbenchExperiment({
   snapshotVersion?: number;
   slots?: BenchSlot[];
   trashProduceLots?: TrashProduceLotEntry[];
-  trashSampleLabels?: TrashSampleLabelEntry[];
+    trashSampleLabels?: TrashSampleLabelEntry[];
   trashTools?: BenchToolInstance[];
   workspaceWidgets?: ExperimentWorkspaceWidget[];
 } = {}): Experiment {
+  const normalizedWorkspaceWidgets = workspaceWidgets.map((widget) => {
+    if (widget.id !== "rack" || !rackSlots.some((slot) => slot.tool !== null)) {
+      return widget;
+    }
+    return {
+      ...widget,
+      canStore: false,
+      isDraggable: false,
+      allowedDropTargets: [],
+    };
+  });
+  const normalizedSlots = slots.map((slot) => ({
+    ...slot,
+    tool: slot.tool ? makeTool(slot.tool) : null,
+  }));
+  const normalizedRackSlots = rackSlots.map((slot) => ({
+    ...slot,
+    tool: slot.tool ? makeTool(slot.tool) : null,
+  }));
+
   return {
     id: "experiment_pesticides",
     status: "preparing",
     last_simulation_at: lastSimulationAt,
     snapshot_version: snapshotVersion,
-    workbench: { slots },
-    rack: { slots: rackSlots },
-    trash: { children: trashTools ?? [], discardedFrom: {}, produceLots: trashProduceLots, sampleLabels: trashSampleLabels },
-    workspace: { produceBasketLots: basketProduceLots, widgets: workspaceWidgets },
-    basketTools,
+    workbench: { slots: normalizedSlots },
+    rack: { slots: normalizedRackSlots },
+    trash: { children: (trashTools ?? []).map((tool) => makeTool(tool)), discardedFrom: {}, produceLots: trashProduceLots, sampleLabels: trashSampleLabels },
+    workspace: { produceBasketLots: basketProduceLots, widgets: normalizedWorkspaceWidgets },
+    basketTools: basketTools.map((tool) => makeTool(tool)),
       spatula: {
         isLoaded: false,
         produceFractions: [],
@@ -1866,7 +1982,7 @@ describe("LabScene", () => {
     expect(screen.getByTestId("grinder-power-button")).toBeDisabled();
   });
 
-  it("shows OVERLOAD on the grinder lcd when a whole apple lot is started", async () => {
+  it("shows OVERLOAD on the grinder lcd when the backend reports a whole apple lot", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
         workspaceWidgets: makeWorkspaceWithGrinderVisible({
@@ -1883,17 +1999,15 @@ describe("LabScene", () => {
       expect(screen.getByTestId("grinder-power-button")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("grinder-power-button"));
-
     expect(screen.getByTestId("grinder-lcd-status")).toHaveTextContent("OVERLOAD");
     expect(screen.getByTestId("grinder-lcd-message")).toHaveTextContent("Whole fruit detected");
     expect(screen.getByTestId("cryogenic-grinder-illustration")).toHaveAttribute(
       "data-status",
-      "ready",
+      "idle",
     );
   });
 
-  it("shows JAMMED on the grinder lcd when the produce is not cold enough", async () => {
+  it("shows JAMMED on the grinder lcd when the backend reports produce that is not cold enough", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
         workspaceWidgets: makeWorkspaceWithGrinderVisible({
@@ -1910,13 +2024,11 @@ describe("LabScene", () => {
       expect(screen.getByTestId("grinder-power-button")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("grinder-power-button"));
-
     expect(screen.getByTestId("grinder-lcd-status")).toHaveTextContent("JAMMED");
     expect(screen.getByTestId("grinder-lcd-message")).toHaveTextContent("Product not cold enough");
     expect(screen.getByTestId("cryogenic-grinder-illustration")).toHaveAttribute(
       "data-status",
-      "ready",
+      "idle",
     );
   });
 

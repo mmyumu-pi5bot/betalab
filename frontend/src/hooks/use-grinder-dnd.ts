@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import type { DragEvent } from "react";
 
 import {
@@ -28,11 +27,6 @@ import type {
   RestoreTrashedProduceLotToWidgetPayload,
   StartGrinderCyclePayload,
 } from "@/types/api-payloads";
-
-const ambientTemperatureC = 20;
-const grinderOptimalThresholdC = -40;
-const grinderStartThresholdC = -20;
-const grinderJamThresholdC = -10;
 
 type GrinderDndExperimentApi = {
   addWorkspaceProduceLotToWidget: (payload: AddWorkspaceProduceLotToWidgetPayload) => void;
@@ -102,16 +96,12 @@ export function useGrinderDnd({
   setPendingDropDraft,
 }: GrinderDndOptions): GrinderDndApi {
   const { clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
-  const [grinderFeedback, setGrinderFeedback] = useState<"neutral" | "overload" | "jammed">(
-    "neutral",
-  );
 
   const grinderProduceLots = grinderWidget?.produceLots ?? [];
   const grinderLiquids: NonNullable<ExperimentWorkspaceWidget["liquids"]> =
     grinderWidget?.liquids ?? [];
   const grinderLoadedLot = grinderProduceLots[0] ?? null;
   const grinderHasProduceLot = grinderProduceLots.length > 0;
-  const grinderLotIsGround = (grinderLoadedLot?.materialState ?? "whole") === "ground";
   const grinderLotIsWaste = (grinderLoadedLot?.materialState ?? "whole") === "waste";
   const grinderFault = grinderWidget?.grinderFault ?? null;
   const grinderRunRemainingMs = grinderWidget?.grinderRunRemainingMs ?? 0;
@@ -132,40 +122,8 @@ export function useGrinderDnd({
     pendingDropDraft.targetId === "grinder"
       ? pendingDropDraft
       : null;
-  const grinderCanAttempt =
-    grinderHasProduceLot && !grinderLotIsGround && !grinderLotIsWaste && !pendingGrinderDropDraft;
-  const grinderLotIsWhole = (grinderLoadedLot?.materialState ?? "whole") === "whole";
-  const grinderLotTemperatureC = grinderLoadedLot?.temperatureC ?? ambientTemperatureC;
-  const grinderLotIsColdEnough = grinderLotTemperatureC <= grinderStartThresholdC;
-  const grinderLotIsInHighTorqueZone =
-    grinderLotTemperatureC > grinderStartThresholdC &&
-    grinderLotTemperatureC < grinderJamThresholdC;
+  const grinderCanAttempt = Boolean(grinderWidget?.grinderCanStart) && !pendingGrinderDropDraft;
   const grinderDndDisabled = dndDisabledByAction || isGrinderRunning;
-
-  useEffect(() => {
-    const hasProduceLot = (grinderWidget?.produceLots?.length ?? 0) > 0;
-    const grinderDraftIsOpen =
-      pendingDropDraft?.targetKind === "workspace_widget" &&
-      pendingDropDraft.targetId === "grinder";
-    if (!hasProduceLot || grinderDraftIsOpen) {
-      setGrinderFeedback("neutral");
-    }
-  }, [pendingDropDraft, grinderWidget]);
-
-  useEffect(() => {
-    const loadedLot = grinderWidget?.produceLots?.[0] ?? null;
-    const grinderDraftIsOpen =
-      pendingDropDraft?.targetKind === "workspace_widget" &&
-      pendingDropDraft.targetId === "grinder";
-    if (!loadedLot || grinderDraftIsOpen) {
-      return;
-    }
-    const lotIsWhole = (loadedLot.materialState ?? "whole") === "whole";
-    const lotTemperatureC = loadedLot.temperatureC ?? ambientTemperatureC;
-    if (!lotIsWhole && lotTemperatureC <= grinderStartThresholdC) {
-      setGrinderFeedback("neutral");
-    }
-  }, [pendingDropDraft, grinderWidget]);
 
   const grinderStatus: "running" | "ready" | "idle" =
     isGrinderRunning && grinderFault !== "motor_jammed"
@@ -174,21 +132,7 @@ export function useGrinderDnd({
         ? "ready"
         : "idle";
 
-  const grinderDisplayMode: GrinderDisplayMode = grinderLotIsGround
-    ? "complete"
-    : grinderFault === "motor_jammed"
-      ? "jammed"
-      : !grinderCanAttempt
-        ? "idle"
-        : isGrinderRunning && grinderLotIsInHighTorqueZone
-          ? "warning"
-          : isGrinderRunning
-            ? "running"
-            : grinderFeedback === "overload"
-              ? "overload"
-              : grinderFeedback === "jammed"
-                ? "jammed"
-                : "ready";
+  const grinderDisplayMode = (grinderWidget?.grinderDisplayMode ?? "idle") as GrinderDisplayMode;
 
   const grinderDisplayLabel =
     grinderDisplayMode === "running"
@@ -240,9 +184,7 @@ export function useGrinderDnd({
       : grinderDisplayMode === "warning"
         ? "Pre-cool now"
         : grinderDisplayMode === "ready"
-          ? grinderLotTemperatureC <= grinderOptimalThresholdC
-            ? "Optimal"
-            : "Cryo armed"
+          ? "Cryo armed"
           : grinderDisplayMode === "complete"
             ? "Unload lot"
             : grinderDisplayMode === "overload"
@@ -349,15 +291,6 @@ export function useGrinderDnd({
     if (!grinderCanAttempt || isGrinderRunning || isCommandPending) {
       return;
     }
-    if (grinderLotIsWhole) {
-      setGrinderFeedback("overload");
-      return;
-    }
-    if (!grinderLotIsColdEnough) {
-      setGrinderFeedback("jammed");
-      return;
-    }
-    setGrinderFeedback("neutral");
     void experimentApi.startGrinderCycle({ widget_id: "grinder" });
   };
 

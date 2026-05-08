@@ -1,4 +1,5 @@
 import { createEvent, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkbenchPanel } from "@/components/workbench-panel";
@@ -9,9 +10,16 @@ import {
   writeSampleLabelDragPayload,
   writeToolbarDragPayload,
 } from "@/lib/workbench-dnd";
-import type { BenchSlot } from "@/types/workbench";
+import {
+  canToolAcceptLiquids,
+  canToolAcceptProduce,
+  canToolBeSealed,
+  canToolReceiveContents,
+  getOpenEmptyToolContainment,
+} from "@/test-support/tool-capabilities";
+import type { BenchSlot, BenchToolInstance } from "@/types/workbench";
 
-import { getProduceLotDropTargets, getSampleLabelDropTargets, getToolDropTargets } from "@/lib/tool-drop-targets";
+import { getProduceLotDropTargets, getSampleLabelDropTargets, getToolDropTargets } from "@/test-support/drop-targets";
 import type { BenchLabel, ExperimentProduceLot } from "@/types/workbench";
 
 function makeProduceLot(overrides: Partial<ExperimentProduceLot> & { id: string }): ExperimentProduceLot {
@@ -40,7 +48,53 @@ function makeSampleBagLabel(overrides: Partial<BenchLabel> = {}): BenchLabel {
   };
 }
 
-const PesticideWorkbenchPanel = WorkbenchPanel;
+function withToolCapabilities(tool: BenchToolInstance): BenchToolInstance {
+  const toolWithCapabilities = {
+    canReceiveContents: canToolReceiveContents(tool.toolType, tool.isSealed ?? false),
+    canReceiveLiquids: canToolAcceptLiquids(tool.toolType),
+    canReceiveProduce: canToolAcceptProduce(tool.toolType),
+    canSeal: canToolBeSealed(tool.toolType),
+    ...tool,
+  };
+  return {
+    ...toolWithCapabilities,
+    containment: toolWithCapabilities.containment ?? getOpenEmptyToolContainment(toolWithCapabilities.toolType),
+  };
+}
+
+function PesticideWorkbenchPanel(props: ComponentProps<typeof WorkbenchPanel>) {
+  return (
+    <WorkbenchPanel
+      {...props}
+      slots={props.slots.map((slot) => ({
+        ...slot,
+        tool: slot.tool ? withToolCapabilities(slot.tool) : null,
+      })).map((slot) => ({
+        ...slot,
+        containment: slot.containment ?? {
+          accepts: [{ entityKind: "tool" }, { entityKind: "produce" }],
+          blockedReason:
+            slot.tool !== null || (slot.surfaceProduceLots?.length ?? 0) > 0
+              ? "occupied"
+              : null,
+          canReceive: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0,
+          capacity: 1,
+          children: [
+            ...(slot.tool
+              ? [{ entityKind: "tool" as const, id: slot.tool.id, toolType: slot.tool.toolType }]
+              : []),
+            ...((slot.surfaceProduceLots ?? []).map((produceLot) => ({
+              entityKind: "produce" as const,
+              id: produceLot.id,
+              produceType: produceLot.produceType,
+            }))),
+          ],
+          remainingCapacity: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0 ? 1 : 0,
+        },
+      }))}
+    />
+  );
+}
 
 const slots: BenchSlot[] = [
   { id: "station_1", label: "Station 1", tool: null, dropTargetTypes: ["workbench_slot"] },

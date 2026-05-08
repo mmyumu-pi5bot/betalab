@@ -25,7 +25,6 @@ describe("workspace equipment illustrations", () => {
     const icon = screen.getByLabelText("sample vial").parentElement;
     const liquidLayer = icon?.querySelector("path[fill='#38bdf8']");
     const powderLayer = icon?.querySelector("[data-powder-layer='true']");
-    const powderPath = powderLayer?.getAttribute("d") ?? "";
     const liquidTopY = Number(liquidLayer?.getAttribute("d")?.match(/^M\d+(?:\.\d+)?\s+(\d+(?:\.\d+)?)/)?.[1]);
     const powderTopY = Number(powderLayer?.getAttribute("d")?.match(/^M\d+(?:\.\d+)?\s+(\d+(?:\.\d+)?)/)?.[1]);
 

@@ -186,11 +186,19 @@ def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
     ]
     placed_slot = placed.json()["workbench"]["slots"][0]
     assert placed_slot["drop_target_types"] == ["workbench_slot"]
+    placed_tool_containment = placed_slot["tool"]["containment"]
+    assert placed_tool_containment["can_receive"] is True
+    assert {"entity_kind": "sample_label", "tool_type": None, "liquid_type": None} in placed_tool_containment["accepts"]
 
     tool = applied.json()["workbench"]["slots"][0]["tool"]
     applied_slot = applied.json()["workbench"]["slots"][0]
     assert applied_slot["drop_target_types"] == ["workbench_slot"]
     assert tool["is_draggable"] is True
+    assert tool["can_seal"] is True
+    assert tool["can_receive_liquids"] is False
+    assert tool["can_receive_produce"] is True
+    assert tool["is_sealed"] is True
+    assert tool["can_receive_contents"] is False
     assert tool["allowed_drop_targets"] == [
         "workbench_slot",
         "trash_bin",
@@ -203,12 +211,28 @@ def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
         "analytical_balance_widget",
         "trash_bin",
     ]
+    assert {
+        "entity_kind": "sample_label",
+        "id": tool["labels"][0]["id"],
+        "tool_type": None,
+        "liquid_type": None,
+        "produce_type": None,
+    } in tool["children"]
+    assert tool["containment"]["accepts"] == [
+        {"entity_kind": "sample_label", "tool_type": None, "liquid_type": None},
+    ]
     gross_balance_widget = next(widget for widget in applied.json()["workspace"]["widgets"] if widget["id"] == "gross_balance")
     analytical_balance_widget = next(widget for widget in applied.json()["workspace"]["widgets"] if widget["id"] == "analytical_balance")
     grinder_widget = next(widget for widget in applied.json()["workspace"]["widgets"] if widget["id"] == "grinder")
     assert gross_balance_widget["drop_target_types"] == ["gross_balance_widget"]
+    assert gross_balance_widget["is_storable"] is True
+    assert gross_balance_widget["can_store"] is True
+    assert gross_balance_widget["allowed_drop_targets"] == ["workspace_canvas"]
     assert analytical_balance_widget["drop_target_types"] == ["analytical_balance_widget"]
     assert grinder_widget["drop_target_types"] == ["grinder_widget"]
+    assert grinder_widget["is_storable"] is True
+    assert grinder_widget["can_store"] is True
+    assert grinder_widget["allowed_drop_targets"] == ["workspace_canvas"]
 
 
 def test_toolbar_catalog_exposes_backend_dnd_targets_over_http() -> None:
@@ -222,6 +246,9 @@ def test_toolbar_catalog_exposes_backend_dnd_targets_over_http() -> None:
     label = next(item for category in categories for item in category["items"] if item["id"] == "sampling_bag_label")
 
     assert sample_vial["item_type"] == "tool"
+    assert sample_vial["can_seal"] is True
+    assert sample_vial["can_receive_liquids"] is True
+    assert sample_vial["can_receive_produce"] is False
     assert sample_vial["allowed_drop_targets"] == [
         "workbench_slot",
         "rack_slot",

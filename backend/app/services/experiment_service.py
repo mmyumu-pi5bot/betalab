@@ -74,6 +74,12 @@ class ExperimentRuntimeService:
 
     def _to_schema(self, experiment: Experiment) -> ExperimentSchema:
         sync_canonical_produce_model(experiment)
+        workspace = asdict(experiment.workspace)
+        rack_has_tools = any(slot.tool is not None for slot in experiment.rack.slots)
+        produce_material_states = [asdict(state) for state in experiment.produce_material_states]
+        for widget in workspace["widgets"]:
+            widget["store_allowed_override"] = _can_store_workspace_widget(widget, rack_has_tools)
+            widget["produce_material_states"] = produce_material_states
         return ExperimentSchema.model_validate(
             {
                 "id": experiment.id,
@@ -83,11 +89,11 @@ class ExperimentRuntimeService:
                 "workbench": asdict(experiment.workbench),
                 "rack": asdict(experiment.rack),
                 "trash": asdict(experiment.trash),
-                "workspace": asdict(experiment.workspace),
+                "workspace": workspace,
                 "lims_reception": asdict(experiment.lims_reception),
                 "lims_entries": [asdict(entry) for entry in experiment.lims_entries],
                 "basket_tools": [asdict(t) for t in experiment.basket_tools],
-                "produce_material_states": [asdict(state) for state in experiment.produce_material_states],
+                "produce_material_states": produce_material_states,
                 "spatula": asdict(experiment.spatula),
                 "analytical_balance": asdict(experiment.analytical_balance),
                 "audit_log": experiment.audit_log,
@@ -98,3 +104,13 @@ class ExperimentRuntimeService:
         experiment.snapshot_version += 1
         self._repository.save(experiment)
         return self._to_schema(experiment)
+
+
+def _can_store_workspace_widget(widget: dict, rack_has_tools: bool) -> bool:
+    if widget["id"] not in {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}:
+        return False
+    if widget["id"] == "rack" and rack_has_tools:
+        return False
+    if widget["is_trashed"]:
+        return True
+    return widget["tool"] is None and not widget["produce_lots"] and not widget["liquids"]

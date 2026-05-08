@@ -13,6 +13,7 @@ from app.domain.models import (
     new_id,
 )
 from app.domain.rules import can_tool_be_sealed
+from app.domain.spatula_rules import can_spatula_load_from_tool, can_spatula_pour_into_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
     build_manual_label,
@@ -674,7 +675,7 @@ class LoadSpatulaFromWorkbenchToolService(WriteDomainService[WorkbenchSlotReques
     def _run(self, experiment: Experiment, request: WorkbenchSlotRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "loading the spatula")
-        if tool.tool_type in {"cutting_board", "sample_vial", "cleanup_tube"}:
+        if not can_spatula_load_from_tool(tool.tool_type):
             raise ValueError("The spatula cannot be loaded from this container.")
         if tool.is_sealed:
             raise ValueError(f"Open {tool.label} before loading the spatula.")
@@ -712,7 +713,7 @@ class PourSpatulaIntoWorkbenchToolService(WriteDomainService[PourSpatulaIntoWork
     def _run(self, experiment: Experiment, request: PourSpatulaIntoWorkbenchToolRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "receiving powder")
-        if tool.tool_type not in {"sample_vial", "centrifuge_tube"}:
+        if not can_spatula_pour_into_tool(tool.tool_type):
             raise ValueError("The spatula can only pour into an autosampler vial or centrifuge tube.")
         if tool.is_sealed:
             raise ValueError(f"Open {tool.label} before adding powder.")

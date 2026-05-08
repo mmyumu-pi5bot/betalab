@@ -6,7 +6,6 @@ import { InventoryEquipmentItem } from "@/components/inventory-equipment-item";
 import { LabAssetIcon } from "@/components/icons/lab-asset-icon";
 import { WorkspaceEquipmentIcon } from "@/components/icons/workspace-equipment-icon";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
-import { canToolBeSealed } from "@/lib/entity-rules";
 import { createToolbarDragPayload, writeToolbarDragPayload } from "@/lib/workbench-dnd";
 import type { DropTargetType, ToolbarAccent, ToolbarCategory, ToolbarItem } from "@/types/workbench";
 
@@ -160,7 +159,7 @@ export function ToolbarPanel({
                             className="h-8 w-7 shrink-0"
                             fillRatio={item.itemType === "tool" ? 0 : undefined}
                             isSealed={
-                              item.itemType === "tool" ? canToolBeSealed(item.toolType) : false
+                              item.itemType === "tool" ? (item.canSeal ?? false) : false
                             }
                             kind={item.itemType === "tool" ? item.toolType : item.liquidType}
                             tone={item.itemType === "tool" ? "neutral" : "accent"}

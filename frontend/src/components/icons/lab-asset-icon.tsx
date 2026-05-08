@@ -92,22 +92,6 @@ function PowderLayer({
   );
 }
 
-function getPowderSurfaceBaseY({
-  liquidTop,
-  settledBaseY,
-  surfaceDepthY = 6,
-}: {
-  liquidTop?: number;
-  settledBaseY: number;
-  surfaceDepthY?: number;
-}) {
-  if (liquidTop === undefined) {
-    return settledBaseY;
-  }
-
-  return Math.min(liquidTop + surfaceDepthY, settledBaseY);
-}
-
 function VolumetricFlaskIcon({
   fillRatio,
   glow,

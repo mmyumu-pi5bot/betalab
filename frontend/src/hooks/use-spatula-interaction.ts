@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
@@ -12,15 +12,12 @@ const HOLD_THRESHOLD_MS = 200;
 const CLICK_INCREMENT_MU_G = 0.05;
 const CLICK_INCREMENT_SIGMA_G = 0.007;
 
-// Types that can be loaded from (mirrors backend restriction)
-const SPATULA_LOAD_SOURCE_TYPES = new Set(["storage_jar", "centrifuge_tube", "beaker", "sample_bag"]);
-
-function randomNormalIncrement(): number {
+function randomNormalIncrement(muG: number, sigmaG: number): number {
   // Box-Muller transform
   const u1 = Math.random();
   const u2 = Math.random();
   const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  const value = CLICK_INCREMENT_MU_G + CLICK_INCREMENT_SIGMA_G * z;
+  const value = muG + sigmaG * z;
   return Math.round(Math.max(0.01, Math.min(0.15, value)) * 1000) / 1000;
 }
 
@@ -58,6 +55,36 @@ export function useSpatulaInteraction({
   // Prevents the synthetic click generated right after a pour from reloading the spatula.
   const justPouredRef = useRef(false);
   const justPouredResetTimeoutRef = useRef<number | null>(null);
+  const allowedLoadSourceToolTypes = useMemo(
+    () =>
+      spatula.allowedLoadSourceToolTypes ?? [
+        "storage_jar",
+        "centrifuge_tube",
+        "beaker",
+        "sample_bag",
+      ],
+    [spatula.allowedLoadSourceToolTypes],
+  );
+  const allowedPourTargetToolTypes = useMemo(
+    () => spatula.allowedPourTargetToolTypes ?? ["sample_vial", "centrifuge_tube"],
+    [spatula.allowedPourTargetToolTypes],
+  );
+  const clickIncrementMuG = spatula.clickIncrementMuG ?? CLICK_INCREMENT_MU_G;
+  const clickIncrementSigmaG = spatula.clickIncrementSigmaG ?? CLICK_INCREMENT_SIGMA_G;
+  const holdThresholdMs = spatula.holdThresholdMs ?? HOLD_THRESHOLD_MS;
+  const holdIntervalMs = spatula.holdIntervalMs ?? 100;
+  const holdInitialRateG = spatula.holdInitialRateG ?? 0.08;
+  const holdMaxRateG = spatula.holdMaxRateG ?? 0.28;
+  const holdLiftRateGPerPx = spatula.holdLiftRateGPerPx ?? 0.0022;
+  const canDiscardSpatula = spatula.canDiscard ?? spatula.isLoaded;
+  const canLoadFromTool = useCallback(
+    (tool: BenchToolInstance) => allowedLoadSourceToolTypes.includes(tool.toolType),
+    [allowedLoadSourceToolTypes],
+  );
+  const canPourIntoTool = useCallback(
+    (tool: BenchToolInstance) => allowedPourTargetToolTypes.includes(tool.toolType),
+    [allowedPourTargetToolTypes],
+  );
 
   const stopSpatulaPour = useCallback(() => {
     if (spatulaPourHoldTimeoutRef.current !== null) {
@@ -110,7 +137,7 @@ export function useSpatulaInteraction({
       }
 
       const liftPx = Math.max(pourState.startY - event.clientY, 0);
-      pourState.currentRateG = Math.min(0.28, 0.06 + liftPx * 0.0022);
+      pourState.currentRateG = Math.min(holdMaxRateG, 0.06 + liftPx * holdLiftRateGPerPx);
     };
 
     const handlePointerUp = () => {
@@ -128,7 +155,7 @@ export function useSpatulaInteraction({
       window.removeEventListener("pointerup", handlePointerUp);
       stopSpatulaPour();
     };
-  }, [isSpatulaMode, stopSpatulaPour]);
+  }, [holdLiftRateGPerPx, holdMaxRateG, isSpatulaMode, stopSpatulaPour]);
 
   const handleSpatulaToolPointerDown = useCallback(
     (slotId: string, tool: BenchToolInstance, event: ReactPointerEvent<HTMLElement>) => {
@@ -136,7 +163,7 @@ export function useSpatulaInteraction({
         return;
       }
 
-      if (tool.toolType !== "sample_vial" && tool.toolType !== "centrifuge_tube") {
+      if (!canPourIntoTool(tool)) {
         return;
       }
 
@@ -149,7 +176,7 @@ export function useSpatulaInteraction({
       stopSpatulaPour();
       setSpatulaHintMessage("Versement en cours...");
       spatulaPourStateRef.current = {
-        currentRateG: 0.08,
+        currentRateG: holdInitialRateG,
         isHolding: false,
         slotId,
         startY: event.clientY,
@@ -159,7 +186,7 @@ export function useSpatulaInteraction({
           spatulaPourStateRef.current.isHolding = true;
         }
         spatulaPourHoldTimeoutRef.current = null;
-      }, HOLD_THRESHOLD_MS);
+      }, holdThresholdMs);
       spatulaPourIntervalRef.current = window.setInterval(() => {
         const pourState = spatulaPourStateRef.current;
         if (!pourState || !pourState.isHolding) {
@@ -170,9 +197,18 @@ export function useSpatulaInteraction({
           slot_id: pourState.slotId,
           delta_mass_g: Number(pourState.currentRateG.toFixed(3)),
         });
-      }, 100);
+      }, holdIntervalMs);
     },
-    [isSpatulaMode, onPourIntoTool, spatula.isLoaded, stopSpatulaPour],
+    [
+      canPourIntoTool,
+      holdInitialRateG,
+      holdIntervalMs,
+      holdThresholdMs,
+      isSpatulaMode,
+      onPourIntoTool,
+      spatula.isLoaded,
+      stopSpatulaPour,
+    ],
   );
 
   const handleSpatulaToolPointerUp = useCallback(() => {
@@ -180,7 +216,7 @@ export function useSpatulaInteraction({
     if (pourState) {
       armJustPouredGuard();
       if (!pourState.isHolding) {
-        const delta = randomNormalIncrement();
+        const delta = randomNormalIncrement(clickIncrementMuG, clickIncrementSigmaG);
         if (pourState.slotId === "analytical_balance") {
           onPourIntoAnalyticalBalanceTool({ delta_mass_g: delta });
         } else {
@@ -189,7 +225,14 @@ export function useSpatulaInteraction({
       }
     }
     stopSpatulaPour();
-  }, [armJustPouredGuard, onPourIntoAnalyticalBalanceTool, onPourIntoTool, stopSpatulaPour]);
+  }, [
+    armJustPouredGuard,
+    clickIncrementMuG,
+    clickIncrementSigmaG,
+    onPourIntoAnalyticalBalanceTool,
+    onPourIntoTool,
+    stopSpatulaPour,
+  ]);
 
   const loadSpatulaFromTool = useCallback(
     (slotId: string) => {
@@ -202,7 +245,7 @@ export function useSpatulaInteraction({
 
   const handleSpatulaToolIllustrationClick = useCallback(
     (slotId: string, tool: BenchToolInstance, event: ReactMouseEvent<HTMLButtonElement>) => {
-      if (!isSpatulaMode || !SPATULA_LOAD_SOURCE_TYPES.has(tool.toolType)) {
+      if (!isSpatulaMode || !canLoadFromTool(tool)) {
         return;
       }
       if (justPouredRef.current) {
@@ -215,7 +258,7 @@ export function useSpatulaInteraction({
       event.stopPropagation();
       loadSpatulaFromTool(slotId);
     },
-    [isSpatulaMode, loadSpatulaFromTool],
+    [canLoadFromTool, isSpatulaMode, loadSpatulaFromTool],
   );
 
   const handleSpatulaAnalyticalBalancePointerDown = useCallback(
@@ -224,7 +267,7 @@ export function useSpatulaInteraction({
         return;
       }
 
-      if (tool.toolType !== "sample_vial" && tool.toolType !== "centrifuge_tube") {
+      if (!canPourIntoTool(tool)) {
         return;
       }
 
@@ -247,7 +290,7 @@ export function useSpatulaInteraction({
       stopSpatulaPour();
       setSpatulaHintMessage("Versement en cours...");
       spatulaPourStateRef.current = {
-        currentRateG: 0.08,
+        currentRateG: holdInitialRateG,
         isHolding: false,
         slotId: "analytical_balance",
         startY: event.clientY,
@@ -257,7 +300,7 @@ export function useSpatulaInteraction({
           spatulaPourStateRef.current.isHolding = true;
         }
         spatulaPourHoldTimeoutRef.current = null;
-      }, HOLD_THRESHOLD_MS);
+      }, holdThresholdMs);
       spatulaPourIntervalRef.current = window.setInterval(() => {
         const pourState = spatulaPourStateRef.current;
         if (!pourState || !pourState.isHolding) {
@@ -267,9 +310,19 @@ export function useSpatulaInteraction({
         onPourIntoAnalyticalBalanceTool({
           delta_mass_g: Number(pourState.currentRateG.toFixed(3)),
         });
-      }, 100);
+      }, holdIntervalMs);
     },
-    [isSpatulaMode, onLoadFromAnalyticalBalance, onPourIntoAnalyticalBalanceTool, spatula.isLoaded, stopSpatulaPour],
+    [
+      canPourIntoTool,
+      holdInitialRateG,
+      holdIntervalMs,
+      holdThresholdMs,
+      isSpatulaMode,
+      onLoadFromAnalyticalBalance,
+      onPourIntoAnalyticalBalanceTool,
+      spatula.isLoaded,
+      stopSpatulaPour,
+    ],
   );
 
   const handleSpatulaToolCardClick = useCallback(
@@ -283,7 +336,7 @@ export function useSpatulaInteraction({
         return;
       }
 
-      if (SPATULA_LOAD_SOURCE_TYPES.has(tool.toolType) && !spatula.isLoaded) {
+      if (canLoadFromTool(tool) && !spatula.isLoaded) {
         if (justPouredRef.current) {
           event.preventDefault();
           return;
@@ -294,19 +347,19 @@ export function useSpatulaInteraction({
       }
       justPouredRef.current = false;
 
-      if ((tool.toolType === "sample_vial" || tool.toolType === "centrifuge_tube") && !spatula.isLoaded) {
+      if (canPourIntoTool(tool) && !spatula.isLoaded) {
         setSpatulaHintMessage("La spatule est vide. Charge-la d'abord sur un container ouvert.");
       }
     },
-    [isSpatulaMode, loadSpatulaFromTool, spatula.isLoaded],
+    [canLoadFromTool, canPourIntoTool, isSpatulaMode, loadSpatulaFromTool, spatula.isLoaded],
   );
 
   const handleSpatulaTrashClick = useCallback(() => {
-    if (!isSpatulaMode || !spatula.isLoaded) {
+    if (!isSpatulaMode || !canDiscardSpatula) {
       return;
     }
     onDiscardSpatula();
-  }, [isSpatulaMode, onDiscardSpatula, spatula.isLoaded]);
+  }, [canDiscardSpatula, isSpatulaMode, onDiscardSpatula]);
 
   return {
     handleSpatulaAnalyticalBalancePointerDown,

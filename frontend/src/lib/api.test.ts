@@ -135,6 +135,9 @@ describe("api client", () => {
               accent: "sky",
               tool_type: "sample_vial",
               capacity_ml: 2,
+              can_receive_liquids: true,
+              can_receive_produce: false,
+              can_seal: true,
               allowed_drop_targets: ["workbench_slot", "rack_slot"],
             },
           ],
@@ -159,6 +162,9 @@ describe("api client", () => {
             accent: "sky",
             toolType: "sample_vial",
             capacity_ml: 2,
+            canReceiveLiquids: true,
+            canReceiveProduce: false,
+            canSeal: true,
             allowedDropTargets: ["workbench_slot", "rack_slot"],
           },
         ],
@@ -185,6 +191,11 @@ describe("api client", () => {
               accent: "emerald",
               tool_type: "sample_bag",
               capacity_ml: 2500,
+              can_receive_contents: false,
+              can_receive_liquids: false,
+              can_receive_produce: true,
+              can_seal: true,
+              is_sealed: true,
               is_draggable: false,
               allowed_drop_targets: ["trash_bin"],
               labels: [
@@ -245,6 +256,11 @@ describe("api client", () => {
 
     expect(experiment.workbench.slots[0].tool).toMatchObject({
       isDraggable: false,
+      canReceiveContents: false,
+      canReceiveLiquids: false,
+      canReceiveProduce: true,
+      canSeal: true,
+      isSealed: true,
       allowedDropTargets: ["trash_bin"],
       labels: [
         {

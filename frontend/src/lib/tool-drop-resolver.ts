@@ -3,21 +3,13 @@ import {
   resolveDropTargetFromDataTransfer,
   type DropTargetNode,
 } from "@/lib/drop-target-resolver";
-import {
-  canToolAcceptLiquids,
-  canToolAcceptProduce,
-  canToolReceiveContents,
-} from "@/lib/tool-drop-targets";
+import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import { readDragDescriptor } from "@/lib/workbench-dnd";
 import type { BenchToolInstance, DragDescriptor, DropTargetType } from "@/types/workbench";
 
 type ToolDropResolution =
   | { kind: "parent" }
   | { kind: "tool"; tool: BenchToolInstance };
-
-function toolHasLimsLabel(tool: BenchToolInstance) {
-  return (tool.labels ?? []).some((label) => label.labelKind === "lims");
-}
 
 function canDescriptorResolveOnTool(
   descriptor: DragDescriptor | null,
@@ -37,30 +29,7 @@ function canDescriptorResolveOnTool(
     return false;
   }
 
-  if (descriptor.entityKind === "liquid") {
-    return (
-      canToolAcceptLiquids(tool.toolType) &&
-      canToolReceiveContents(tool.toolType, tool.isSealed)
-    );
-  }
-
-  if (descriptor.entityKind === "produce") {
-    return (
-      canToolAcceptProduce(tool.toolType) &&
-      canToolReceiveContents(tool.toolType, tool.isSealed) &&
-      (tool.produceLots?.length ?? 0) === 0
-    );
-  }
-
-  if (descriptor.entityKind === "sample_label") {
-    return true;
-  }
-
-  if (descriptor.entityKind === "lims_label_ticket") {
-    return !toolHasLimsLabel(tool);
-  }
-
-  return false;
+  return containmentAcceptsDescriptor(tool.containment, descriptor);
 }
 
 function buildToolDropTree({

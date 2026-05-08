@@ -38,16 +38,6 @@ function isToolbarToolPayload(payload: SupportedToolDropPayload): payload is Too
   return "itemType" in payload && payload.itemType === "tool";
 }
 
-function isSampleVialTool(payload: SupportedToolDropPayload) {
-  return ("toolType" in payload && payload.toolType === "sample_vial") ||
-    (isToolbarToolPayload(payload) && payload.toolType === "sample_vial");
-}
-
-function isVortexCompatibleTool(payload: SupportedToolDropPayload) {
-  return ("toolType" in payload && ["centrifuge_tube", "cleanup_tube"].includes(payload.toolType)) ||
-    (isToolbarToolPayload(payload) && ["centrifuge_tube", "cleanup_tube"].includes(payload.toolType));
-}
-
 function getTargetId(target: ToolDropTarget): string {
   if (target.kind === "workbench_slot") {
     return target.slotId;
@@ -75,12 +65,6 @@ export function resolveToolDropCommand(
   payload: SupportedToolDropPayload,
   target: ToolDropTarget,
 ): ToolDropCommand | null {
-  if (target.kind === "rack_slot" && !isSampleVialTool(payload)) {
-    return null;
-  }
-  if (target.kind === "vortex" && !isVortexCompatibleTool(payload)) {
-    return null;
-  }
   if (
     !isToolbarToolPayload(payload) &&
     ((target.kind === "workbench_slot" && "sourceSlotId" in payload && payload.sourceSlotId === target.slotId) ||
