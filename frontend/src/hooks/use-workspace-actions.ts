@@ -48,7 +48,6 @@ export function useWorkspaceActions({
   experimentApi,
   grossBalanceTool,
   grossBalanceNetMassG,
-  measuredSampleMassG,
 }: UseWorkspaceActionsOptions): WorkspaceActions {
   const handleBalanceToolSealToggle = () => {
     if (!grossBalanceTool) {
@@ -85,7 +84,7 @@ export function useWorkspaceActions({
       harvest_date: payload.harvest_date,
       indicative_mass_g: payload.indicative_mass_g,
       measured_gross_mass_g: grossBalanceNetMassG,
-      measured_sample_mass_g: payload.measured_sample_mass_g ?? measuredSampleMassG,
+      measured_sample_mass_g: payload.measured_sample_mass_g,
     });
   };
 

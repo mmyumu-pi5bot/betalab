@@ -2879,6 +2879,110 @@ describe("LabScene", () => {
     });
   });
 
+  it("clears the sample mass field when switching to a LIMS entry without one", async () => {
+    const entryWithSampleMass = makeLimsReception({
+      id: "lims_entry_1",
+      orchardName: "Martin Orchard",
+      harvestDate: "2026-03-29",
+      indicativeMassG: 2041.1,
+      measuredSampleMassG: 10,
+      labSampleCode: "APP-2026-0001",
+      status: "awaiting_label_application",
+    });
+    const entryWithoutSampleMass = makeLimsReception({
+      id: "lims_entry_2",
+      orchardName: "Martin Orchard",
+      harvestDate: "2026-03-30",
+      indicativeMassG: 1998.4,
+      measuredSampleMassG: null,
+      labSampleCode: "APP-2026-0002",
+      status: "awaiting_label_application",
+    });
+
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        limsReception: entryWithSampleMass,
+        limsEntries: [entryWithSampleMass, entryWithoutSampleMass],
+      }),
+    );
+
+    render(<PesticideWorkbench />);
+
+    const recordSelect = await screen.findByLabelText("Record");
+    const sampleMassInput = screen.getByLabelText("Sample mass (g)");
+
+    await waitFor(() => {
+      expect(sampleMassInput).toHaveValue(10);
+    });
+
+    fireEvent.change(recordSelect, { target: { value: "lims_entry_2" } });
+
+    expect(sampleMassInput).toHaveValue(null);
+    expect(screen.getByText(/Sample mass: --/)).toBeInTheDocument();
+  });
+
+  it("does not copy the current LIMS sample mass into a new entry", async () => {
+    const existingEntry = makeLimsReception({
+      id: "lims_entry_1",
+      orchardName: "Martin Orchard",
+      harvestDate: "2026-03-29",
+      indicativeMassG: 2041.1,
+      measuredSampleMassG: 10.02,
+      labSampleCode: "APP-2026-0001",
+      status: "awaiting_label_application",
+    });
+
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        limsReception: existingEntry,
+        limsEntries: [existingEntry],
+      }),
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(
+      makeWorkbenchExperiment({
+        limsReception: makeLimsReception({
+          id: "lims_entry_2",
+          orchardName: "Second Orchard",
+          harvestDate: "2026-03-30",
+          indicativeMassG: 1998.4,
+          measuredSampleMassG: null,
+          labSampleCode: "APP-2026-0002",
+          status: "awaiting_label_application",
+        }),
+      }),
+    );
+
+    render(<PesticideWorkbench />);
+
+    const recordSelect = await screen.findByLabelText("Record");
+    fireEvent.change(recordSelect, { target: { value: "new" } });
+    fireEvent.change(screen.getByLabelText("Orchard / producer"), {
+      target: { value: "Second Orchard" },
+    });
+    fireEvent.change(screen.getByLabelText("Harvest date"), {
+      target: { value: "2026-03-30" },
+    });
+    fireEvent.change(screen.getByLabelText("Indicative field mass (g)"), {
+      target: { value: "1998.4" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create LIMS record" }));
+
+    await waitFor(() => {
+      expect(sendExperimentCommand).toHaveBeenCalledWith(
+        "experiment_pesticides",
+        "create_lims_reception",
+        {
+          orchard_name: "Second Orchard",
+          harvest_date: "2026-03-30",
+          indicative_mass_g: 1998.4,
+          measured_gross_mass_g: null,
+          measured_sample_mass_g: null,
+        },
+      );
+    });
+  });
+
   it("discards the received sampling bag from the basket into the trash", async () => {
     vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment({
       basketTools: [makeSampleBagTool({

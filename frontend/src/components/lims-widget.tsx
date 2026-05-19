@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
@@ -53,6 +53,26 @@ export function LimsWidget({
   const selectedEntryIndicativeMassG = selectedEntryView?.indicativeMassG ?? null;
   const selectedEntryMeasuredSampleMassG = selectedEntryView?.measuredSampleMassG ?? null;
   const hasSelectedEntryView = selectedEntryView !== null;
+  const loadFormFromEntry = useCallback((entry: LimsReception | null) => {
+    if (entry === null) {
+      setOrchardName("");
+      setHarvestDate("");
+      setIndicativeMassText("");
+      setMeasuredSampleMassText("");
+      return;
+    }
+
+    setOrchardName(entry.orchardName ?? "");
+    setHarvestDate(entry.harvestDate ?? "");
+    setIndicativeMassText(
+      entry.indicativeMassG !== null && entry.indicativeMassG > 0
+        ? entry.indicativeMassG.toFixed(1)
+        : "",
+    );
+    setMeasuredSampleMassText(
+      entry.measuredSampleMassG !== null ? entry.measuredSampleMassG.toFixed(3) : "",
+    );
+  }, []);
 
   useEffect(() => {
     if (reception.id !== previousReceptionIdRef.current) {
@@ -239,8 +259,14 @@ export function LimsWidget({
             <select
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 focus:border-sky-400"
               onChange={(event) => {
-                selectedEntryIdRef.current = event.target.value;
-                setSelectedEntryId(event.target.value);
+                const nextEntryId = event.target.value;
+                const nextEntry =
+                  nextEntryId === "new"
+                    ? null
+                    : entries.find((entry) => entry.id === nextEntryId) ?? null;
+                selectedEntryIdRef.current = nextEntryId;
+                setSelectedEntryId(nextEntryId);
+                loadFormFromEntry(nextEntry);
               }}
               value={selectedEntryId}
             >
