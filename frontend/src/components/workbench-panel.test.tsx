@@ -19,7 +19,7 @@ import {
 } from "@/test-support/tool-capabilities";
 import type { BenchSlot, BenchToolInstance } from "@/types/workbench";
 
-import { getProduceLotDropTargets, getSampleLabelDropTargets, getToolDropTargets } from "@/test-support/drop-targets";
+import { getProduceLotDropTargets, getSampleLabelDropTargets, getToolDropTargets, isToolStorable } from "@/test-support/drop-targets";
 import type { BenchLabel, ExperimentProduceLot } from "@/types/workbench";
 
 function makeProduceLot(overrides: Partial<ExperimentProduceLot> & { id: string }): ExperimentProduceLot {
@@ -49,12 +49,22 @@ function makeSampleBagLabel(overrides: Partial<BenchLabel> = {}): BenchLabel {
 }
 
 function withToolCapabilities(tool: BenchToolInstance): BenchToolInstance {
+  const isStorable = tool.isStorable ?? isToolStorable(tool.toolType);
+  const canStore =
+    tool.canStore ??
+    (isStorable &&
+      (tool.produceLots?.length ?? 0) === 0 &&
+      (tool.produceFractions?.length ?? 0) === 0 &&
+      tool.liquids.length === 0 &&
+      (tool.labels?.length ?? 0) === 0);
   const toolWithCapabilities = {
+    ...tool,
     canReceiveContents: canToolReceiveContents(tool.toolType, tool.isSealed ?? false),
     canReceiveLiquids: canToolAcceptLiquids(tool.toolType),
     canReceiveProduce: canToolAcceptProduce(tool.toolType),
     canSeal: canToolBeSealed(tool.toolType),
-    ...tool,
+    isStorable,
+    canStore,
   };
   return {
     ...toolWithCapabilities,
@@ -205,6 +215,86 @@ describe("WorkbenchPanel", () => {
     expect(onAddWorkbenchSlot).toHaveBeenCalledTimes(1);
     expect(onRemoveWorkbenchSlot).toHaveBeenCalledWith("station_1");
     expect(screen.getByTestId("remove-workbench-slot-button-station_2")).toBeDisabled();
+  });
+
+  it("shows an inventory store action for empty cutting boards", () => {
+    const onStoreWorkbenchTool = vi.fn();
+
+    render(
+      <PesticideWorkbenchPanel
+        onLiquidVolumeChange={vi.fn()}
+        onRemoveLiquid={vi.fn()}
+        onStoreWorkbenchTool={onStoreWorkbenchTool}
+        onToolbarItemDrop={vi.fn()}
+        slots={[
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              accent: "emerald",
+              capacity_ml: 0,
+              canReceiveProduce: true,
+              id: "bench_tool_board",
+              label: "Cutting board",
+              liquids: [],
+              produceLots: [],
+              subtitle: "Prep surface",
+              toolId: "cutting_board_hdpe",
+              toolType: "cutting_board",
+            },
+          },
+        ]}
+        statusMessage="Ready."
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Store Cutting board in inventory" }));
+
+    expect(onStoreWorkbenchTool).toHaveBeenCalledWith("station_1");
+  });
+
+  it("disables cutting board storage until the board is empty", () => {
+    const onStoreWorkbenchTool = vi.fn();
+
+    render(
+      <PesticideWorkbenchPanel
+        onLiquidVolumeChange={vi.fn()}
+        onRemoveLiquid={vi.fn()}
+        onStoreWorkbenchTool={onStoreWorkbenchTool}
+        onToolbarItemDrop={vi.fn()}
+        slots={[
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              accent: "emerald",
+              capacity_ml: 0,
+              canReceiveProduce: true,
+              id: "bench_tool_board",
+              label: "Cutting board",
+              liquids: [],
+              produceLots: [
+                {
+                  allowedDropTargets: ["workbench_slot", "grinder_widget", "trash_bin", "gross_balance_widget"],
+                  id: "produce_lot_1",
+                  isDraggable: true,
+                  label: "Apple lot",
+                  produceType: "apple",
+                  unitCount: 1,
+                },
+              ],
+              subtitle: "Prep surface",
+              toolId: "cutting_board_hdpe",
+              toolType: "cutting_board",
+            },
+          },
+        ]}
+        statusMessage="Ready."
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Store Cutting board in inventory" })).toBeDisabled();
+    expect(onStoreWorkbenchTool).not.toHaveBeenCalled();
   });
 
   it("shows multi-liquid tools with multiple fill segments", () => {

@@ -165,6 +165,8 @@ describe("api client", () => {
             canReceiveLiquids: true,
             canReceiveProduce: false,
             canSeal: true,
+            isDiscardable: true,
+            isStorable: false,
             allowedDropTargets: ["workbench_slot", "rack_slot"],
           },
         ],

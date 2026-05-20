@@ -477,6 +477,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         handleRemoveLiquid: workbenchHandlers.handleRemoveLiquid,
         handleRemoveWorkbenchSlot: workbenchHandlers.handleRemoveWorkbenchSlot,
         handleRestoreTrashedSampleLabel: workbenchHandlers.handleRestoreTrashedSampleLabel,
+        handleStoreWorkbenchTool: workbenchHandlers.handleStoreWorkbenchTool,
         handleSampleLabelTextChange: workbenchHandlers.handleSampleLabelTextChange,
         handleToggleToolSeal: workbenchHandlers.handleToggleToolSeal,
         handleToolbarItemDrop: workbenchHandlers.handleToolbarItemDrop,

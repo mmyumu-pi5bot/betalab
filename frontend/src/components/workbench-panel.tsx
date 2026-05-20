@@ -89,6 +89,7 @@ type WorkbenchPanelProps = {
     dataTransfer: DataTransfer,
   ) => void;
   onSampleLabelTextChange?: (slotId: string, labelId: string, sampleLabelText: string) => void;
+  onStoreWorkbenchTool?: (slotId: string) => void;
   onToggleToolSeal?: (slotId: string, tool: BenchToolInstance) => void;
   renderPendingContent?: (slot: BenchSlot, tool: BenchToolInstance | null) => ReactNode;
   slots: BenchSlot[];
@@ -119,6 +120,7 @@ export function WorkbenchPanel({
   onSampleLabelDragEnd,
   onSampleLabelDragStart,
   onSampleLabelTextChange,
+  onStoreWorkbenchTool,
   onToggleToolSeal,
   renderPendingContent,
   slots,
@@ -370,6 +372,13 @@ export function WorkbenchPanel({
                       onSampleLabelTextChange={(labelId, sampleLabelText) => {
                         onSampleLabelTextChange?.(slot.id, labelId, sampleLabelText);
                       }}
+                      onStore={
+                        tool.isStorable
+                          ? () => {
+                              onStoreWorkbenchTool?.(slot.id);
+                            }
+                          : undefined
+                      }
                       onToggleSeal={() => {
                         onToggleToolSeal?.(slot.id, tool);
                       }}

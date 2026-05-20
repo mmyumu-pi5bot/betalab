@@ -1,10 +1,10 @@
 import type { Page, Route } from "@playwright/test";
 
+import { getToolDropTargets } from "../../src/test-support/drop-targets";
 import type { Experiment, ExperimentListEntry } from "../../src/types/experiment";
 import type {
   BenchSlot,
   BenchToolInstance,
-  DropTargetType,
   ExperimentProduceLot,
   ExperimentWorkspaceWidget,
   RackSlot,
@@ -102,16 +102,6 @@ function makeWorkspaceWidgets(): ExperimentWorkspaceWidget[] {
   ];
 }
 
-function getToolAllowedDropTargets(toolType: ToolType): DropTargetType[] {
-  const targets: DropTargetType[] = ["workbench_slot", "trash_bin", "gross_balance_widget"];
-  if (toolType === "sample_vial") {
-    targets.splice(1, 0, "rack_slot");
-  }
-  if (toolType !== "cutting_board" && toolType !== "sample_bag") {
-    targets.push("analytical_balance_widget");
-  }
-  return targets;
-}
 
 function makeTool(toolId: string): BenchToolInstance {
   const toolMap: Record<string, Omit<BenchToolInstance, "id" | "allowedDropTargets" | "isDraggable">> = {
@@ -199,7 +189,7 @@ function makeTool(toolId: string): BenchToolInstance {
     contactImpurityMgPerG: 0,
     isDraggable: true,
     ...baseTool,
-    allowedDropTargets: getToolAllowedDropTargets(baseTool.toolType),
+    allowedDropTargets: getToolDropTargets(baseTool.toolType),
     produceFractions: [],
   };
 }

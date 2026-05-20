@@ -33,6 +33,7 @@ type WorkbenchHandlersExperimentApi = {
     target_slot_id: string;
     trash_sample_label_id: string;
   }) => void;
+  storeWorkbenchTool: (payload: { slot_id: string }) => void;
   updateWorkbenchToolSampleLabelText: (payload: {
     label_id?: string;
     slot_id: string;
@@ -69,6 +70,7 @@ type WorkbenchHandlers = {
     targetSlotId: string,
     payload: { trashSampleLabelId?: string },
   ) => void;
+  handleStoreWorkbenchTool: (slotId: string) => void;
   handleSampleLabelTextChange: (slotId: string, labelId: string, text: string) => void;
   handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;
   handleToolbarItemDrop: (slotId: string, payload: ToolbarDragPayload) => void;
@@ -202,6 +204,11 @@ export function useWorkbenchHandlers({
     void experimentApi.removeWorkbenchSlot({ slot_id: slotId });
   };
 
+  const handleStoreWorkbenchTool = (slotId: string) => {
+    clearDropTargets();
+    void experimentApi.storeWorkbenchTool({ slot_id: slotId });
+  };
+
   const handleApplyLimsLabelTicket = (payload: {
     basketBag?: true;
     grossBalanceBag?: true;
@@ -255,6 +262,7 @@ export function useWorkbenchHandlers({
     handleRemoveLiquid,
     handleRemoveWorkbenchSlot,
     handleRestoreTrashedSampleLabel,
+    handleStoreWorkbenchTool,
     handleSampleLabelTextChange,
     handleToggleToolSeal,
     handleToolbarItemDrop,

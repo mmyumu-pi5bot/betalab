@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
+from app.domain.dnd_rules import can_tool_be_discarded, can_tool_be_stored
 from app.domain.models import (
     Experiment,
     ProduceMaterialState,
@@ -245,6 +246,8 @@ class DiscardWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         if slot.tool is None:
             raise ValueError(f"Place a tool on {slot.label} before discarding it.")
+        if not can_tool_be_discarded(slot.tool.tool_type):
+            raise ValueError(f"{slot.tool.label} must be stored in inventory instead of discarded.")
 
         discarded_tool = slot.tool
         slot.tool = None
@@ -253,12 +256,32 @@ class DiscardWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
         experiment.audit_log.append(f"{discarded_tool.label} discarded from {slot.label}.")
 
 
+class StoreWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
+    def __init__(self, runtime: ExperimentRuntime) -> None:
+        super().__init__(runtime)
+
+    def _run(self, experiment: Experiment, request: WorkbenchSlotRequest) -> None:
+        slot = find_workbench_slot(experiment.workbench, request.slot_id)
+        if slot.tool is None:
+            raise ValueError(f"Place a tool on {slot.label} before storing it.")
+        if not can_tool_be_stored(slot.tool.tool_type):
+            raise ValueError(f"{slot.tool.label} cannot be stored.")
+        if slot.tool.produce_lots or slot.tool.produce_fractions or slot.tool.liquids or slot.tool.labels:
+            raise ValueError(f"Empty {slot.tool.label} before storing it.")
+
+        stored_tool = slot.tool
+        slot.tool = None
+        experiment.audit_log.append(f"{stored_tool.label} stored in inventory.")
+
+
 class DiscardToolFromPaletteService(WriteDomainService[DiscardToolFromPaletteRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
 
     def _run(self, experiment: Experiment, request: DiscardToolFromPaletteRequest) -> None:
         discarded_tool = build_workbench_tool(request.tool_id)
+        if not can_tool_be_discarded(discarded_tool.tool_type):
+            raise ValueError(f"{discarded_tool.label} must be stored in inventory instead of discarded.")
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Palette"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Palette.")

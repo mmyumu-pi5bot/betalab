@@ -102,8 +102,9 @@ const toolItems = toolbarItems.filter((item): item is ToolCatalogItem => item.it
 const paletteItems = toolbarItems.filter((item) => item.itemType !== "sample_label");
 const sampleVialItem = labToolCatalog.sample_vial_lcms;
 const sampleBagItem = pesticideToolCatalog.sealed_sampling_bag;
+const trashableToolItems = toolItems.filter((item) => getToolDropTargets(item.toolType).includes("trash_bin"));
 const weighableToolItems = toolItems.filter(
-  (item) => item.toolType !== "cutting_board" && item.toolType !== "sample_bag",
+  (item) => getToolDropTargets(item.toolType).includes("analytical_balance_widget"),
 );
 
 const analyticalBalanceCompatibleSourceIds = new Set<string>([
@@ -603,9 +604,9 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
             : null,
       },
       "trash-dropzone": {
-        compatible: item.itemType === "tool",
+        compatible: item.itemType === "tool" && getToolDropTargets(item.toolType).includes("trash_bin"),
         command:
-          item.itemType === "tool"
+          item.itemType === "tool" && getToolDropTargets(item.toolType).includes("trash_bin")
             ? {
                 type: "place_tool_from_palette",
                 payload: {
@@ -818,16 +819,19 @@ function createWorkbenchToolSourceCase(item: ToolCatalogItem): DndSourceCase {
         command: null,
       },
       "trash-dropzone": {
-        compatible: true,
-        command: {
-          type: "move_tool",
-          payload: {
-            source_kind: "workbench",
-            source_id: "station_1",
-            destination_kind: "trash_bin",
-            destination_id: "trash_bin",
-          },
-        },
+        compatible: getToolDropTargets(item.toolType).includes("trash_bin"),
+        command:
+          getToolDropTargets(item.toolType).includes("trash_bin")
+            ? {
+                type: "move_tool",
+                payload: {
+                  source_kind: "workbench",
+                  source_id: "station_1",
+                  destination_kind: "trash_bin",
+                  destination_id: "trash_bin",
+                },
+              }
+            : null,
       },
     },
   };
@@ -1975,7 +1979,7 @@ const baseDndSourceCases: DndSourceCase[] = [
   createTrashProduceLotSourceCase(),
   createTrashSampleLabelSourceCase(),
   createRackSourceCase(),
-  ...toolItems.map(createTrashToolSourceCase),
+  ...trashableToolItems.map(createTrashToolSourceCase),
   createTrashWidgetSourceCase("rack", "autosampler_rack", "Autosampler rack"),
   createTrashWidgetSourceCase("instrument", "lc_msms_instrument", "LC-MS/MS"),
   createTrashWidgetSourceCase("grinder", "cryogenic_grinder", "Cryogenic grinder"),

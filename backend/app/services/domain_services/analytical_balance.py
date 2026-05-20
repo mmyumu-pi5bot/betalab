@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
+from app.domain.dnd_rules import get_tool_allowed_drop_targets
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.domain.rules import can_tool_be_sealed
 from app.domain.spatula_rules import can_spatula_load_from_tool, can_spatula_pour_into_tool
@@ -135,8 +136,8 @@ class AnalyticalBalanceServiceBase(WriteDomainService[object]):
         return widget.tool
 
     def _validate_supported_tool(self, tool: WorkbenchTool) -> None:
-        if tool.tool_type == "cutting_board":
-            raise ValueError("The analytical balance cannot accept the cutting board (too heavy).")
+        if "analytical_balance_widget" not in get_tool_allowed_drop_targets(tool.tool_type):
+            raise ValueError(f"The analytical balance cannot accept {tool.label.lower()}.")
 
     def _calculate_tool_mass_g(self, tool: WorkbenchTool) -> float:
         produce_mass_g = get_tool_total_produce_mass_g(tool)

@@ -32,7 +32,7 @@ def delete_experiment(experiment_id: str) -> None:
         raise HTTPException(status_code=404, detail="Experiment not found") from exc
 
 
-@router.get("/catalog/toolbar", response_model=list[ToolbarCategorySchema])
+@router.get("/catalog/toolbar", response_model=list[ToolbarCategorySchema], response_model_exclude_none=True)
 def get_toolbar_catalog() -> list[dict[str, object]]:
     return get_toolbar_categories()
 

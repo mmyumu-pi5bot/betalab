@@ -97,14 +97,25 @@ export function ToolbarPanel({
               data-testid={`toolbar-category-panel-${category.id}`}
             >
                 {category.items.map((item) => (
-                  item.itemType === "workspace_widget" ? (
+                  item.itemType === "workspace_widget" || (item.itemType === "tool" && item.isStorable) ? (
                     <InventoryEquipmentItem
                       dataTestId={`toolbar-item-${item.id}`}
                       icon={(
-                        <WorkspaceEquipmentIcon
-                          className="h-8 w-10 shrink-0 overflow-hidden rounded-md"
-                          widgetType={item.widgetType}
-                        />
+                        item.itemType === "workspace_widget" ? (
+                          <WorkspaceEquipmentIcon
+                            className="h-8 w-10 shrink-0 overflow-hidden rounded-md"
+                            widgetType={item.widgetType}
+                          />
+                        ) : (
+                          <LabAssetIcon
+                            accent={item.accent}
+                            className="h-8 w-10 shrink-0"
+                            fillRatio={0}
+                            isSealed={false}
+                            kind={item.toolType}
+                            tone="neutral"
+                          />
+                        )
                       )}
                       key={item.id}
                       onDragEnd={

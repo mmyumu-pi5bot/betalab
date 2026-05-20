@@ -34,6 +34,7 @@ export const moveToolBetweenWorkbenchSlots = wrapCommand("move_tool_between_work
 export const moveTool = wrapCommand("move_tool");
 export const placeToolFromPalette = wrapCommand("place_tool_from_palette");
 export const discardWorkbenchTool = wrapCommand("discard_workbench_tool");
+export const storeWorkbenchTool = wrapCommand("store_workbench_tool");
 export const discardToolFromPalette = wrapCommand("discard_tool_from_palette");
 export const discardSampleLabelFromPalette = wrapCommand("discard_sample_label_from_palette");
 export const restoreTrashedToolToWorkbenchSlot = wrapCommand("restore_trashed_tool_to_workbench_slot");

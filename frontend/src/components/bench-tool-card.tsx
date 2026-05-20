@@ -1,6 +1,7 @@
 import type { DragEvent, MouseEvent, PointerEvent, ReactNode } from "react";
 
 import { LabAssetIcon } from "@/components/icons/lab-asset-icon";
+import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon";
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
@@ -31,6 +32,7 @@ type BenchToolCardProps = {
   onToggleSeal?: () => void;
   onSampleLabelDragEnd?: (event: DragEvent<HTMLElement>) => void;
   onSampleLabelDragStart?: (label: BenchLabel, event: DragEvent<HTMLElement>) => void;
+  onStore?: () => void;
   onToolIllustrationClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   tool: BenchToolInstance;
 };
@@ -63,6 +65,7 @@ export function BenchToolCard({
   onToggleSeal,
   onSampleLabelDragEnd,
   onSampleLabelDragStart,
+  onStore,
   onToolIllustrationClick,
   tool,
 }: BenchToolCardProps) {
@@ -85,6 +88,7 @@ export function BenchToolCard({
   const canDragContainedProduce = !isSealed;
   const labels = tool.labels ?? [];
   const hasLabels = labels.length > 0;
+  const canStore = tool.canStore ?? false;
   const hasFieldLabel = isSampleBag && tool.fieldLabelText !== null && tool.fieldLabelText !== undefined;
   const displayLabelText = isSampleBag ? getPrimaryToolLabelText(labels) : null;
   const sealStateLabel =
@@ -128,6 +132,22 @@ export function BenchToolCard({
             <h3 className="min-w-0 flex-1 text-base font-semibold leading-5 text-slate-950">
               {tool.label}
             </h3>
+            {onStore ? (
+              <button
+                aria-label={`Store ${tool.label} in inventory`}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
+                disabled={!canStore}
+                draggable={false}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStore();
+                }}
+                title={canStore ? "Store in inventory" : "Empty this tool before storing it"}
+                type="button"
+              >
+                <StoreInInventoryIcon className="h-4 w-4" />
+              </button>
+            ) : null}
             {isSealable ? (
               <div className="flex w-[7.75rem] shrink-0 items-center justify-end gap-2">
                 <span

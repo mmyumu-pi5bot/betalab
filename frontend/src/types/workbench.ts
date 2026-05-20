@@ -89,6 +89,8 @@ export type ToolCatalogItem = ToolbarBaseItem & {
   canReceiveLiquids?: boolean;
   canReceiveProduce?: boolean;
   canSeal?: boolean;
+  isDiscardable?: boolean;
+  isStorable?: boolean;
   itemType: "tool";
   toolType: ToolType;
   capacity_ml: number;
@@ -369,6 +371,9 @@ export type BenchToolInstance = {
   fieldLabelText?: string | null;
   isMixed?: boolean;
   isDraggable: boolean;
+  isDiscardable?: boolean;
+  isStorable?: boolean;
+  canStore?: boolean;
   allowedDropTargets: DropTargetType[];
   children?: ContainedEntity[];
   containment?: Containment | null;

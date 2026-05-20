@@ -47,6 +47,8 @@ export type DiscardToolFromPalettePayload = { tool_id: string };
 
 export type DiscardWorkbenchToolPayload = { slot_id: string };
 
+export type StoreWorkbenchToolPayload = { slot_id: string };
+
 export type LoadSpatulaFromWorkbenchToolPayload = { slot_id: string };
 
 export type MoveSampleLabelBetweenWorkbenchToolsPayload = {

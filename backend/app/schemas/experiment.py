@@ -6,6 +6,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, computed_field
 
 from app.domain.dnd_rules import (
+    can_tool_be_discarded,
+    can_tool_be_stored,
     can_tool_receive_contents,
     can_tool_receive_liquids,
     can_tool_receive_produce,
@@ -265,6 +267,18 @@ class WorkbenchToolSchema(BaseModel):
     @computed_field
     def allowed_drop_targets(self) -> list[str]:
         return get_tool_allowed_drop_targets(self.tool_type)
+
+    @computed_field
+    def is_discardable(self) -> bool:
+        return can_tool_be_discarded(self.tool_type)
+
+    @computed_field
+    def is_storable(self) -> bool:
+        return can_tool_be_stored(self.tool_type)
+
+    @computed_field
+    def can_store(self) -> bool:
+        return self.is_storable and not self.produce_lots and not self.produce_fractions and not self.liquids and not self.labels
 
     @computed_field
     def can_seal(self) -> bool:
@@ -703,6 +717,8 @@ class ToolbarItemSchema(BaseModel):
     description: str
     accent: str
     allowed_drop_targets: list[str]
+    is_discardable: bool | None = None
+    is_storable: bool | None = None
     can_receive_liquids: bool | None = None
     can_receive_produce: bool | None = None
     can_seal: bool | None = None

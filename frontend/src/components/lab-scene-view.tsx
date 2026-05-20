@@ -124,6 +124,7 @@ type LabSceneViewProps = {
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
     handleRestoreTrashedSampleLabel: (targetSlotId: string, payload: { trashSampleLabelId?: string }) => void;
+    handleStoreWorkbenchTool: (slotId: string) => void;
     handleSampleLabelTextChange: (slotId: string, labelId: string, text: string) => void;
     handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;
     handleToolbarItemDrop: (slotId: string, payload: ToolbarDragPayload) => void;

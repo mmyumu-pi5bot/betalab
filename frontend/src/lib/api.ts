@@ -242,6 +242,8 @@ function normalizeToolbarItem(rawItem: Record<string, unknown>): ToolbarItem {
       canReceiveLiquids: Boolean(rawItem.canReceiveLiquids ?? rawItem.can_receive_liquids),
       canReceiveProduce: Boolean(rawItem.canReceiveProduce ?? rawItem.can_receive_produce),
       canSeal: Boolean(rawItem.canSeal ?? rawItem.can_seal),
+      isDiscardable: Boolean(rawItem.isDiscardable ?? rawItem.is_discardable ?? true),
+      isStorable: Boolean(rawItem.isStorable ?? rawItem.is_storable ?? false),
       capacity_ml: Number(rawItem.capacity_ml ?? 0),
       itemType: "tool",
       toolType: String(rawItem.toolType ?? rawItem.tool_type) as Extract<ToolbarItem, { itemType: "tool" }>["toolType"],
@@ -541,6 +543,14 @@ export async function discardWorkbenchTool(experimentId: string, payload: Mutati
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "slot_id"))}/discard`,
+  });
+}
+
+export async function storeWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "slot_id"))}/store`,
   });
 }
 
@@ -1849,6 +1859,9 @@ function normalizeBenchTool(
           ? (tool.field_label_text as string | null)
           : null,
     isDraggable: Boolean(tool.isDraggable ?? tool.is_draggable),
+    isDiscardable: Boolean(tool.isDiscardable ?? tool.is_discardable ?? true),
+    isStorable: Boolean(tool.isStorable ?? tool.is_storable ?? false),
+    canStore: Boolean(tool.canStore ?? tool.can_store ?? false),
     allowedDropTargets: normalizeAllowedDropTargets(tool.allowedDropTargets ?? tool.allowed_drop_targets),
     children: normalizeContainedEntities(tool.children),
     containment: normalizeContainment(tool.containment),

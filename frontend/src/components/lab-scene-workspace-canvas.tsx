@@ -10,6 +10,7 @@ import { FloatingWidget } from "@/components/floating-widget";
 import { GrinderWidgetContent } from "@/components/grinder-widget-content";
 import { GrossBalanceWidget } from "@/components/gross-balance-widget";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
+import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon";
 import { LimsWidget } from "@/components/lims-widget";
 import { ProduceBasketWidget } from "@/components/produce-basket-widget";
 import { ProduceLotCard } from "@/components/produce-lot-card";
@@ -118,6 +119,7 @@ type LabSceneWorkspaceCanvasProps = {
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
     handleRestoreTrashedSampleLabel: (targetSlotId: string, payload: { trashSampleLabelId?: string }) => void;
+    handleStoreWorkbenchTool: (slotId: string) => void;
     handleSampleLabelTextChange: (slotId: string, labelId: string, text: string) => void;
     handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;
     handleToolbarItemDrop: (slotId: string, payload: ToolbarDragPayload) => void;
@@ -219,31 +221,7 @@ export function LabSceneWorkspaceCanvas({
         title={isDisabled ? "Empty this equipment before storing it" : "Store in inventory"}
         type="button"
       >
-        <svg
-          aria-hidden="true"
-          className="h-4.5 w-4.5"
-          fill="none"
-          viewBox="0 0 20 20"
-        >
-          <path
-            d="M5.75 4.75H12.5C12.9142 4.75 13.25 5.08579 13.25 5.5V14.5C13.25 14.9142 12.9142 15.25 12.5 15.25H5.75C5.33579 15.25 5 14.9142 5 14.5V5.5C5 5.08579 5.33579 4.75 5.75 4.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-          <path
-            d="M10.25 7L7.25 10L10.25 13"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-          />
-          <path
-            d="M15.5 10H7.75"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="1.5"
-          />
-        </svg>
+        <StoreInInventoryIcon className="h-4.5 w-4.5" />
       </button>
     );
   };
@@ -640,6 +618,7 @@ export function LabSceneWorkspaceCanvas({
             onSampleLabelDragEnd={dnd.clearDropTargets}
             onSampleLabelDragStart={dnd.workbench.handleWorkbenchSampleLabelDragStart}
             onSampleLabelTextChange={workbench.handleSampleLabelTextChange}
+            onStoreWorkbenchTool={workbench.handleStoreWorkbenchTool}
             onToggleToolSeal={workbench.handleToggleToolSeal}
             renderPendingContent={(slot) => dropDraft.renderPendingBenchDropDraft(slot.id)}
             slots={display.slots}

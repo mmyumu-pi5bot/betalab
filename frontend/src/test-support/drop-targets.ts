@@ -1,19 +1,33 @@
 import type { DropTargetType, LiquidType, ToolType } from "@/types/workbench";
 
+import toolSpecs from "./backend-tool-specs.json";
+
+type ToolSpec = {
+  allowed_drop_targets: DropTargetType[];
+  is_discardable: boolean;
+  is_storable: boolean;
+};
+
+const specs = toolSpecs as Record<string, ToolSpec>;
+
+function requireToolSpec(toolType: ToolType): ToolSpec {
+  const spec = specs[toolType];
+  if (!spec) {
+    throw new Error(`Missing backend tool spec for ${toolType}`);
+  }
+  return spec;
+}
+
 export function getToolDropTargets(toolType: ToolType): DropTargetType[] {
-  const targets: DropTargetType[] = ["workbench_slot", "trash_bin", "gross_balance_widget"];
+  return requireToolSpec(toolType).allowed_drop_targets;
+}
 
-  if (toolType === "sample_vial") {
-    targets.splice(1, 0, "rack_slot");
-  }
-  if (toolType !== "cutting_board" && toolType !== "sample_bag") {
-    targets.push("analytical_balance_widget");
-  }
-  if (toolType === "centrifuge_tube" || toolType === "cleanup_tube") {
-    targets.push("vortex_widget");
-  }
+export function isToolDiscardable(toolType: ToolType): boolean {
+  return requireToolSpec(toolType).is_discardable;
+}
 
-  return targets;
+export function isToolStorable(toolType: ToolType): boolean {
+  return requireToolSpec(toolType).is_storable;
 }
 
 export function getProduceLotDropTargets(): DropTargetType[] {

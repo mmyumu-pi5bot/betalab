@@ -8,6 +8,8 @@ import {
   getLiquidDropTargets,
   getSampleLabelDropTargets,
   getToolDropTargets,
+  isToolDiscardable,
+  isToolStorable,
 } from "@/test-support/drop-targets";
 import type { ToolbarCategory, ToolbarItem } from "@/types/workbench";
 
@@ -16,6 +18,8 @@ function withAllowedDropTargets(item: ToolbarItem): ToolbarItem {
     return {
       ...item,
       allowedDropTargets: getToolDropTargets(item.toolType),
+      isDiscardable: isToolDiscardable(item.toolType),
+      isStorable: isToolStorable(item.toolType),
       canReceiveLiquids: canToolAcceptLiquids(item.toolType),
       canReceiveProduce: canToolAcceptProduce(item.toolType),
       canSeal: canToolBeSealed(item.toolType),

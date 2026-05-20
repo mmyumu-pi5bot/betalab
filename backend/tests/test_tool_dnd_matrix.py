@@ -59,9 +59,11 @@ from app.services.experiment_service import ExperimentRuntimeService
 ToolSource = Literal[
     "palette_vial",
     "palette_storage_jar",
+    "palette_cutting_board",
     "basket_bag",
     "workbench_vial",
     "workbench_storage_jar",
+    "workbench_cutting_board",
     "rack_vial",
     "trash_vial",
     "trash_storage_jar",
@@ -90,6 +92,12 @@ TOOL_DND_CASES: tuple[ToolDndCase, ...] = (
     ToolDndCase("palette_storage_jar", "occupied_rack", False),
     ToolDndCase("palette_storage_jar", "gross_balance", True),
     ToolDndCase("palette_storage_jar", "trash", True),
+    ToolDndCase("palette_cutting_board", "empty_workbench", True),
+    ToolDndCase("palette_cutting_board", "occupied_workbench", False),
+    ToolDndCase("palette_cutting_board", "empty_rack", False),
+    ToolDndCase("palette_cutting_board", "occupied_rack", False),
+    ToolDndCase("palette_cutting_board", "gross_balance", True),
+    ToolDndCase("palette_cutting_board", "trash", False),
     ToolDndCase("basket_bag", "empty_workbench", True),
     ToolDndCase("basket_bag", "occupied_workbench", False),
     ToolDndCase("basket_bag", "empty_rack", False),
@@ -108,6 +116,12 @@ TOOL_DND_CASES: tuple[ToolDndCase, ...] = (
     ToolDndCase("workbench_storage_jar", "occupied_rack", False),
     ToolDndCase("workbench_storage_jar", "gross_balance", True),
     ToolDndCase("workbench_storage_jar", "trash", True),
+    ToolDndCase("workbench_cutting_board", "empty_workbench", True),
+    ToolDndCase("workbench_cutting_board", "occupied_workbench", False),
+    ToolDndCase("workbench_cutting_board", "empty_rack", False),
+    ToolDndCase("workbench_cutting_board", "occupied_rack", False),
+    ToolDndCase("workbench_cutting_board", "gross_balance", True),
+    ToolDndCase("workbench_cutting_board", "trash", False),
     ToolDndCase("rack_vial", "empty_workbench", True),
     ToolDndCase("rack_vial", "occupied_workbench", False),
     ToolDndCase("rack_vial", "empty_rack", True),
@@ -137,6 +151,8 @@ def _tool_id_for_source(source: ToolSource) -> str:
         return "sample_vial_lcms"
     if source in {"palette_storage_jar", "workbench_storage_jar", "trash_storage_jar"}:
         return "hdpe_storage_jar_2l"
+    if source in {"palette_cutting_board", "workbench_cutting_board"}:
+        return "cutting_board_hdpe"
     if source == "basket_bag":
         return "sealed_sampling_bag"
     raise AssertionError(f"Unhandled source: {source}")

@@ -111,6 +111,7 @@ from app.services.domain_services.workbench import (
     RestoreTrashedSampleLabelToWorkbenchToolService,
     RestoreTrashedToolToWorkbenchSlotRequest,
     RestoreTrashedToolToWorkbenchSlotService,
+    StoreWorkbenchToolService,
     UpdateWorkbenchLiquidVolumeRequest,
     UpdateWorkbenchLiquidVolumeService,
     UpdateWorkbenchToolSampleLabelTextRequest,
@@ -383,6 +384,7 @@ def apply_command(
             ),
         ),
         "discard_workbench_tool": lambda: DiscardWorkbenchToolService(service).run(experiment_id, WorkbenchSlotRequest(slot_id=payload["slot_id"])),
+        "store_workbench_tool": lambda: StoreWorkbenchToolService(service).run(experiment_id, WorkbenchSlotRequest(slot_id=payload["slot_id"])),
         "discard_tool_from_palette": lambda: DiscardToolFromPaletteService(service).run(
             experiment_id, DiscardToolFromPaletteRequest(tool_id=payload["tool_id"])
         ),
@@ -4606,6 +4608,132 @@ def test_discard_workbench_tool_removes_it_from_station() -> None:
     assert updated.trash.discarded_from[updated.trash.children[0].id] == "Station 1"
     assert updated.trash.children[0].label == "Autosampler vial"
     assert updated.audit_log[-1] == "Autosampler vial discarded from Station 1."
+
+
+def test_discard_workbench_cutting_board_is_rejected() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    apply_command(
+        service,
+        experiment.id,
+        "place_tool_on_workbench",
+        {
+            "slot_id": "station_1",
+            "tool_id": "cutting_board_hdpe",
+        },
+    )
+
+    with pytest.raises(ValueError, match=r"Cutting board must be stored in inventory instead of discarded."):
+        apply_command(
+            service,
+            experiment.id,
+            "discard_workbench_tool",
+            {
+                "slot_id": "station_1",
+            },
+        )
+
+
+def test_discard_palette_cutting_board_is_rejected() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    with pytest.raises(ValueError, match=r"Cutting board must be stored in inventory instead of discarded."):
+        apply_command(
+            service,
+            experiment.id,
+            "discard_tool_from_palette",
+            {
+                "tool_id": "cutting_board_hdpe",
+            },
+        )
+
+
+def test_store_workbench_cutting_board_returns_it_to_inventory() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    apply_command(
+        service,
+        experiment.id,
+        "place_tool_on_workbench",
+        {
+            "slot_id": "station_1",
+            "tool_id": "cutting_board_hdpe",
+        },
+    )
+
+    updated = apply_command(
+        service,
+        experiment.id,
+        "store_workbench_tool",
+        {
+            "slot_id": "station_1",
+        },
+    )
+
+    assert updated.workbench.slots[0].tool is None
+    assert updated.trash.children == []
+    assert updated.audit_log[-1] == "Cutting board stored in inventory."
+
+
+def test_store_workbench_cutting_board_requires_empty_board() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    created_lot = apply_command(service, experiment.id, "create_produce_lot", {"produce_type": "apple"})
+    produce_lot_id = created_lot.basket_tools[-1].produce_lots[0].id
+    apply_command(
+        service,
+        experiment.id,
+        "place_tool_on_workbench",
+        {
+            "slot_id": "station_1",
+            "tool_id": "cutting_board_hdpe",
+        },
+    )
+    apply_command(
+        service,
+        experiment.id,
+        "add_produce_lot_to_workbench_tool",
+        {
+            "produce_lot_id": produce_lot_id,
+            "slot_id": "station_1",
+        },
+    )
+
+    with pytest.raises(ValueError, match=r"Empty Cutting board before storing it."):
+        apply_command(
+            service,
+            experiment.id,
+            "store_workbench_tool",
+            {
+                "slot_id": "station_1",
+            },
+        )
+
+
+def test_store_workbench_tool_rejects_non_storable_tools() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    apply_command(
+        service,
+        experiment.id,
+        "place_tool_on_workbench",
+        {
+            "slot_id": "station_1",
+            "tool_id": "sample_vial_lcms",
+        },
+    )
+
+    with pytest.raises(ValueError, match=r"Autosampler vial cannot be stored."):
+        apply_command(
+            service,
+            experiment.id,
+            "store_workbench_tool",
+            {
+                "slot_id": "station_1",
+            },
+        )
 
 
 def test_workspace_widget_commands_manage_presence_and_position() -> None:

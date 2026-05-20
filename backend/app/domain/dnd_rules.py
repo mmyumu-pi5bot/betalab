@@ -1,17 +1,77 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ToolDndSpec:
+    allowed_drop_targets: tuple[str, ...]
+    is_discardable: bool = True
+    is_storable: bool = False
+
+
+_DEFAULT_TOOL_DND_SPEC = ToolDndSpec(
+    allowed_drop_targets=(
+        "workbench_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+    )
+)
+
+_TOOL_DND_SPECS: dict[str, ToolDndSpec] = {
+    "centrifuge_tube": ToolDndSpec(
+        allowed_drop_targets=(
+            "workbench_slot",
+            "trash_bin",
+            "gross_balance_widget",
+            "analytical_balance_widget",
+            "vortex_widget",
+        )
+    ),
+    "cleanup_tube": ToolDndSpec(
+        allowed_drop_targets=(
+            "workbench_slot",
+            "trash_bin",
+            "gross_balance_widget",
+            "analytical_balance_widget",
+            "vortex_widget",
+        )
+    ),
+    "cutting_board": ToolDndSpec(
+        allowed_drop_targets=("workbench_slot", "gross_balance_widget"),
+        is_discardable=False,
+        is_storable=True,
+    ),
+    "sample_bag": ToolDndSpec(
+        allowed_drop_targets=("workbench_slot", "trash_bin", "gross_balance_widget")
+    ),
+    "sample_vial": ToolDndSpec(
+        allowed_drop_targets=(
+            "workbench_slot",
+            "rack_slot",
+            "trash_bin",
+            "gross_balance_widget",
+            "analytical_balance_widget",
+        )
+    ),
+}
+
+
+def get_tool_dnd_spec(tool_type: str) -> ToolDndSpec:
+    return _TOOL_DND_SPECS.get(tool_type, _DEFAULT_TOOL_DND_SPEC)
+
 
 def get_tool_allowed_drop_targets(tool_type: str) -> list[str]:
-    targets = ["workbench_slot", "trash_bin", "gross_balance_widget"]
+    return list(get_tool_dnd_spec(tool_type).allowed_drop_targets)
 
-    if tool_type == "sample_vial":
-        targets.insert(1, "rack_slot")
-    if tool_type not in {"cutting_board", "sample_bag"}:
-        targets.append("analytical_balance_widget")
-    if tool_type in {"centrifuge_tube", "cleanup_tube"}:
-        targets.append("vortex_widget")
 
-    return targets
+def can_tool_be_discarded(tool_type: str) -> bool:
+    return get_tool_dnd_spec(tool_type).is_discardable
+
+
+def can_tool_be_stored(tool_type: str) -> bool:
+    return get_tool_dnd_spec(tool_type).is_storable
 
 
 def can_tool_receive_liquids(tool_type: str) -> bool:

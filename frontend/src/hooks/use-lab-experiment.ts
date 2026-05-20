@@ -105,6 +105,7 @@ import {
   startGrinderCycle,
   startVortexCycle,
   discardVortexTool,
+  storeWorkbenchTool,
   moveAnalyticalBalanceToolToVortex,
   moveGrossBalanceToolToVortex,
   moveRackToolToVortex,
@@ -147,6 +148,7 @@ import type {
   DiscardWidgetProduceLotPayload,
   DiscardWorkbenchToolPayload,
   DiscardWorkspaceProduceLotPayload,
+  StoreWorkbenchToolPayload,
   StoreWorkspaceWidgetPayload,
   LoadSpatulaFromWorkbenchToolPayload,
   MoveAnalyticalBalanceToolToRackPayload,
@@ -322,6 +324,7 @@ const mutationFns = {
   startGrinderCycle,
   startVortexCycle,
   discardVortexTool,
+  storeWorkbenchTool,
   moveAnalyticalBalanceToolToVortex,
   moveGrossBalanceToolToVortex,
   moveRackToolToVortex,
@@ -566,6 +569,8 @@ export function useLabExperiment({
       executeMutation(mutationFns.discardWorkbenchTool, payload),
     discardWorkspaceProduceLot: (payload: DiscardWorkspaceProduceLotPayload) =>
       executeMutation(mutationFns.discardWorkspaceProduceLot, payload),
+    storeWorkbenchTool: (payload: StoreWorkbenchToolPayload) =>
+      executeMutation(mutationFns.storeWorkbenchTool, payload),
     storeWorkspaceWidget: (payload: StoreWorkspaceWidgetPayload) =>
       executeMutation(mutationFns.storeWorkspaceWidget, payload),
     moveBasketToolToGrossBalance: (payload: BasketToolReferencePayload) =>

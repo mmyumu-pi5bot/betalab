@@ -52,6 +52,7 @@ from app.services.domain_services.workbench import (
     RemoveWorkbenchSlotService,
     RestoreTrashedSampleLabelToWorkbenchToolRequest,
     RestoreTrashedSampleLabelToWorkbenchToolService,
+    StoreWorkbenchToolService,
     UpdateWorkbenchLiquidVolumeRequest,
     UpdateWorkbenchLiquidVolumeService,
     UpdateWorkbenchToolSampleLabelTextRequest,
@@ -116,6 +117,16 @@ def move_tool_between_workbench_slots(
 def discard_workbench_tool(experiment_id: str, tool_id: str) -> ExperimentSchema:
     return handle_service_errors(
         lambda: DiscardWorkbenchToolService(experiment_service).run(
+            experiment_id,
+            WorkbenchSlotRequest(slot_id=find_tool_slot(experiment_id, tool_id)),
+        )
+    )
+
+
+@router.post("/{experiment_id}/workbench/tools/{tool_id}/store", response_model=ExperimentSchema)
+def store_workbench_tool(experiment_id: str, tool_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: StoreWorkbenchToolService(experiment_service).run(
             experiment_id,
             WorkbenchSlotRequest(slot_id=find_tool_slot(experiment_id, tool_id)),
         )

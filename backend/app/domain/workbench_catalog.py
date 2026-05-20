@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.dnd_rules import (
+    can_tool_be_discarded,
+    can_tool_be_stored,
     can_tool_receive_liquids,
     can_tool_receive_produce,
     can_tool_seal,
@@ -273,6 +275,8 @@ def _build_tool_toolbar_item(tool_id: str) -> dict[str, object]:
     return {
         "accent": tool.accent,
         "allowed_drop_targets": get_tool_allowed_drop_targets(tool.tool_type),
+        "is_discardable": can_tool_be_discarded(tool.tool_type),
+        "is_storable": can_tool_be_stored(tool.tool_type),
         "can_receive_liquids": can_tool_receive_liquids(tool.tool_type),
         "can_receive_produce": can_tool_receive_produce(tool.tool_type),
         "can_seal": can_tool_seal(tool.tool_type),

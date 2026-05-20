@@ -1,21 +1,33 @@
 import type { Containment, ToolType } from "@/types/workbench";
 
+import toolSpecs from "./backend-tool-specs.json";
+
+type ToolSpec = {
+  can_receive_liquids: boolean;
+  can_receive_produce: boolean;
+  can_seal: boolean;
+};
+
+const specs = toolSpecs as Record<string, ToolSpec>;
+
+function requireToolSpec(toolType: ToolType): ToolSpec {
+  const spec = specs[toolType];
+  if (!spec) {
+    throw new Error(`Missing backend tool spec for ${toolType}`);
+  }
+  return spec;
+}
+
 export function canToolAcceptLiquids(toolType: ToolType): boolean {
-  return toolType !== "sample_bag" && toolType !== "cutting_board" && toolType !== "storage_jar";
+  return requireToolSpec(toolType).can_receive_liquids;
 }
 
 export function canToolAcceptProduce(toolType: ToolType): boolean {
-  return toolType === "sample_bag" || toolType === "cutting_board" || toolType === "storage_jar";
+  return requireToolSpec(toolType).can_receive_produce;
 }
 
 export function canToolBeSealed(toolType: ToolType): boolean {
-  return (
-    toolType === "sample_bag" ||
-    toolType === "storage_jar" ||
-    toolType === "centrifuge_tube" ||
-    toolType === "cleanup_tube" ||
-    toolType === "sample_vial"
-  );
+  return requireToolSpec(toolType).can_seal;
 }
 
 export function canToolReceiveContents(toolType: ToolType, isSealed = false): boolean {

@@ -242,6 +242,7 @@ def test_toolbar_catalog_exposes_backend_dnd_targets_over_http() -> None:
     assert response.status_code == 200
     categories = response.json()
     sample_vial = next(item for category in categories for item in category["items"] if item["id"] == "sample_vial_lcms")
+    cutting_board = next(item for category in categories for item in category["items"] if item["id"] == "cutting_board_hdpe")
     dry_ice = next(item for category in categories for item in category["items"] if item["id"] == "dry_ice_pellets")
     label = next(item for category in categories for item in category["items"] if item["id"] == "sampling_bag_label")
 
@@ -256,6 +257,8 @@ def test_toolbar_catalog_exposes_backend_dnd_targets_over_http() -> None:
         "gross_balance_widget",
         "analytical_balance_widget",
     ]
+    assert cutting_board["item_type"] == "tool"
+    assert cutting_board["allowed_drop_targets"] == ["workbench_slot", "gross_balance_widget"]
     assert dry_ice["item_type"] == "liquid"
     assert dry_ice["allowed_drop_targets"] == ["grinder_widget"]
     assert label["item_type"] == "sample_label"
@@ -285,6 +288,22 @@ def test_dnd_move_places_palette_tool_on_workbench_over_http() -> None:
 
     assert moved.status_code == 200
     assert _find_slot(moved.json(), "station_1")["tool"]["tool_type"] == "cutting_board"
+
+
+def test_dnd_move_rejects_cutting_board_to_trash_over_http() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        response = client.post(
+            f"/experiments/{experiment_id}/dnd/move",
+            json={
+                "entity": {"kind": "tool", "id": "cutting_board_hdpe"},
+                "source": {"kind": "palette", "id": "lab_tools"},
+                "destination": {"kind": "trash_bin", "id": "trash_bin"},
+            },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Cutting board cannot be dropped on trash."
 
 
 def test_dnd_move_moves_workbench_tool_to_gross_balance_over_http() -> None:
