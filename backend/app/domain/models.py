@@ -95,10 +95,17 @@ class ProduceFraction:
     is_contaminated: bool = False
     impurity_mass_mg: float = 0.0
     exposure_container_ids: list[str] = field(default_factory=list)
+    # Invariant: location_kind and location_id are always set together (or both None).
+    # container_id and container_label are set for tool fractions; container_id may be
+    # None for surface fractions while container_label carries the display name.
     location_kind: str | None = None
     location_id: str | None = None
     container_id: str | None = None
     container_label: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.location_kind is None) != (self.location_id is None):
+            raise ValueError("location_kind and location_id must both be set or both be None")
 
 
 @dataclass
@@ -112,9 +119,13 @@ class WorkbenchTool:
     capacity_ml: float
     contact_impurity_mg_per_g: float = 0.0
     is_sealed: bool = False
-    closure_fault: str | None = None
+    closure_fault: str | None = None  # Non-None only when is_sealed=True and a fault occurred
+
+    def __post_init__(self) -> None:
+        if self.closure_fault is not None and not self.is_sealed:
+            raise ValueError("closure_fault must be None when is_sealed=False")
     internal_pressure_bar: float = 1.0
-    trapped_co2_mass_g: float = 0.0
+    trapped_co2_mass_g: float = 0.0  # Non-zero only for sealed containers with CO2 inside
     field_label_text: str | None = None
     is_mixed: bool = False
     labels: list[ContainerLabel] = field(default_factory=list)
@@ -127,13 +138,22 @@ class WorkbenchTool:
 class SpatulaState:
     is_loaded: bool = False
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
-    source_tool_id: str | None = None
+    source_tool_id: str | None = None  # Set iff is_loaded=True
+
+    def __post_init__(self) -> None:
+        if self.is_loaded != (self.source_tool_id is not None):
+            raise ValueError("source_tool_id must be set iff is_loaded=True")
 
 
 @dataclass
 class AnalyticalBalanceState:
+    # Invariant: tare_mass_g and tared_tool_id are both set or both None.
     tare_mass_g: float | None = None
     tared_tool_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.tare_mass_g is None) != (self.tared_tool_id is None):
+            raise ValueError("tare_mass_g and tared_tool_id must both be set or both be None")
 
 
 @dataclass

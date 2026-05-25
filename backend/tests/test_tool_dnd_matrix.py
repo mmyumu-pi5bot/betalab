@@ -5,6 +5,7 @@ from typing import Literal
 
 import pytest
 
+from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
 from app.services.domain_services.gross_balance import (
     DiscardGrossBalanceToolService,
     EmptyRequest,
@@ -308,3 +309,40 @@ def test_tool_dnd_matrix(source: ToolSource, target: ToolTarget, allowed: bool) 
         return
     if target == "trash":
         assert updated.trash.children
+
+
+def test_dnd_move_rejects_tool_entity_that_does_not_match_source() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    PlaceToolOnWorkbenchService(service).run(experiment.id, PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id="sample_vial_lcms"))
+
+    with pytest.raises(ValueError, match="Moved tool entity does not match"):
+        DndMoveObjectService(service).run(
+            experiment.id,
+            DndMoveObjectRequest(
+                entity=DndObjectRef(kind="tool", id="wrong_tool"),
+                source=DndObjectRef(kind="workbench", id="station_1"),
+                destination=DndObjectRef(kind="gross_balance", id="gross_balance"),
+            ),
+        )
+
+
+def test_dnd_move_rejects_tool_drop_onto_current_location() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    updated = PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id="sample_vial_lcms"),
+    )
+    tool = next(slot for slot in updated.workbench.slots if slot.id == "station_1").tool
+    assert tool is not None
+
+    with pytest.raises(ValueError, match="current location"):
+        DndMoveObjectService(service).run(
+            experiment.id,
+            DndMoveObjectRequest(
+                entity=DndObjectRef(kind="tool", id=tool.id),
+                source=DndObjectRef(kind="workbench", id="station_1"),
+                destination=DndObjectRef(kind="workbench_slot", id="station_1"),
+            ),
+        )

@@ -1,6 +1,6 @@
 import type { BenchToolInstance } from "@/types/workbench";
 
-type WorkspaceActionsExperimentApi = {
+export type WorkspaceActionsExperimentApi = {
   closeAnalyticalBalanceTool: () => void;
   closeGrossBalanceTool: () => void;
   createLimsReception: (payload: {

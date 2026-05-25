@@ -11,17 +11,13 @@ import {
   toDragDescriptor,
   writeEquipmentToolDragPayload,
 } from "@/lib/workbench-dnd";
-import type {
-  MoveToolPayload,
-  PlaceToolFromPalettePayload,
-} from "@/types/api-payloads";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 import type { BenchToolInstance } from "@/types/workbench";
 import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 
-type VortexDndExperimentApi = {
-  moveTool: (payload: MoveToolPayload) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
+export type VortexDndExperimentApi = {
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type VortexDndOptions = {
@@ -96,6 +92,7 @@ export function useVortexDnd({
       entityKind: "tool",
       sourceId: "vortex",
       sourceKind: "vortex",
+      entityId: vortexTool.id,
       toolId: vortexTool.toolId,
       toolType: vortexTool.toolType,
     };

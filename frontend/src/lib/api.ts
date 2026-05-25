@@ -419,18 +419,31 @@ function requirePayload(payload: MutationPayload): Record<string, unknown> {
   return payload ?? {};
 }
 
-function sendDndMoveObject(
-  experimentId: string,
-  {
-    destination,
-    entity,
-    source,
-  }: {
-    destination: DndObjectRef;
-    entity: DndObjectRef;
-    source: DndObjectRef;
-  },
-): Promise<Experiment> {
+function requireDndObjectRef(payload: Record<string, unknown>, fieldName: string): DndObjectRef {
+  const value = payload[fieldName];
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    "id" in value &&
+    typeof value.kind === "string" &&
+    typeof value.id === "string"
+  ) {
+    return { kind: value.kind, id: value.id };
+  }
+
+  throw new Error(`Missing ${fieldName}`);
+}
+
+// All drag-and-drop moves (tools and produce lots) go through moveObject → POST /dnd/move.
+// Explicit UI actions that are not drag-based (balance measurements, dedicated operation buttons)
+// use their own typed endpoints below. Do not call moveObject for those.
+export function moveObject(experimentId: string, payload: MutationPayload): Promise<Experiment> {
+  const body = requirePayload(payload);
+  const destination = requireDndObjectRef(body, "destination");
+  const entity = requireDndObjectRef(body, "entity");
+  const source = requireDndObjectRef(body, "source");
+
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/dnd/move`,
@@ -481,62 +494,6 @@ export async function removeWorkbenchSlot(experimentId: string, payload: Mutatio
   });
 }
 
-export async function placeToolOnWorkbench(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workbench/slots/${requireString(body, "slot_id")}/place-tool`,
-    body: { tool_id: requireString(body, "tool_id") },
-  });
-}
-
-export async function moveToolBetweenWorkbenchSlots(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "source_slot_id"))}/move-to-slot`,
-    body: { target_slot_id: requireString(body, "target_slot_id") },
-  });
-}
-
-export async function moveTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendDndMoveObject(experimentId, {
-    entity: {
-      kind: "tool",
-      id: requireString(body, "source_id"),
-    },
-    source: {
-      kind: requireString(body, "source_kind"),
-      id: requireString(body, "source_id"),
-    },
-    destination: {
-      kind: requireString(body, "destination_kind"),
-      id: requireString(body, "destination_id"),
-    },
-  });
-}
-
-export async function placeToolFromPalette(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const destinationKind = requireString(body, "destination_kind");
-  const destinationId = requireString(body, "destination_id");
-  const toolId = requireString(body, "tool_id");
-
-  if (destinationKind === "trash_bin") {
-    return sendMutationRequest(experimentId, {
-      method: "POST",
-      path: `/experiments/${experimentId}/palette/tools/discard`,
-      body: { tool_id: toolId },
-    });
-  }
-
-  return sendDndMoveObject(experimentId, {
-    entity: { kind: "tool", id: toolId },
-    source: { kind: "palette", id: "lab_tools" },
-    destination: { kind: destinationKind, id: destinationId },
-  });
-}
 
 export async function discardWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
@@ -551,15 +508,6 @@ export async function storeWorkbenchTool(experimentId: string, payload: Mutation
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "slot_id"))}/store`,
-  });
-}
-
-export async function discardToolFromPalette(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/palette/tools/discard`,
-    body: { tool_id: requireString(body, "tool_id") },
   });
 }
 
@@ -654,7 +602,7 @@ export async function startGrinderCycle(experimentId: string, payload: MutationP
 export async function addWorkspaceProduceLotToWidget(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "basket", id: "produce_basket" },
     destination: { kind: "workspace_widget", id: requireString(body, "widget_id") },
@@ -664,7 +612,7 @@ export async function addWorkspaceProduceLotToWidget(experimentId: string, paylo
 export async function moveWorkbenchProduceLotToWidget(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "workbench", id: requireString(body, "source_slot_id") },
     destination: { kind: "workspace_widget", id: requireString(body, "widget_id") },
@@ -673,7 +621,7 @@ export async function moveWorkbenchProduceLotToWidget(experimentId: string, payl
 
 export async function restoreTrashedProduceLotToWidget(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: requireString(body, "trash_produce_lot_id") },
     source: { kind: "trash", id: requireString(body, "trash_produce_lot_id") },
     destination: { kind: "workspace_widget", id: requireString(body, "widget_id") },
@@ -1021,7 +969,7 @@ export async function moveWorkspaceProduceLotToGrossBalance(
 ): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "basket", id: "produce_basket" },
     destination: { kind: "gross_balance", id: "gross_balance" },
@@ -1034,7 +982,7 @@ export async function moveWorkbenchProduceLotToGrossBalance(
 ): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "workbench", id: requireString(body, "source_slot_id") },
     destination: { kind: "gross_balance", id: "gross_balance" },
@@ -1047,7 +995,7 @@ export async function moveWidgetProduceLotToGrossBalance(
 ): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "grinder", id: "grinder" },
     destination: { kind: "gross_balance", id: "gross_balance" },
@@ -1059,7 +1007,7 @@ export async function restoreTrashedProduceLotToGrossBalance(
   payload: MutationPayload,
 ): Promise<Experiment> {
   const body = requirePayload(payload);
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: requireString(body, "trash_produce_lot_id") },
     source: { kind: "trash", id: requireString(body, "trash_produce_lot_id") },
     destination: { kind: "gross_balance", id: "gross_balance" },
@@ -1319,7 +1267,7 @@ export async function addLiquidToWorkbenchTool(experimentId: string, payload: Mu
 export async function addProduceLotToWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "basket", id: "produce_basket" },
     destination: { kind: "workbench_tool", id: requireString(body, "slot_id") },
@@ -1347,7 +1295,7 @@ export async function cutWorkbenchProduceLot(experimentId: string, payload: Muta
 export async function moveProduceLotBetweenWorkbenchTools(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   const produceLotId = requireString(body, "produce_lot_id");
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: produceLotId },
     source: { kind: "workbench", id: requireString(body, "source_slot_id") },
     destination: { kind: "workbench_tool", id: requireString(body, "target_slot_id") },
@@ -1356,7 +1304,7 @@ export async function moveProduceLotBetweenWorkbenchTools(experimentId: string, 
 
 export async function restoreTrashedProduceLotToWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
-  return sendDndMoveObject(experimentId, {
+  return moveObject(experimentId, {
     entity: { kind: "produce_lot", id: requireString(body, "trash_produce_lot_id") },
     source: { kind: "trash", id: requireString(body, "trash_produce_lot_id") },
     destination: { kind: "workbench_tool", id: requireString(body, "target_slot_id") },
@@ -1842,6 +1790,8 @@ function normalizeBenchTool(
     canReceiveProduce: Boolean(tool.canReceiveProduce ?? tool.can_receive_produce),
     canSeal: Boolean(tool.canSeal ?? tool.can_seal),
     contactImpurityMgPerG: Number(tool.contactImpurityMgPerG ?? tool.contact_impurity_mg_per_g ?? 0),
+    internalPressureBar: Number(tool.internalPressureBar ?? tool.internal_pressure_bar ?? 1.0),
+    trappedCo2MassG: Number(tool.trappedCo2MassG ?? tool.trapped_co2_mass_g ?? 0),
     isMixed: Boolean(tool.isMixed ?? tool.is_mixed ?? false),
     isSealed: Boolean(tool.isSealed ?? tool.is_sealed ?? false),
     closureFault:

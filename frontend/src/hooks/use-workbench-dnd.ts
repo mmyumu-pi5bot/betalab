@@ -35,21 +35,19 @@ import type {
   AddProduceLotToWorkbenchToolPayload,
   CutWorkbenchProduceLotPayload,
   MoveGrossBalanceProduceLotToWorkbenchPayload,
-  MoveToolPayload,
+  MoveObjectPayload,
   MoveProduceLotBetweenWorkbenchToolsPayload,
   MoveWidgetProduceLotToWorkbenchToolPayload,
-  PlaceToolFromPalettePayload,
   RestoreTrashedProduceLotToWorkbenchToolPayload,
 } from "@/types/api-payloads";
 
-type WorkbenchDndExperimentApi = {
+export type WorkbenchDndExperimentApi = {
   addProduceLotToWorkbenchTool: (payload: AddProduceLotToWorkbenchToolPayload) => void;
   cutWorkbenchProduceLot: (payload: CutWorkbenchProduceLotPayload) => void;
   moveGrossBalanceProduceLotToWorkbench: (payload: MoveGrossBalanceProduceLotToWorkbenchPayload) => void;
-  moveTool: (payload: MoveToolPayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
   moveProduceLotBetweenWorkbenchTools: (payload: MoveProduceLotBetweenWorkbenchToolsPayload) => void;
   moveWidgetProduceLotToWorkbenchTool: (payload: MoveWidgetProduceLotToWorkbenchToolPayload) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
   restoreTrashedProduceLotToWorkbenchTool: (payload: RestoreTrashedProduceLotToWorkbenchToolPayload) => void;
 };
 
@@ -139,6 +137,7 @@ export function useWorkbenchDnd({
       sourceId: slotId,
       sourceKind: "workbench",
       sourceSlotId: slotId,
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     });
@@ -148,6 +147,7 @@ export function useWorkbenchDnd({
       entityKind: "tool",
       sourceId: slotId,
       sourceKind: "workbench",
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     });
@@ -189,6 +189,7 @@ export function useWorkbenchDnd({
       entityKind: "tool",
       sourceId: tool.id,
       sourceKind: "basket",
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     });
@@ -198,6 +199,7 @@ export function useWorkbenchDnd({
       entityKind: "tool",
       sourceId: tool.id,
       sourceKind: "basket",
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     });

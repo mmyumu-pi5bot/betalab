@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.domain.dnd_rules import get_tool_allowed_drop_targets
+from app.domain.dnd_contracts import DndEntityContract, get_dnd_contract, source_kind_to_drop_target_type
 from app.domain.models import Experiment, WorkbenchTool
 from app.services.domain_services.analytical_balance import AnalyticalBalanceServiceBase
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
@@ -81,7 +81,16 @@ class MoveSourceBase:
         self._source = source
 
     def validate_remove(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
-        pass
+        if request.entity.kind == "tool":
+            self._validate_tool_for_destination(experiment, request, destination)
+        elif request.entity.kind == "produce_lot":
+            contract = get_dnd_contract("produce_lot", "produce_lot")
+            _assert_entity_can_move(contract, "Produce lot", destination)
+        else:
+            raise ValueError(f"Entity kind {request.entity.kind!r} is not supported by the object move command.")
+
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        raise ValueError(f"{self._source.kind} cannot move tools.")
 
     def remove(self, experiment: Experiment, request: DndMoveObjectRequest) -> DndMovedObject:
         if request.entity.kind == "tool":
@@ -113,11 +122,23 @@ class MoveSourceBase:
 
 
 class PaletteMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        tool = build_workbench_tool(request.entity.id)
+        _assert_entity_can_move(get_dnd_contract("tool", tool.tool_type), tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         return build_workbench_tool(request.entity.id), "Palette"
 
 
 class BasketMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        tool = next((t for t in experiment.basket_tools if t.id == request.source.id), None)
+        if tool is None:
+            raise ValueError("The specified bag is not in the produce basket.")
+        if request.entity.id != tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", tool.tool_type), tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         tool_index = next((index for index, tool in enumerate(experiment.basket_tools) if tool.id == request.source.id), None)
         if tool_index is None:
@@ -129,6 +150,14 @@ class BasketMoveSource(MoveSourceBase):
 
 
 class WorkbenchMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        slot = find_workbench_slot(experiment.workbench, request.source.id)
+        if slot.tool is None:
+            raise ValueError(f"Place a tool on {slot.label} before moving it.")
+        if request.entity.id != slot.tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", slot.tool.tool_type), slot.tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         slot = find_workbench_slot(experiment.workbench, request.source.id)
         if slot.tool is None:
@@ -142,6 +171,14 @@ class WorkbenchMoveSource(MoveSourceBase):
 
 
 class RackMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        rack_slot = find_rack_slot(experiment.rack, request.source.id)
+        if rack_slot.tool is None:
+            raise ValueError(f"{rack_slot.label} does not contain a tool.")
+        if request.entity.id != rack_slot.tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", rack_slot.tool.tool_type), rack_slot.tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         rack_slot = find_rack_slot(experiment.rack, request.source.id)
         if rack_slot.tool is None:
@@ -155,6 +192,14 @@ class RackMoveSource(MoveSourceBase):
 
 
 class GrossBalanceMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        widget = next((w for w in experiment.workspace.widgets if w.id == self._source.id), None)
+        if widget is None or widget.tool is None:
+            raise ValueError("Place a tool on Gross balance before moving it.")
+        if request.entity.id != widget.tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", widget.tool.tool_type), widget.tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         service = _DndGrossBalanceService(self._runtime)
         return service._take_tool_from_balance(experiment), "Gross balance"
@@ -164,6 +209,14 @@ class GrossBalanceMoveSource(MoveSourceBase):
 
 
 class AnalyticalBalanceMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        widget = next((w for w in experiment.workspace.widgets if w.id == self._source.id), None)
+        if widget is None or widget.tool is None:
+            raise ValueError("Place a tool on Analytical balance before moving it.")
+        if request.entity.id != widget.tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", widget.tool.tool_type), widget.tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         return _DndAnalyticalBalanceService(self._runtime)._take_tool_from_balance(experiment), "Analytical balance"
 
@@ -172,6 +225,14 @@ class AnalyticalBalanceMoveSource(MoveSourceBase):
 
 
 class VortexMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        widget = next((w for w in experiment.workspace.widgets if w.id == self._source.id), None)
+        if widget is None or widget.tool is None:
+            raise ValueError("Place a tool on Vortex mixer before moving it.")
+        if request.entity.id != widget.tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", widget.tool.tool_type), widget.tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         return _DndVortexService(self._runtime)._take_tool_from_vortex(experiment), "Vortex mixer"
 
@@ -185,6 +246,10 @@ class GrinderMoveSource(MoveSourceBase):
 
 
 class TrashMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        tool = find_trash_tool(experiment.trash, request.source.id)
+        _assert_entity_can_move(get_dnd_contract("tool", tool.tool_type), tool.label, destination)
+
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         tool = find_trash_tool(experiment.trash, request.source.id)
         origin_label = experiment.trash.discarded_from.get(tool.id, "Trash")
@@ -325,7 +390,6 @@ class GrinderMoveDestination(MoveDestinationBase):
 class TrashBinMoveDestination(MoveDestinationBase):
     def _place_tool(self, experiment: Experiment, moved: DndMovedObject) -> None:
         tool = _require_tool(moved)
-        _raise_if_tool_cannot_drop_on_destination(tool, self)
         experiment.trash.children.append(tool)
         experiment.trash.discarded_from[tool.id] = moved.source_label or moved.source_ref.kind
         experiment.audit_log.append(f"{tool.label} discarded from {moved.source_label or moved.source_ref.kind}.")
@@ -341,8 +405,7 @@ class DndMoveObjectService(WriteDomainService[DndMoveObjectRequest]):
     def _run(self, experiment: Experiment, request: DndMoveObjectRequest) -> None:
         source = _resolve_source(self._runtime, request.source)
         destination = _resolve_destination(self._runtime, request.destination)
-
-        _validate_entity_can_drop_on_destination(experiment, request, destination)
+        _validate_not_same_location(request, destination)
         source.validate_remove(experiment, request, destination)
         destination.validate_place(experiment, request)
         moved = source.remove(experiment, request)
@@ -449,56 +512,18 @@ def _get_drop_target_label(destination_kind: str) -> str:
     return labels.get(destination_kind, destination_kind)
 
 
-def _raise_if_tool_cannot_drop_on_destination(tool: WorkbenchTool, destination: MoveDestination) -> None:
-    if destination.drop_target_type not in get_tool_allowed_drop_targets(tool.tool_type):
-        raise ValueError(f"{tool.label} cannot be dropped on {destination.drop_target_label}.")
+def _assert_entity_can_move(contract: DndEntityContract, label: str, destination: MoveDestination) -> None:
+    if not contract.supports_object_move:
+        raise ValueError(f"{label} cannot be moved with the generic DnD move command.")
+    if destination.drop_target_type not in contract.allowed_drop_targets:
+        raise ValueError(f"{label} cannot be dropped on {destination.drop_target_label}.")
 
 
-def _validate_entity_can_drop_on_destination(
-    experiment: Experiment,
-    request: DndMoveObjectRequest,
-    destination: MoveDestination,
-) -> None:
-    if request.entity.kind == "tool":
-        _raise_if_tool_cannot_drop_on_destination(_resolve_tool_for_move(experiment, request), destination)
-
-
-def _resolve_tool_for_move(experiment: Experiment, request: DndMoveObjectRequest) -> WorkbenchTool:
-    if request.source.kind in {"palette", "toolbar"}:
-        return build_workbench_tool(request.entity.id)
-    if request.source.kind == "basket":
-        tool = next((candidate for candidate in experiment.basket_tools if candidate.id == request.source.id), None)
-        if tool is None:
-            raise ValueError("The specified bag is not in the produce basket.")
-        return tool
-    if request.source.kind == "workbench":
-        slot = find_workbench_slot(experiment.workbench, request.source.id)
-        if slot.tool is None:
-            raise ValueError(f"Place a tool on {slot.label} before moving it.")
-        return slot.tool
-    if request.source.kind == "rack":
-        rack_slot = find_rack_slot(experiment.rack, request.source.id)
-        if rack_slot.tool is None:
-            raise ValueError(f"{rack_slot.label} does not contain a tool.")
-        return rack_slot.tool
-    if request.source.kind == "gross_balance":
-        widget = next(widget for widget in experiment.workspace.widgets if widget.id == "gross_balance")
-        if widget.tool is None:
-            raise ValueError("Place a tool on Gross balance before moving it.")
-        return widget.tool
-    if request.source.kind == "analytical_balance":
-        widget = next(widget for widget in experiment.workspace.widgets if widget.id == "analytical_balance")
-        if widget.tool is None:
-            raise ValueError("Place a tool on Analytical balance before moving it.")
-        return widget.tool
-    if request.source.kind == "vortex":
-        widget = next(widget for widget in experiment.workspace.widgets if widget.id == "vortex")
-        if widget.tool is None:
-            raise ValueError("Place a tool on Vortex mixer before moving it.")
-        return widget.tool
-    if request.source.kind == "trash":
-        return find_trash_tool(experiment.trash, request.source.id)
-    raise ValueError(f"{request.source.kind} cannot move tools.")
+def _validate_not_same_location(request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+    if request.source.kind == "trash" and destination.drop_target_type == "trash_bin":
+        raise ValueError("Cannot drop an entity onto its current location.")
+    if source_kind_to_drop_target_type(request.source.kind) == destination.drop_target_type and request.source.id == request.destination.id:
+        raise ValueError("Cannot drop an entity onto its current location.")
 
 
 def _tool_action_verb(moved: DndMovedObject, *, restored: str) -> str:

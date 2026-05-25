@@ -64,6 +64,7 @@ describe("workbench dnd helpers", () => {
 
     writePayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot", "rack_slot"],
+      entityId: "sample_vial_lcms",
       entityKind: "tool",
       itemId: "sample_vial_lcms",
       itemType: "tool",
@@ -76,6 +77,7 @@ describe("workbench dnd helpers", () => {
     expect(hasCompatibleDropTarget(dataTransfer, "rack_slot")).toBe(true);
     expect(readToolbarDragPayload(dataTransfer)).toEqual({
       allowedDropTargets: ["workbench_slot", "rack_slot"],
+      entityId: "sample_vial_lcms",
       entityKind: "tool",
       itemId: "sample_vial_lcms",
       itemType: "tool",
@@ -318,6 +320,7 @@ describe("workbench dnd helpers", () => {
 
     writeBenchToolDragPayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot", "rack_slot", "trash_bin"],
+      entityId: "bench_tool_1",
       entityKind: "tool",
       sourceId: "station_1",
       sourceKind: "workbench",
@@ -332,6 +335,7 @@ describe("workbench dnd helpers", () => {
     expect(hasCompatibleDropTarget(dataTransfer, "trash_bin")).toBe(true);
     expect(readBenchToolDragPayload(dataTransfer)).toEqual({
       allowedDropTargets: ["workbench_slot", "rack_slot", "trash_bin"],
+      entityId: "bench_tool_1",
       entityKind: "tool",
       sourceId: "station_1",
       sourceKind: "workbench",
@@ -346,6 +350,7 @@ describe("workbench dnd helpers", () => {
 
     writeBenchToolDragPayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot", "trash_bin"],
+      entityId: "bench_tool_2",
       entityKind: "tool",
       sourceId: "station_2",
       sourceKind: "workbench",
@@ -360,6 +365,7 @@ describe("workbench dnd helpers", () => {
     expect(hasCompatibleDropTarget(dataTransfer, "trash_bin")).toBe(true);
     expect(readBenchToolDragPayload(dataTransfer)).toEqual({
       allowedDropTargets: ["workbench_slot", "trash_bin"],
+      entityId: "bench_tool_2",
       entityKind: "tool",
       sourceId: "station_2",
       sourceKind: "workbench",
@@ -374,6 +380,7 @@ describe("workbench dnd helpers", () => {
 
     writeRackToolDragPayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot", "trash_bin"],
+      entityId: "rack_tool_1",
       entityKind: "tool",
       rackSlotId: "rack_slot_1",
       sourceId: "rack_slot_1",
@@ -388,6 +395,7 @@ describe("workbench dnd helpers", () => {
     expect(hasCompatibleDropTarget(dataTransfer, "trash_bin")).toBe(true);
     expect(readRackToolDragPayload(dataTransfer)).toEqual({
       allowedDropTargets: ["workbench_slot", "trash_bin"],
+      entityId: "rack_tool_1",
       entityKind: "tool",
       rackSlotId: "rack_slot_1",
       sourceId: "rack_slot_1",

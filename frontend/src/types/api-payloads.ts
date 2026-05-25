@@ -43,8 +43,6 @@ export type DiscardSampleLabelFromWorkbenchToolPayload = {
   label_id?: string;
 };
 
-export type DiscardToolFromPalettePayload = { tool_id: string };
-
 export type DiscardWorkbenchToolPayload = { slot_id: string };
 
 export type StoreWorkbenchToolPayload = { slot_id: string };
@@ -63,22 +61,37 @@ export type MoveProduceLotBetweenWorkbenchToolsPayload = {
   target_slot_id: string;
 };
 
-export type MoveToolBetweenWorkbenchSlotsPayload = {
-  source_slot_id: string;
-  target_slot_id: string;
-};
 
-export type MoveToolPayload = {
-  source_kind: string;
-  source_id: string;
-  destination_kind: string;
-  destination_id: string;
-};
-
-export type PlaceToolFromPalettePayload = {
-  tool_id: string;
-  destination_kind: string;
-  destination_id: string;
+export type MoveObjectPayload = {
+  entity: {
+    kind: "tool" | "produce_lot";
+    id: string;
+  };
+  source: {
+    kind:
+      | "analytical_balance"
+      | "basket"
+      | "grinder"
+      | "gross_balance"
+      | "palette"
+      | "rack"
+      | "trash"
+      | "vortex"
+      | "workbench";
+    id: string;
+  };
+  destination: {
+    kind:
+      | "analytical_balance"
+      | "gross_balance"
+      | "rack_slot"
+      | "trash_bin"
+      | "vortex"
+      | "workbench_slot"
+      | "workbench_tool"
+      | "workspace_widget";
+    id: string;
+  };
 };
 
 export type MoveWidgetProduceLotToWorkbenchToolPayload = {
@@ -91,8 +104,6 @@ export type OpenWorkbenchToolPayload = { slot_id: string };
 
 export type PlaceReceivedBagOnWorkbenchPayload = { target_slot_id: string; tool_id: string };
 export type BasketToolReferencePayload = { tool_id: string };
-
-export type PlaceToolOnWorkbenchPayload = { slot_id: string; tool_id: string };
 
 export type PourSpatulaIntoWorkbenchToolPayload = {
   slot_id: string;

@@ -11,14 +11,10 @@ import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
 import type { DragStateApi } from "@/hooks/use-drag-state";
-import type {
-  MoveToolPayload,
-  PlaceToolFromPalettePayload,
-} from "@/types/api-payloads";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
-type RackDndExperimentApi = {
-  moveTool: (payload: MoveToolPayload) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
+export type RackDndExperimentApi = {
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type RackDndOptions = {
@@ -121,6 +117,7 @@ export function useRackDnd({
       rackSlotId: rackSlot.id,
       sourceId: rackSlot.id,
       sourceKind: "rack",
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     });
@@ -129,6 +126,7 @@ export function useRackDnd({
       entityKind: "tool" as const,
       sourceId: rackSlot.id,
       sourceKind: "rack" as const,
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     };

@@ -1,6 +1,6 @@
 import type { DropTargetType, LiquidType, ToolType } from "@/types/workbench";
 
-import toolSpecs from "./backend-tool-specs.json";
+import toolSpecs from "@/generated/dnd-contract.json";
 
 type ToolSpec = {
   allowed_drop_targets: DropTargetType[];
@@ -8,12 +8,38 @@ type ToolSpec = {
   is_storable: boolean;
 };
 
-const specs = toolSpecs as Record<string, ToolSpec>;
+type EntitySpec = {
+  allowed_drop_targets: DropTargetType[];
+};
+
+type DndContract = {
+  entities: Record<string, EntitySpec>;
+  liquids: Record<string, EntitySpec>;
+  tools: Record<string, ToolSpec>;
+};
+
+const contract = toolSpecs as DndContract;
 
 function requireToolSpec(toolType: ToolType): ToolSpec {
-  const spec = specs[toolType];
+  const spec = contract.tools[toolType];
   if (!spec) {
     throw new Error(`Missing backend tool spec for ${toolType}`);
+  }
+  return spec;
+}
+
+function requireEntitySpec(entityKind: string): EntitySpec {
+  const spec = contract.entities[entityKind];
+  if (!spec) {
+    throw new Error(`Missing backend DnD entity spec for ${entityKind}`);
+  }
+  return spec;
+}
+
+function requireLiquidSpec(liquidType: LiquidType): EntitySpec {
+  const spec = contract.liquids[liquidType];
+  if (!spec) {
+    throw new Error(`Missing backend liquid spec for ${liquidType}`);
   }
   return spec;
 }
@@ -31,21 +57,17 @@ export function isToolStorable(toolType: ToolType): boolean {
 }
 
 export function getProduceLotDropTargets(): DropTargetType[] {
-  return ["workbench_slot", "grinder_widget", "trash_bin", "gross_balance_widget"];
+  return requireEntitySpec("produce_lot").allowed_drop_targets;
 }
 
 export function getSampleLabelDropTargets(): DropTargetType[] {
-  return ["workbench_slot", "gross_balance_widget", "analytical_balance_widget", "trash_bin"];
+  return requireEntitySpec("sample_label").allowed_drop_targets;
 }
 
 export function getLimsLabelTicketDropTargets(): DropTargetType[] {
-  return getSampleLabelDropTargets();
+  return requireEntitySpec("lims_label_ticket").allowed_drop_targets;
 }
 
 export function getLiquidDropTargets(liquidType: LiquidType): DropTargetType[] {
-  if (liquidType === "dry_ice_pellets") {
-    return ["grinder_widget"];
-  }
-
-  return ["workbench_slot", "analytical_balance_widget"];
+  return requireLiquidSpec(liquidType).allowed_drop_targets;
 }

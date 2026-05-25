@@ -13,6 +13,10 @@ from app.api.experiment_routes import rack as experiment_routes_rack
 from app.api.experiment_routes import reception as experiment_routes_reception
 from app.api.experiment_routes import trash as experiment_routes_trash
 from app.api.experiment_routes import workbench as experiment_routes_workbench
+from app.api.experiment_routes import workbench_labels as experiment_routes_workbench_labels
+from app.api.experiment_routes import workbench_liquids as experiment_routes_workbench_liquids
+from app.api.experiment_routes import workbench_produce as experiment_routes_workbench_produce
+from app.api.experiment_routes import workbench_spatula as experiment_routes_workbench_spatula
 from app.api.experiment_routes import workspace as experiment_routes_workspace
 from app.core.config import Settings, settings
 from app.domain.models import ProduceFraction, ProduceMaterialState
@@ -39,6 +43,10 @@ def isolated_api_experiment_service(tmp_path, monkeypatch):
     monkeypatch.setattr(experiment_routes_reception, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_trash, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench, "experiment_service", isolated_service)
+    monkeypatch.setattr(experiment_routes_workbench_labels, "experiment_service", isolated_service)
+    monkeypatch.setattr(experiment_routes_workbench_liquids, "experiment_service", isolated_service)
+    monkeypatch.setattr(experiment_routes_workbench_produce, "experiment_service", isolated_service)
+    monkeypatch.setattr(experiment_routes_workbench_spatula, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workspace, "experiment_service", isolated_service)
     monkeypatch.setattr(experiments_api, "experiment_service", isolated_service)
     globals()["experiment_service"] = isolated_service
@@ -316,7 +324,7 @@ def test_dnd_move_moves_workbench_tool_to_gross_balance_over_http() -> None:
         moved = client.post(
             f"/experiments/{experiment_id}/dnd/move",
             json={
-                "entity": {"kind": "tool", "id": "station_1"},
+                "entity": {"kind": "tool", "id": _find_slot(placed.json(), "station_1")["tool"]["id"]},
                 "source": {"kind": "workbench", "id": "station_1"},
                 "destination": {"kind": "gross_balance", "id": "gross_balance"},
             },

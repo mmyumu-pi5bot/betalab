@@ -5,6 +5,7 @@ from typing import Literal
 
 import pytest
 
+from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
 from app.services.domain_services.gross_balance import (
     CloseGrossBalanceToolService,
     DiscardGrossBalanceProduceLotRequest,
@@ -402,3 +403,23 @@ def test_produce_lot_dnd_matrix(source: SourceKind, target: TargetKind, allowed:
             assert [lot.id for lot in gross_balance.tool.produce_lots] == [produce_lot_id]
             return
         assert [lot.id for lot in gross_balance.produce_lots] == [produce_lot_id]
+
+
+def test_dnd_move_rejects_produce_lot_drop_onto_current_location() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    produce_lot_id = _create_basket_lot(service, experiment.id)
+    AddProduceLotToWorkbenchToolService(service).run(
+        experiment.id,
+        AddProduceLotToWorkbenchToolRequest(slot_id="station_1", produce_lot_id=produce_lot_id),
+    )
+
+    with pytest.raises(ValueError, match="current location"):
+        DndMoveObjectService(service).run(
+            experiment.id,
+            DndMoveObjectRequest(
+                entity=DndObjectRef(kind="produce_lot", id=produce_lot_id),
+                source=DndObjectRef(kind="workbench", id="station_1"),
+                destination=DndObjectRef(kind="workbench_slot", id="station_1"),
+            ),
+        )

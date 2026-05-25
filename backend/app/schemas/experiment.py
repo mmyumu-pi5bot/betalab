@@ -17,7 +17,13 @@ from app.domain.dnd_rules import (
     get_sample_label_allowed_drop_targets,
     get_tool_allowed_drop_targets,
 )
-from app.domain.rules import can_workspace_widget_be_stored
+from app.domain.grinder_rules import (
+    GRINDER_AMBIENT_TEMPERATURE_C,
+    GRINDER_START_THRESHOLD_C,
+    get_grinder_display_mode,
+    get_grinder_start_block_reason,
+)
+from app.domain.rules import can_workspace_widget_be_stored, can_workspace_widget_store_now
 from app.domain.spatula_rules import (
     SPATULA_CLICK_INCREMENT_MU_G,
     SPATULA_CLICK_INCREMENT_SIGMA_G,
@@ -29,16 +35,6 @@ from app.domain.spatula_rules import (
     SPATULA_LOAD_SOURCE_TOOL_TYPES,
     SPATULA_POUR_TARGET_TOOL_TYPES,
 )
-from app.services.physical_simulation_service import PhysicalSimulationService
-
-GRINDER_AMBIENT_TEMPERATURE_C = PhysicalSimulationService.ambient_temperature_c
-GRINDER_START_THRESHOLD_C = PhysicalSimulationService.grinder_start_threshold_c
-
-
-def _tool_exposes_sample_bag_label_target(tool: WorkbenchToolSchema | None) -> bool:
-    return tool is not None
-
-
 class WorkbenchLiquidSchema(BaseModel):
     id: str
     liquid_id: str
@@ -95,6 +91,26 @@ class ContainmentSchema(BaseModel):
     accepts: list[ContainmentRuleSchema] = Field(default_factory=list)
     can_receive: bool
     blocked_reason: str | None = None
+
+
+def _tool_entity(tool: "WorkbenchToolSchema") -> ContainedEntitySchema:
+    return ContainedEntitySchema(entity_kind="tool", id=tool.id, tool_type=tool.tool_type)
+
+
+def _produce_lot_entity(lot: "ProduceLotSchema") -> ContainedEntitySchema:
+    return ContainedEntitySchema(entity_kind="produce", id=lot.id, produce_type=lot.produce_type)
+
+
+def _produce_fraction_entity(fraction: "ProduceFractionSchema") -> ContainedEntitySchema:
+    return ContainedEntitySchema(entity_kind="produce", id=fraction.id)
+
+
+def _liquid_entity(liquid: "WorkbenchLiquidSchema") -> ContainedEntitySchema:
+    return ContainedEntitySchema(entity_kind="liquid", id=liquid.id, liquid_type=liquid.liquid_id)
+
+
+def _sample_label_entity(label: "ContainerLabelSchema") -> ContainedEntitySchema:
+    return ContainedEntitySchema(entity_kind="sample_label", id=label.id)
 
 
 class SpatulaStateSchema(BaseModel):
@@ -301,38 +317,12 @@ class WorkbenchToolSchema(BaseModel):
         return self._contained_entities()
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:
-        children: list[ContainedEntitySchema] = []
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="liquid",
-                id=liquid.id,
-                liquid_type=liquid.liquid_id,
-            )
-            for liquid in self.liquids
-        )
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="produce",
-                id=produce_lot.id,
-                produce_type=produce_lot.produce_type,
-            )
-            for produce_lot in self.produce_lots
-        )
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="produce",
-                id=produce_fraction.id,
-            )
-            for produce_fraction in self.produce_fractions
-        )
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="sample_label",
-                id=label.id,
-            )
-            for label in self.labels
-        )
-        return children
+        return [
+            *[_liquid_entity(liq) for liq in self.liquids],
+            *[_produce_lot_entity(lot) for lot in self.produce_lots],
+            *[_produce_fraction_entity(f) for f in self.produce_fractions],
+            *[_sample_label_entity(lbl) for lbl in self.labels],
+        ]
 
     @computed_field
     def containment(self) -> ContainmentSchema:
@@ -381,24 +371,10 @@ class WorkbenchSlotSchema(BaseModel):
         return self._contained_entities()
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:
-        children: list[ContainedEntitySchema] = []
-        if self.tool is not None:
-            children.append(
-                ContainedEntitySchema(
-                    entity_kind="tool",
-                    id=self.tool.id,
-                    tool_type=self.tool.tool_type,
-                )
-            )
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="produce",
-                id=produce_lot.id,
-                produce_type=produce_lot.produce_type,
-            )
-            for produce_lot in self.surface_produce_lots
-        )
-        return children
+        return [
+            *([_tool_entity(self.tool)] if self.tool is not None else []),
+            *[_produce_lot_entity(lot) for lot in self.surface_produce_lots],
+        ]
 
     @computed_field
     def containment(self) -> ContainmentSchema:
@@ -435,15 +411,7 @@ class RackSlotSchema(BaseModel):
         return self._contained_entities()
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:
-        if self.tool is None:
-            return []
-        return [
-            ContainedEntitySchema(
-                entity_kind="tool",
-                id=self.tool.id,
-                tool_type=self.tool.tool_type,
-            )
-        ]
+        return [_tool_entity(self.tool)] if self.tool is not None else []
 
     @computed_field
     def containment(self) -> ContainmentSchema:
@@ -542,32 +510,11 @@ class WorkspaceWidgetSchema(BaseModel):
         return self._contained_entities()
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:
-        children: list[ContainedEntitySchema] = []
-        if self.tool is not None:
-            children.append(
-                ContainedEntitySchema(
-                    entity_kind="tool",
-                    id=self.tool.id,
-                    tool_type=self.tool.tool_type,
-                )
-            )
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="produce",
-                id=produce_lot.id,
-                produce_type=produce_lot.produce_type,
-            )
-            for produce_lot in self.produce_lots
-        )
-        children.extend(
-            ContainedEntitySchema(
-                entity_kind="liquid",
-                id=liquid.id,
-                liquid_type=liquid.liquid_id,
-            )
-            for liquid in self.liquids
-        )
-        return children
+        return [
+            *([_tool_entity(self.tool)] if self.tool is not None else []),
+            *[_produce_lot_entity(lot) for lot in self.produce_lots],
+            *[_liquid_entity(liq) for liq in self.liquids],
+        ]
 
     @computed_field
     def containment(self) -> ContainmentSchema | None:
@@ -608,69 +555,43 @@ class WorkspaceWidgetSchema(BaseModel):
     def grinder_start_block_reason(self) -> str | None:
         if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
             return "not_grinder"
-        if self.grinder_run_remaining_ms > 0:
-            return "running"
-        if not self.produce_lots:
-            return "empty"
-        produce_lot = self.produce_lots[0]
-        material_state = self._get_produce_material_state_name(produce_lot.id)
-        if material_state == "whole":
-            return "must_be_cut"
-        if material_state == "ground":
-            return "already_ground"
-        if material_state == "waste":
-            return "waste"
-        temperature_c = self._get_produce_temperature_c(produce_lot.id)
-        if temperature_c > GRINDER_START_THRESHOLD_C:
-            return "not_cold_enough"
-        return None
+        return get_grinder_start_block_reason(
+            produce_lot_ids=[lot.id for lot in self.produce_lots],
+            material_states=self._produce_material_states_map(),
+            temperatures=self._produce_temperatures_map(),
+            grinder_run_remaining_ms=self.grinder_run_remaining_ms,
+        )
 
     @computed_field
     def grinder_display_mode(self) -> str | None:
         if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
             return None
-        if self.produce_lots:
-            material_state = self._get_produce_material_state_name(self.produce_lots[0].id)
-            temperature_c = self._get_produce_temperature_c(self.produce_lots[0].id)
-        else:
-            material_state = "whole"
-            temperature_c = GRINDER_AMBIENT_TEMPERATURE_C
-        if material_state == "ground":
-            return "complete"
-        if self.grinder_fault == "motor_jammed" or self.grinder_start_block_reason == "not_cold_enough":
-            return "jammed"
-        if self.grinder_run_remaining_ms > 0 and temperature_c > GRINDER_START_THRESHOLD_C:
-            return "warning"
-        if self.grinder_run_remaining_ms > 0:
-            return "running"
-        if self.grinder_can_start:
-            return "ready"
-        if self.grinder_start_block_reason == "must_be_cut":
-            return "overload"
-        return "idle"
-
-    def _get_produce_material_state_name(self, produce_lot_id: str) -> str:
-        state = next(
-            (state for state in self.produce_material_states if state.produce_lot_id == produce_lot_id),
-            None,
+        return get_grinder_display_mode(
+            produce_lot_ids=[lot.id for lot in self.produce_lots],
+            material_states=self._produce_material_states_map(),
+            temperatures=self._produce_temperatures_map(),
+            grinder_run_remaining_ms=self.grinder_run_remaining_ms,
+            grinder_fault=self.grinder_fault,
+            grinder_can_start=self.grinder_can_start,
+            grinder_start_block_reason=self.grinder_start_block_reason,
         )
-        return state.material_state if state is not None else "whole"
 
-    def _get_produce_temperature_c(self, produce_lot_id: str) -> float:
-        state = next(
-            (state for state in self.produce_material_states if state.produce_lot_id == produce_lot_id),
-            None,
-        )
-        return state.temperature_c if state is not None else GRINDER_AMBIENT_TEMPERATURE_C
+    def _produce_material_states_map(self) -> dict[str, str]:
+        return {s.produce_lot_id: s.material_state for s in self.produce_material_states}
+
+    def _produce_temperatures_map(self) -> dict[str, float]:
+        return {s.produce_lot_id: s.temperature_c for s in self.produce_material_states}
 
     def _can_store(self) -> bool:
         if self.store_allowed_override is not None:
             return self.store_allowed_override
-        if not self.is_storable:
-            return False
-        if self.is_trashed:
-            return True
-        return self.tool is None and len(self.produce_lots) == 0 and len(self.liquids) == 0
+        return can_workspace_widget_store_now(
+            self.id,
+            is_trashed=self.is_trashed,
+            has_tool=self.tool is not None,
+            has_produce=len(self.produce_lots) > 0,
+            has_liquids=len(self.liquids) > 0,
+        )
 
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
 
@@ -831,13 +752,6 @@ class DndMoveObjectSchema(BaseModel):
     entity: DndObjectRefSchema
     source: DndObjectRefSchema
     destination: DndObjectRefSchema
-
-
-class DndMoveToolSchema(BaseModel):
-    source_kind: str
-    source_id: str
-    destination_kind: str
-    destination_id: str
 
 
 class TrashProduceLotRestoreToWorkbenchSchema(BaseModel):

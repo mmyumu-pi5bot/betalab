@@ -20,21 +20,19 @@ import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
-  MoveToolPayload,
-  PlaceToolFromPalettePayload,
+  MoveObjectPayload,
 } from "@/types/api-payloads";
 
-type AnalyticalBalanceDndExperimentApi = {
+export type AnalyticalBalanceDndExperimentApi = {
   addLiquidToAnalyticalBalanceTool: (payload: AddLiquidToAnalyticalBalanceToolPayload) => void;
   applyPrintedLimsLabelToAnalyticalBalanceTool: () => void;
   applySampleLabelToAnalyticalBalanceTool: () => void;
   moveGrossBalanceToolToAnalyticalBalance: () => void;
-  moveTool: (payload: MoveToolPayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
   moveWorkbenchSampleLabelToAnalyticalBalance: (payload: {
     source_slot_id: string;
     label_id: string;
   }) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
   restoreTrashedSampleLabelToAnalyticalBalance: (payload: {
     trash_sample_label_id: string;
   }) => void;
@@ -187,6 +185,7 @@ export function useAnalyticalBalanceDnd({
       entityKind: "tool",
       sourceId: "analytical_balance",
       sourceKind: "analytical_balance",
+      entityId: analyticalBalanceTool.id,
       toolId: analyticalBalanceTool.toolId,
       toolType: analyticalBalanceTool.toolType,
     };

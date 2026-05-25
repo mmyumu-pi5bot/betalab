@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { LabSceneView } from "@/components/lab-scene-view";
+import type { FlatExperimentApi } from "@/types/flat-experiment-api";
 import { DropDraftCard } from "@/components/drop-draft-card";
 import { useAnalyticalBalanceDnd } from "@/hooks/use-analytical-balance-dnd";
 import { useDragState } from "@/hooks/use-drag-state";
@@ -52,12 +53,92 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     experimentId,
   });
   const { state, statusMessage, isCommandPending, loadExperiment } = experimentApi;
+
+  // Flat adapter — maps grouped API back to the flat shape expected by consumer hooks.
+  const flatApi: FlatExperimentApi = {
+    // Workbench
+    addWorkbenchSlot: experimentApi.workbench.addSlot,
+    addLiquidToWorkbenchTool: experimentApi.workbench.addLiquid,
+    addProduceLotToWorkbenchTool: experimentApi.workbench.addProduceLot,
+    applySampleLabelToWorkbenchTool: experimentApi.workbench.applySampleLabel,
+    closeWorkbenchTool: experimentApi.workbench.closeTool,
+    cutWorkbenchProduceLot: experimentApi.workbench.cutProduceLot,
+    discardProduceLotFromWorkbenchTool: experimentApi.workbench.discardProduceLot,
+    discardSampleLabelFromPalette: experimentApi.workbench.discardSampleLabelFromPalette,
+    discardSampleLabelFromWorkbenchTool: experimentApi.workbench.discardSampleLabel,
+    moveSampleLabelBetweenWorkbenchTools: experimentApi.workbench.moveSampleLabel,
+    moveProduceLotBetweenWorkbenchTools: experimentApi.workbench.moveProduceLot,
+    moveWorkbenchProduceLotToGrossBalance: experimentApi.workbench.moveProduceLotToGrossBalance,
+    moveWorkbenchProduceLotToWidget: experimentApi.workbench.moveProduceLotToWidget,
+    moveWorkbenchSampleLabelToGrossBalance: experimentApi.workbench.moveSampleLabelToGrossBalance,
+    moveWorkbenchSampleLabelToAnalyticalBalance: experimentApi.workbench.moveSampleLabelToAnalyticalBalance,
+    openWorkbenchTool: experimentApi.workbench.openTool,
+    removeLiquidFromWorkbenchTool: experimentApi.workbench.removeLiquid,
+    removeWorkbenchSlot: experimentApi.workbench.removeSlot,
+    restoreTrashedProduceLotToWorkbenchTool: experimentApi.workbench.restoreProduceLotFromTrash,
+    restoreTrashedSampleLabelToWorkbenchTool: experimentApi.workbench.restoreSampleLabelFromTrash,
+    storeWorkbenchTool: experimentApi.workbench.storeTool,
+    updateWorkbenchToolSampleLabelText: experimentApi.workbench.updateSampleLabelText,
+    // Workspace
+    addWorkspaceWidget: experimentApi.workspace.addWidget,
+    addWorkspaceProduceLotToWidget: experimentApi.workspace.addProduceLot,
+    addLiquidToWorkspaceWidget: experimentApi.workspace.addLiquid,
+    discardWidgetProduceLot: experimentApi.workspace.discardWidgetProduceLot,
+    discardWorkspaceProduceLot: experimentApi.workspace.discardProduceLot,
+    moveWidgetProduceLotToGrossBalance: experimentApi.workspace.moveWidgetProduceLotToGrossBalance,
+    moveWidgetProduceLotToWorkbenchTool: experimentApi.workspace.moveWidgetProduceLotToWorkbenchTool,
+    moveWorkspaceProduceLotToGrossBalance: experimentApi.workspace.moveProduceLotToGrossBalance,
+    removeLiquidFromWorkspaceWidget: experimentApi.workspace.removeLiquid,
+    // Gross balance
+    applyPrintedLimsLabelToGrossBalanceBag: experimentApi.grossBalance.applyLimsLabel,
+    applySampleLabelToGrossBalanceTool: experimentApi.grossBalance.applySampleLabel,
+    closeGrossBalanceTool: experimentApi.grossBalance.closeTool,
+    discardGrossBalanceProduceLot: experimentApi.grossBalance.discardProduceLot,
+    moveGrossBalanceProduceLotToWidget: experimentApi.grossBalance.moveProduceLotToWidget,
+    moveGrossBalanceProduceLotToWorkbench: experimentApi.grossBalance.moveProduceLotToWorkbench,
+    moveGrossBalanceToolToAnalyticalBalance: experimentApi.grossBalance.moveToolToAnalyticalBalance,
+    openGrossBalanceTool: experimentApi.grossBalance.openTool,
+    restoreTrashedProduceLotToGrossBalance: experimentApi.grossBalance.restoreProduceLotFromTrash,
+    restoreTrashedSampleLabelToGrossBalance: experimentApi.grossBalance.restoreSampleLabelFromTrash,
+    setGrossBalanceContainerOffset: experimentApi.grossBalance.setContainerOffset,
+    // Analytical balance
+    addLiquidToAnalyticalBalanceTool: experimentApi.analyticalBalance.addLiquid,
+    applyPrintedLimsLabelToAnalyticalBalanceTool: experimentApi.analyticalBalance.applyLimsLabel,
+    applySampleLabelToAnalyticalBalanceTool: experimentApi.analyticalBalance.applySampleLabel,
+    closeAnalyticalBalanceTool: experimentApi.analyticalBalance.closeTool,
+    loadSpatulaFromAnalyticalBalanceTool: experimentApi.analyticalBalance.loadSpatula,
+    openAnalyticalBalanceTool: experimentApi.analyticalBalance.openTool,
+    pourSpatulaIntoAnalyticalBalanceTool: experimentApi.analyticalBalance.pourSpatula,
+    restoreTrashedSampleLabelToAnalyticalBalance: experimentApi.analyticalBalance.restoreSampleLabelFromTrash,
+    tareAnalyticalBalance: experimentApi.analyticalBalance.tare,
+    updateAnalyticalBalanceToolSampleLabelText: experimentApi.analyticalBalance.updateSampleLabelText,
+    // Grinder
+    startGrinderCycle: experimentApi.grinder.start,
+    // Spatula
+    discardSpatula: experimentApi.spatula.discard,
+    loadSpatulaFromWorkbenchTool: experimentApi.spatula.load,
+    pourSpatulaIntoWorkbenchTool: experimentApi.spatula.pour,
+    // DnD
+    moveObject: experimentApi.dnd.moveObject,
+    // LIMS
+    applyPrintedLimsLabel: experimentApi.lims.applyLabel,
+    applyPrintedLimsLabelToBasketBag: experimentApi.lims.applyLabelToBasketBag,
+    createLimsReception: experimentApi.lims.createReception,
+    discardPrintedLimsLabel: experimentApi.lims.discardLabel,
+    printLimsLabel: experimentApi.lims.printLabel,
+    // Produce / debug
+    createDebugProduceLotOnWorkbench: experimentApi.produce.debugSpawnOnWorkbench,
+    createDebugProduceLotToWidget: experimentApi.produce.debugSpawnToWidget,
+    createProduceLot: experimentApi.produce.create,
+    restoreTrashedProduceLotToWidget: experimentApi.produce.restoreFromTrash,
+  };
+
   const {
     pendingDropDraft,
     setPendingDropDraft,
     handleUpdateDropDraftField,
     handleConfirmDropDraft,
-  } = useDropDraft(experimentApi);
+  } = useDropDraft(flatApi);
   const {
     activeDropTargets,
     activeDragItem,
@@ -113,7 +194,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     spatulaCursorPosition,
     spatulaHintMessage,
     stopSpatulaPour,
-  } = useActionMode({ clearDropTargets, experimentApi, spatula });
+  } = useActionMode({ clearDropTargets, experimentApi: flatApi, spatula });
 
   const liveWidgetIds: WidgetId[] =
     state.status === "ready"
@@ -139,10 +220,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     initialOrder: [...labSceneWidgetIds],
     onStoreWidget: (widgetId) => {
       clearDropTargets();
-      void experimentApi.storeWorkspaceWidget({ widget_id: widgetId });
+      void experimentApi.workspace.storeWidget({ widget_id: widgetId });
     },
     onMoveWidget: (widgetId, nextPosition) => {
-      void experimentApi.moveWorkspaceWidget({
+      void experimentApi.workspace.moveWidget({
         widget_id: widgetId,
         anchor: nextPosition.anchor,
         offset_x: nextPosition.offsetX,
@@ -207,7 +288,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const rackDnd = useRackDnd({
     dndDisabledByAction,
     dragState: { activeDragItem, activeDropTargets, clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
     rackSlots,
   });
 
@@ -215,7 +296,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     buildDebugProduceDraftFields,
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
     grinderWidget,
     isCommandPending,
     pendingDropDraft,
@@ -226,7 +307,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     buildDebugProduceDraftFields,
     dndDisabledByAction,
     dragState: { activeDropTargets, activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
     grossBalanceProduceLot,
     grossBalanceTool,
     hasPrintedLabelTicket,
@@ -237,14 +318,14 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     analyticalBalanceTool,
     dndDisabledByAction,
     dragState: { activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
     setPendingDropDraft,
   });
 
   const trashDnd = useTrashDnd({
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
     isGrinderRunning: grinderDnd.isGrinderRunning,
   });
 
@@ -252,7 +333,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     buildDebugProduceDraftFields,
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
     isKnifeMode,
     setPendingDropDraft,
   });
@@ -261,13 +342,13 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     vortexTool,
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi,
+    experimentApi: flatApi,
   });
 
   const { handleWorkspaceDragOver, handleWorkspaceDrop } = useWorkspaceDrop({
     clearDropTargets,
     dndDisabledByAction,
-    experimentApi,
+    experimentApi: flatApi,
     widgetHeights,
     widgetLayout,
     workspaceRef,
@@ -285,14 +366,14 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     activeDropTargets,
     clearDropTargets,
     dndDisabledByAction,
-    experimentApi,
+    experimentApi: flatApi,
     hasPrintedLabelTicket,
     setPendingDropDraft,
   });
 
   const workspaceActions = useWorkspaceActions({
     analyticalBalanceTool,
-    experimentApi,
+    experimentApi: flatApi,
     grossBalanceTool,
     grossBalanceNetMassG,
     measuredSampleMassG: readyExperiment?.limsReception.measuredSampleMassG ?? null,
@@ -499,10 +580,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       }}
       workspaceActions={{
         ...workspaceActions,
-        onStartVortex: () => { void experimentApi.startVortexCycle(); },
+        onStartVortex: () => { void experimentApi.vortex.start(); },
         onStoreWorkspaceWidget: (widgetId) => {
           clearDropTargets();
-          void experimentApi.storeWorkspaceWidget({ widget_id: widgetId });
+          void experimentApi.workspace.storeWidget({ widget_id: widgetId });
         },
       }}
     />

@@ -70,6 +70,7 @@ export function createToolbarDragPayload(item: ToolbarItem): ToolbarDragPayload 
   if (item.itemType === "tool") {
     return {
       allowedDropTargets: item.allowedDropTargets,
+      entityId: item.id,
       entityKind: "tool",
       itemId: item.id,
       itemType: "tool",
@@ -226,6 +227,7 @@ export function readToolbarDragPayload(dataTransfer: DataTransfer): ToolbarDragP
     ) {
       return {
         allowedDropTargets,
+        entityId: typeof parsed.entityId === "string" ? parsed.entityId : parsed.itemId,
         entityKind: "tool",
         itemId: parsed.itemId,
         itemType: "tool",
@@ -310,6 +312,7 @@ export function readEquipmentToolDragPayload(
   try {
     const parsed = JSON.parse(rawPayload) as {
       entityKind?: unknown;
+      entityId?: unknown;
       sourceKind?: unknown;
       sourceId?: unknown;
       toolId?: unknown;
@@ -322,6 +325,7 @@ export function readEquipmentToolDragPayload(
 
     if (
       parsed.entityKind !== "tool" ||
+      typeof parsed.entityId !== "string" ||
       typeof parsed.sourceId !== "string" ||
       typeof parsed.toolId !== "string" ||
       typeof parsed.toolType !== "string"
@@ -332,6 +336,7 @@ export function readEquipmentToolDragPayload(
     const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
     const base = {
       allowedDropTargets,
+      entityId: parsed.entityId,
       entityKind: "tool" as const,
       sourceId: parsed.sourceId,
       toolId: parsed.toolId,
@@ -637,6 +642,7 @@ export function toDragDescriptor(
     if (payload.itemType === "tool") {
       return {
         allowedDropTargets: payload.allowedDropTargets,
+        entityId: payload.itemId,
         entityKind: "tool",
         sourceId: payload.sourceId,
         sourceKind: payload.sourceKind,
@@ -709,6 +715,7 @@ export function toDragDescriptor(
     const p = payload as EquipmentToolDragPayload;
     return {
       allowedDropTargets: p.allowedDropTargets,
+      entityId: p.entityId,
       entityKind: "tool",
       sourceId: p.sourceId,
       sourceKind: p.sourceKind,

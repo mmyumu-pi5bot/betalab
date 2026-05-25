@@ -31,101 +31,81 @@ import type {
 
 type ToolDropPayload = EquipmentToolDragPayload;
 
+export type WorkbenchPanelHandlers = {
+  canDragBenchTool?: (slotId: string, tool: BenchToolInstance) => boolean;
+  isBenchSlotHighlighted?: (slot: BenchSlot) => boolean;
+  onAddWorkbenchSlot?: () => void;
+  onApplyLimsLabelTicket?: (targetSlotId: string, payload: LimsLabelTicketDragPayload) => void;
+  onApplySampleLabel?: (slotId: string) => void;
+  onBenchToolClick?: (slotId: string, tool: BenchToolInstance, event: MouseEvent<HTMLElement>) => void;
+  onBenchToolDragEnd?: () => void;
+  onBenchToolDragStart?: (slotId: string, tool: BenchToolInstance, dataTransfer: DataTransfer) => void;
+  onBenchToolDrop?: (targetSlotId: string, payload: ToolDropPayload) => void;
+  onBenchToolIllustrationClick?: (slotId: string, tool: BenchToolInstance, event: MouseEvent<HTMLButtonElement>) => void;
+  onBenchToolPointerDown?: (slotId: string, tool: BenchToolInstance, event: PointerEvent<HTMLElement>) => void;
+  onBenchToolPointerUp?: (slotId: string, tool: BenchToolInstance, event: PointerEvent<HTMLElement>) => void;
+  onMoveSampleLabel?: (targetSlotId: string, payload: SampleLabelDragPayload) => void;
+  onProduceDrop?: (targetSlotId: string, payload: ProduceDragPayload) => void;
+  onProduceLotClick?: (slotId: string, produceLot: ExperimentProduceLot) => void;
+  onProduceLotDragStart?: (slotId: string, produceLot: ExperimentProduceLot, dataTransfer: DataTransfer) => void;
+  onRemoveLiquid?: (slotId: string, liquidId: string) => void;
+  onRemoveWorkbenchSlot?: (slotId: string) => void;
+  onRestoreTrashedSampleLabel?: (targetSlotId: string, payload: SampleLabelDragPayload) => void;
+  onSampleLabelDragEnd?: () => void;
+  onSampleLabelDragStart?: (slotId: string, label: BenchLabel, dataTransfer: DataTransfer) => void;
+  onSampleLabelTextChange?: (slotId: string, labelId: string, sampleLabelText: string) => void;
+  onStoreWorkbenchTool?: (slotId: string) => void;
+  onToggleToolSeal?: (slotId: string, tool: BenchToolInstance) => void;
+  onToolbarItemDrop?: (slotId: string, payload: ToolbarDragPayload) => void;
+};
+
+type WorkbenchPanelProps = {
+  dndDisabled?: boolean;
+  handlers?: WorkbenchPanelHandlers;
+  renderPendingContent?: (slot: BenchSlot, tool: BenchToolInstance | null) => ReactNode;
+  slots: BenchSlot[];
+};
+
 function formatProduceLotMetadata(produceLot: ExperimentProduceLot) {
   return produceLot.unitCount === null
     ? ""
     : `${produceLot.unitCount} unit${produceLot.unitCount === 1 ? "" : "s"}`;
 }
 
-type WorkbenchPanelProps = {
-  dndDisabled?: boolean;
-  onAddWorkbenchSlot?: () => void;
-  canDragBenchTool?: (slotId: string, tool: BenchToolInstance) => boolean;
-  onBenchToolDragStart?: (
-    slotId: string,
-    tool: BenchToolInstance,
-    dataTransfer: DataTransfer,
-  ) => void;
-  onBenchToolDragEnd?: () => void;
-  onBenchToolClick?: (
-    slotId: string,
-    tool: BenchToolInstance,
-    event: MouseEvent<HTMLElement>,
-  ) => void;
-  onBenchToolPointerDown?: (
-    slotId: string,
-    tool: BenchToolInstance,
-    event: PointerEvent<HTMLElement>,
-  ) => void;
-  onBenchToolPointerUp?: (
-    slotId: string,
-    tool: BenchToolInstance,
-    event: PointerEvent<HTMLElement>,
-  ) => void;
-  onBenchToolIllustrationClick?: (
-    slotId: string,
-    tool: BenchToolInstance,
-    event: MouseEvent<HTMLButtonElement>,
-  ) => void;
-  onProduceLotDragStart?: (
-    slotId: string,
-    produceLot: ExperimentProduceLot,
-    dataTransfer: DataTransfer,
-  ) => void;
-  onBenchToolDrop?: (targetSlotId: string, payload: ToolDropPayload) => void;
-  onProduceLotClick?: (slotId: string, produceLot: ExperimentProduceLot) => void;
-  onProduceDrop?: (targetSlotId: string, payload: ProduceDragPayload) => void;
-  isBenchSlotHighlighted?: (slot: BenchSlot) => boolean;
-  onApplySampleLabel?: (slotId: string) => void;
-  onMoveSampleLabel?: (targetSlotId: string, payload: SampleLabelDragPayload) => void;
-  onApplyLimsLabelTicket?: (targetSlotId: string, payload: LimsLabelTicketDragPayload) => void;
-  onRemoveLiquid: (slotId: string, liquidId: string) => void;
-  onRemoveWorkbenchSlot?: (slotId: string) => void;
-  onRestoreTrashedSampleLabel?: (targetSlotId: string, payload: SampleLabelDragPayload) => void;
-  onSampleLabelDragEnd?: () => void;
-  onSampleLabelDragStart?: (
-    slotId: string,
-    label: BenchLabel,
-    dataTransfer: DataTransfer,
-  ) => void;
-  onSampleLabelTextChange?: (slotId: string, labelId: string, sampleLabelText: string) => void;
-  onStoreWorkbenchTool?: (slotId: string) => void;
-  onToggleToolSeal?: (slotId: string, tool: BenchToolInstance) => void;
-  renderPendingContent?: (slot: BenchSlot, tool: BenchToolInstance | null) => ReactNode;
-  slots: BenchSlot[];
-  onToolbarItemDrop: (slotId: string, payload: ToolbarDragPayload) => void;
-};
-
 export function WorkbenchPanel({
   dndDisabled = false,
-  onAddWorkbenchSlot,
-  canDragBenchTool,
-  isBenchSlotHighlighted,
-  onBenchToolDragEnd,
-  onBenchToolClick,
-  onBenchToolPointerDown,
-  onBenchToolPointerUp,
-  onBenchToolIllustrationClick,
-  onBenchToolDragStart,
-  onBenchToolDrop,
-  onProduceLotClick,
-  onProduceLotDragStart,
-  onProduceDrop,
-  onApplySampleLabel,
-  onMoveSampleLabel,
-  onApplyLimsLabelTicket,
-  onRemoveLiquid,
-  onRemoveWorkbenchSlot,
-  onRestoreTrashedSampleLabel,
-  onSampleLabelDragEnd,
-  onSampleLabelDragStart,
-  onSampleLabelTextChange,
-  onStoreWorkbenchTool,
-  onToggleToolSeal,
+  handlers = {},
   renderPendingContent,
   slots,
-  onToolbarItemDrop,
 }: WorkbenchPanelProps) {
+  const {
+    canDragBenchTool,
+    isBenchSlotHighlighted,
+    onAddWorkbenchSlot,
+    onApplyLimsLabelTicket,
+    onApplySampleLabel,
+    onBenchToolClick,
+    onBenchToolDragEnd,
+    onBenchToolDragStart,
+    onBenchToolDrop,
+    onBenchToolIllustrationClick,
+    onBenchToolPointerDown,
+    onBenchToolPointerUp,
+    onMoveSampleLabel,
+    onProduceDrop,
+    onProduceLotClick,
+    onProduceLotDragStart,
+    onRemoveLiquid,
+    onRemoveWorkbenchSlot,
+    onRestoreTrashedSampleLabel,
+    onSampleLabelDragEnd,
+    onSampleLabelDragStart,
+    onSampleLabelTextChange,
+    onStoreWorkbenchTool,
+    onToggleToolSeal,
+    onToolbarItemDrop,
+  } = handlers;
+
   const canAcceptWorkbenchDrop = (event: DragEvent<HTMLElement>, slot: BenchSlot) => {
     if (dndDisabled) {
       return false;
@@ -213,7 +193,7 @@ export function WorkbenchPanel({
       return;
     }
 
-    onToolbarItemDrop(slot.id, payload);
+    onToolbarItemDrop?.(slot.id, payload);
   };
 
   return (
@@ -367,7 +347,7 @@ export function WorkbenchPanel({
                         onBenchToolIllustrationClick?.(slot.id, tool, event);
                       }}
                       onRemoveLiquid={(liquidId) => {
-                        onRemoveLiquid(slot.id, liquidId);
+                        onRemoveLiquid?.(slot.id, liquidId);
                       }}
                       onSampleLabelTextChange={(labelId, sampleLabelText) => {
                         onSampleLabelTextChange?.(slot.id, labelId, sampleLabelText);

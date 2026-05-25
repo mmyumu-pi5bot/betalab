@@ -25,19 +25,18 @@ import type { DragStateApi } from "@/hooks/use-drag-state";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type {
-  MoveToolPayload,
+  MoveObjectPayload,
   MoveWidgetProduceLotToGrossBalancePayload,
   MoveWorkbenchProduceLotToGrossBalancePayload,
   MoveWorkspaceProduceLotToGrossBalancePayload,
-  PlaceToolFromPalettePayload,
   RestoreTrashedProduceLotToGrossBalancePayload,
 } from "@/types/api-payloads";
 
-type GrossBalanceDndExperimentApi = {
+export type GrossBalanceDndExperimentApi = {
   applyPrintedLimsLabelToGrossBalanceBag: () => void;
   applySampleLabelToGrossBalanceTool: () => void;
   moveGrossBalanceToolToAnalyticalBalance: () => void;
-  moveTool: (payload: MoveToolPayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
   moveWorkbenchSampleLabelToGrossBalance: (payload: {
     source_slot_id: string;
     label_id: string;
@@ -45,7 +44,6 @@ type GrossBalanceDndExperimentApi = {
   moveWidgetProduceLotToGrossBalance: (payload: MoveWidgetProduceLotToGrossBalancePayload) => void;
   moveWorkbenchProduceLotToGrossBalance: (payload: MoveWorkbenchProduceLotToGrossBalancePayload) => void;
   moveWorkspaceProduceLotToGrossBalance: (payload: MoveWorkspaceProduceLotToGrossBalancePayload) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
   restoreTrashedProduceLotToGrossBalance: (payload: RestoreTrashedProduceLotToGrossBalancePayload) => void;
   restoreTrashedSampleLabelToGrossBalance: (payload: {
     trash_sample_label_id: string;
@@ -193,6 +191,7 @@ export function useGrossBalanceDnd({
         entityKind: "tool",
         sourceId: "gross_balance",
         sourceKind: "gross_balance",
+        entityId: grossBalanceTool.id,
         toolId: grossBalanceTool.toolId,
         toolType: grossBalanceTool.toolType,
       });
@@ -202,6 +201,7 @@ export function useGrossBalanceDnd({
         entityKind: "tool",
         sourceId: "gross_balance",
         sourceKind: "gross_balance",
+        entityId: grossBalanceTool.id,
         toolId: grossBalanceTool.toolId,
         toolType: grossBalanceTool.toolType,
       });

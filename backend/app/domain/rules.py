@@ -25,3 +25,18 @@ def can_tool_receive_contents(tool_type: str, is_sealed: bool) -> bool:
 
 def can_workspace_widget_be_stored(widget_id: str) -> bool:
     return widget_id in {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}
+
+
+def can_workspace_widget_store_now(
+    widget_id: str,
+    *,
+    is_trashed: bool,
+    has_tool: bool,
+    has_produce: bool,
+    has_liquids: bool,
+) -> bool:
+    if not can_workspace_widget_be_stored(widget_id):
+        return False
+    if is_trashed:
+        return True
+    return not has_tool and not has_produce and not has_liquids

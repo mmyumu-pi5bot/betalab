@@ -3,7 +3,10 @@ import type { Dispatch, SetStateAction } from "react";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
+import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
+import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { canResolveActiveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 import type {
   BenchLabel,
   BenchSlot,
@@ -13,7 +16,7 @@ import type {
   ToolbarDragPayload,
 } from "@/types/workbench";
 
-type WorkbenchHandlersExperimentApi = {
+export type WorkbenchHandlersExperimentApi = {
   addWorkbenchSlot: () => void;
   applySampleLabelToWorkbenchTool: (payload: { slot_id: string }) => void;
   applyPrintedLimsLabel: (payload: { slot_id: string }) => void;
@@ -25,8 +28,8 @@ type WorkbenchHandlersExperimentApi = {
     source_slot_id: string;
     target_slot_id: string;
   }) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
   openWorkbenchTool: (payload: { slot_id: string }) => void;
-  placeToolOnWorkbench: (payload: { slot_id: string; tool_id: string }) => void;
   removeLiquidFromWorkbenchTool: (payload: { slot_id: string; liquid_entry_id: string }) => void;
   removeWorkbenchSlot: (payload: { slot_id: string }) => void;
   restoreTrashedSampleLabelToWorkbenchTool: (payload: {
@@ -102,9 +105,13 @@ export function useWorkbenchHandlers({
   };
 
   const handleToolbarItemDrop = (slotId: string, payload: ToolbarDragPayload) => {
+    clearDropTargets();
+
     if (payload.itemType === "tool") {
-      clearDropTargets();
-      void experimentApi.placeToolOnWorkbench({ slot_id: slotId, tool_id: payload.itemId });
+      executeToolDropCommand(
+        resolveToolDropCommand(payload, { kind: "workbench_slot", slotId }),
+        { moveObject: experimentApi.moveObject },
+      );
       return;
     }
 
@@ -112,7 +119,6 @@ export function useWorkbenchHandlers({
       return;
     }
 
-    clearDropTargets();
     const liquidDefinition = labLiquidCatalog[payload.itemId];
     setPendingDropDraft({
       commandType: "add_liquid_to_workbench_tool",

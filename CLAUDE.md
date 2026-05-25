@@ -54,6 +54,8 @@ HTTP Request → app/api/ (routes) → app/schemas/ (validation)
 - `src/lib/` — API client and mock data
 - API base URL configured via `NEXT_PUBLIC_API_BASE_URL`
 
+**Schema sync rule:** When a field is added, renamed, or removed in a backend Pydantic schema, update both `frontend/src/types/workbench.ts` (TypeScript type, camelCase) and the corresponding `normalize*` function in `frontend/src/lib/api.ts` in the same change. There is no codegen — the mapping is manual and TypeScript will not catch a missing field. See AGENTS.md § Backend-Frontend Type Sync for the full rule.
+
 ### Key design rules (from AGENTS.md)
 
 **State & commands:**
@@ -89,7 +91,7 @@ For backend layering: `docs/BACKEND_ARCHITECTURE.md`
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **betalab** (2233 symbols, 10599 relationships, 188 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **betalab** (2963 symbols, 14319 relationships, 250 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

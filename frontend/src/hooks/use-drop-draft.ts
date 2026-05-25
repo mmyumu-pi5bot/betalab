@@ -26,7 +26,7 @@ export type DropDraft = {
   title: string;
 };
 
-type DropDraftExperimentApi = {
+export type DropDraftExperimentApi = {
   addLiquidToAnalyticalBalanceTool: (payload: AddLiquidToAnalyticalBalanceToolPayload) => void;
   addLiquidToWorkbenchTool: (payload: AddLiquidToWorkbenchToolPayload) => void;
   addLiquidToWorkspaceWidget: (payload: AddLiquidToWorkspaceWidgetPayload) => void;

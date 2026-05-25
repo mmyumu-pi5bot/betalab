@@ -596,33 +596,35 @@ export function LabSceneWorkspaceCanvas({
         >
           <WorkbenchPanel
             dndDisabled={dnd.dndDisabledByAction}
-            onAddWorkbenchSlot={workbench.handleAddWorkbenchSlot}
-            onApplyLimsLabelTicket={(slotId) => workbench.handleApplyLimsLabelTicket({ slotId })}
-            onApplySampleLabel={workbench.handleApplySampleLabel}
-            canDragBenchTool={dnd.workbench.canDragBenchTool}
-            isBenchSlotHighlighted={workbench.isBenchSlotHighlighted}
-            onBenchToolClick={spatula.handleSpatulaToolCardClick}
-            onBenchToolDragEnd={dnd.clearDropTargets}
-            onBenchToolIllustrationClick={spatula.handleSpatulaToolIllustrationClick}
-            onBenchToolPointerDown={spatula.handleSpatulaToolPointerDown}
-            onBenchToolPointerUp={spatula.handleSpatulaToolPointerUp}
-            onBenchToolDragStart={dnd.workbench.handleBenchToolDragStart}
-            onBenchToolDrop={dnd.workbench.handleBenchToolDrop}
-            onProduceLotClick={dnd.workbench.handleWorkbenchProduceLotClick}
-            onMoveSampleLabel={workbench.handleMoveSampleLabel}
-            onProduceLotDragStart={dnd.workbench.handleWorkbenchProduceLotDragStart}
-            onProduceDrop={dnd.workbench.handleProduceDrop}
-            onRemoveLiquid={workbench.handleRemoveLiquid}
-            onRemoveWorkbenchSlot={workbench.handleRemoveWorkbenchSlot}
-            onRestoreTrashedSampleLabel={workbench.handleRestoreTrashedSampleLabel}
-            onSampleLabelDragEnd={dnd.clearDropTargets}
-            onSampleLabelDragStart={dnd.workbench.handleWorkbenchSampleLabelDragStart}
-            onSampleLabelTextChange={workbench.handleSampleLabelTextChange}
-            onStoreWorkbenchTool={workbench.handleStoreWorkbenchTool}
-            onToggleToolSeal={workbench.handleToggleToolSeal}
+            handlers={{
+              canDragBenchTool: dnd.workbench.canDragBenchTool,
+              isBenchSlotHighlighted: workbench.isBenchSlotHighlighted,
+              onAddWorkbenchSlot: workbench.handleAddWorkbenchSlot,
+              onApplyLimsLabelTicket: (slotId) => workbench.handleApplyLimsLabelTicket({ slotId }),
+              onApplySampleLabel: workbench.handleApplySampleLabel,
+              onBenchToolClick: spatula.handleSpatulaToolCardClick,
+              onBenchToolDragEnd: dnd.clearDropTargets,
+              onBenchToolDragStart: dnd.workbench.handleBenchToolDragStart,
+              onBenchToolDrop: dnd.workbench.handleBenchToolDrop,
+              onBenchToolIllustrationClick: spatula.handleSpatulaToolIllustrationClick,
+              onBenchToolPointerDown: spatula.handleSpatulaToolPointerDown,
+              onBenchToolPointerUp: spatula.handleSpatulaToolPointerUp,
+              onMoveSampleLabel: workbench.handleMoveSampleLabel,
+              onProduceDrop: dnd.workbench.handleProduceDrop,
+              onProduceLotClick: dnd.workbench.handleWorkbenchProduceLotClick,
+              onProduceLotDragStart: dnd.workbench.handleWorkbenchProduceLotDragStart,
+              onRemoveLiquid: workbench.handleRemoveLiquid,
+              onRemoveWorkbenchSlot: workbench.handleRemoveWorkbenchSlot,
+              onRestoreTrashedSampleLabel: workbench.handleRestoreTrashedSampleLabel,
+              onSampleLabelDragEnd: dnd.clearDropTargets,
+              onSampleLabelDragStart: dnd.workbench.handleWorkbenchSampleLabelDragStart,
+              onSampleLabelTextChange: workbench.handleSampleLabelTextChange,
+              onStoreWorkbenchTool: workbench.handleStoreWorkbenchTool,
+              onToggleToolSeal: workbench.handleToggleToolSeal,
+              onToolbarItemDrop: workbench.handleToolbarItemDrop,
+            }}
             renderPendingContent={(slot) => dropDraft.renderPendingBenchDropDraft(slot.id)}
             slots={display.slots}
-            onToolbarItemDrop={workbench.handleToolbarItemDrop}
           />
         </FloatingWidget>
       </div>

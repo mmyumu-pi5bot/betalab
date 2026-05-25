@@ -9,7 +9,7 @@ import {
   type WorkspaceEquipmentWidgetId,
 } from "@/lib/workspace-widget-ids";
 
-type WorkspaceDropExperimentApi = {
+export type WorkspaceDropExperimentApi = {
   addWorkspaceWidget: (payload: {
     widget_id: string;
     anchor: string;

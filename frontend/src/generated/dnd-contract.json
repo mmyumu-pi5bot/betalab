@@ -1,0 +1,206 @@
+{
+  "entities": {
+    "lims_label_ticket": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+        "trash_bin"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "produce_lot": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "grinder_widget",
+        "trash_bin",
+        "gross_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "sample_label": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+        "trash_bin"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "workspace_widget": {
+      "allowed_drop_targets": [
+        "workspace_canvas"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": true
+    }
+  },
+  "liquids": {
+    "acetonitrile": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "apple_extract": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "dry_ice_pellets": {
+      "allowed_drop_targets": [
+        "grinder_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "ultrapure_water": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": false
+    }
+  },
+  "tools": {
+    "beaker": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": true,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "centrifuge_tube": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+        "vortex_widget"
+      ],
+      "can_receive_liquids": true,
+      "can_receive_produce": false,
+      "can_seal": true,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "cleanup_tube": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+        "vortex_widget"
+      ],
+      "can_receive_liquids": true,
+      "can_receive_produce": false,
+      "can_seal": true,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "cutting_board": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "gross_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": true,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": true
+    },
+    "sample_bag": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "trash_bin",
+        "gross_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": true,
+      "can_seal": true,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "sample_vial": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "rack_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": true,
+      "can_receive_produce": false,
+      "can_seal": true,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    },
+    "storage_jar": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": true,
+      "can_seal": true,
+      "is_discardable": true,
+      "is_draggable": true,
+      "is_storable": false
+    }
+  }
+}

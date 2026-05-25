@@ -1,4 +1,4 @@
-import type { MoveToolPayload, PlaceToolFromPalettePayload } from "@/types/api-payloads";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 import type {
   AnalyticalBalanceToolDragPayload,
   BasketToolDragPayload,
@@ -30,9 +30,7 @@ type ToolDropTarget =
   | { kind: "vortex" }
   | { kind: "workbench_slot"; slotId: string };
 
-export type ToolDropCommand =
-  | { kind: "move_tool"; payload: MoveToolPayload }
-  | { kind: "place_tool_from_palette"; payload: PlaceToolFromPalettePayload };
+export type ToolDropCommand = { kind: "move_object"; payload: MoveObjectPayload };
 
 function isToolbarToolPayload(payload: SupportedToolDropPayload): payload is ToolbarToolDragPayload {
   return "itemType" in payload && payload.itemType === "tool";
@@ -61,6 +59,10 @@ function getSourceId(payload: Exclude<SupportedToolDropPayload, ToolbarToolDragP
   return payload.sourceId;
 }
 
+function getEntityId(payload: Exclude<SupportedToolDropPayload, ToolbarToolDragPayload>): string {
+  return payload.entityId;
+}
+
 export function resolveToolDropCommand(
   payload: SupportedToolDropPayload,
   target: ToolDropTarget,
@@ -71,6 +73,7 @@ export function resolveToolDropCommand(
       (target.kind === "rack_slot" && "rackSlotId" in payload && payload.rackSlotId === target.rackSlotId) ||
       (target.kind === "gross_balance" && payload.sourceKind === "gross_balance") ||
       (target.kind === "analytical_balance" && payload.sourceKind === "analytical_balance") ||
+      (target.kind === "vortex" && payload.sourceKind === "vortex") ||
       (target.kind === "trash_bin" && payload.sourceKind === "trash"))
   ) {
     return null;
@@ -78,22 +81,23 @@ export function resolveToolDropCommand(
 
   if (isToolbarToolPayload(payload)) {
     return {
-      kind: "place_tool_from_palette",
+      kind: "move_object",
       payload: {
-        tool_id: payload.itemId,
-        destination_kind: target.kind,
-        destination_id: getTargetId(target),
+        entity: { kind: "tool", id: payload.itemId },
+        source: { kind: payload.sourceKind, id: payload.itemId },
+        destination: { kind: target.kind, id: getTargetId(target) },
       },
     };
   }
 
+  const sourceId = getSourceId(payload);
+  const entityId = getEntityId(payload);
   return {
-    kind: "move_tool",
+    kind: "move_object",
     payload: {
-      source_kind: payload.sourceKind,
-      source_id: getSourceId(payload),
-      destination_kind: target.kind,
-      destination_id: getTargetId(target),
+      entity: { kind: "tool", id: entityId },
+      source: { kind: payload.sourceKind, id: sourceId },
+      destination: { kind: target.kind, id: getTargetId(target) },
     },
   };
 }

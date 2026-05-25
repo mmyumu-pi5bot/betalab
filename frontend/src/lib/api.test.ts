@@ -9,11 +9,9 @@ import {
   getExperiment,
   getToolbarCatalog,
   listExperiments,
+  moveObject,
   moveProduceLotBetweenWorkbenchTools,
-  moveTool,
   openWorkbenchTool,
-  placeToolFromPalette,
-  placeToolOnWorkbench,
   subscribeToExperimentStream,
 } from "@/lib/api";
 import type { Experiment, ExperimentListEntry } from "@/types/experiment";
@@ -294,35 +292,6 @@ describe("api client", () => {
     });
   });
 
-  it("places a tool on the workbench via its dedicated endpoint", async () => {
-    const experiment = makeExperiment();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => experiment,
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      placeToolOnWorkbench("experiment_123", {
-        slot_id: "station_1",
-        tool_id: "sample_vial_lcms",
-      }),
-    ).resolves.toEqual(experiment);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/experiments/experiment_123/workbench/slots/station_1/place-tool",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tool_id: "sample_vial_lcms",
-        }),
-      },
-    );
-  });
-
   it("moves a tool through the generic DnD move endpoint", async () => {
     const experiment = makeExperiment();
     const fetchMock = vi.fn().mockResolvedValue({
@@ -333,11 +302,10 @@ describe("api client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      moveTool("experiment_123", {
-        source_kind: "workbench",
-        source_id: "station_1",
-        destination_kind: "gross_balance",
-        destination_id: "gross_balance",
+      moveObject("experiment_123", {
+        destination: { kind: "gross_balance", id: "gross_balance" },
+        entity: { kind: "tool", id: "bench_tool_1" },
+        source: { kind: "workbench", id: "station_1" },
       }),
     ).resolves.toEqual(experiment);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -346,7 +314,7 @@ describe("api client", () => {
     );
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
       destination: { kind: "gross_balance", id: "gross_balance" },
-      entity: { kind: "tool", id: "station_1" },
+      entity: { kind: "tool", id: "bench_tool_1" },
       source: { kind: "workbench", id: "station_1" },
     });
   });
@@ -361,10 +329,10 @@ describe("api client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      placeToolFromPalette("experiment_123", {
-        tool_id: "cutting_board_hdpe",
-        destination_kind: "workbench_slot",
-        destination_id: "station_1",
+      moveObject("experiment_123", {
+        destination: { kind: "workbench_slot", id: "station_1" },
+        entity: { kind: "tool", id: "cutting_board_hdpe" },
+        source: { kind: "palette", id: "cutting_board_hdpe" },
       }),
     ).resolves.toEqual(experiment);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -374,7 +342,7 @@ describe("api client", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
       destination: { kind: "workbench_slot", id: "station_1" },
       entity: { kind: "tool", id: "cutting_board_hdpe" },
-      source: { kind: "palette", id: "lab_tools" },
+      source: { kind: "palette", id: "cutting_board_hdpe" },
     });
   });
 
@@ -944,9 +912,10 @@ describe("api client", () => {
     );
 
     await expect(
-      placeToolOnWorkbench("experiment_123", {
-        slot_id: "station_1",
-        tool_id: "sample_vial_lcms",
+      moveObject("experiment_123", {
+        destination: { kind: "gross_balance", id: "gross_balance" },
+        entity: { kind: "tool", id: "bench_tool_1" },
+        source: { kind: "workbench", id: "station_1" },
       }),
     ).rejects.toThrow("Failed to send experiment mutation");
   });
@@ -1019,9 +988,10 @@ describe("api client", () => {
     );
 
     await expect(
-      placeToolOnWorkbench("experiment_123", {
-        slot_id: "station_1",
-        tool_id: "sample_vial_lcms",
+      moveObject("experiment_123", {
+        destination: { kind: "gross_balance", id: "gross_balance" },
+        entity: { kind: "tool", id: "bench_tool_1" },
+        source: { kind: "workbench", id: "station_1" },
       }),
     ).rejects.toThrow("Experiment not found");
   });

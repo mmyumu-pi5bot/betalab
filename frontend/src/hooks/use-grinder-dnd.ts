@@ -28,7 +28,7 @@ import type {
   StartGrinderCyclePayload,
 } from "@/types/api-payloads";
 
-type GrinderDndExperimentApi = {
+export type GrinderDndExperimentApi = {
   addWorkspaceProduceLotToWidget: (payload: AddWorkspaceProduceLotToWidgetPayload) => void;
   moveGrossBalanceProduceLotToWidget: (payload: MoveGrossBalanceProduceLotToWidgetPayload) => void;
   moveWorkbenchProduceLotToWidget: (payload: MoveWorkbenchProduceLotToWidgetPayload) => void;

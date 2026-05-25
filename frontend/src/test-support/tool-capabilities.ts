@@ -1,6 +1,6 @@
 import type { Containment, ToolType } from "@/types/workbench";
 
-import toolSpecs from "./backend-tool-specs.json";
+import toolSpecs from "@/generated/dnd-contract.json";
 
 type ToolSpec = {
   can_receive_liquids: boolean;
@@ -8,10 +8,14 @@ type ToolSpec = {
   can_seal: boolean;
 };
 
-const specs = toolSpecs as Record<string, ToolSpec>;
+type DndContract = {
+  tools: Record<string, ToolSpec>;
+};
+
+const contract = toolSpecs as DndContract;
 
 function requireToolSpec(toolType: ToolType): ToolSpec {
-  const spec = specs[toolType];
+  const spec = contract.tools[toolType];
   if (!spec) {
     throw new Error(`Missing backend tool spec for ${toolType}`);
   }
@@ -34,48 +38,27 @@ export function canToolReceiveContents(toolType: ToolType, isSealed = false): bo
   return !canToolBeSealed(toolType) || !isSealed;
 }
 
-const liquidToolContainment: Containment = {
-  accepts: [{ entityKind: "liquid" }, { entityKind: "sample_label" }, { entityKind: "lims_label_ticket" }],
-  blockedReason: null,
-  canReceive: true,
-  capacity: 3,
-  children: [],
-  remainingCapacity: 3,
-};
+const labelOnlyAccepts = [
+  { entityKind: "sample_label" as const },
+  { entityKind: "lims_label_ticket" as const },
+];
 
-const produceToolContainment: Containment = {
-  accepts: [{ entityKind: "produce" }, { entityKind: "sample_label" }, { entityKind: "lims_label_ticket" }],
-  blockedReason: null,
-  canReceive: true,
-  capacity: 3,
-  children: [],
-  remainingCapacity: 3,
-};
-
-const labelOnlyToolContainment: Containment = {
-  accepts: [{ entityKind: "sample_label" }, { entityKind: "lims_label_ticket" }],
-  blockedReason: null,
-  canReceive: true,
-  capacity: 2,
-  children: [],
-  remainingCapacity: 2,
-};
-
-const openEmptyToolContainmentByType: Record<ToolType, Containment> = {
-  beaker: liquidToolContainment,
-  centrifuge_tube: liquidToolContainment,
-  cleanup_tube: liquidToolContainment,
-  cutting_board: produceToolContainment,
-  sample_bag: produceToolContainment,
-  sample_vial: liquidToolContainment,
-  storage_jar: produceToolContainment,
-};
+function buildOpenEmptyContainment(toolType: ToolType): Containment {
+  const spec = requireToolSpec(toolType);
+  const accepts: Containment["accepts"] = [];
+  if (spec.can_receive_liquids) accepts.push({ entityKind: "liquid" });
+  if (spec.can_receive_produce) accepts.push({ entityKind: "produce" });
+  accepts.push(...labelOnlyAccepts);
+  return {
+    accepts,
+    blockedReason: null,
+    canReceive: true,
+    capacity: accepts.length,
+    children: [],
+    remainingCapacity: accepts.length,
+  };
+}
 
 export function getOpenEmptyToolContainment(toolType: ToolType): Containment {
-  const containment = openEmptyToolContainmentByType[toolType] ?? labelOnlyToolContainment;
-  return {
-    ...containment,
-    accepts: containment.accepts.map((rule) => ({ ...rule })),
-    children: containment.children.map((child) => ({ ...child })),
-  };
+  return buildOpenEmptyContainment(toolType);
 }

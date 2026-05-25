@@ -31,12 +31,11 @@ import type {
   DiscardSampleLabelFromWorkbenchToolPayload,
   DiscardWidgetProduceLotPayload,
   DiscardWorkspaceProduceLotPayload,
-  MoveToolPayload,
-  PlaceToolFromPalettePayload,
+  MoveObjectPayload,
   RemoveLiquidFromWorkspaceWidgetPayload,
 } from "@/types/api-payloads";
 
-type TrashDndExperimentApi = {
+export type TrashDndExperimentApi = {
   discardGrossBalanceProduceLot: (payload: DiscardGrossBalanceProduceLotPayload) => void;
   discardPrintedLimsLabel: () => void;
   discardProduceLotFromWorkbenchTool: (payload: DiscardProduceLotFromWorkbenchToolPayload) => void;
@@ -44,8 +43,7 @@ type TrashDndExperimentApi = {
   discardSampleLabelFromWorkbenchTool: (payload: DiscardSampleLabelFromWorkbenchToolPayload) => void;
   discardWidgetProduceLot: (payload: DiscardWidgetProduceLotPayload) => void;
   discardWorkspaceProduceLot: (payload: DiscardWorkspaceProduceLotPayload) => void;
-  moveTool: (payload: MoveToolPayload) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
   removeLiquidFromWorkspaceWidget: (payload: RemoveLiquidFromWorkspaceWidgetPayload) => void;
 };
 
@@ -178,6 +176,7 @@ export function useTrashDnd({
       entityKind: "tool",
       sourceId: tool.id,
       sourceKind: "trash",
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
       trashToolId: tool.id,
@@ -188,6 +187,7 @@ export function useTrashDnd({
       entityKind: "tool",
       sourceId: tool.id,
       sourceKind: "trash",
+      entityId: tool.id,
       toolId: tool.toolId,
       toolType: tool.toolType,
     });

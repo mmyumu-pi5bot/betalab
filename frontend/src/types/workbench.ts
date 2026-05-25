@@ -143,6 +143,7 @@ type BaseDragPayload = {
 
 export type ToolbarDragPayload =
   | (BaseDragPayload & {
+      entityId: string;
       entityKind: "tool";
       itemId: string;
       itemType: "tool";
@@ -215,6 +216,7 @@ export type WorkspaceLiquidDragPayload = BaseDragPayload & {
 };
 
 export type BenchToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   sourceSlotId: string;
   sourceId: string;
@@ -224,6 +226,7 @@ export type BenchToolDragPayload = BaseDragPayload & {
 };
 
 export type BasketToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   sourceId: string;
   sourceKind: "basket";
@@ -232,6 +235,7 @@ export type BasketToolDragPayload = BaseDragPayload & {
 };
 
 export type RackToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   rackSlotId: string;
   sourceId: string;
@@ -241,6 +245,7 @@ export type RackToolDragPayload = BaseDragPayload & {
 };
 
 export type GrossBalanceToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   sourceId: string;
   sourceKind: "gross_balance";
@@ -249,6 +254,7 @@ export type GrossBalanceToolDragPayload = BaseDragPayload & {
 };
 
 export type AnalyticalBalanceToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   sourceId: string;
   sourceKind: "analytical_balance";
@@ -257,6 +263,7 @@ export type AnalyticalBalanceToolDragPayload = BaseDragPayload & {
 };
 
 export type VortexToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   sourceId: string;
   sourceKind: "vortex";
@@ -265,6 +272,7 @@ export type VortexToolDragPayload = BaseDragPayload & {
 };
 
 export type TrashToolDragPayload = BaseDragPayload & {
+  entityId: string;
   entityKind: "tool";
   sourceId: string;
   sourceKind: "trash";
@@ -283,6 +291,7 @@ export type WorkspaceWidgetDragPayload = BaseDragPayload & {
 
 export type DragDescriptor =
   | (BaseDragPayload & {
+      entityId: string;
       entityKind: "tool";
       toolId: string;
       toolType: ToolType;
@@ -366,6 +375,8 @@ export type BenchToolInstance = {
   canReceiveProduce: boolean;
   canSeal: boolean;
   contactImpurityMgPerG?: number;
+  internalPressureBar?: number;
+  trappedCo2MassG?: number;
   isSealed?: boolean;
   closureFault?: string | null;
   fieldLabelText?: string | null;

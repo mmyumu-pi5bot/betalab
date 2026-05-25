@@ -2,123 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  addLiquidToAnalyticalBalanceTool,
-  addLiquidToWorkbenchTool,
-  discardAnalyticalBalanceTool,
-  addLiquidToWorkspaceWidget,
-  addProduceLotToWorkbenchTool,
-  addWorkbenchSlot,
-  addWorkspaceProduceLotToWidget,
-  addWorkspaceWidget,
-  applyPrintedLimsLabelToGrossBalanceBag,
-  applyPrintedLimsLabelToAnalyticalBalanceTool,
-  applyPrintedLimsLabel,
-  applyPrintedLimsLabelToBasketBag,
-  applySampleLabelToGrossBalanceTool,
-  applySampleLabelToAnalyticalBalanceTool,
-  applySampleLabelToWorkbenchTool,
-  closeAnalyticalBalanceTool,
-  closeGrossBalanceTool,
-  closeWorkbenchTool,
-  completeGrinderCycle,
-  createLimsReception,
-  createExperiment,
-  getExperiment,
-  createDebugProduceLotOnWorkbench,
-  createDebugProduceLotToWidget,
-  createProduceLot,
-  cutWorkbenchProduceLot,
-  discardBasketTool,
-  discardSpatula,
-  discardGrossBalanceProduceLot,
-  discardGrossBalanceTool,
-  discardProduceLotFromWorkbenchTool,
-  discardPrintedLimsLabel,
-  discardRackTool,
-  discardSampleLabelFromPalette,
-  discardSampleLabelFromWorkbenchTool,
-  discardToolFromPalette,
-  discardWidgetProduceLot,
-  discardWorkbenchTool,
-  discardWorkspaceProduceLot,
-  storeWorkspaceWidget,
-  moveBasketToolToGrossBalance,
-  moveAnalyticalBalanceToolToRack,
-  moveAnalyticalBalanceToolToGrossBalance,
-  moveAnalyticalBalanceToolToWorkbench,
-  placeToolOnGrossBalance,
-  placeToolOnAnalyticalBalance,
-  moveGrossBalanceProduceLotToWidget,
-  moveGrossBalanceToolToAnalyticalBalance,
-  moveGrossBalanceProduceLotToWorkbench,
-  moveGrossBalanceToolToRack,
-  moveGrossBalanceToolToWorkbench,
-  moveProduceLotBetweenWorkbenchTools,
-  moveRackToolBetweenSlots,
-  moveRackToolToGrossBalance,
-  moveRackToolToAnalyticalBalance,
-  moveWorkbenchSampleLabelToGrossBalance,
-  moveWorkbenchSampleLabelToAnalyticalBalance,
-  moveWorkbenchProduceLotToGrossBalance,
-  moveWorkbenchToolToAnalyticalBalance,
-  moveWorkbenchToolToGrossBalance,
-  moveWidgetProduceLotToGrossBalance,
-  moveWorkspaceProduceLotToGrossBalance,
-  openAnalyticalBalanceTool,
-  openGrossBalanceTool,
-  moveSampleLabelBetweenWorkbenchTools,
-  moveToolBetweenWorkbenchSlots,
-  moveTool,
-  moveWidgetProduceLotToWorkbenchTool,
-  moveWorkbenchProduceLotToWidget,
-  moveWorkspaceWidget,
-  loadSpatulaFromWorkbenchTool,
-  loadSpatulaFromAnalyticalBalanceTool,
-  openWorkbenchTool,
-  placeToolInRackSlot,
-  placeReceivedBagOnWorkbench,
-  placeToolOnWorkbench,
-  placeToolFromPalette,
-  placeWorkbenchToolInRackSlot,
-  printLimsLabel,
-  pourSpatulaIntoWorkbenchTool,
-  pourSpatulaIntoAnalyticalBalanceTool,
-  recordGrossWeight,
-  recordAnalyticalSampleMass,
-  setGrossBalanceContainerOffset,
-  removeLiquidFromWorkbenchTool,
-  removeLiquidFromWorkspaceWidget,
-  removeRackToolToWorkbenchSlot,
-  removeWorkbenchSlot,
-  restoreTrashedProduceLotToWorkbenchTool,
-  restoreTrashedProduceLotToGrossBalance,
-  restoreTrashedSampleLabelToGrossBalance,
-  restoreTrashedProduceLotToWidget,
-  restoreTrashedSampleLabelToAnalyticalBalance,
-  restoreTrashedToolToAnalyticalBalance,
-  restoreTrashedSampleLabelToWorkbenchTool,
-  restoreTrashedToolToGrossBalance,
-  restoreTrashedToolToRackSlot,
-  restoreTrashedToolToWorkbenchSlot,
-  subscribeToExperimentStream,
-  startGrinderCycle,
-  startVortexCycle,
-  discardVortexTool,
-  storeWorkbenchTool,
-  moveAnalyticalBalanceToolToVortex,
-  moveGrossBalanceToolToVortex,
-  moveRackToolToVortex,
-  moveVortexToolToAnalyticalBalance,
-  moveVortexToolToGrossBalance,
-  moveVortexToolToWorkbench,
-  moveWorkbenchToolToVortex,
-  placeToolOnVortex,
-  restoreTrashedToolToVortex,
-  tareAnalyticalBalance,
-  updateAnalyticalBalanceToolSampleLabelText,
-  updateWorkbenchToolSampleLabelText,
-} from "@/lib/api";
+import { createExperiment, getExperiment, subscribeToExperimentStream } from "@/lib/api";
+import { mutationFns, type MutationFn } from "@/lib/experiment-mutation-fns";
+import { useCommandPending } from "@/hooks/use-command-pending";
 import type { Experiment } from "@/types/experiment";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
@@ -144,7 +30,6 @@ import type {
   DiscardProduceLotFromWorkbenchToolPayload,
   DiscardRackToolPayload,
   DiscardSampleLabelFromWorkbenchToolPayload,
-  DiscardToolFromPalettePayload,
   DiscardWidgetProduceLotPayload,
   DiscardWorkbenchToolPayload,
   DiscardWorkspaceProduceLotPayload,
@@ -164,8 +49,7 @@ import type {
   MoveWorkbenchSampleLabelToGrossBalancePayload,
   MoveWorkbenchSampleLabelToAnalyticalBalancePayload,
   MoveSampleLabelBetweenWorkbenchToolsPayload,
-  MoveToolBetweenWorkbenchSlotsPayload,
-  MoveToolPayload,
+  MoveObjectPayload,
   MoveWidgetProduceLotToGrossBalancePayload,
   MoveWidgetProduceLotToWorkbenchToolPayload,
   MoveWorkbenchProduceLotToGrossBalancePayload,
@@ -179,8 +63,6 @@ import type {
   PlaceToolInRackSlotPayload,
   PlaceToolOnAnalyticalBalancePayload,
   PlaceToolOnGrossBalancePayload,
-  PlaceToolOnWorkbenchPayload,
-  PlaceToolFromPalettePayload,
   PlaceWorkbenchToolInRackSlotPayload,
   PourSpatulaIntoWorkbenchToolPayload,
   PourSpatulaIntoAnalyticalBalanceToolPayload,
@@ -222,122 +104,6 @@ type UseLabExperimentOptions = {
   experimentId?: string;
 };
 
-type MutationFn = (experimentId: string, payload?: Record<string, unknown>) => Promise<Experiment>;
-
-const mutationFns = {
-  addLiquidToAnalyticalBalanceTool,
-  addLiquidToWorkbenchTool,
-  discardAnalyticalBalanceTool,
-  addLiquidToWorkspaceWidget,
-  addProduceLotToWorkbenchTool,
-  addWorkbenchSlot,
-  addWorkspaceProduceLotToWidget,
-  addWorkspaceWidget,
-  applyPrintedLimsLabelToGrossBalanceBag,
-  applyPrintedLimsLabelToAnalyticalBalanceTool,
-  applyPrintedLimsLabel,
-  applyPrintedLimsLabelToBasketBag,
-  applySampleLabelToGrossBalanceTool,
-  applySampleLabelToAnalyticalBalanceTool,
-  applySampleLabelToWorkbenchTool,
-  closeAnalyticalBalanceTool,
-  closeGrossBalanceTool,
-  closeWorkbenchTool,
-  completeGrinderCycle,
-  createLimsReception,
-  createProduceLot,
-  createDebugProduceLotOnWorkbench,
-  createDebugProduceLotToWidget,
-  cutWorkbenchProduceLot,
-  discardBasketTool,
-  discardGrossBalanceProduceLot,
-  discardGrossBalanceTool,
-  discardProduceLotFromWorkbenchTool,
-  discardPrintedLimsLabel,
-  discardRackTool,
-  discardSampleLabelFromPalette,
-  discardSampleLabelFromWorkbenchTool,
-  discardToolFromPalette,
-  discardWidgetProduceLot,
-  discardWorkbenchTool,
-  discardWorkspaceProduceLot,
-  storeWorkspaceWidget,
-  moveBasketToolToGrossBalance,
-  moveAnalyticalBalanceToolToRack,
-  moveAnalyticalBalanceToolToGrossBalance,
-  moveAnalyticalBalanceToolToWorkbench,
-  placeToolOnGrossBalance,
-  placeToolOnAnalyticalBalance,
-  moveGrossBalanceProduceLotToWidget,
-  moveGrossBalanceToolToAnalyticalBalance,
-  moveGrossBalanceProduceLotToWorkbench,
-  moveGrossBalanceToolToRack,
-  moveGrossBalanceToolToWorkbench,
-  moveProduceLotBetweenWorkbenchTools,
-  moveRackToolBetweenSlots,
-  moveRackToolToGrossBalance,
-  moveRackToolToAnalyticalBalance,
-  moveWorkbenchSampleLabelToGrossBalance,
-  moveWorkbenchSampleLabelToAnalyticalBalance,
-  moveWorkbenchProduceLotToGrossBalance,
-  moveWorkbenchToolToAnalyticalBalance,
-  moveWorkbenchToolToGrossBalance,
-  moveWidgetProduceLotToGrossBalance,
-  moveWorkspaceProduceLotToGrossBalance,
-  openAnalyticalBalanceTool,
-  openGrossBalanceTool,
-  moveSampleLabelBetweenWorkbenchTools,
-  moveToolBetweenWorkbenchSlots,
-  moveTool,
-  moveWidgetProduceLotToWorkbenchTool,
-  moveWorkbenchProduceLotToWidget,
-  moveWorkspaceWidget,
-  discardSpatula,
-  loadSpatulaFromWorkbenchTool,
-  loadSpatulaFromAnalyticalBalanceTool,
-  openWorkbenchTool,
-  placeToolInRackSlot,
-  placeReceivedBagOnWorkbench,
-  placeToolOnWorkbench,
-  placeToolFromPalette,
-  placeWorkbenchToolInRackSlot,
-  printLimsLabel,
-  pourSpatulaIntoWorkbenchTool,
-  pourSpatulaIntoAnalyticalBalanceTool,
-  recordGrossWeight,
-  recordAnalyticalSampleMass,
-  setGrossBalanceContainerOffset,
-  removeLiquidFromWorkbenchTool,
-  removeLiquidFromWorkspaceWidget,
-  removeRackToolToWorkbenchSlot,
-  removeWorkbenchSlot,
-  restoreTrashedProduceLotToWorkbenchTool,
-  restoreTrashedProduceLotToGrossBalance,
-  restoreTrashedSampleLabelToGrossBalance,
-  restoreTrashedProduceLotToWidget,
-  restoreTrashedSampleLabelToAnalyticalBalance,
-  restoreTrashedToolToAnalyticalBalance,
-  restoreTrashedSampleLabelToWorkbenchTool,
-  restoreTrashedToolToGrossBalance,
-  restoreTrashedToolToRackSlot,
-  restoreTrashedToolToWorkbenchSlot,
-  startGrinderCycle,
-  startVortexCycle,
-  discardVortexTool,
-  storeWorkbenchTool,
-  moveAnalyticalBalanceToolToVortex,
-  moveGrossBalanceToolToVortex,
-  moveRackToolToVortex,
-  moveVortexToolToAnalyticalBalance,
-  moveVortexToolToGrossBalance,
-  moveVortexToolToWorkbench,
-  moveWorkbenchToolToVortex,
-  placeToolOnVortex,
-  restoreTrashedToolToVortex,
-  tareAnalyticalBalance,
-  updateAnalyticalBalanceToolSampleLabelText,
-  updateWorkbenchToolSampleLabelText,
-} satisfies Record<string, MutationFn>;
 
 export function useLabExperiment({
   defaultErrorMessage,
@@ -346,16 +112,10 @@ export function useLabExperiment({
 }: UseLabExperimentOptions) {
   const [state, setState] = useState<LabExperimentState>({ status: "loading" });
   const [statusMessage, setStatusMessage] = useState(defaultStatusMessage);
-  const [isCommandPending, setIsCommandPending] = useState(false);
   const latestSnapshotVersionRef = useRef(0);
-  const isCommandPendingRef = useRef(false);
   const grossBalanceOffsetQueuedPayloadRef = useRef<Record<string, unknown> | null>(null);
   const grossBalanceOffsetInFlightRef = useRef(false);
-
-  const setCommandPending = (pending: boolean) => {
-    isCommandPendingRef.current = pending;
-    setIsCommandPending(pending);
-  };
+  const { isPending: isCommandPending, isPendingRef: isCommandPendingRef, setPending: setCommandPending } = useCommandPending();
 
   const getLatestStatusMessage = useCallback((experiment: Experiment) => {
     return experiment.audit_log.at(-1) ?? defaultStatusMessage;
@@ -365,7 +125,6 @@ export function useLabExperiment({
     if (experiment.snapshot_version < latestSnapshotVersionRef.current) {
       return;
     }
-
     latestSnapshotVersionRef.current = experiment.snapshot_version;
     setState({ status: "ready", experiment });
     setStatusMessage(getLatestStatusMessage(experiment));
@@ -398,7 +157,6 @@ export function useLabExperiment({
     if (!readyExperimentId) {
       return;
     }
-
     return subscribeToExperimentStream(readyExperimentId, {
       onError: (error) => {
         setStatusMessage(error.message);
@@ -427,7 +185,6 @@ export function useLabExperiment({
       if (!(error instanceof Error) || error.message !== "Experiment not found") {
         throw error;
       }
-
       if (experimentId) {
         throw error;
       }
@@ -488,235 +245,166 @@ export function useLabExperiment({
     }
   };
 
+  const exec = (fn: MutationFn, payload?: Record<string, unknown>) =>
+    executeMutation(fn, payload);
+
   return {
     isCommandPending,
     loadExperiment,
     state,
     statusMessage,
-    addLiquidToAnalyticalBalanceTool: (payload: AddLiquidToAnalyticalBalanceToolPayload) =>
-      executeMutation(mutationFns.addLiquidToAnalyticalBalanceTool, payload),
-    addLiquidToWorkbenchTool: (payload: AddLiquidToWorkbenchToolPayload) =>
-      executeMutation(mutationFns.addLiquidToWorkbenchTool, payload),
-    addLiquidToWorkspaceWidget: (payload: AddLiquidToWorkspaceWidgetPayload) =>
-      executeMutation(mutationFns.addLiquidToWorkspaceWidget, payload),
-    addProduceLotToWorkbenchTool: (payload: AddProduceLotToWorkbenchToolPayload) =>
-      executeMutation(mutationFns.addProduceLotToWorkbenchTool, payload),
-    addWorkbenchSlot: () => executeMutation(mutationFns.addWorkbenchSlot),
-    addWorkspaceProduceLotToWidget: (payload: AddWorkspaceProduceLotToWidgetPayload) =>
-      executeMutation(mutationFns.addWorkspaceProduceLotToWidget, payload),
-    addWorkspaceWidget: (payload: AddWorkspaceWidgetPayload) =>
-      executeMutation(mutationFns.addWorkspaceWidget, payload),
-    applyPrintedLimsLabel: (payload: ApplyPrintedLimsLabelPayload) =>
-      executeMutation(mutationFns.applyPrintedLimsLabel, payload),
-    applyPrintedLimsLabelToGrossBalanceBag: () =>
-      executeMutation(mutationFns.applyPrintedLimsLabelToGrossBalanceBag),
-    applyPrintedLimsLabelToAnalyticalBalanceTool: (
-      payload?: ApplyPrintedLimsLabelToAnalyticalBalanceToolPayload,
-    ) => executeMutation(mutationFns.applyPrintedLimsLabelToAnalyticalBalanceTool, payload),
-    applyPrintedLimsLabelToBasketBag: () =>
-      executeMutation(mutationFns.applyPrintedLimsLabelToBasketBag),
-    applySampleLabelToGrossBalanceTool: (
-      payload?: ApplySampleLabelToGrossBalanceToolPayload,
-    ) => executeMutation(mutationFns.applySampleLabelToGrossBalanceTool, payload),
-    applySampleLabelToAnalyticalBalanceTool: (
-      payload?: ApplySampleLabelToAnalyticalBalanceToolPayload,
-    ) => executeMutation(mutationFns.applySampleLabelToAnalyticalBalanceTool, payload),
-    applySampleLabelToWorkbenchTool: (payload: ApplySampleLabelToWorkbenchToolPayload) =>
-      executeMutation(mutationFns.applySampleLabelToWorkbenchTool, payload),
-    closeGrossBalanceTool: () =>
-      executeMutation(mutationFns.closeGrossBalanceTool),
-    closeAnalyticalBalanceTool: () =>
-      executeMutation(mutationFns.closeAnalyticalBalanceTool),
-    closeWorkbenchTool: (payload: CloseWorkbenchToolPayload) =>
-      executeMutation(mutationFns.closeWorkbenchTool, payload),
-    completeGrinderCycle: (payload: CompleteGrinderCyclePayload) =>
-      executeMutation(mutationFns.completeGrinderCycle, payload),
-    startGrinderCycle: (payload: StartGrinderCyclePayload) =>
-      executeMutation(mutationFns.startGrinderCycle, payload),
-    createProduceLot: (payload: CreateProduceLotPayload) =>
-      executeMutation(mutationFns.createProduceLot, payload),
-    createDebugProduceLotOnWorkbench: (payload: CreateDebugProduceLotOnWorkbenchPayload) =>
-      executeMutation(mutationFns.createDebugProduceLotOnWorkbench, payload),
-    createDebugProduceLotToWidget: (payload: CreateDebugProduceLotToWidgetPayload) =>
-      executeMutation(mutationFns.createDebugProduceLotToWidget, payload),
-    createLimsReception: (payload: CreateLimsReceptionPayload) =>
-      executeMutation(mutationFns.createLimsReception, payload),
-    cutWorkbenchProduceLot: (payload: CutWorkbenchProduceLotPayload) =>
-      executeMutation(mutationFns.cutWorkbenchProduceLot, payload),
-    discardBasketTool: (payload: BasketToolReferencePayload) =>
-      executeMutation(mutationFns.discardBasketTool, payload),
-    discardAnalyticalBalanceTool: () =>
-      executeMutation(mutationFns.discardAnalyticalBalanceTool),
-    discardGrossBalanceProduceLot: (payload: DiscardGrossBalanceProduceLotPayload) =>
-      executeMutation(mutationFns.discardGrossBalanceProduceLot, payload),
-    discardGrossBalanceTool: () =>
-      executeMutation(mutationFns.discardGrossBalanceTool),
-    discardProduceLotFromWorkbenchTool: (payload: DiscardProduceLotFromWorkbenchToolPayload) =>
-      executeMutation(mutationFns.discardProduceLotFromWorkbenchTool, payload),
-    discardPrintedLimsLabel: () =>
-      executeMutation(mutationFns.discardPrintedLimsLabel),
-    discardRackTool: (payload: DiscardRackToolPayload) =>
-      executeMutation(mutationFns.discardRackTool, payload),
-    discardSampleLabelFromPalette: () =>
-      executeMutation(mutationFns.discardSampleLabelFromPalette),
-    discardSampleLabelFromWorkbenchTool: (payload: DiscardSampleLabelFromWorkbenchToolPayload) =>
-      executeMutation(mutationFns.discardSampleLabelFromWorkbenchTool, payload),
-    discardToolFromPalette: (payload: DiscardToolFromPalettePayload) =>
-      executeMutation(mutationFns.discardToolFromPalette, payload),
-    discardWidgetProduceLot: (payload: DiscardWidgetProduceLotPayload) =>
-      executeMutation(mutationFns.discardWidgetProduceLot, payload),
-    discardWorkbenchTool: (payload: DiscardWorkbenchToolPayload) =>
-      executeMutation(mutationFns.discardWorkbenchTool, payload),
-    discardWorkspaceProduceLot: (payload: DiscardWorkspaceProduceLotPayload) =>
-      executeMutation(mutationFns.discardWorkspaceProduceLot, payload),
-    storeWorkbenchTool: (payload: StoreWorkbenchToolPayload) =>
-      executeMutation(mutationFns.storeWorkbenchTool, payload),
-    storeWorkspaceWidget: (payload: StoreWorkspaceWidgetPayload) =>
-      executeMutation(mutationFns.storeWorkspaceWidget, payload),
-    moveBasketToolToGrossBalance: (payload: BasketToolReferencePayload) =>
-      executeMutation(mutationFns.moveBasketToolToGrossBalance, payload),
-    moveAnalyticalBalanceToolToGrossBalance: () =>
-      executeMutation(mutationFns.moveAnalyticalBalanceToolToGrossBalance),
-    moveAnalyticalBalanceToolToRack: (payload: MoveAnalyticalBalanceToolToRackPayload) =>
-      executeMutation(mutationFns.moveAnalyticalBalanceToolToRack, payload),
-    moveAnalyticalBalanceToolToWorkbench: (payload: MoveAnalyticalBalanceToolToWorkbenchPayload) =>
-      executeMutation(mutationFns.moveAnalyticalBalanceToolToWorkbench, payload),
-    placeToolOnAnalyticalBalance: (payload: PlaceToolOnAnalyticalBalancePayload) =>
-      executeMutation(mutationFns.placeToolOnAnalyticalBalance, payload),
-    placeToolOnGrossBalance: (payload: PlaceToolOnGrossBalancePayload) =>
-      executeMutation(mutationFns.placeToolOnGrossBalance, payload),
-    moveGrossBalanceProduceLotToWidget: (payload: MoveGrossBalanceProduceLotToWidgetPayload) =>
-      executeMutation(mutationFns.moveGrossBalanceProduceLotToWidget, payload),
-    moveGrossBalanceToolToAnalyticalBalance: () =>
-      executeMutation(mutationFns.moveGrossBalanceToolToAnalyticalBalance),
-    moveGrossBalanceProduceLotToWorkbench: (payload: MoveGrossBalanceProduceLotToWorkbenchPayload) =>
-      executeMutation(mutationFns.moveGrossBalanceProduceLotToWorkbench, payload),
-    moveGrossBalanceToolToRack: (payload: MoveGrossBalanceToolToRackPayload) =>
-      executeMutation(mutationFns.moveGrossBalanceToolToRack, payload),
-    moveGrossBalanceToolToWorkbench: (payload: MoveGrossBalanceToolToWorkbenchPayload) =>
-      executeMutation(mutationFns.moveGrossBalanceToolToWorkbench, payload),
-    moveProduceLotBetweenWorkbenchTools: (payload: MoveProduceLotBetweenWorkbenchToolsPayload) =>
-      executeMutation(mutationFns.moveProduceLotBetweenWorkbenchTools, payload),
-    moveRackToolBetweenSlots: (payload: MoveRackToolBetweenSlotsPayload) =>
-      executeMutation(mutationFns.moveRackToolBetweenSlots, payload),
-    moveRackToolToAnalyticalBalance: (payload: MoveRackToolToAnalyticalBalancePayload) =>
-      executeMutation(mutationFns.moveRackToolToAnalyticalBalance, payload),
-    moveRackToolToGrossBalance: (payload: MoveRackToolToGrossBalancePayload) =>
-      executeMutation(mutationFns.moveRackToolToGrossBalance, payload),
-    moveWorkbenchSampleLabelToGrossBalance: (
-      payload: MoveWorkbenchSampleLabelToGrossBalancePayload,
-    ) => executeMutation(mutationFns.moveWorkbenchSampleLabelToGrossBalance, payload),
-    moveWorkbenchSampleLabelToAnalyticalBalance: (
-      payload: MoveWorkbenchSampleLabelToAnalyticalBalancePayload,
-    ) => executeMutation(mutationFns.moveWorkbenchSampleLabelToAnalyticalBalance, payload),
-    moveSampleLabelBetweenWorkbenchTools: (payload: MoveSampleLabelBetweenWorkbenchToolsPayload) =>
-      executeMutation(mutationFns.moveSampleLabelBetweenWorkbenchTools, payload),
-    moveToolBetweenWorkbenchSlots: (payload: MoveToolBetweenWorkbenchSlotsPayload) =>
-      executeMutation(mutationFns.moveToolBetweenWorkbenchSlots, payload),
-    moveTool: (payload: MoveToolPayload) =>
-      executeMutation(mutationFns.moveTool, payload),
-    moveWorkbenchProduceLotToGrossBalance: (payload: MoveWorkbenchProduceLotToGrossBalancePayload) =>
-      executeMutation(mutationFns.moveWorkbenchProduceLotToGrossBalance, payload),
-    moveWorkbenchToolToAnalyticalBalance: (payload: MoveWorkbenchToolToAnalyticalBalancePayload) =>
-      executeMutation(mutationFns.moveWorkbenchToolToAnalyticalBalance, payload),
-    moveWorkbenchToolToGrossBalance: (payload: MoveWorkbenchToolToGrossBalancePayload) =>
-      executeMutation(mutationFns.moveWorkbenchToolToGrossBalance, payload),
-    moveWidgetProduceLotToWorkbenchTool: (payload: MoveWidgetProduceLotToWorkbenchToolPayload) =>
-      executeMutation(mutationFns.moveWidgetProduceLotToWorkbenchTool, payload),
-    moveWidgetProduceLotToGrossBalance: (payload: MoveWidgetProduceLotToGrossBalancePayload) =>
-      executeMutation(mutationFns.moveWidgetProduceLotToGrossBalance, payload),
-    moveWorkbenchProduceLotToWidget: (payload: MoveWorkbenchProduceLotToWidgetPayload) =>
-      executeMutation(mutationFns.moveWorkbenchProduceLotToWidget, payload),
-    moveWorkspaceProduceLotToGrossBalance: (payload: MoveWorkspaceProduceLotToGrossBalancePayload) =>
-      executeMutation(mutationFns.moveWorkspaceProduceLotToGrossBalance, payload),
-    moveWorkspaceWidget: (payload: MoveWorkspaceWidgetPayload) =>
-      executeMutation(mutationFns.moveWorkspaceWidget, payload),
-    discardSpatula: () =>
-      executeMutation(mutationFns.discardSpatula),
-    loadSpatulaFromWorkbenchTool: (payload: LoadSpatulaFromWorkbenchToolPayload) =>
-      executeMutation(mutationFns.loadSpatulaFromWorkbenchTool, payload),
-    loadSpatulaFromAnalyticalBalanceTool: () =>
-      executeMutation(mutationFns.loadSpatulaFromAnalyticalBalanceTool),
-    openGrossBalanceTool: () =>
-      executeMutation(mutationFns.openGrossBalanceTool),
-    openAnalyticalBalanceTool: () =>
-      executeMutation(mutationFns.openAnalyticalBalanceTool),
-    openWorkbenchTool: (payload: OpenWorkbenchToolPayload) =>
-      executeMutation(mutationFns.openWorkbenchTool, payload),
-    placeToolInRackSlot: (payload: PlaceToolInRackSlotPayload) =>
-      executeMutation(mutationFns.placeToolInRackSlot, payload),
-    placeReceivedBagOnWorkbench: (payload: PlaceReceivedBagOnWorkbenchPayload) =>
-      executeMutation(mutationFns.placeReceivedBagOnWorkbench, payload),
-    placeToolOnWorkbench: (payload: PlaceToolOnWorkbenchPayload) =>
-      executeMutation(mutationFns.placeToolOnWorkbench, payload),
-    placeToolFromPalette: (payload: PlaceToolFromPalettePayload) =>
-      executeMutation(mutationFns.placeToolFromPalette, payload),
-    placeWorkbenchToolInRackSlot: (payload: PlaceWorkbenchToolInRackSlotPayload) =>
-      executeMutation(mutationFns.placeWorkbenchToolInRackSlot, payload),
-    printLimsLabel: (payload?: PrintLimsLabelPayload) =>
-      executeMutation(mutationFns.printLimsLabel, payload),
-    pourSpatulaIntoWorkbenchTool: (payload: PourSpatulaIntoWorkbenchToolPayload) =>
-      executeMutation(mutationFns.pourSpatulaIntoWorkbenchTool, payload),
-    pourSpatulaIntoAnalyticalBalanceTool: (payload: PourSpatulaIntoAnalyticalBalanceToolPayload) =>
-      executeMutation(mutationFns.pourSpatulaIntoAnalyticalBalanceTool, payload),
-    recordGrossWeight: (payload?: RecordGrossWeightPayload) =>
-      executeMutation(mutationFns.recordGrossWeight, payload),
-    recordAnalyticalSampleMass: () =>
-      executeMutation(mutationFns.recordAnalyticalSampleMass),
-    setGrossBalanceContainerOffset: (payload: SetGrossBalanceContainerOffsetPayload) =>
-      executeGrossBalanceOffsetMutation(payload),
-    tareAnalyticalBalance: () =>
-      executeMutation(mutationFns.tareAnalyticalBalance),
-    removeLiquidFromWorkbenchTool: (payload: RemoveLiquidFromWorkbenchToolPayload) =>
-      executeMutation(mutationFns.removeLiquidFromWorkbenchTool, payload),
-    removeLiquidFromWorkspaceWidget: (payload: RemoveLiquidFromWorkspaceWidgetPayload) =>
-      executeMutation(mutationFns.removeLiquidFromWorkspaceWidget, payload),
-    removeRackToolToWorkbenchSlot: (payload: RemoveRackToolToWorkbenchSlotPayload) =>
-      executeMutation(mutationFns.removeRackToolToWorkbenchSlot, payload),
-    removeWorkbenchSlot: (payload: RemoveWorkbenchSlotPayload) =>
-      executeMutation(mutationFns.removeWorkbenchSlot, payload),
-    restoreTrashedProduceLotToGrossBalance: (payload: RestoreTrashedProduceLotToGrossBalancePayload) =>
-      executeMutation(mutationFns.restoreTrashedProduceLotToGrossBalance, payload),
-    restoreTrashedProduceLotToWorkbenchTool: (payload: RestoreTrashedProduceLotToWorkbenchToolPayload) =>
-      executeMutation(mutationFns.restoreTrashedProduceLotToWorkbenchTool, payload),
-    restoreTrashedProduceLotToWidget: (payload: RestoreTrashedProduceLotToWidgetPayload) =>
-      executeMutation(mutationFns.restoreTrashedProduceLotToWidget, payload),
-    restoreTrashedSampleLabelToGrossBalance: (
-      payload: RestoreTrashedSampleLabelToGrossBalancePayload,
-    ) => executeMutation(mutationFns.restoreTrashedSampleLabelToGrossBalance, payload),
-    restoreTrashedSampleLabelToAnalyticalBalance: (
-      payload: RestoreTrashedSampleLabelToAnalyticalBalancePayload,
-    ) => executeMutation(mutationFns.restoreTrashedSampleLabelToAnalyticalBalance, payload),
-    restoreTrashedSampleLabelToWorkbenchTool: (payload: RestoreTrashedSampleLabelToWorkbenchToolPayload) =>
-      executeMutation(mutationFns.restoreTrashedSampleLabelToWorkbenchTool, payload),
-    restoreTrashedToolToAnalyticalBalance: (payload: RestoreTrashedToolToAnalyticalBalancePayload) =>
-      executeMutation(mutationFns.restoreTrashedToolToAnalyticalBalance, payload),
-    restoreTrashedToolToGrossBalance: (payload: RestoreTrashedToolToGrossBalancePayload) =>
-      executeMutation(mutationFns.restoreTrashedToolToGrossBalance, payload),
-    restoreTrashedToolToRackSlot: (payload: RestoreTrashedToolToRackSlotPayload) =>
-      executeMutation(mutationFns.restoreTrashedToolToRackSlot, payload),
-    restoreTrashedToolToWorkbenchSlot: (payload: RestoreTrashedToolToWorkbenchSlotPayload) =>
-      executeMutation(mutationFns.restoreTrashedToolToWorkbenchSlot, payload),
-    startVortexCycle: () => executeMutation(mutationFns.startVortexCycle),
-    discardVortexTool: () => executeMutation(mutationFns.discardVortexTool),
-    moveAnalyticalBalanceToolToVortex: () => executeMutation(mutationFns.moveAnalyticalBalanceToolToVortex),
-    moveGrossBalanceToolToVortex: () => executeMutation(mutationFns.moveGrossBalanceToolToVortex),
-    moveRackToolToVortex: (payload: MoveRackToolToVortexPayload) =>
-      executeMutation(mutationFns.moveRackToolToVortex, payload),
-    moveVortexToolToAnalyticalBalance: () => executeMutation(mutationFns.moveVortexToolToAnalyticalBalance),
-    moveVortexToolToGrossBalance: () => executeMutation(mutationFns.moveVortexToolToGrossBalance),
-    moveVortexToolToWorkbench: (payload: MoveVortexToolToWorkbenchPayload) =>
-      executeMutation(mutationFns.moveVortexToolToWorkbench, payload),
-    moveWorkbenchToolToVortex: (payload: MoveWorkbenchToolToVortexPayload) =>
-      executeMutation(mutationFns.moveWorkbenchToolToVortex, payload),
-    placeToolOnVortex: (payload: PlaceToolOnVortexPayload) =>
-      executeMutation(mutationFns.placeToolOnVortex, payload),
-    restoreTrashedToolToVortex: (payload: RestoreTrashedToolToVortexPayload) =>
-      executeMutation(mutationFns.restoreTrashedToolToVortex, payload),
-    updateAnalyticalBalanceToolSampleLabelText: (
-      payload: UpdateAnalyticalBalanceToolSampleLabelTextPayload,
-    ) => executeMutation(mutationFns.updateAnalyticalBalanceToolSampleLabelText, payload),
-    updateWorkbenchToolSampleLabelText: (payload: UpdateWorkbenchToolSampleLabelTextPayload) =>
-      executeMutation(mutationFns.updateWorkbenchToolSampleLabelText, payload),
+
+    // ── Workbench ────────────────────────────────────────────────────────────
+    workbench: {
+      addSlot: () => exec(mutationFns.addWorkbenchSlot),
+      removeSlot: (p: RemoveWorkbenchSlotPayload) => exec(mutationFns.removeWorkbenchSlot, p),
+      placeTool: (p: PlaceWorkbenchToolInRackSlotPayload) => exec(mutationFns.placeWorkbenchToolInRackSlot, p),
+      openTool: (p: OpenWorkbenchToolPayload) => exec(mutationFns.openWorkbenchTool, p),
+      closeTool: (p: CloseWorkbenchToolPayload) => exec(mutationFns.closeWorkbenchTool, p),
+      discardTool: (p: DiscardWorkbenchToolPayload) => exec(mutationFns.discardWorkbenchTool, p),
+      storeTool: (p: StoreWorkbenchToolPayload) => exec(mutationFns.storeWorkbenchTool, p),
+      addLiquid: (p: AddLiquidToWorkbenchToolPayload) => exec(mutationFns.addLiquidToWorkbenchTool, p),
+      removeLiquid: (p: RemoveLiquidFromWorkbenchToolPayload) => exec(mutationFns.removeLiquidFromWorkbenchTool, p),
+      applySampleLabel: (p: ApplySampleLabelToWorkbenchToolPayload) => exec(mutationFns.applySampleLabelToWorkbenchTool, p),
+      discardSampleLabel: (p: DiscardSampleLabelFromWorkbenchToolPayload) => exec(mutationFns.discardSampleLabelFromWorkbenchTool, p),
+      moveSampleLabel: (p: MoveSampleLabelBetweenWorkbenchToolsPayload) => exec(mutationFns.moveSampleLabelBetweenWorkbenchTools, p),
+      updateSampleLabelText: (p: UpdateWorkbenchToolSampleLabelTextPayload) => exec(mutationFns.updateWorkbenchToolSampleLabelText, p),
+      moveToolToGrossBalance: (p: MoveWorkbenchToolToGrossBalancePayload) => exec(mutationFns.moveWorkbenchToolToGrossBalance, p),
+      moveToolToAnalyticalBalance: (p: MoveWorkbenchToolToAnalyticalBalancePayload) => exec(mutationFns.moveWorkbenchToolToAnalyticalBalance, p),
+      moveToolToVortex: (p: MoveWorkbenchToolToVortexPayload) => exec(mutationFns.moveWorkbenchToolToVortex, p),
+      moveSampleLabelToGrossBalance: (p: MoveWorkbenchSampleLabelToGrossBalancePayload) => exec(mutationFns.moveWorkbenchSampleLabelToGrossBalance, p),
+      moveSampleLabelToAnalyticalBalance: (p: MoveWorkbenchSampleLabelToAnalyticalBalancePayload) => exec(mutationFns.moveWorkbenchSampleLabelToAnalyticalBalance, p),
+      addProduceLot: (p: AddProduceLotToWorkbenchToolPayload) => exec(mutationFns.addProduceLotToWorkbenchTool, p),
+      discardProduceLot: (p: DiscardProduceLotFromWorkbenchToolPayload) => exec(mutationFns.discardProduceLotFromWorkbenchTool, p),
+      moveProduceLot: (p: MoveProduceLotBetweenWorkbenchToolsPayload) => exec(mutationFns.moveProduceLotBetweenWorkbenchTools, p),
+      moveProduceLotToGrossBalance: (p: MoveWorkbenchProduceLotToGrossBalancePayload) => exec(mutationFns.moveWorkbenchProduceLotToGrossBalance, p),
+      moveProduceLotToWidget: (p: MoveWorkbenchProduceLotToWidgetPayload) => exec(mutationFns.moveWorkbenchProduceLotToWidget, p),
+      cutProduceLot: (p: CutWorkbenchProduceLotPayload) => exec(mutationFns.cutWorkbenchProduceLot, p),
+      discardSampleLabelFromPalette: () => exec(mutationFns.discardSampleLabelFromPalette),
+      restoreToolFromTrash: (p: RestoreTrashedToolToWorkbenchSlotPayload) => exec(mutationFns.restoreTrashedToolToWorkbenchSlot, p),
+      restoreProduceLotFromTrash: (p: RestoreTrashedProduceLotToWorkbenchToolPayload) => exec(mutationFns.restoreTrashedProduceLotToWorkbenchTool, p),
+      restoreSampleLabelFromTrash: (p: RestoreTrashedSampleLabelToWorkbenchToolPayload) => exec(mutationFns.restoreTrashedSampleLabelToWorkbenchTool, p),
+    },
+
+    // ── Rack ─────────────────────────────────────────────────────────────────
+    rack: {
+      placeTool: (p: PlaceToolInRackSlotPayload) => exec(mutationFns.placeToolInRackSlot, p),
+      moveTool: (p: MoveRackToolBetweenSlotsPayload) => exec(mutationFns.moveRackToolBetweenSlots, p),
+      discardTool: (p: DiscardRackToolPayload) => exec(mutationFns.discardRackTool, p),
+      moveToolToWorkbench: (p: RemoveRackToolToWorkbenchSlotPayload) => exec(mutationFns.removeRackToolToWorkbenchSlot, p),
+      moveToolToGrossBalance: (p: MoveRackToolToGrossBalancePayload) => exec(mutationFns.moveRackToolToGrossBalance, p),
+      moveToolToAnalyticalBalance: (p: MoveRackToolToAnalyticalBalancePayload) => exec(mutationFns.moveRackToolToAnalyticalBalance, p),
+      moveToolToVortex: (p: MoveRackToolToVortexPayload) => exec(mutationFns.moveRackToolToVortex, p),
+      restoreToolFromTrash: (p: RestoreTrashedToolToRackSlotPayload) => exec(mutationFns.restoreTrashedToolToRackSlot, p),
+    },
+
+    // ── Workspace (widgets) ──────────────────────────────────────────────────
+    workspace: {
+      addWidget: (p: AddWorkspaceWidgetPayload) => exec(mutationFns.addWorkspaceWidget, p),
+      moveWidget: (p: MoveWorkspaceWidgetPayload) => exec(mutationFns.moveWorkspaceWidget, p),
+      storeWidget: (p: StoreWorkspaceWidgetPayload) => exec(mutationFns.storeWorkspaceWidget, p),
+      addLiquid: (p: AddLiquidToWorkspaceWidgetPayload) => exec(mutationFns.addLiquidToWorkspaceWidget, p),
+      removeLiquid: (p: RemoveLiquidFromWorkspaceWidgetPayload) => exec(mutationFns.removeLiquidFromWorkspaceWidget, p),
+      addProduceLot: (p: AddWorkspaceProduceLotToWidgetPayload) => exec(mutationFns.addWorkspaceProduceLotToWidget, p),
+      discardProduceLot: (p: DiscardWorkspaceProduceLotPayload) => exec(mutationFns.discardWorkspaceProduceLot, p),
+      moveProduceLotToGrossBalance: (p: MoveWorkspaceProduceLotToGrossBalancePayload) => exec(mutationFns.moveWorkspaceProduceLotToGrossBalance, p),
+      moveWidgetProduceLotToGrossBalance: (p: MoveWidgetProduceLotToGrossBalancePayload) => exec(mutationFns.moveWidgetProduceLotToGrossBalance, p),
+      moveWidgetProduceLotToWorkbenchTool: (p: MoveWidgetProduceLotToWorkbenchToolPayload) => exec(mutationFns.moveWidgetProduceLotToWorkbenchTool, p),
+      discardWidgetProduceLot: (p: DiscardWidgetProduceLotPayload) => exec(mutationFns.discardWidgetProduceLot, p),
+    },
+
+    // ── Gross balance ────────────────────────────────────────────────────────
+    grossBalance: {
+      placeTool: (p: PlaceToolOnGrossBalancePayload) => exec(mutationFns.placeToolOnGrossBalance, p),
+      openTool: () => exec(mutationFns.openGrossBalanceTool),
+      closeTool: () => exec(mutationFns.closeGrossBalanceTool),
+      discardTool: () => exec(mutationFns.discardGrossBalanceTool),
+      moveToolToWorkbench: (p: MoveGrossBalanceToolToWorkbenchPayload) => exec(mutationFns.moveGrossBalanceToolToWorkbench, p),
+      moveToolToRack: (p: MoveGrossBalanceToolToRackPayload) => exec(mutationFns.moveGrossBalanceToolToRack, p),
+      moveToolToAnalyticalBalance: () => exec(mutationFns.moveGrossBalanceToolToAnalyticalBalance),
+      moveToolToVortex: () => exec(mutationFns.moveGrossBalanceToolToVortex),
+      applySampleLabel: (p?: ApplySampleLabelToGrossBalanceToolPayload) => exec(mutationFns.applySampleLabelToGrossBalanceTool, p),
+      recordWeight: (p?: RecordGrossWeightPayload) => exec(mutationFns.recordGrossWeight, p),
+      setContainerOffset: (p: SetGrossBalanceContainerOffsetPayload) => executeGrossBalanceOffsetMutation(p),
+      moveBasketTool: (p: BasketToolReferencePayload) => exec(mutationFns.moveBasketToolToGrossBalance, p),
+      applyLimsLabel: () => exec(mutationFns.applyPrintedLimsLabelToGrossBalanceBag),
+      moveProduceLotToWorkbench: (p: MoveGrossBalanceProduceLotToWorkbenchPayload) => exec(mutationFns.moveGrossBalanceProduceLotToWorkbench, p),
+      moveProduceLotToWidget: (p: MoveGrossBalanceProduceLotToWidgetPayload) => exec(mutationFns.moveGrossBalanceProduceLotToWidget, p),
+      discardProduceLot: (p: DiscardGrossBalanceProduceLotPayload) => exec(mutationFns.discardGrossBalanceProduceLot, p),
+      restoreToolFromTrash: (p: RestoreTrashedToolToGrossBalancePayload) => exec(mutationFns.restoreTrashedToolToGrossBalance, p),
+      restoreProduceLotFromTrash: (p: RestoreTrashedProduceLotToGrossBalancePayload) => exec(mutationFns.restoreTrashedProduceLotToGrossBalance, p),
+      restoreSampleLabelFromTrash: (p: RestoreTrashedSampleLabelToGrossBalancePayload) => exec(mutationFns.restoreTrashedSampleLabelToGrossBalance, p),
+    },
+
+    // ── Analytical balance ───────────────────────────────────────────────────
+    analyticalBalance: {
+      placeTool: (p: PlaceToolOnAnalyticalBalancePayload) => exec(mutationFns.placeToolOnAnalyticalBalance, p),
+      openTool: () => exec(mutationFns.openAnalyticalBalanceTool),
+      closeTool: () => exec(mutationFns.closeAnalyticalBalanceTool),
+      discardTool: () => exec(mutationFns.discardAnalyticalBalanceTool),
+      tare: () => exec(mutationFns.tareAnalyticalBalance),
+      recordSampleMass: () => exec(mutationFns.recordAnalyticalSampleMass),
+      moveToolToWorkbench: (p: MoveAnalyticalBalanceToolToWorkbenchPayload) => exec(mutationFns.moveAnalyticalBalanceToolToWorkbench, p),
+      moveToolToRack: (p: MoveAnalyticalBalanceToolToRackPayload) => exec(mutationFns.moveAnalyticalBalanceToolToRack, p),
+      moveToolToGrossBalance: () => exec(mutationFns.moveAnalyticalBalanceToolToGrossBalance),
+      moveToolToVortex: () => exec(mutationFns.moveAnalyticalBalanceToolToVortex),
+      applySampleLabel: (p?: ApplySampleLabelToAnalyticalBalanceToolPayload) => exec(mutationFns.applySampleLabelToAnalyticalBalanceTool, p),
+      applyLimsLabel: (p?: ApplyPrintedLimsLabelToAnalyticalBalanceToolPayload) => exec(mutationFns.applyPrintedLimsLabelToAnalyticalBalanceTool, p),
+      updateSampleLabelText: (p: UpdateAnalyticalBalanceToolSampleLabelTextPayload) => exec(mutationFns.updateAnalyticalBalanceToolSampleLabelText, p),
+      addLiquid: (p: AddLiquidToAnalyticalBalanceToolPayload) => exec(mutationFns.addLiquidToAnalyticalBalanceTool, p),
+      restoreToolFromTrash: (p: RestoreTrashedToolToAnalyticalBalancePayload) => exec(mutationFns.restoreTrashedToolToAnalyticalBalance, p),
+      restoreSampleLabelFromTrash: (p: RestoreTrashedSampleLabelToAnalyticalBalancePayload) => exec(mutationFns.restoreTrashedSampleLabelToAnalyticalBalance, p),
+      loadSpatula: () => exec(mutationFns.loadSpatulaFromAnalyticalBalanceTool),
+      pourSpatula: (p: PourSpatulaIntoAnalyticalBalanceToolPayload) => exec(mutationFns.pourSpatulaIntoAnalyticalBalanceTool, p),
+    },
+
+    // ── Vortex ────────────────────────────────────────────────────────────────
+    vortex: {
+      placeTool: (p: PlaceToolOnVortexPayload) => exec(mutationFns.placeToolOnVortex, p),
+      discard: () => exec(mutationFns.discardVortexTool),
+      start: () => exec(mutationFns.startVortexCycle),
+      moveToolToWorkbench: (p: MoveVortexToolToWorkbenchPayload) => exec(mutationFns.moveVortexToolToWorkbench, p),
+      moveToolToGrossBalance: () => exec(mutationFns.moveVortexToolToGrossBalance),
+      moveToolToAnalyticalBalance: () => exec(mutationFns.moveVortexToolToAnalyticalBalance),
+      restoreToolFromTrash: (p: RestoreTrashedToolToVortexPayload) => exec(mutationFns.restoreTrashedToolToVortex, p),
+    },
+
+    // ── Grinder ───────────────────────────────────────────────────────────────
+    grinder: {
+      start: (p: StartGrinderCyclePayload) => exec(mutationFns.startGrinderCycle, p),
+      complete: (p: CompleteGrinderCyclePayload) => exec(mutationFns.completeGrinderCycle, p),
+    },
+
+    // ── Spatula ───────────────────────────────────────────────────────────────
+    spatula: {
+      load: (p: LoadSpatulaFromWorkbenchToolPayload) => exec(mutationFns.loadSpatulaFromWorkbenchTool, p),
+      discard: () => exec(mutationFns.discardSpatula),
+      pour: (p: PourSpatulaIntoWorkbenchToolPayload) => exec(mutationFns.pourSpatulaIntoWorkbenchTool, p),
+    },
+
+    // ── DnD (generic move) ───────────────────────────────────────────────────
+    dnd: {
+      moveObject: (p: MoveObjectPayload) => exec(mutationFns.moveObject, p),
+    },
+
+    // ── LIMS / Reception ──────────────────────────────────────────────────────
+    lims: {
+      createReception: (p: CreateLimsReceptionPayload) => exec(mutationFns.createLimsReception, p),
+      printLabel: (p?: PrintLimsLabelPayload) => exec(mutationFns.printLimsLabel, p),
+      discardLabel: () => exec(mutationFns.discardPrintedLimsLabel),
+      applyLabel: (p: ApplyPrintedLimsLabelPayload) => exec(mutationFns.applyPrintedLimsLabel, p),
+      applyLabelToBasketBag: () => exec(mutationFns.applyPrintedLimsLabelToBasketBag),
+      placeReceivedBag: (p: PlaceReceivedBagOnWorkbenchPayload) => exec(mutationFns.placeReceivedBagOnWorkbench, p),
+      discardBasketTool: (p: BasketToolReferencePayload) => exec(mutationFns.discardBasketTool, p),
+    },
+
+    // ── Produce / debug ───────────────────────────────────────────────────────
+    produce: {
+      create: (p: CreateProduceLotPayload) => exec(mutationFns.createProduceLot, p),
+      debugSpawnOnWorkbench: (p: CreateDebugProduceLotOnWorkbenchPayload) => exec(mutationFns.createDebugProduceLotOnWorkbench, p),
+      debugSpawnToWidget: (p: CreateDebugProduceLotToWidgetPayload) => exec(mutationFns.createDebugProduceLotToWidget, p),
+      restoreFromTrash: (p: RestoreTrashedProduceLotToWidgetPayload) => exec(mutationFns.restoreTrashedProduceLotToWidget, p),
+      moveProduceLotToWidget: (p: MoveWorkbenchProduceLotToWidgetPayload) => exec(mutationFns.moveWorkbenchProduceLotToWidget, p),
+    },
   };
 }

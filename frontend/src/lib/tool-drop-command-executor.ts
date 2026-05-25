@@ -1,19 +1,15 @@
 import type { ToolDropCommand } from "@/lib/tool-drop-command-resolver";
-import type { MoveToolPayload, PlaceToolFromPalettePayload } from "@/types/api-payloads";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 type ToolDropApi = {
-  moveTool: (payload: MoveToolPayload) => void;
-  placeToolFromPalette: (payload: PlaceToolFromPalettePayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
-export function executeToolDropCommand(command: ToolDropCommand, api: ToolDropApi): boolean {
-  if (command.kind === "move_tool") {
-    void api.moveTool(command.payload);
-    return true;
+export function executeToolDropCommand(command: ToolDropCommand | null, api: ToolDropApi): boolean {
+  if (!command) {
+    return false;
   }
-  if (command.kind === "place_tool_from_palette") {
-    void api.placeToolFromPalette(command.payload);
-    return true;
-  }
-  return false;
+
+  void api.moveObject(command.payload);
+  return true;
 }

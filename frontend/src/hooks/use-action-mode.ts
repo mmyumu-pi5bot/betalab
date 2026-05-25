@@ -6,7 +6,7 @@ import { useSpatulaInteraction } from "@/hooks/use-spatula-interaction";
 import { knifeCursor, spatulaCursor } from "@/lib/lab-scene-config";
 import type { SpatulaState } from "@/types/workbench";
 
-type ActionModeExperimentApi = {
+export type ActionModeExperimentApi = {
   discardSpatula: () => void;
   loadSpatulaFromWorkbenchTool: (payload: { slot_id: string }) => void;
   loadSpatulaFromAnalyticalBalanceTool: () => void;

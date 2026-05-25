@@ -78,6 +78,23 @@ Use TypeScript for frontend code and Python 3.11+ for backend code. Prefer 2-spa
 - Only recrop an illustration when the goal is specifically to remove empty space inside the illustration frame. When doing that, verify that rounded surface corners still render correctly after the crop.
 - When multiple equipment widgets should feel visually aligned, prefer converging them on the same shared widget structure and width logic rather than stacking one-off padding and margin fixes.
 
+## Backend-Frontend Type Sync
+
+The backend and frontend maintain separate data models connected by JSON over HTTP. There is no codegen — the mapping is manual. This means **every schema change in the backend requires two frontend updates in the same commit**.
+
+When you add, rename, or remove a field in a Pydantic schema (`backend/app/schemas/`):
+
+1. **`frontend/src/types/workbench.ts`** — add/update the TypeScript type. Use camelCase (`internalPressureBar`, not `internal_pressure_bar`).
+2. **`frontend/src/lib/api.ts`** — add/update the field in the corresponding `normalize*` function. Follow the existing pattern that accepts both forms:
+   ```typescript
+   internalPressureBar: Number(tool.internalPressureBar ?? tool.internal_pressure_bar ?? 1.0),
+   ```
+   The fallback default must match the Pydantic field default.
+
+If you only update one of these two files, the field silently disappears or stays stale on the frontend — TypeScript will not warn you.
+
+The affected `normalize*` functions are at the top of `frontend/src/lib/api.ts`. The most common ones are `normalizeBenchTool`, `normalizeWorkspaceWidget`, `normalizeProduceLot`, `normalizeRackSlot`.
+
 ## Testing Guidelines
 
 TDD is the default workflow: write the failing test first, then implement. Backend tests use `pytest`; name files `test_*.py` and test functions `test_*`. Keep coverage at or above the current backend baseline and add coverage for API routes when features touch HTTP behavior.
@@ -164,7 +181,7 @@ Do not commit secrets, `.env` files, or generated artifacts from `.venv/`, `.cov
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **betalab** (2233 symbols, 10599 relationships, 188 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **betalab** (2963 symbols, 14319 relationships, 250 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

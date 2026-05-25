@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkbenchPanel } from "@/components/workbench-panel";
+import type { WorkbenchPanelHandlers } from "@/components/workbench-panel";
 import {
   writeBenchToolDragPayload,
   writeProduceDragPayload,
@@ -59,10 +60,10 @@ function withToolCapabilities(tool: BenchToolInstance): BenchToolInstance {
       (tool.labels?.length ?? 0) === 0);
   const toolWithCapabilities = {
     ...tool,
-    canReceiveContents: canToolReceiveContents(tool.toolType, tool.isSealed ?? false),
-    canReceiveLiquids: canToolAcceptLiquids(tool.toolType),
-    canReceiveProduce: canToolAcceptProduce(tool.toolType),
-    canSeal: canToolBeSealed(tool.toolType),
+    canReceiveContents: tool.canReceiveContents ?? canToolReceiveContents(tool.toolType, tool.isSealed ?? false),
+    canReceiveLiquids: tool.canReceiveLiquids ?? canToolAcceptLiquids(tool.toolType),
+    canReceiveProduce: tool.canReceiveProduce ?? canToolAcceptProduce(tool.toolType),
+    canSeal: tool.canSeal ?? canToolBeSealed(tool.toolType),
     isStorable,
     canStore,
   };
@@ -72,36 +73,104 @@ function withToolCapabilities(tool: BenchToolInstance): BenchToolInstance {
   };
 }
 
-function PesticideWorkbenchPanel(props: ComponentProps<typeof WorkbenchPanel>) {
+// Adapter: accepts flat handler props (test convention) and maps to the WorkbenchPanel
+// handlers object. Unknown props like onLiquidVolumeChange / statusMessage are captured
+// in ...rest and silently ignored — they were test artifacts with no corresponding prop.
+type FlatHandlerProps = WorkbenchPanelHandlers & {
+  slots: ComponentProps<typeof WorkbenchPanel>["slots"];
+  dndDisabled?: boolean;
+  renderPendingContent?: ComponentProps<typeof WorkbenchPanel>["renderPendingContent"];
+  [key: string]: unknown;
+};
+
+function PesticideWorkbenchPanel({
+  slots,
+  dndDisabled,
+  renderPendingContent,
+  canDragBenchTool,
+  isBenchSlotHighlighted,
+  onAddWorkbenchSlot,
+  onApplyLimsLabelTicket,
+  onApplySampleLabel,
+  onBenchToolClick,
+  onBenchToolDragEnd,
+  onBenchToolDragStart,
+  onBenchToolDrop,
+  onBenchToolIllustrationClick,
+  onBenchToolPointerDown,
+  onBenchToolPointerUp,
+  onMoveSampleLabel,
+  onProduceDrop,
+  onProduceLotClick,
+  onProduceLotDragStart,
+  onRemoveLiquid,
+  onRemoveWorkbenchSlot,
+  onRestoreTrashedSampleLabel,
+  onSampleLabelDragEnd,
+  onSampleLabelDragStart,
+  onSampleLabelTextChange,
+  onStoreWorkbenchTool,
+  onToggleToolSeal,
+  onToolbarItemDrop,
+}: FlatHandlerProps) {
+  const enhancedSlots = slots.map((slot) => ({
+    ...slot,
+    tool: slot.tool ? withToolCapabilities(slot.tool) : null,
+  })).map((slot) => ({
+    ...slot,
+    containment: slot.containment ?? {
+      accepts: [{ entityKind: "tool" }, { entityKind: "produce" }],
+      blockedReason:
+        slot.tool !== null || (slot.surfaceProduceLots?.length ?? 0) > 0
+          ? "occupied"
+          : null,
+      canReceive: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0,
+      capacity: 1,
+      children: [
+        ...(slot.tool
+          ? [{ entityKind: "tool" as const, id: slot.tool.id, toolType: slot.tool.toolType }]
+          : []),
+        ...((slot.surfaceProduceLots ?? []).map((produceLot) => ({
+          entityKind: "produce" as const,
+          id: produceLot.id,
+          produceType: produceLot.produceType,
+        }))),
+      ],
+      remainingCapacity: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0 ? 1 : 0,
+    },
+  }));
   return (
     <WorkbenchPanel
-      {...props}
-      slots={props.slots.map((slot) => ({
-        ...slot,
-        tool: slot.tool ? withToolCapabilities(slot.tool) : null,
-      })).map((slot) => ({
-        ...slot,
-        containment: slot.containment ?? {
-          accepts: [{ entityKind: "tool" }, { entityKind: "produce" }],
-          blockedReason:
-            slot.tool !== null || (slot.surfaceProduceLots?.length ?? 0) > 0
-              ? "occupied"
-              : null,
-          canReceive: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0,
-          capacity: 1,
-          children: [
-            ...(slot.tool
-              ? [{ entityKind: "tool" as const, id: slot.tool.id, toolType: slot.tool.toolType }]
-              : []),
-            ...((slot.surfaceProduceLots ?? []).map((produceLot) => ({
-              entityKind: "produce" as const,
-              id: produceLot.id,
-              produceType: produceLot.produceType,
-            }))),
-          ],
-          remainingCapacity: slot.tool === null && (slot.surfaceProduceLots?.length ?? 0) === 0 ? 1 : 0,
-        },
-      }))}
+      dndDisabled={dndDisabled}
+      handlers={{
+        canDragBenchTool,
+        isBenchSlotHighlighted,
+        onAddWorkbenchSlot,
+        onApplyLimsLabelTicket,
+        onApplySampleLabel,
+        onBenchToolClick,
+        onBenchToolDragEnd,
+        onBenchToolDragStart,
+        onBenchToolDrop,
+        onBenchToolIllustrationClick,
+        onBenchToolPointerDown,
+        onBenchToolPointerUp,
+        onMoveSampleLabel,
+        onProduceDrop,
+        onProduceLotClick,
+        onProduceLotDragStart,
+        onRemoveLiquid,
+        onRemoveWorkbenchSlot,
+        onRestoreTrashedSampleLabel,
+        onSampleLabelDragEnd,
+        onSampleLabelDragStart,
+        onSampleLabelTextChange,
+        onStoreWorkbenchTool,
+        onToggleToolSeal,
+        onToolbarItemDrop,
+      }}
+      renderPendingContent={renderPendingContent}
+      slots={enhancedSlots}
     />
   );
 }
@@ -758,6 +827,7 @@ describe("WorkbenchPanel", () => {
     const dataTransfer = createDataTransfer();
     writePayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot"],
+      entityId: "sample_vial_lcms",
       entityKind: "tool",
       itemId: "sample_vial_lcms",
       itemType: "tool",
@@ -784,6 +854,7 @@ describe("WorkbenchPanel", () => {
     expect(dragOverEvent.defaultPrevented).toBe(true);
     expect(onToolbarItemDrop).toHaveBeenCalledWith("station_1", {
       allowedDropTargets: ["workbench_slot"],
+      entityId: "sample_vial_lcms",
       entityKind: "tool",
       itemId: "sample_vial_lcms",
       itemType: "tool",
@@ -1398,6 +1469,7 @@ describe("WorkbenchPanel", () => {
     const dataTransfer = createDataTransfer();
     writeBenchToolDragPayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot"],
+      entityId: "bench_tool_1",
       entityKind: "tool",
       sourceId: "station_1",
       sourceKind: "workbench",
@@ -1426,6 +1498,7 @@ describe("WorkbenchPanel", () => {
     expect(dragOverEvent.defaultPrevented).toBe(true);
     expect(onBenchToolDrop).toHaveBeenCalledWith("station_2", {
       allowedDropTargets: ["workbench_slot"],
+      entityId: "bench_tool_1",
       entityKind: "tool",
       sourceId: "station_1",
       sourceKind: "workbench",
@@ -1440,6 +1513,7 @@ describe("WorkbenchPanel", () => {
     const dataTransfer = createDataTransfer();
     writeRackToolDragPayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot"],
+      entityId: "rack_tool_1",
       entityKind: "tool",
       rackSlotId: "rack_slot_1",
       sourceId: "rack_slot_1",
@@ -1468,6 +1542,7 @@ describe("WorkbenchPanel", () => {
     expect(dragOverEvent.defaultPrevented).toBe(true);
     expect(onBenchToolDrop).toHaveBeenCalledWith("station_2", {
       allowedDropTargets: ["workbench_slot"],
+      entityId: "rack_tool_1",
       entityKind: "tool",
       rackSlotId: "rack_slot_1",
       sourceId: "rack_slot_1",

@@ -7,7 +7,7 @@ import {
   dndSourceCases,
   dndTargetCases,
   type DndCoverageScenario,
-} from "@/components/lab-scene-dnd-test-helpers";
+} from "@/test-support/lab-scene-dnd-test-helpers";
 
 vi.mock("@/lib/api", async () => await import("@/test-support/api-mock"));
 
