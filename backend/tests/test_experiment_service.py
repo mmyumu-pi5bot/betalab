@@ -4241,6 +4241,55 @@ def test_service_can_reload_experiment_state_from_sqlite_snapshot(tmp_path) -> N
     assert reloaded.snapshot_version == updated.snapshot_version
 
 
+def test_service_can_reload_pressure_popped_tool_from_sqlite_snapshot(tmp_path) -> None:
+    repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+    first_service = ExperimentRuntimeService(repository=repository)
+    fixed_now = datetime(2026, 1, 1, tzinfo=UTC)
+    first_service._now_fn = lambda: fixed_now
+
+    experiment = first_service.create_experiment()
+    created = apply_command(first_service, experiment.id, "create_produce_lot", {"produce_type": "apple"})
+    produce_lot_id = created.basket_tools[-1].produce_lots[0].id
+    apply_command(
+        first_service,
+        experiment.id,
+        "place_tool_on_workbench",
+        {"slot_id": "station_1", "tool_id": "hdpe_storage_jar_2l"},
+    )
+    apply_command(
+        first_service,
+        experiment.id,
+        "add_produce_lot_to_workbench_tool",
+        {"slot_id": "station_1", "produce_lot_id": produce_lot_id},
+    )
+
+    stored_tool = first_service._experiments[experiment.id].workbench.slots[0].tool
+    assert stored_tool is not None
+    stored_lot = stored_tool.produce_lots[0]
+    set_material_state_name(first_service._experiments[experiment.id].produce_material_states, stored_lot.id, "ground")
+    state = _lot_state(first_service._experiments[experiment.id], stored_lot.id)
+    state.residual_co2_mass_g = 18.0
+    state.homogeneity_score = 0.96
+    stored_lot.total_mass_g = 1000.0
+
+    apply_command(first_service, experiment.id, "close_workbench_tool", {"slot_id": "station_1"})
+    first_service._experiments[experiment.id].last_simulation_at -= timedelta(minutes=2)
+    popped = first_service.get_experiment(experiment.id)
+    slot = next(slot for slot in popped.workbench.slots if slot.id == "station_1")
+    assert slot.tool is not None
+    assert slot.tool.is_sealed is False
+    assert slot.tool.closure_fault == "pressure_pop"
+
+    second_service = ExperimentRuntimeService(repository=repository)
+    second_service._now_fn = lambda: fixed_now
+    reloaded = second_service.get_experiment(experiment.id)
+
+    reloaded_slot = next(slot for slot in reloaded.workbench.slots if slot.id == "station_1")
+    assert reloaded_slot.tool is not None
+    assert reloaded_slot.tool.is_sealed is False
+    assert reloaded_slot.tool.closure_fault == "pressure_pop"
+
+
 def test_service_recovers_if_sqlite_file_is_deleted_while_running(tmp_path) -> None:
     db_path = tmp_path / "experiments.sqlite3"
     service = ExperimentRuntimeService(repository=SqliteExperimentRepository(str(db_path)))

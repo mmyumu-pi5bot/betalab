@@ -119,11 +119,11 @@ class WorkbenchTool:
     capacity_ml: float
     contact_impurity_mg_per_g: float = 0.0
     is_sealed: bool = False
-    closure_fault: str | None = None  # Non-None only when is_sealed=True and a fault occurred
+    closure_fault: str | None = None
 
     def __post_init__(self) -> None:
-        if self.closure_fault is not None and not self.is_sealed:
-            raise ValueError("closure_fault must be None when is_sealed=False")
+        if self.closure_fault is not None and self.closure_fault != "pressure_pop" and not self.is_sealed:
+            raise ValueError("closure_fault must be None when is_sealed=False unless the tool popped open")
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0  # Non-zero only for sealed containers with CO2 inside
     field_label_text: str | None = None
