@@ -29,13 +29,6 @@ export type AnalyticalBalanceDndExperimentApi = {
   applySampleLabelToAnalyticalBalanceTool: () => void;
   moveGrossBalanceToolToAnalyticalBalance: () => void;
   moveObject: (payload: MoveObjectPayload) => void;
-  moveWorkbenchSampleLabelToAnalyticalBalance: (payload: {
-    source_slot_id: string;
-    label_id: string;
-  }) => void;
-  restoreTrashedSampleLabelToAnalyticalBalance: (payload: {
-    trash_sample_label_id: string;
-  }) => void;
   updateAnalyticalBalanceToolSampleLabelText: (payload: {
     label_id: string;
     sample_label_text: string;

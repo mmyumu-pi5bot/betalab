@@ -32,23 +32,13 @@ import type {
 } from "@/types/workbench";
 
 import type {
-  AddProduceLotToWorkbenchToolPayload,
   CutWorkbenchProduceLotPayload,
-  MoveGrossBalanceProduceLotToWorkbenchPayload,
   MoveObjectPayload,
-  MoveProduceLotBetweenWorkbenchToolsPayload,
-  MoveWidgetProduceLotToWorkbenchToolPayload,
-  RestoreTrashedProduceLotToWorkbenchToolPayload,
 } from "@/types/api-payloads";
 
 export type WorkbenchDndExperimentApi = {
-  addProduceLotToWorkbenchTool: (payload: AddProduceLotToWorkbenchToolPayload) => void;
   cutWorkbenchProduceLot: (payload: CutWorkbenchProduceLotPayload) => void;
-  moveGrossBalanceProduceLotToWorkbench: (payload: MoveGrossBalanceProduceLotToWorkbenchPayload) => void;
   moveObject: (payload: MoveObjectPayload) => void;
-  moveProduceLotBetweenWorkbenchTools: (payload: MoveProduceLotBetweenWorkbenchToolsPayload) => void;
-  moveWidgetProduceLotToWorkbenchTool: (payload: MoveWidgetProduceLotToWorkbenchToolPayload) => void;
-  restoreTrashedProduceLotToWorkbenchTool: (payload: RestoreTrashedProduceLotToWorkbenchToolPayload) => void;
 };
 
 type WorkbenchDndOptions = {

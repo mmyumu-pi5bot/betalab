@@ -5,10 +5,7 @@ from app.schemas.experiment import (
     WorkspaceWidgetCreateSchema,
     WorkspaceWidgetLiquidCreateSchema,
     WorkspaceWidgetLiquidUpdateSchema,
-    WorkspaceWidgetMoveProduceLotToWorkbenchSchema,
     WorkspaceWidgetMoveSchema,
-    WorkspaceWidgetMoveWorkbenchProduceLotSchema,
-    WorkspaceWidgetProduceLotCreateSchema,
 )
 from app.services.domain_services.debug import (
     CreateDebugProduceLotToWidgetRequest,
@@ -17,20 +14,10 @@ from app.services.domain_services.debug import (
 from app.services.domain_services.workspace import (
     AddLiquidToWorkspaceWidgetRequest,
     AddLiquidToWorkspaceWidgetService,
-    AddWorkspaceProduceLotToWidgetRequest,
-    AddWorkspaceProduceLotToWidgetService,
     AddWorkspaceWidgetService,
     CompleteGrinderCycleService,
     CreateOrInitProduceLotService,
     CreateProduceLotRequest,
-    DiscardWidgetProduceLotRequest,
-    DiscardWidgetProduceLotService,
-    DiscardWorkspaceProduceLotRequest,
-    DiscardWorkspaceProduceLotService,
-    MoveWidgetProduceLotToWorkbenchToolRequest,
-    MoveWidgetProduceLotToWorkbenchToolService,
-    MoveWorkbenchProduceLotToWidgetRequest,
-    MoveWorkbenchProduceLotToWidgetService,
     MoveWorkspaceWidgetService,
     RemoveLiquidFromWorkspaceWidgetService,
     StartGrinderCycleService,
@@ -184,99 +171,6 @@ def create_produce_lot(
         lambda: CreateOrInitProduceLotService(experiment_service).run(
             experiment_id,
             CreateProduceLotRequest(produce_type=request.produce_type),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/workspace/widgets/{widget_id}/add-produce-lot",
-    response_model=ExperimentSchema,
-)
-def add_workspace_produce_lot_to_widget(
-    experiment_id: str,
-    widget_id: str,
-    request: WorkspaceWidgetProduceLotCreateSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: AddWorkspaceProduceLotToWidgetService(experiment_service).run(
-            experiment_id,
-            AddWorkspaceProduceLotToWidgetRequest(
-                widget_id=widget_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/workspace/widgets/{widget_id}/move-workbench-produce-lot",
-    response_model=ExperimentSchema,
-)
-def move_workbench_produce_lot_to_widget(
-    experiment_id: str,
-    widget_id: str,
-    request: WorkspaceWidgetMoveWorkbenchProduceLotSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveWorkbenchProduceLotToWidgetService(experiment_service).run(
-            experiment_id,
-            MoveWorkbenchProduceLotToWidgetRequest(
-                widget_id=widget_id,
-                source_slot_id=request.source_slot_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/workspace/produce-lots/{produce_lot_id}/discard",
-    response_model=ExperimentSchema,
-)
-def discard_workspace_produce_lot(experiment_id: str, produce_lot_id: str) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: DiscardWorkspaceProduceLotService(experiment_service).run(
-            experiment_id,
-            DiscardWorkspaceProduceLotRequest(produce_lot_id=produce_lot_id),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/workspace/widgets/{widget_id}/produce-lots/{produce_lot_id}/move-to-workbench-tool",
-    response_model=ExperimentSchema,
-)
-def move_widget_produce_lot_to_workbench_tool(
-    experiment_id: str,
-    widget_id: str,
-    produce_lot_id: str,
-    request: WorkspaceWidgetMoveProduceLotToWorkbenchSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveWidgetProduceLotToWorkbenchToolService(experiment_service).run(
-            experiment_id,
-            MoveWidgetProduceLotToWorkbenchToolRequest(
-                widget_id=widget_id,
-                produce_lot_id=produce_lot_id,
-                target_slot_id=request.target_slot_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/workspace/widgets/{widget_id}/produce-lots/{produce_lot_id}/discard",
-    response_model=ExperimentSchema,
-)
-def discard_widget_produce_lot(
-    experiment_id: str,
-    widget_id: str,
-    produce_lot_id: str,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: DiscardWidgetProduceLotService(experiment_service).run(
-            experiment_id,
-            DiscardWidgetProduceLotRequest(widget_id=widget_id, produce_lot_id=produce_lot_id),
         )
     )
 

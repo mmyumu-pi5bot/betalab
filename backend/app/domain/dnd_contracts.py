@@ -129,7 +129,14 @@ def get_dnd_contract(entity_kind: DndEntityKind, entity_type: str) -> DndEntityC
             is_discardable=True,
             supports_object_move=True,
         )
-    if entity_kind in {"sample_label", "lims_label_ticket"}:
+    if entity_kind == "sample_label":
+        return DndEntityContract(
+            entity_kind=entity_kind,
+            allowed_drop_targets=("workbench_slot", "gross_balance_widget", "analytical_balance_widget", "trash_bin"),
+            is_discardable=True,
+            supports_object_move=True,
+        )
+    if entity_kind == "lims_label_ticket":
         return DndEntityContract(
             entity_kind=entity_kind,
             allowed_drop_targets=("workbench_slot", "gross_balance_widget", "analytical_balance_widget", "trash_bin"),

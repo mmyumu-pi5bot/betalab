@@ -12,22 +12,21 @@ describe("label-drop-command-executor", () => {
     const api = {
       applyPrintedLimsLabel: vi.fn(),
       applySampleLabelToWorkbenchTool: vi.fn(),
-      moveSampleLabelBetweenWorkbenchTools: vi.fn(),
-      restoreTrashedSampleLabelToWorkbenchTool: vi.fn(),
+      moveObject: vi.fn(),
     };
 
     expect(executeWorkbenchLabelDropCommand({
-      kind: "move_sample_label_between_workbench_tools",
+      kind: "move_object",
       payload: {
-        label_id: "label_1",
-        source_slot_id: "station_1",
-        target_slot_id: "station_2",
+        destination: { kind: "workbench_tool", id: "station_2" },
+        entity: { kind: "sample_label", id: "label_1" },
+        source: { kind: "workbench", id: "station_1" },
       },
     }, api)).toBe(true);
-    expect(api.moveSampleLabelBetweenWorkbenchTools).toHaveBeenCalledWith({
-      label_id: "label_1",
-      source_slot_id: "station_1",
-      target_slot_id: "station_2",
+    expect(api.moveObject).toHaveBeenCalledWith({
+      destination: { kind: "workbench_tool", id: "station_2" },
+      entity: { kind: "sample_label", id: "label_1" },
+      source: { kind: "workbench", id: "station_1" },
     });
   });
 
@@ -35,19 +34,17 @@ describe("label-drop-command-executor", () => {
     const grossApi = {
       applyPrintedLimsLabelToGrossBalanceBag: vi.fn(),
       applySampleLabelToGrossBalanceTool: vi.fn(),
-      moveWorkbenchSampleLabelToGrossBalance: vi.fn(),
-      restoreTrashedSampleLabelToGrossBalance: vi.fn(),
+      moveObject: vi.fn(),
     };
     const analyticalApi = {
       applyPrintedLimsLabelToAnalyticalBalanceTool: vi.fn(),
       applySampleLabelToAnalyticalBalanceTool: vi.fn(),
-      moveWorkbenchSampleLabelToAnalyticalBalance: vi.fn(),
-      restoreTrashedSampleLabelToAnalyticalBalance: vi.fn(),
+      moveObject: vi.fn(),
     };
     const trashApi = {
       discardPrintedLimsLabel: vi.fn(),
       discardSampleLabelFromPalette: vi.fn(),
-      discardSampleLabelFromWorkbenchTool: vi.fn(),
+      moveObject: vi.fn(),
     };
 
     expect(executeGrossBalanceLabelDropCommand({
@@ -56,11 +53,17 @@ describe("label-drop-command-executor", () => {
     expect(grossApi.applyPrintedLimsLabelToGrossBalanceBag).toHaveBeenCalled();
 
     expect(executeAnalyticalBalanceLabelDropCommand({
-      kind: "restore_trashed_sample_label_to_analytical_balance",
-      payload: { trash_sample_label_id: "trash_1" },
+      kind: "move_object",
+      payload: {
+        destination: { kind: "analytical_balance", id: "analytical_balance" },
+        entity: { kind: "sample_label", id: "label_1" },
+        source: { kind: "trash", id: "trash_1" },
+      },
     }, analyticalApi)).toBe(true);
-    expect(analyticalApi.restoreTrashedSampleLabelToAnalyticalBalance).toHaveBeenCalledWith({
-      trash_sample_label_id: "trash_1",
+    expect(analyticalApi.moveObject).toHaveBeenCalledWith({
+      destination: { kind: "analytical_balance", id: "analytical_balance" },
+      entity: { kind: "sample_label", id: "label_1" },
+      source: { kind: "trash", id: "trash_1" },
     });
 
     expect(executeTrashLabelDropCommand({

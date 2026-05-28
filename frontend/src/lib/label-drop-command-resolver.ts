@@ -3,6 +3,8 @@ import type {
   SampleLabelDragPayload,
   ToolbarDragPayload,
 } from "@/types/workbench";
+import { resolveSampleLabelMoveObjectPayload } from "@/lib/label-dnd-object-command";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 export type LabelDragPayload =
   | { kind: "palette_sample_label"; payload: ToolbarDragPayload }
@@ -25,34 +27,7 @@ export type LabelDropCommand =
   | { kind: "apply_sample_label_to_workbench_tool"; payload: { slot_id: string } }
   | { kind: "discard_printed_lims_label" }
   | { kind: "discard_sample_label_from_palette" }
-  | {
-      kind: "discard_sample_label_from_workbench_tool";
-      payload: { label_id: string; slot_id: string };
-    }
-  | {
-      kind: "move_sample_label_between_workbench_tools";
-      payload: { label_id: string; source_slot_id: string; target_slot_id: string };
-    }
-  | {
-      kind: "move_workbench_sample_label_to_analytical_balance";
-      payload: { label_id: string; source_slot_id: string };
-    }
-  | {
-      kind: "move_workbench_sample_label_to_gross_balance";
-      payload: { label_id: string; source_slot_id: string };
-    }
-  | {
-      kind: "restore_trashed_sample_label_to_analytical_balance";
-      payload: { trash_sample_label_id: string };
-    }
-  | {
-      kind: "restore_trashed_sample_label_to_gross_balance";
-      payload: { trash_sample_label_id: string };
-    }
-  | {
-      kind: "restore_trashed_sample_label_to_workbench_tool";
-      payload: { target_slot_id: string; trash_sample_label_id: string };
-    };
+  | { kind: "move_object"; payload: MoveObjectPayload };
 
 export function resolveLabelDropCommand(
   payload: LabelDragPayload,
@@ -75,25 +50,17 @@ export function resolveLabelDropCommand(
       if (!payload.payload.sourceSlotId || payload.payload.sourceSlotId === target.slotId) {
         return null;
       }
-      return {
-        kind: "move_sample_label_between_workbench_tools",
-        payload: {
-          label_id: payload.payload.sampleLabelId,
-          source_slot_id: payload.payload.sourceSlotId,
-          target_slot_id: target.slotId,
-        },
-      };
+      const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, {
+        kind: "workbench_tool",
+        slotId: target.slotId,
+      });
+      return movePayload === null ? null : { kind: "move_object", payload: movePayload };
     }
-    if (!payload.payload.trashSampleLabelId) {
-      return null;
-    }
-    return {
-      kind: "restore_trashed_sample_label_to_workbench_tool",
-      payload: {
-        target_slot_id: target.slotId,
-        trash_sample_label_id: payload.payload.trashSampleLabelId,
-      },
-    };
+    const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, {
+      kind: "workbench_tool",
+      slotId: target.slotId,
+    });
+    return movePayload === null ? null : { kind: "move_object", payload: movePayload };
   }
 
   if (target.kind === "gross_balance") {
@@ -107,21 +74,11 @@ export function resolveLabelDropCommand(
       if (!payload.payload.sourceSlotId) {
         return null;
       }
-      return {
-        kind: "move_workbench_sample_label_to_gross_balance",
-        payload: {
-          label_id: payload.payload.sampleLabelId,
-          source_slot_id: payload.payload.sourceSlotId,
-        },
-      };
+      const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, { kind: "gross_balance" });
+      return movePayload === null ? null : { kind: "move_object", payload: movePayload };
     }
-    if (!payload.payload.trashSampleLabelId) {
-      return null;
-    }
-    return {
-      kind: "restore_trashed_sample_label_to_gross_balance",
-      payload: { trash_sample_label_id: payload.payload.trashSampleLabelId },
-    };
+    const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, { kind: "gross_balance" });
+    return movePayload === null ? null : { kind: "move_object", payload: movePayload };
   }
 
   if (target.kind === "analytical_balance") {
@@ -135,21 +92,11 @@ export function resolveLabelDropCommand(
       if (!payload.payload.sourceSlotId) {
         return null;
       }
-      return {
-        kind: "move_workbench_sample_label_to_analytical_balance",
-        payload: {
-          label_id: payload.payload.sampleLabelId,
-          source_slot_id: payload.payload.sourceSlotId,
-        },
-      };
+      const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, { kind: "analytical_balance" });
+      return movePayload === null ? null : { kind: "move_object", payload: movePayload };
     }
-    if (!payload.payload.trashSampleLabelId) {
-      return null;
-    }
-    return {
-      kind: "restore_trashed_sample_label_to_analytical_balance",
-      payload: { trash_sample_label_id: payload.payload.trashSampleLabelId },
-    };
+    const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, { kind: "analytical_balance" });
+    return movePayload === null ? null : { kind: "move_object", payload: movePayload };
   }
 
   if (payload.kind === "lims_label_ticket") {
@@ -159,13 +106,8 @@ export function resolveLabelDropCommand(
     return { kind: "discard_sample_label_from_palette" };
   }
   if (payload.kind === "workbench_sample_label" && payload.payload.sourceSlotId) {
-    return {
-      kind: "discard_sample_label_from_workbench_tool",
-      payload: {
-        label_id: payload.payload.sampleLabelId,
-        slot_id: payload.payload.sourceSlotId,
-      },
-    };
+    const movePayload = resolveSampleLabelMoveObjectPayload(payload.payload, { kind: "trash_bin" });
+    return movePayload === null ? null : { kind: "move_object", payload: movePayload };
   }
 
   return null;

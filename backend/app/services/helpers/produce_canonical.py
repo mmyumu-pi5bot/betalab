@@ -562,6 +562,13 @@ def get_tool_remaining_fill_capacity_ml(
     return round(max(tool.capacity_ml - powder_volume_ml - liquid_volume_ml, 0.0), 3)
 
 
+def mark_surface_fractions_contaminated(experiment: Experiment, produce_lot_id: str) -> None:
+    for slot in experiment.workbench.slots:
+        for fraction in slot.surface_produce_fractions:
+            if fraction.produce_lot_id == produce_lot_id:
+                fraction.is_contaminated = True
+
+
 def get_spatula_total_produce_mass_g(spatula: SpatulaState) -> float:
     return sum(max(fraction.mass_g, 0.0) for fraction in spatula.produce_fractions)
 

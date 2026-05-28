@@ -1,50 +1,28 @@
 import type { LabelDropCommand } from "@/lib/label-drop-command-resolver";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 type WorkbenchLabelDropApi = {
   applyPrintedLimsLabel: (payload: { slot_id: string }) => void;
   applySampleLabelToWorkbenchTool: (payload: { slot_id: string }) => void;
-  moveSampleLabelBetweenWorkbenchTools: (payload: {
-    label_id: string;
-    source_slot_id: string;
-    target_slot_id: string;
-  }) => void;
-  restoreTrashedSampleLabelToWorkbenchTool: (payload: {
-    target_slot_id: string;
-    trash_sample_label_id: string;
-  }) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type GrossBalanceLabelDropApi = {
   applyPrintedLimsLabelToGrossBalanceBag: () => void;
   applySampleLabelToGrossBalanceTool: () => void;
-  moveWorkbenchSampleLabelToGrossBalance: (payload: {
-    label_id: string;
-    source_slot_id: string;
-  }) => void;
-  restoreTrashedSampleLabelToGrossBalance: (payload: {
-    trash_sample_label_id: string;
-  }) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type AnalyticalBalanceLabelDropApi = {
   applyPrintedLimsLabelToAnalyticalBalanceTool: () => void;
   applySampleLabelToAnalyticalBalanceTool: () => void;
-  moveWorkbenchSampleLabelToAnalyticalBalance: (payload: {
-    label_id: string;
-    source_slot_id: string;
-  }) => void;
-  restoreTrashedSampleLabelToAnalyticalBalance: (payload: {
-    trash_sample_label_id: string;
-  }) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type TrashLabelDropApi = {
   discardPrintedLimsLabel: () => void;
   discardSampleLabelFromPalette: () => void;
-  discardSampleLabelFromWorkbenchTool: (payload: {
-    label_id: string;
-    slot_id: string;
-  }) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 export function executeWorkbenchLabelDropCommand(command: LabelDropCommand, api: WorkbenchLabelDropApi): boolean {
@@ -56,12 +34,8 @@ export function executeWorkbenchLabelDropCommand(command: LabelDropCommand, api:
     void api.applySampleLabelToWorkbenchTool(command.payload);
     return true;
   }
-  if (command.kind === "move_sample_label_between_workbench_tools") {
-    void api.moveSampleLabelBetweenWorkbenchTools(command.payload);
-    return true;
-  }
-  if (command.kind === "restore_trashed_sample_label_to_workbench_tool") {
-    void api.restoreTrashedSampleLabelToWorkbenchTool(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   return false;
@@ -76,12 +50,8 @@ export function executeGrossBalanceLabelDropCommand(command: LabelDropCommand, a
     void api.applySampleLabelToGrossBalanceTool();
     return true;
   }
-  if (command.kind === "move_workbench_sample_label_to_gross_balance") {
-    void api.moveWorkbenchSampleLabelToGrossBalance(command.payload);
-    return true;
-  }
-  if (command.kind === "restore_trashed_sample_label_to_gross_balance") {
-    void api.restoreTrashedSampleLabelToGrossBalance(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   return false;
@@ -99,12 +69,8 @@ export function executeAnalyticalBalanceLabelDropCommand(
     void api.applySampleLabelToAnalyticalBalanceTool();
     return true;
   }
-  if (command.kind === "move_workbench_sample_label_to_analytical_balance") {
-    void api.moveWorkbenchSampleLabelToAnalyticalBalance(command.payload);
-    return true;
-  }
-  if (command.kind === "restore_trashed_sample_label_to_analytical_balance") {
-    void api.restoreTrashedSampleLabelToAnalyticalBalance(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   return false;
@@ -115,8 +81,8 @@ export function executeTrashLabelDropCommand(command: LabelDropCommand, api: Tra
     void api.discardSampleLabelFromPalette();
     return true;
   }
-  if (command.kind === "discard_sample_label_from_workbench_tool") {
-    void api.discardSampleLabelFromWorkbenchTool(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   if (command.kind === "discard_printed_lims_label") {

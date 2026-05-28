@@ -100,6 +100,50 @@ function expectedToolMoveCommand({
   };
 }
 
+function expectedProduceMoveCommand({
+  destinationId,
+  destinationKind,
+  sourceId,
+  sourceKind,
+}: {
+  destinationId: string;
+  destinationKind: string;
+  sourceId: string;
+  sourceKind: string;
+}): ExpectedCommand {
+  return {
+    type: "move_object",
+    payload: {
+      entity: { kind: "produce_lot", id: "produce_1" },
+      source: { kind: sourceKind, id: sourceId },
+      destination: { kind: destinationKind, id: destinationId },
+    },
+  };
+}
+
+function expectedSampleLabelMoveCommand({
+  destinationId,
+  destinationKind,
+  entityId,
+  sourceId,
+  sourceKind,
+}: {
+  destinationId: string;
+  destinationKind: string;
+  entityId: string;
+  sourceId: string;
+  sourceKind: string;
+}): ExpectedCommand {
+  return {
+    type: "move_object",
+    payload: {
+      entity: { kind: "sample_label", id: entityId },
+      source: { kind: sourceKind, id: sourceId },
+      destination: { kind: destinationKind, id: destinationId },
+    },
+  };
+}
+
 type DndSourceCase = {
   availableTargets: DndTargetId[];
   buildExperiment: () => Experiment;
@@ -1083,33 +1127,30 @@ function createBasketProduceSourceCase(): DndSourceCase {
     targetExpectations: {
       "bench-slot-station_1": {
         compatible: true,
-        command: {
-          type: "add_produce_lot_to_workbench_tool",
-          payload: {
-            slot_id: "station_1",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "basket",
+          sourceId: "produce_basket",
+          destinationKind: "workbench_tool",
+          destinationId: "station_1",
+        }),
       },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "add_produce_lot_to_workbench_tool",
-          payload: {
-            slot_id: "station_2",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "basket",
+          sourceId: "produce_basket",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "grinder-dropzone": {
         compatible: true,
-        command: {
-          type: "add_workspace_produce_lot_to_widget",
-          payload: {
-            widget_id: "grinder",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "basket",
+          sourceId: "produce_basket",
+          destinationKind: "workspace_widget",
+          destinationId: "grinder",
+        }),
       },
       "rack-illustration-slot-1": {
         compatible: false,
@@ -1121,12 +1162,12 @@ function createBasketProduceSourceCase(): DndSourceCase {
       },
       "trash-dropzone": {
         compatible: true,
-        command: {
-          type: "discard_workspace_produce_lot",
-          payload: {
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "basket",
+          sourceId: "produce_basket",
+          destinationKind: "trash_bin",
+          destinationId: "trash_bin",
+        }),
       },
     },
   };
@@ -1228,25 +1269,21 @@ function createWorkbenchProduceLotSourceCase(): DndSourceCase {
       },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "move_produce_lot_between_workbench_tools",
-          payload: {
-            source_slot_id: "station_1",
-            target_slot_id: "station_2",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "grinder-dropzone": {
         compatible: true,
-        command: {
-          type: "move_workbench_produce_lot_to_widget",
-          payload: {
-            source_slot_id: "station_1",
-            widget_id: "grinder",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "workspace_widget",
+          destinationId: "grinder",
+        }),
       },
       "rack-illustration-slot-1": {
         compatible: false,
@@ -1258,13 +1295,12 @@ function createWorkbenchProduceLotSourceCase(): DndSourceCase {
       },
       "trash-dropzone": {
         compatible: true,
-        command: {
-          type: "discard_produce_lot_from_workbench_tool",
-          payload: {
-            slot_id: "station_1",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "trash_bin",
+          destinationId: "trash_bin",
+        }),
       },
     },
   };
@@ -1302,25 +1338,21 @@ function createWorkbenchSurfaceProduceLotSourceCase(): DndSourceCase {
       },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "move_produce_lot_between_workbench_tools",
-          payload: {
-            source_slot_id: "station_1",
-            target_slot_id: "station_2",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "grinder-dropzone": {
         compatible: true,
-        command: {
-          type: "move_workbench_produce_lot_to_widget",
-          payload: {
-            source_slot_id: "station_1",
-            widget_id: "grinder",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "workspace_widget",
+          destinationId: "grinder",
+        }),
       },
       "rack-illustration-slot-1": {
         compatible: false,
@@ -1332,13 +1364,12 @@ function createWorkbenchSurfaceProduceLotSourceCase(): DndSourceCase {
       },
       "trash-dropzone": {
         compatible: true,
-        command: {
-          type: "discard_produce_lot_from_workbench_tool",
-          payload: {
-            slot_id: "station_1",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "trash_bin",
+          destinationId: "trash_bin",
+        }),
       },
     },
   };
@@ -1380,25 +1411,21 @@ function createGrinderProduceLotSourceCase(): DndSourceCase {
     targetExpectations: {
       "bench-slot-station_1": {
         compatible: true,
-        command: {
-          type: "move_widget_produce_lot_to_workbench_tool",
-          payload: {
-            widget_id: "grinder",
-            target_slot_id: "station_1",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "grinder",
+          sourceId: "grinder",
+          destinationKind: "workbench_tool",
+          destinationId: "station_1",
+        }),
       },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "move_widget_produce_lot_to_workbench_tool",
-          payload: {
-            widget_id: "grinder",
-            target_slot_id: "station_2",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "grinder",
+          sourceId: "grinder",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "grinder-dropzone": {
         compatible: true,
@@ -1414,13 +1441,12 @@ function createGrinderProduceLotSourceCase(): DndSourceCase {
       },
       "trash-dropzone": {
         compatible: true,
-        command: {
-          type: "discard_widget_produce_lot",
-          payload: {
-            widget_id: "grinder",
-            produce_lot_id: "produce_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "grinder",
+          sourceId: "grinder",
+          destinationKind: "trash_bin",
+          destinationId: "trash_bin",
+        }),
       },
     },
   };
@@ -1510,33 +1536,30 @@ function createTrashProduceLotSourceCase(): DndSourceCase {
     targetExpectations: {
       "bench-slot-station_1": {
         compatible: true,
-        command: {
-          type: "restore_trashed_produce_lot_to_workbench_tool",
-          payload: {
-            target_slot_id: "station_1",
-            trash_produce_lot_id: "trash_produce_lot_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "trash",
+          sourceId: "trash_produce_lot_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_1",
+        }),
       },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "restore_trashed_produce_lot_to_workbench_tool",
-          payload: {
-            target_slot_id: "station_2",
-            trash_produce_lot_id: "trash_produce_lot_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "trash",
+          sourceId: "trash_produce_lot_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "grinder-dropzone": {
         compatible: true,
-        command: {
-          type: "restore_trashed_produce_lot_to_widget",
-          payload: {
-            widget_id: "grinder",
-            trash_produce_lot_id: "trash_produce_lot_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "trash",
+          sourceId: "trash_produce_lot_1",
+          destinationKind: "workspace_widget",
+          destinationId: "grinder",
+        }),
       },
       "rack-illustration-slot-1": {
         compatible: false,
@@ -1546,10 +1569,7 @@ function createTrashProduceLotSourceCase(): DndSourceCase {
         compatible: false,
         command: null,
       },
-      "trash-dropzone": {
-        compatible: true,
-        command: null,
-      },
+      "trash-dropzone": { compatible: true, command: null },
     },
   };
 }
@@ -1588,34 +1608,33 @@ function createWorkbenchSampleLabelSourceCase(): DndSourceCase {
       "bench-slot-station_1": { compatible: true, command: null },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "move_sample_label_between_workbench_tools",
-          payload: {
-            label_id: "bench_tool_bag-sample-label",
-            source_slot_id: "station_1",
-            target_slot_id: "station_2",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "bench_tool_bag-sample-label",
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "analytical-balance-dropzone": {
         compatible: true,
-        command: {
-          type: "move_workbench_sample_label_to_analytical_balance",
-          payload: {
-            label_id: "bench_tool_bag-sample-label",
-            source_slot_id: "station_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "bench_tool_bag-sample-label",
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "analytical_balance",
+          destinationId: "analytical_balance",
+        }),
       },
       "gross-balance-dropzone": {
         compatible: true,
-        command: {
-          type: "move_workbench_sample_label_to_gross_balance",
-          payload: {
-            label_id: "bench_tool_bag-sample-label",
-            source_slot_id: "station_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "bench_tool_bag-sample-label",
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "gross_balance",
+          destinationId: "gross_balance",
+        }),
       },
       "grinder-dropzone": {
         compatible: false,
@@ -1625,13 +1644,13 @@ function createWorkbenchSampleLabelSourceCase(): DndSourceCase {
       "widget-workspace": { compatible: false, command: null },
       "trash-dropzone": {
         compatible: true,
-        command: {
-          type: "discard_sample_label_from_workbench_tool",
-          payload: {
-            label_id: "bench_tool_bag-sample-label",
-            slot_id: "station_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "bench_tool_bag-sample-label",
+          sourceKind: "workbench",
+          sourceId: "station_1",
+          destinationKind: "trash_bin",
+          destinationId: "trash_bin",
+        }),
       },
     },
   };
@@ -1671,42 +1690,44 @@ function createTrashSampleLabelSourceCase(): DndSourceCase {
     targetExpectations: {
       "bench-slot-station_1": {
         compatible: true,
-        command: {
-          type: "restore_trashed_sample_label_to_workbench_tool",
-          payload: {
-            target_slot_id: "station_1",
-            trash_sample_label_id: "trash_sample_label_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "trash_sample_label_1",
+          sourceKind: "trash",
+          sourceId: "trash_sample_label_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_1",
+        }),
       },
       "grinder-dropzone": { compatible: false, command: null },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "restore_trashed_sample_label_to_workbench_tool",
-          payload: {
-            target_slot_id: "station_2",
-            trash_sample_label_id: "trash_sample_label_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "trash_sample_label_1",
+          sourceKind: "trash",
+          sourceId: "trash_sample_label_1",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "analytical-balance-dropzone": {
         compatible: true,
-        command: {
-          type: "restore_trashed_sample_label_to_analytical_balance",
-          payload: {
-            trash_sample_label_id: "trash_sample_label_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "trash_sample_label_1",
+          sourceKind: "trash",
+          sourceId: "trash_sample_label_1",
+          destinationKind: "analytical_balance",
+          destinationId: "analytical_balance",
+        }),
       },
       "gross-balance-dropzone": {
         compatible: true,
-        command: {
-          type: "restore_trashed_sample_label_to_gross_balance",
-          payload: {
-            trash_sample_label_id: "trash_sample_label_1",
-          },
-        },
+        command: expectedSampleLabelMoveCommand({
+          entityId: "trash_sample_label_1",
+          sourceKind: "trash",
+          sourceId: "trash_sample_label_1",
+          destinationKind: "gross_balance",
+          destinationId: "gross_balance",
+        }),
       },
       "rack-illustration-slot-1": { compatible: false, command: null },
       "widget-workspace": { compatible: false, command: null },
@@ -1919,40 +1940,42 @@ function createGrossBalanceProduceSourceCase(): DndSourceCase {
     targetExpectations: {
       "bench-slot-station_1": {
         compatible: true,
-        command: {
-          type: "move_gross_balance_produce_lot_to_workbench",
-          payload: {
-            produce_lot_id: "produce_1",
-            target_slot_id: "station_1",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "gross_balance",
+          sourceId: "gross_balance",
+          destinationKind: "workbench_tool",
+          destinationId: "station_1",
+        }),
       },
       "bench-slot-station_2": {
         compatible: true,
-        command: {
-          type: "move_gross_balance_produce_lot_to_workbench",
-          payload: {
-            produce_lot_id: "produce_1",
-            target_slot_id: "station_2",
-          },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "gross_balance",
+          sourceId: "gross_balance",
+          destinationKind: "workbench_tool",
+          destinationId: "station_2",
+        }),
       },
       "grinder-dropzone": {
         compatible: true,
-        command: {
-          type: "move_gross_balance_produce_lot_to_widget",
-          payload: { produce_lot_id: "produce_1" },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "gross_balance",
+          sourceId: "gross_balance",
+          destinationKind: "workspace_widget",
+          destinationId: "grinder",
+        }),
       },
       "gross-balance-dropzone": { compatible: true, command: null },
       "rack-illustration-slot-1": { compatible: false, command: null },
       "widget-workspace": { compatible: false, command: null },
       "trash-dropzone": {
         compatible: true,
-        command: {
-          type: "discard_gross_balance_produce_lot",
-          payload: { produce_lot_id: "produce_1" },
-        },
+        command: expectedProduceMoveCommand({
+          sourceKind: "gross_balance",
+          sourceId: "gross_balance",
+          destinationKind: "trash_bin",
+          destinationId: "trash_bin",
+        }),
       },
     },
   };
@@ -2010,13 +2033,12 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
   ) {
     return {
       compatible: true,
-      command: {
-        type: "move_workbench_produce_lot_to_gross_balance",
-        payload: {
-          source_slot_id: "station_1",
-          produce_lot_id: "produce_1",
-        },
-      },
+      command: expectedProduceMoveCommand({
+        sourceKind: "workbench",
+        sourceId: "station_1",
+        destinationKind: "gross_balance",
+        destinationId: "gross_balance",
+      }),
     };
   }
 
@@ -2062,36 +2084,36 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
   if (sourceCase.id === "basket-produce-lot-apple") {
     return {
       compatible: true,
-      command: {
-        type: "move_workspace_produce_lot_to_gross_balance",
-        payload: {
-          produce_lot_id: "produce_1",
-        },
-      },
+      command: expectedProduceMoveCommand({
+        sourceKind: "basket",
+        sourceId: "produce_basket",
+        destinationKind: "gross_balance",
+        destinationId: "gross_balance",
+      }),
     };
   }
 
   if (sourceCase.id === "grinder-produce-lot-apple") {
     return {
       compatible: true,
-      command: {
-        type: "move_widget_produce_lot_to_gross_balance",
-        payload: {
-          produce_lot_id: "produce_1",
-        },
-      },
+      command: expectedProduceMoveCommand({
+        sourceKind: "grinder",
+        sourceId: "grinder",
+        destinationKind: "gross_balance",
+        destinationId: "gross_balance",
+      }),
     };
   }
 
   if (sourceCase.id === "trash-produce-lot-apple") {
     return {
       compatible: true,
-      command: {
-        type: "restore_trashed_produce_lot_to_gross_balance",
-        payload: {
-          trash_produce_lot_id: "trash_produce_lot_1",
-        },
-      },
+      command: expectedProduceMoveCommand({
+        sourceKind: "trash",
+        sourceId: "trash_produce_lot_1",
+        destinationKind: "gross_balance",
+        destinationId: "gross_balance",
+      }),
     };
   }
 
@@ -2121,25 +2143,26 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
   if (sourceCase.id === "workbench-sample-label") {
     return {
       compatible: true,
-      command: {
-        type: "move_workbench_sample_label_to_gross_balance",
-        payload: {
-          label_id: "bench_tool_bag-sample-label",
-          source_slot_id: "station_1",
-        },
-      },
+      command: expectedSampleLabelMoveCommand({
+        entityId: "bench_tool_bag-sample-label",
+        sourceKind: "workbench",
+        sourceId: "station_1",
+        destinationKind: "gross_balance",
+        destinationId: "gross_balance",
+      }),
     };
   }
 
   if (sourceCase.id === "trash-sample-label") {
     return {
       compatible: true,
-      command: {
-        type: "restore_trashed_sample_label_to_gross_balance",
-        payload: {
-          trash_sample_label_id: "trash_sample_label_1",
-        },
-      },
+      command: expectedSampleLabelMoveCommand({
+        entityId: "trash_sample_label_1",
+        sourceKind: "trash",
+        sourceId: "trash_sample_label_1",
+        destinationKind: "gross_balance",
+        destinationId: "gross_balance",
+      }),
     };
   }
 

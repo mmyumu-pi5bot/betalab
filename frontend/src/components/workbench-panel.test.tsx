@@ -99,13 +99,12 @@ function PesticideWorkbenchPanel({
   onBenchToolIllustrationClick,
   onBenchToolPointerDown,
   onBenchToolPointerUp,
-  onMoveSampleLabel,
+  onMoveObject,
   onProduceDrop,
   onProduceLotClick,
   onProduceLotDragStart,
   onRemoveLiquid,
   onRemoveWorkbenchSlot,
-  onRestoreTrashedSampleLabel,
   onSampleLabelDragEnd,
   onSampleLabelDragStart,
   onSampleLabelTextChange,
@@ -155,13 +154,12 @@ function PesticideWorkbenchPanel({
         onBenchToolIllustrationClick,
         onBenchToolPointerDown,
         onBenchToolPointerUp,
-        onMoveSampleLabel,
+        onMoveObject,
         onProduceDrop,
         onProduceLotClick,
         onProduceLotDragStart,
         onRemoveLiquid,
         onRemoveWorkbenchSlot,
-        onRestoreTrashedSampleLabel,
         onSampleLabelDragEnd,
         onSampleLabelDragStart,
         onSampleLabelTextChange,
@@ -1039,7 +1037,7 @@ describe("WorkbenchPanel", () => {
   });
 
   it("moves a labeled sample label to another unlabeled sampling bag", () => {
-    const onMoveSampleLabel = vi.fn();
+    const onMoveObject = vi.fn();
     const dataTransfer = createDataTransfer();
     writeSampleLabelDragPayload(dataTransfer, {
       allowedDropTargets: ["workbench_slot", "trash_bin"],
@@ -1055,7 +1053,7 @@ describe("WorkbenchPanel", () => {
 
     render(
       <PesticideWorkbenchPanel
-        onMoveSampleLabel={onMoveSampleLabel}
+        onMoveObject={onMoveObject}
         onLiquidVolumeChange={vi.fn()}
         onRemoveLiquid={vi.fn()}
         onToolbarItemDrop={vi.fn()}
@@ -1109,13 +1107,11 @@ describe("WorkbenchPanel", () => {
     fireEvent.drop(station, { dataTransfer });
 
     expect(dragOverEvent.defaultPrevented).toBe(true);
-    expect(onMoveSampleLabel).toHaveBeenCalledWith(
-      "station_2",
-      expect.objectContaining({
-        sourceSlotId: "station_1",
-        sampleLabelText: "LOT-2026-041",
-      }),
-    );
+    expect(onMoveObject).toHaveBeenCalledWith({
+      destination: { kind: "workbench_tool", id: "station_2" },
+      entity: { kind: "sample_label", id: "bench_tool_bag-sample-label" },
+      source: { kind: "workbench", id: "station_1" },
+    });
   });
 
   it("accepts produce drags only on stations containing an open sampling bag", () => {

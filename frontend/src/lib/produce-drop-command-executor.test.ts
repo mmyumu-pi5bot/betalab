@@ -10,11 +10,7 @@ describe("produce-drop-command-executor", () => {
   it("opens the workbench draft for debug produce presets", () => {
     const setPendingDropDraft = vi.fn();
     const api = {
-      addProduceLotToWorkbenchTool: vi.fn(),
-      moveGrossBalanceProduceLotToWorkbench: vi.fn(),
-      moveProduceLotBetweenWorkbenchTools: vi.fn(),
-      moveWidgetProduceLotToWorkbenchTool: vi.fn(),
-      restoreTrashedProduceLotToWorkbenchTool: vi.fn(),
+      moveObject: vi.fn(),
     };
 
     expect(executeWorkbenchProduceDropCommand({
@@ -33,37 +29,44 @@ describe("produce-drop-command-executor", () => {
   it("dispatches gross balance and grinder produce commands", () => {
     const setPendingDropDraft = vi.fn();
     const grossApi = {
-      moveWidgetProduceLotToGrossBalance: vi.fn(),
-      moveWorkbenchProduceLotToGrossBalance: vi.fn(),
-      moveWorkspaceProduceLotToGrossBalance: vi.fn(),
-      restoreTrashedProduceLotToGrossBalance: vi.fn(),
+      moveObject: vi.fn(),
     };
     const grinderApi = {
-      addWorkspaceProduceLotToWidget: vi.fn(),
-      moveGrossBalanceProduceLotToWidget: vi.fn(),
-      moveWorkbenchProduceLotToWidget: vi.fn(),
-      restoreTrashedProduceLotToWidget: vi.fn(),
+      moveObject: vi.fn(),
     };
 
     expect(executeGrossBalanceProduceDropCommand({
-      kind: "move_workspace_produce_lot_to_gross_balance",
-      payload: { produce_lot_id: "produce_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "basket", id: "produce_basket" },
+        destination: { kind: "gross_balance", id: "gross_balance" },
+      },
     }, grossApi, {
       buildDebugProduceDraftFields: () => [],
       setPendingDropDraft,
     })).toBe(true);
-    expect(grossApi.moveWorkspaceProduceLotToGrossBalance).toHaveBeenCalledWith({ produce_lot_id: "produce_1" });
+    expect(grossApi.moveObject).toHaveBeenCalledWith({
+      entity: { kind: "produce_lot", id: "produce_1" },
+      source: { kind: "basket", id: "produce_basket" },
+      destination: { kind: "gross_balance", id: "gross_balance" },
+    });
 
     expect(executeGrinderProduceDropCommand({
-      kind: "restore_trashed_produce_lot_to_widget",
-      payload: { widget_id: "grinder", trash_produce_lot_id: "trash_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "trash", id: "trash_1" },
+        destination: { kind: "workspace_widget", id: "grinder" },
+      },
     }, grinderApi, {
       buildDebugProduceDraftFields: () => [],
       setPendingDropDraft,
     })).toBe(true);
-    expect(grinderApi.restoreTrashedProduceLotToWidget).toHaveBeenCalledWith({
-      widget_id: "grinder",
-      trash_produce_lot_id: "trash_1",
+    expect(grinderApi.moveObject).toHaveBeenCalledWith({
+      entity: { kind: "produce_lot", id: "produce_1" },
+      source: { kind: "trash", id: "trash_1" },
+      destination: { kind: "workspace_widget", id: "grinder" },
     });
   });
 });

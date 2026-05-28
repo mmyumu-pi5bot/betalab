@@ -26,10 +26,6 @@ import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type {
   MoveObjectPayload,
-  MoveWidgetProduceLotToGrossBalancePayload,
-  MoveWorkbenchProduceLotToGrossBalancePayload,
-  MoveWorkspaceProduceLotToGrossBalancePayload,
-  RestoreTrashedProduceLotToGrossBalancePayload,
 } from "@/types/api-payloads";
 
 export type GrossBalanceDndExperimentApi = {
@@ -37,17 +33,6 @@ export type GrossBalanceDndExperimentApi = {
   applySampleLabelToGrossBalanceTool: () => void;
   moveGrossBalanceToolToAnalyticalBalance: () => void;
   moveObject: (payload: MoveObjectPayload) => void;
-  moveWorkbenchSampleLabelToGrossBalance: (payload: {
-    source_slot_id: string;
-    label_id: string;
-  }) => void;
-  moveWidgetProduceLotToGrossBalance: (payload: MoveWidgetProduceLotToGrossBalancePayload) => void;
-  moveWorkbenchProduceLotToGrossBalance: (payload: MoveWorkbenchProduceLotToGrossBalancePayload) => void;
-  moveWorkspaceProduceLotToGrossBalance: (payload: MoveWorkspaceProduceLotToGrossBalancePayload) => void;
-  restoreTrashedProduceLotToGrossBalance: (payload: RestoreTrashedProduceLotToGrossBalancePayload) => void;
-  restoreTrashedSampleLabelToGrossBalance: (payload: {
-    trash_sample_label_id: string;
-  }) => void;
 };
 
 type GrossBalanceDndOptions = {
@@ -269,17 +254,14 @@ export function useGrossBalanceDnd({
       void experimentApi.applySampleLabelToGrossBalanceTool();
       return;
     }
-    if (labelDragPayload?.kind === "workbench_sample_label") {
-      void experimentApi.moveWorkbenchSampleLabelToGrossBalance({
-        source_slot_id: labelDragPayload.payload.sourceSlotId!,
-        label_id: labelDragPayload.payload.sampleLabelId,
-      });
-      return;
-    }
-    if (labelDragPayload?.kind === "trash_sample_label") {
-      void experimentApi.restoreTrashedSampleLabelToGrossBalance({
-        trash_sample_label_id: labelDragPayload.payload.trashSampleLabelId!,
-      });
+    if (labelDragPayload) {
+      const command = resolveLabelDropCommand(labelDragPayload, { kind: "gross_balance" });
+      if (command) {
+        executeGrossBalanceLabelDropCommand(command, {
+          ...experimentApi,
+          applyPrintedLimsLabelToGrossBalanceBag: applyLimsTicketToGrossBalance,
+        });
+      }
     }
   };
 

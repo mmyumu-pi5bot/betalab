@@ -10,7 +10,6 @@ import {
   getToolbarCatalog,
   listExperiments,
   moveObject,
-  moveProduceLotBetweenWorkbenchTools,
   openWorkbenchTool,
   subscribeToExperimentStream,
 } from "@/lib/api";
@@ -343,33 +342,6 @@ describe("api client", () => {
       destination: { kind: "workbench_slot", id: "station_1" },
       entity: { kind: "tool", id: "cutting_board_hdpe" },
       source: { kind: "palette", id: "cutting_board_hdpe" },
-    });
-  });
-
-  it("moves produce through the generic DnD move endpoint", async () => {
-    const experiment = makeExperiment();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => experiment,
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      moveProduceLotBetweenWorkbenchTools("experiment_123", {
-        produce_lot_id: "produce_1",
-        source_slot_id: "station_1",
-        target_slot_id: "station_2",
-      }),
-    ).resolves.toEqual(experiment);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/experiments/experiment_123/dnd/move",
-      expect.objectContaining({ method: "POST" }),
-    );
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      destination: { kind: "workbench_tool", id: "station_2" },
-      entity: { kind: "produce_lot", id: "produce_1" },
-      source: { kind: "workbench", id: "station_1" },
     });
   });
 

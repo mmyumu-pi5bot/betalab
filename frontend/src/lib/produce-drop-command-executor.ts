@@ -1,42 +1,19 @@
 import type { ProduceDropCommand } from "@/lib/produce-drop-command-resolver";
 import type { DropDraft } from "@/hooks/use-drop-draft";
-import type {
-  AddWorkspaceProduceLotToWidgetPayload,
-  AddProduceLotToWorkbenchToolPayload,
-  MoveGrossBalanceProduceLotToWidgetPayload,
-  MoveGrossBalanceProduceLotToWorkbenchPayload,
-  MoveProduceLotBetweenWorkbenchToolsPayload,
-  MoveWidgetProduceLotToWorkbenchToolPayload,
-  MoveWorkbenchProduceLotToGrossBalancePayload,
-  MoveWorkbenchProduceLotToWidgetPayload,
-  MoveWorkspaceProduceLotToGrossBalancePayload,
-  RestoreTrashedProduceLotToGrossBalancePayload,
-  RestoreTrashedProduceLotToWorkbenchToolPayload,
-  RestoreTrashedProduceLotToWidgetPayload,
-} from "@/types/api-payloads";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 type SetPendingDropDraft = (draft: DropDraft | null) => void;
 
 type WorkbenchProduceDropApi = {
-  addProduceLotToWorkbenchTool: (payload: AddProduceLotToWorkbenchToolPayload) => void;
-  moveGrossBalanceProduceLotToWorkbench: (payload: MoveGrossBalanceProduceLotToWorkbenchPayload) => void;
-  moveProduceLotBetweenWorkbenchTools: (payload: MoveProduceLotBetweenWorkbenchToolsPayload) => void;
-  moveWidgetProduceLotToWorkbenchTool: (payload: MoveWidgetProduceLotToWorkbenchToolPayload) => void;
-  restoreTrashedProduceLotToWorkbenchTool: (payload: RestoreTrashedProduceLotToWorkbenchToolPayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type GrossBalanceProduceDropApi = {
-  moveWidgetProduceLotToGrossBalance: (payload: MoveGrossBalanceProduceLotToWidgetPayload) => void;
-  moveWorkbenchProduceLotToGrossBalance: (payload: MoveWorkbenchProduceLotToGrossBalancePayload) => void;
-  moveWorkspaceProduceLotToGrossBalance: (payload: MoveWorkspaceProduceLotToGrossBalancePayload) => void;
-  restoreTrashedProduceLotToGrossBalance: (payload: RestoreTrashedProduceLotToGrossBalancePayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 type GrinderProduceDropApi = {
-  addWorkspaceProduceLotToWidget: (payload: AddWorkspaceProduceLotToWidgetPayload) => void;
-  moveGrossBalanceProduceLotToWidget: (payload: MoveGrossBalanceProduceLotToWidgetPayload) => void;
-  moveWorkbenchProduceLotToWidget: (payload: MoveWorkbenchProduceLotToWidgetPayload) => void;
-  restoreTrashedProduceLotToWidget: (payload: RestoreTrashedProduceLotToWidgetPayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
 };
 
 function openProduceDraft(
@@ -78,24 +55,8 @@ export function executeWorkbenchProduceDropCommand(
     openProduceDraft(command, options.setPendingDropDraft, options.buildDebugProduceDraftFields);
     return true;
   }
-  if (command.kind === "add_produce_lot_to_workbench_tool") {
-    void api.addProduceLotToWorkbenchTool(command.payload);
-    return true;
-  }
-  if (command.kind === "move_produce_lot_between_workbench_tools") {
-    void api.moveProduceLotBetweenWorkbenchTools(command.payload);
-    return true;
-  }
-  if (command.kind === "move_widget_produce_lot_to_workbench_tool") {
-    void api.moveWidgetProduceLotToWorkbenchTool(command.payload);
-    return true;
-  }
-  if (command.kind === "move_gross_balance_produce_lot_to_workbench") {
-    void api.moveGrossBalanceProduceLotToWorkbench(command.payload);
-    return true;
-  }
-  if (command.kind === "restore_trashed_produce_lot_to_workbench_tool") {
-    void api.restoreTrashedProduceLotToWorkbenchTool(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   return false;
@@ -113,20 +74,8 @@ export function executeGrossBalanceProduceDropCommand(
     openProduceDraft(command, options.setPendingDropDraft, options.buildDebugProduceDraftFields);
     return true;
   }
-  if (command.kind === "move_workspace_produce_lot_to_gross_balance") {
-    void api.moveWorkspaceProduceLotToGrossBalance(command.payload);
-    return true;
-  }
-  if (command.kind === "move_workbench_produce_lot_to_gross_balance") {
-    void api.moveWorkbenchProduceLotToGrossBalance(command.payload);
-    return true;
-  }
-  if (command.kind === "move_widget_produce_lot_to_gross_balance") {
-    void api.moveWidgetProduceLotToGrossBalance(command.payload);
-    return true;
-  }
-  if (command.kind === "restore_trashed_produce_lot_to_gross_balance") {
-    void api.restoreTrashedProduceLotToGrossBalance(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   return false;
@@ -144,20 +93,8 @@ export function executeGrinderProduceDropCommand(
     openProduceDraft(command, options.setPendingDropDraft, options.buildDebugProduceDraftFields);
     return true;
   }
-  if (command.kind === "add_workspace_produce_lot_to_widget") {
-    void api.addWorkspaceProduceLotToWidget(command.payload);
-    return true;
-  }
-  if (command.kind === "move_workbench_produce_lot_to_widget") {
-    void api.moveWorkbenchProduceLotToWidget(command.payload);
-    return true;
-  }
-  if (command.kind === "move_gross_balance_produce_lot_to_widget") {
-    void api.moveGrossBalanceProduceLotToWidget(command.payload);
-    return true;
-  }
-  if (command.kind === "restore_trashed_produce_lot_to_widget") {
-    void api.restoreTrashedProduceLotToWidget(command.payload);
+  if (command.kind === "move_object") {
+    void api.moveObject(command.payload);
     return true;
   }
   return false;

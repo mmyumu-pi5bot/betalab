@@ -92,18 +92,19 @@ describe("resolveLabelDropCommand", () => {
     });
     expect(resolveLabelDropCommand(createWorkbenchLabelPayload(), { kind: "workbench_slot", slotId: "station_1" })).toBeNull();
     expect(resolveLabelDropCommand(createWorkbenchLabelPayload(), { kind: "workbench_slot", slotId: "station_2" })).toEqual({
-      kind: "move_sample_label_between_workbench_tools",
+      kind: "move_object",
       payload: {
-        label_id: "bench_tool_1-sample-label",
-        source_slot_id: "station_1",
-        target_slot_id: "station_2",
+        destination: { kind: "workbench_tool", id: "station_2" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "workbench", id: "station_1" },
       },
     });
     expect(resolveLabelDropCommand(createTrashLabelPayload(), { kind: "workbench_slot", slotId: "station_2" })).toEqual({
-      kind: "restore_trashed_sample_label_to_workbench_tool",
+      kind: "move_object",
       payload: {
-        target_slot_id: "station_2",
-        trash_sample_label_id: "trash_sample_label_1",
+        destination: { kind: "workbench_tool", id: "station_2" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "trash", id: "trash_sample_label_1" },
       },
     });
   });
@@ -113,15 +114,20 @@ describe("resolveLabelDropCommand", () => {
       kind: "apply_sample_label_to_gross_balance_tool",
     });
     expect(resolveLabelDropCommand(createWorkbenchLabelPayload(), { kind: "gross_balance" })).toEqual({
-      kind: "move_workbench_sample_label_to_gross_balance",
+      kind: "move_object",
       payload: {
-        label_id: "bench_tool_1-sample-label",
-        source_slot_id: "station_1",
+        destination: { kind: "gross_balance", id: "gross_balance" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "workbench", id: "station_1" },
       },
     });
     expect(resolveLabelDropCommand(createTrashLabelPayload(), { kind: "gross_balance" })).toEqual({
-      kind: "restore_trashed_sample_label_to_gross_balance",
-      payload: { trash_sample_label_id: "trash_sample_label_1" },
+      kind: "move_object",
+      payload: {
+        destination: { kind: "gross_balance", id: "gross_balance" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "trash", id: "trash_sample_label_1" },
+      },
     });
     expect(resolveLabelDropCommand(createLimsTicketPayload(), { kind: "gross_balance" })).toEqual({
       kind: "apply_printed_lims_label_to_gross_balance_bag",
@@ -131,15 +137,20 @@ describe("resolveLabelDropCommand", () => {
       kind: "apply_sample_label_to_analytical_balance_tool",
     });
     expect(resolveLabelDropCommand(createWorkbenchLabelPayload(), { kind: "analytical_balance" })).toEqual({
-      kind: "move_workbench_sample_label_to_analytical_balance",
+      kind: "move_object",
       payload: {
-        label_id: "bench_tool_1-sample-label",
-        source_slot_id: "station_1",
+        destination: { kind: "analytical_balance", id: "analytical_balance" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "workbench", id: "station_1" },
       },
     });
     expect(resolveLabelDropCommand(createTrashLabelPayload(), { kind: "analytical_balance" })).toEqual({
-      kind: "restore_trashed_sample_label_to_analytical_balance",
-      payload: { trash_sample_label_id: "trash_sample_label_1" },
+      kind: "move_object",
+      payload: {
+        destination: { kind: "analytical_balance", id: "analytical_balance" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "trash", id: "trash_sample_label_1" },
+      },
     });
     expect(resolveLabelDropCommand(createLimsTicketPayload(), { kind: "analytical_balance" })).toEqual({
       kind: "apply_printed_lims_label_to_analytical_balance_tool",
@@ -151,10 +162,11 @@ describe("resolveLabelDropCommand", () => {
       kind: "discard_sample_label_from_palette",
     });
     expect(resolveLabelDropCommand(createWorkbenchLabelPayload(), { kind: "trash_bin" })).toEqual({
-      kind: "discard_sample_label_from_workbench_tool",
+      kind: "move_object",
       payload: {
-        label_id: "bench_tool_1-sample-label",
-        slot_id: "station_1",
+        destination: { kind: "trash_bin", id: "trash_bin" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "workbench", id: "station_1" },
       },
     });
     expect(resolveLabelDropCommand(createLimsTicketPayload(), { kind: "trash_bin" })).toEqual({

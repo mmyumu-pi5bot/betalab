@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -18,8 +18,6 @@ from app.domain.dnd_rules import (
     get_tool_allowed_drop_targets,
 )
 from app.domain.grinder_rules import (
-    GRINDER_AMBIENT_TEMPERATURE_C,
-    GRINDER_START_THRESHOLD_C,
     get_grinder_display_mode,
     get_grinder_start_block_reason,
 )
@@ -35,6 +33,8 @@ from app.domain.spatula_rules import (
     SPATULA_LOAD_SOURCE_TOOL_TYPES,
     SPATULA_POUR_TARGET_TOOL_TYPES,
 )
+
+
 class WorkbenchLiquidSchema(BaseModel):
     id: str
     liquid_id: str
@@ -93,23 +93,23 @@ class ContainmentSchema(BaseModel):
     blocked_reason: str | None = None
 
 
-def _tool_entity(tool: "WorkbenchToolSchema") -> ContainedEntitySchema:
+def _tool_entity(tool: WorkbenchToolSchema) -> ContainedEntitySchema:
     return ContainedEntitySchema(entity_kind="tool", id=tool.id, tool_type=tool.tool_type)
 
 
-def _produce_lot_entity(lot: "ProduceLotSchema") -> ContainedEntitySchema:
+def _produce_lot_entity(lot: ProduceLotSchema) -> ContainedEntitySchema:
     return ContainedEntitySchema(entity_kind="produce", id=lot.id, produce_type=lot.produce_type)
 
 
-def _produce_fraction_entity(fraction: "ProduceFractionSchema") -> ContainedEntitySchema:
+def _produce_fraction_entity(fraction: ProduceFractionSchema) -> ContainedEntitySchema:
     return ContainedEntitySchema(entity_kind="produce", id=fraction.id)
 
 
-def _liquid_entity(liquid: "WorkbenchLiquidSchema") -> ContainedEntitySchema:
+def _liquid_entity(liquid: WorkbenchLiquidSchema) -> ContainedEntitySchema:
     return ContainedEntitySchema(entity_kind="liquid", id=liquid.id, liquid_type=liquid.liquid_id)
 
 
-def _sample_label_entity(label: "ContainerLabelSchema") -> ContainedEntitySchema:
+def _sample_label_entity(label: ContainerLabelSchema) -> ContainedEntitySchema:
     return ContainedEntitySchema(entity_kind="sample_label", id=label.id)
 
 
@@ -572,8 +572,8 @@ class WorkspaceWidgetSchema(BaseModel):
             temperatures=self._produce_temperatures_map(),
             grinder_run_remaining_ms=self.grinder_run_remaining_ms,
             grinder_fault=self.grinder_fault,
-            grinder_can_start=self.grinder_can_start,
-            grinder_start_block_reason=self.grinder_start_block_reason,
+            grinder_can_start=cast(bool, self.grinder_can_start),
+            grinder_start_block_reason=cast(str | None, self.grinder_start_block_reason),
         )
 
     def _produce_material_states_map(self) -> dict[str, str]:
@@ -693,22 +693,12 @@ class WorkbenchToolSampleLabelUpdateSchema(BaseModel):
     sample_label_text: str
 
 
-class WorkbenchToolSampleLabelMoveSchema(BaseModel):
-    label_id: str | None = None
-    target_tool_id: str
-
-
 class WorkbenchToolPowderPourSchema(BaseModel):
     delta_mass_g: float
 
 
-class WorkbenchToolProduceLotCreateSchema(BaseModel):
+class ProduceLotReferenceSchema(BaseModel):
     produce_lot_id: str
-
-
-class WorkbenchProduceLotMoveSchema(BaseModel):
-    source_slot_id: str
-    target_slot_id: str
 
 
 class PaletteToolDiscardSchema(BaseModel):
@@ -754,18 +744,6 @@ class DndMoveObjectSchema(BaseModel):
     destination: DndObjectRefSchema
 
 
-class TrashProduceLotRestoreToWorkbenchSchema(BaseModel):
-    target_slot_id: str
-
-
-class TrashProduceLotRestoreToWidgetSchema(BaseModel):
-    widget_id: str
-
-
-class TrashSampleLabelRestoreSchema(BaseModel):
-    target_tool_id: str
-
-
 class WorkspaceWidgetCreateSchema(LayoutPositionSchema):
     widget_id: str
 
@@ -799,24 +777,6 @@ class DebugProducePresetSpawnToWidgetSchema(BaseModel):
     total_mass_g: float | None = None
     temperature_c: float | None = None
     residual_co2_mass_g: float | None = None
-
-
-class WorkspaceWidgetProduceLotCreateSchema(BaseModel):
-    produce_lot_id: str
-
-
-class WorkspaceWidgetMoveWorkbenchProduceLotSchema(BaseModel):
-    source_slot_id: str
-    produce_lot_id: str
-
-
-class WorkspaceWidgetMoveProduceLotToWorkbenchSchema(BaseModel):
-    target_slot_id: str
-
-
-class GrossBalanceMoveProduceLotToWorkbenchSchema(BaseModel):
-    target_slot_id: str
-    produce_lot_id: str
 
 
 class ReceivedBagPlacementSchema(BaseModel):

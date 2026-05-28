@@ -5,13 +5,9 @@ import { executeTrashDropCommand } from "@/lib/trash-drop-command-executor";
 describe("trash-drop-command-executor", () => {
   it("dispatches workspace liquid and produce trash commands", () => {
     const api = {
-      discardGrossBalanceProduceLot: vi.fn(),
       discardPrintedLimsLabel: vi.fn(),
-      discardProduceLotFromWorkbenchTool: vi.fn(),
       discardSampleLabelFromPalette: vi.fn(),
-      discardSampleLabelFromWorkbenchTool: vi.fn(),
-      discardWidgetProduceLot: vi.fn(),
-      discardWorkspaceProduceLot: vi.fn(),
+      moveObject: vi.fn(),
       removeLiquidFromWorkspaceWidget: vi.fn(),
     };
 
@@ -25,24 +21,25 @@ describe("trash-drop-command-executor", () => {
     });
 
     expect(executeTrashDropCommand({
-      kind: "discard_produce_lot_from_workbench_tool",
-      payload: { produce_lot_id: "produce_1", slot_id: "station_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "workbench", id: "station_1" },
+        destination: { kind: "trash_bin", id: "trash_bin" },
+      },
     }, api)).toBe(true);
-    expect(api.discardProduceLotFromWorkbenchTool).toHaveBeenCalledWith({
-      produce_lot_id: "produce_1",
-      slot_id: "station_1",
+    expect(api.moveObject).toHaveBeenCalledWith({
+      entity: { kind: "produce_lot", id: "produce_1" },
+      source: { kind: "workbench", id: "station_1" },
+      destination: { kind: "trash_bin", id: "trash_bin" },
     });
   });
 
   it("dispatches label trash commands and rejects unrelated commands", () => {
     const api = {
-      discardGrossBalanceProduceLot: vi.fn(),
       discardPrintedLimsLabel: vi.fn(),
-      discardProduceLotFromWorkbenchTool: vi.fn(),
       discardSampleLabelFromPalette: vi.fn(),
-      discardSampleLabelFromWorkbenchTool: vi.fn(),
-      discardWidgetProduceLot: vi.fn(),
-      discardWorkspaceProduceLot: vi.fn(),
+      moveObject: vi.fn(),
       removeLiquidFromWorkspaceWidget: vi.fn(),
     };
 
@@ -52,8 +49,7 @@ describe("trash-drop-command-executor", () => {
     expect(api.discardPrintedLimsLabel).toHaveBeenCalled();
 
     expect(executeTrashDropCommand({
-      kind: "move_workbench_sample_label_to_gross_balance",
-      payload: { label_id: "label_1", source_slot_id: "station_1" },
+      kind: "apply_sample_label_to_gross_balance_tool",
     }, api)).toBe(false);
   });
 });

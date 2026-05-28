@@ -21,18 +21,12 @@ import type { DragStateApi } from "@/hooks/use-drag-state";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type {
-  AddWorkspaceProduceLotToWidgetPayload,
-  MoveGrossBalanceProduceLotToWidgetPayload,
-  MoveWorkbenchProduceLotToWidgetPayload,
-  RestoreTrashedProduceLotToWidgetPayload,
+  MoveObjectPayload,
   StartGrinderCyclePayload,
 } from "@/types/api-payloads";
 
 export type GrinderDndExperimentApi = {
-  addWorkspaceProduceLotToWidget: (payload: AddWorkspaceProduceLotToWidgetPayload) => void;
-  moveGrossBalanceProduceLotToWidget: (payload: MoveGrossBalanceProduceLotToWidgetPayload) => void;
-  moveWorkbenchProduceLotToWidget: (payload: MoveWorkbenchProduceLotToWidgetPayload) => void;
-  restoreTrashedProduceLotToWidget: (payload: RestoreTrashedProduceLotToWidgetPayload) => void;
+  moveObject: (payload: MoveObjectPayload) => void;
   startGrinderCycle: (payload: StartGrinderCyclePayload) => void;
 };
 

@@ -26,23 +26,13 @@ import type {
 } from "@/types/workbench";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type {
-  DiscardGrossBalanceProduceLotPayload,
-  DiscardProduceLotFromWorkbenchToolPayload,
-  DiscardSampleLabelFromWorkbenchToolPayload,
-  DiscardWidgetProduceLotPayload,
-  DiscardWorkspaceProduceLotPayload,
   MoveObjectPayload,
   RemoveLiquidFromWorkspaceWidgetPayload,
 } from "@/types/api-payloads";
 
 export type TrashDndExperimentApi = {
-  discardGrossBalanceProduceLot: (payload: DiscardGrossBalanceProduceLotPayload) => void;
   discardPrintedLimsLabel: () => void;
-  discardProduceLotFromWorkbenchTool: (payload: DiscardProduceLotFromWorkbenchToolPayload) => void;
   discardSampleLabelFromPalette: () => void;
-  discardSampleLabelFromWorkbenchTool: (payload: DiscardSampleLabelFromWorkbenchToolPayload) => void;
-  discardWidgetProduceLot: (payload: DiscardWidgetProduceLotPayload) => void;
-  discardWorkspaceProduceLot: (payload: DiscardWorkspaceProduceLotPayload) => void;
   moveObject: (payload: MoveObjectPayload) => void;
   removeLiquidFromWorkspaceWidget: (payload: RemoveLiquidFromWorkspaceWidgetPayload) => void;
 };

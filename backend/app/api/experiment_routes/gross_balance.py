@@ -1,14 +1,11 @@
 from app.schemas.experiment import (
     BasketToolReferenceSchema,
     ExperimentSchema,
-    GrossBalanceMoveProduceLotToWorkbenchSchema,
+    ProduceLotReferenceSchema,
     RackSlotReferenceSchema,
     TargetWorkbenchSlotSchema,
     WorkbenchSlotReferenceSchema,
     WorkbenchToolPlacementSchema,
-    WorkbenchToolProduceLotCreateSchema,
-    WorkspaceWidgetMoveWorkbenchProduceLotSchema,
-    WorkspaceWidgetProduceLotCreateSchema,
 )
 from app.services.domain_services.gross_balance import (
     ApplySampleLabelToGrossBalanceToolService,
@@ -21,33 +18,17 @@ from app.services.domain_services.gross_balance import (
     MoveAnalyticalBalanceToolToGrossBalanceService,
     MoveBasketToolToGrossBalanceRequest,
     MoveBasketToolToGrossBalanceService,
-    MoveGrossBalanceProduceLotToWidgetRequest,
-    MoveGrossBalanceProduceLotToWidgetService,
-    MoveGrossBalanceProduceLotToWorkbenchRequest,
-    MoveGrossBalanceProduceLotToWorkbenchService,
     MoveGrossBalanceToolToRackRequest,
     MoveGrossBalanceToolToRackService,
     MoveGrossBalanceToolToWorkbenchRequest,
     MoveGrossBalanceToolToWorkbenchService,
     MoveRackToolToGrossBalanceRequest,
     MoveRackToolToGrossBalanceService,
-    MoveWidgetProduceLotToGrossBalanceRequest,
-    MoveWidgetProduceLotToGrossBalanceService,
-    MoveWorkbenchProduceLotToGrossBalanceRequest,
-    MoveWorkbenchProduceLotToGrossBalanceService,
-    MoveWorkbenchSampleLabelToGrossBalanceRequest,
-    MoveWorkbenchSampleLabelToGrossBalanceService,
     MoveWorkbenchToolToGrossBalanceRequest,
     MoveWorkbenchToolToGrossBalanceService,
-    MoveWorkspaceProduceLotToGrossBalanceRequest,
-    MoveWorkspaceProduceLotToGrossBalanceService,
     OpenGrossBalanceToolService,
     PlaceToolOnGrossBalanceRequest,
     PlaceToolOnGrossBalanceService,
-    RestoreTrashedProduceLotToGrossBalanceRequest,
-    RestoreTrashedProduceLotToGrossBalanceService,
-    RestoreTrashedSampleLabelToGrossBalanceRequest,
-    RestoreTrashedSampleLabelToGrossBalanceService,
     RestoreTrashedToolToGrossBalanceRequest,
     RestoreTrashedToolToGrossBalanceService,
 )
@@ -179,156 +160,10 @@ def apply_sample_label_to_gross_balance_tool(experiment_id: str) -> ExperimentSc
     )
 
 
-@router.post(
-    "/{experiment_id}/gross-balance/sample-labels/{label_id}/move-from-workbench-tool",
-    response_model=ExperimentSchema,
-)
-def move_workbench_sample_label_to_gross_balance(
-    experiment_id: str,
-    label_id: str,
-    request: WorkbenchSlotReferenceSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveWorkbenchSampleLabelToGrossBalanceService(experiment_service).run(
-            experiment_id,
-            MoveWorkbenchSampleLabelToGrossBalanceRequest(
-                source_slot_id=request.slot_id,
-                label_id=label_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/restore-trash-sample-label/{trash_sample_label_id}",
-    response_model=ExperimentSchema,
-)
-def restore_trashed_sample_label_to_gross_balance(
-    experiment_id: str,
-    trash_sample_label_id: str,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: RestoreTrashedSampleLabelToGrossBalanceService(experiment_service).run(
-            experiment_id,
-            RestoreTrashedSampleLabelToGrossBalanceRequest(
-                trash_sample_label_id=trash_sample_label_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/place-workspace-produce-lot/{produce_lot_id}",
-    response_model=ExperimentSchema,
-)
-def move_workspace_produce_lot_to_gross_balance(
-    experiment_id: str,
-    produce_lot_id: str,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveWorkspaceProduceLotToGrossBalanceService(experiment_service).run(
-            experiment_id,
-            MoveWorkspaceProduceLotToGrossBalanceRequest(produce_lot_id=produce_lot_id),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/place-workbench-produce-lot",
-    response_model=ExperimentSchema,
-)
-def move_workbench_produce_lot_to_gross_balance(
-    experiment_id: str,
-    request: WorkspaceWidgetMoveWorkbenchProduceLotSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveWorkbenchProduceLotToGrossBalanceService(experiment_service).run(
-            experiment_id,
-            MoveWorkbenchProduceLotToGrossBalanceRequest(
-                source_slot_id=request.source_slot_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/place-widget-produce-lot",
-    response_model=ExperimentSchema,
-)
-def move_widget_produce_lot_to_gross_balance(
-    experiment_id: str,
-    request: WorkspaceWidgetProduceLotCreateSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveWidgetProduceLotToGrossBalanceService(experiment_service).run(
-            experiment_id,
-            MoveWidgetProduceLotToGrossBalanceRequest(
-                widget_id="grinder",
-                produce_lot_id=request.produce_lot_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/restore-trash-produce-lot/{trash_produce_lot_id}",
-    response_model=ExperimentSchema,
-)
-def restore_trashed_produce_lot_to_gross_balance(
-    experiment_id: str,
-    trash_produce_lot_id: str,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: RestoreTrashedProduceLotToGrossBalanceService(experiment_service).run(
-            experiment_id,
-            RestoreTrashedProduceLotToGrossBalanceRequest(trash_produce_lot_id=trash_produce_lot_id),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/move-produce-lot-to-workbench",
-    response_model=ExperimentSchema,
-)
-def move_gross_balance_produce_lot_to_workbench(
-    experiment_id: str,
-    request: GrossBalanceMoveProduceLotToWorkbenchSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveGrossBalanceProduceLotToWorkbenchService(experiment_service).run(
-            experiment_id,
-            MoveGrossBalanceProduceLotToWorkbenchRequest(
-                target_slot_id=request.target_slot_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-        )
-    )
-
-
-@router.post(
-    "/{experiment_id}/gross-balance/move-produce-lot-to-widget",
-    response_model=ExperimentSchema,
-)
-def move_gross_balance_produce_lot_to_widget(
-    experiment_id: str,
-    request: WorkspaceWidgetProduceLotCreateSchema,
-) -> ExperimentSchema:
-    return handle_service_errors(
-        lambda: MoveGrossBalanceProduceLotToWidgetService(experiment_service).run(
-            experiment_id,
-            MoveGrossBalanceProduceLotToWidgetRequest(
-                widget_id="grinder",
-                produce_lot_id=request.produce_lot_id,
-            ),
-        )
-    )
-
-
 @router.post("/{experiment_id}/gross-balance/discard-produce-lot", response_model=ExperimentSchema)
 def discard_gross_balance_produce_lot(
     experiment_id: str,
-    request: WorkbenchToolProduceLotCreateSchema,
+    request: ProduceLotReferenceSchema,
 ) -> ExperimentSchema:
     return handle_service_errors(
         lambda: DiscardGrossBalanceProduceLotService(experiment_service).run(

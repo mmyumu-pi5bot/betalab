@@ -10,7 +10,7 @@ from app.services.helpers.lookups import (
     find_workbench_slot,
     find_workspace_widget,
 )
-from app.services.helpers.produce_canonical import sync_canonical_produce_model
+from app.services.helpers.produce_canonical import mark_surface_fractions_contaminated, sync_canonical_produce_model
 
 EntityT = TypeVar("EntityT")
 SourceEntityT = TypeVar("SourceEntityT")
@@ -64,7 +64,7 @@ class TransferService(Generic[EntityT]):
         placement = target.place(experiment, removal.entity)
         sync_canonical_produce_model(experiment)
         if placement.contaminated_lot_id is not None:
-            _mark_surface_fractions_contaminated(experiment, placement.contaminated_lot_id)
+            mark_surface_fractions_contaminated(experiment, placement.contaminated_lot_id)
         return TransferResult(
             entity=removal.entity,
             source_label=removal.source_label,
@@ -250,13 +250,6 @@ class WorkbenchProduceLotTarget:
             target_label=slot.tool.label,
             location_label=f"{slot.tool.label} on {slot.label}",
         )
-
-
-def _mark_surface_fractions_contaminated(experiment: Experiment, lot_id: str) -> None:
-    for slot in experiment.workbench.slots:
-        for fraction in slot.surface_produce_fractions:
-            if fraction.produce_lot_id == lot_id:
-                fraction.is_contaminated = True
 
 
 def _find_grinder_widget(experiment: Experiment, widget_id: str):

@@ -11,7 +11,6 @@ from app.api.experiment_routes import dnd as experiment_routes_dnd
 from app.api.experiment_routes import gross_balance as experiment_routes_gross_balance
 from app.api.experiment_routes import rack as experiment_routes_rack
 from app.api.experiment_routes import reception as experiment_routes_reception
-from app.api.experiment_routes import trash as experiment_routes_trash
 from app.api.experiment_routes import workbench as experiment_routes_workbench
 from app.api.experiment_routes import workbench_labels as experiment_routes_workbench_labels
 from app.api.experiment_routes import workbench_liquids as experiment_routes_workbench_liquids
@@ -41,7 +40,6 @@ def isolated_api_experiment_service(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(experiment_routes_rack, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_reception, "experiment_service", isolated_service)
-    monkeypatch.setattr(experiment_routes_trash, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench_labels, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench_liquids, "experiment_service", isolated_service)
@@ -68,6 +66,17 @@ def _find_widget(payload: dict, widget_id: str) -> dict:
 
 def _find_material_state(payload: dict, produce_lot_id: str) -> dict:
     return next(state for state in payload["produce_material_states"] if state["produce_lot_id"] == produce_lot_id)
+
+
+def _dnd_move(client: TestClient, experiment_id: str, *, entity: dict, source: dict, destination: dict):
+    return client.post(
+        f"/experiments/{experiment_id}/dnd/move",
+        json={
+            "entity": entity,
+            "source": source,
+            "destination": destination,
+        },
+    )
 
 
 def test_settings_defaults_are_exposed() -> None:
@@ -415,9 +424,12 @@ def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
         bag_tool_id = received_bag["id"]
         board_tool_id = board["id"]
 
-        moved_to_board = client.post(
-            f"/experiments/{experiment_id}/workbench/produce-lots/{produce_lot_id}/move-to-tool",
-            json={"source_slot_id": "station_1", "target_slot_id": "station_2"},
+        moved_to_board = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "workbench", "id": "station_1"},
+            destination={"kind": "workbench_tool", "id": "station_2"},
         )
         cut = client.post(
             f"/experiments/{experiment_id}/workbench/produce-lots/{produce_lot_id}/cut",
@@ -429,9 +441,12 @@ def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
             f"/experiments/{experiment_id}/workspace/widgets",
             json={"widget_id": "grinder", "anchor": "top-right", "offset_x": 0, "offset_y": 420},
         )
-        moved_to_grinder = client.post(
-            f"/experiments/{experiment_id}/workspace/widgets/grinder/move-workbench-produce-lot",
-            json={"source_slot_id": "station_2", "produce_lot_id": produce_lot_id},
+        moved_to_grinder = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "workbench", "id": "station_2"},
+            destination={"kind": "workspace_widget", "id": "grinder"},
         )
         cooled = client.post(
             f"/experiments/{experiment_id}/workspace/widgets/grinder/liquids",
@@ -446,9 +461,12 @@ def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
         )
         jar_tool_id = _find_slot(placed_jar.json(), "station_3")["tool"]["id"]
         opened_jar = client.post(f"/experiments/{experiment_id}/workbench/tools/{jar_tool_id}/open")
-        moved_to_jar = client.post(
-            f"/experiments/{experiment_id}/workspace/widgets/grinder/produce-lots/{produce_lot_id}/move-to-workbench-tool",
-            json={"target_slot_id": "station_3"},
+        moved_to_jar = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "grinder", "id": "grinder"},
+            destination={"kind": "workbench_tool", "id": "station_3"},
         )
 
     assert basket_moved_to_balance.status_code == 200
@@ -847,9 +865,12 @@ def test_workbench_close_route_projects_powder_when_co2_is_still_present() -> No
             json={"tool_id": "hdpe_storage_jar_2l"},
         )
         tool_id = placed.json()["workbench"]["slots"][0]["tool"]["id"]
-        client.post(
-            f"/experiments/{experiment_id}/workbench/tools/{tool_id}/add-produce-lot",
-            json={"produce_lot_id": produce_lot_id},
+        _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "basket", "id": "produce_basket"},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
 
         experiment_state = experiment_service._experiments[experiment_id]
@@ -885,9 +906,12 @@ def test_sealed_storage_jar_pops_after_physics_ticks_over_http() -> None:
             json={"tool_id": "hdpe_storage_jar_2l"},
         )
         tool_id = placed.json()["workbench"]["slots"][0]["tool"]["id"]
-        client.post(
-            f"/experiments/{experiment_id}/workbench/tools/{tool_id}/add-produce-lot",
-            json={"produce_lot_id": produce_lot_id},
+        _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "basket", "id": "produce_basket"},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
 
         experiment_state = experiment_service._experiments[experiment_id]
@@ -972,15 +996,22 @@ def test_workbench_sample_label_routes_round_trip_over_http() -> None:
             f"/experiments/{experiment_id}/workbench/tools/{first_tool_id}/sample-label",
             json={"sample_label_text": "LOT-2026-041"},
         )
-        moved = client.post(
-            f"/experiments/{experiment_id}/workbench/tools/{first_tool_id}/sample-label/move-to-tool",
-            json={"target_tool_id": second_tool_id},
+        label_id = updated.json()["workbench"]["slots"][0]["tool"]["labels"][0]["id"]
+        moved = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "sample_label", "id": label_id},
+            source={"kind": "workbench", "id": "station_1"},
+            destination={"kind": "workbench_tool", "id": "station_2"},
         )
         discarded = client.delete(f"/experiments/{experiment_id}/workbench/tools/{second_tool_id}/sample-label")
         trash_entry_id = discarded.json()["trash"]["sample_labels"][0]["id"]
-        restored = client.post(
-            f"/experiments/{experiment_id}/trash/sample-labels/{trash_entry_id}/restore-to-workbench-tool",
-            json={"target_tool_id": first_tool_id},
+        restored = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "sample_label", "id": trash_entry_id},
+            source={"kind": "trash", "id": trash_entry_id},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
 
     assert labeled.status_code == 200
@@ -1098,9 +1129,12 @@ def test_workspace_routes_round_trip_over_http() -> None:
                 json={"produce_type": "apple"},
             )
             produce_lot_id = produce_created.json()["basket_tools"][-1]["produce_lots"][0]["id"]
-            produce_loaded = client.post(
-                f"/experiments/{experiment_id}/workspace/widgets/grinder/add-produce-lot",
-                json={"produce_lot_id": produce_lot_id},
+            produce_loaded = _dnd_move(
+                client,
+                experiment_id,
+                entity={"kind": "produce_lot", "id": produce_lot_id},
+                source={"kind": "basket", "id": "produce_basket"},
+                destination={"kind": "workspace_widget", "id": "grinder"},
             )
             added_liquid = client.post(
                 f"/experiments/{experiment_id}/workspace/widgets/grinder/liquids",
@@ -1114,7 +1148,13 @@ def test_workspace_routes_round_trip_over_http() -> None:
             experiment_service._now_fn = lambda: warmed_at
             advanced = client.get(f"/experiments/{experiment_id}")
             removed_liquid = client.delete(f"/experiments/{experiment_id}/workspace/widgets/grinder/liquids/{liquid_id}")
-            discarded_produce_lot = client.post(f"/experiments/{experiment_id}/workspace/widgets/grinder/produce-lots/{produce_lot_id}/discard")
+            discarded_produce_lot = _dnd_move(
+                client,
+                experiment_id,
+                entity={"kind": "produce_lot", "id": produce_lot_id},
+                source={"kind": "grinder", "id": "grinder"},
+                destination={"kind": "trash_bin", "id": "trash"},
+            )
             stored_widget = client.post(f"/experiments/{experiment_id}/workspace/widgets/grinder/store")
     finally:
         experiment_service._now_fn = original_now_fn
@@ -1162,9 +1202,12 @@ def test_experiment_stream_pushes_updated_snapshots() -> None:
                 json={"produce_type": "apple"},
             )
             produce_lot_id = produced.json()["basket_tools"][-1]["produce_lots"][0]["id"]
-            client.post(
-                f"/experiments/{experiment_id}/workspace/widgets/grinder/add-produce-lot",
-                json={"produce_lot_id": produce_lot_id},
+            _dnd_move(
+                client,
+                experiment_id,
+                entity={"kind": "produce_lot", "id": produce_lot_id},
+                source={"kind": "basket", "id": "produce_basket"},
+                destination={"kind": "workspace_widget", "id": "grinder"},
             )
             client.post(
                 f"/experiments/{experiment_id}/workspace/widgets/grinder/liquids",
@@ -1192,55 +1235,84 @@ def test_produce_lot_routes_round_trip_over_http() -> None:
             json={"produce_type": "apple"},
         )
         first_lot_id = created.json()["basket_tools"][-1]["produce_lots"][0]["id"]
-        placed_board = client.post(
+        client.post(
             f"/experiments/{experiment_id}/workbench/slots/station_1/place-tool",
             json={"tool_id": "cutting_board_hdpe"},
         )
-        board_id = placed_board.json()["workbench"]["slots"][0]["tool"]["id"]
-        added_to_board = client.post(
-            f"/experiments/{experiment_id}/workbench/tools/{board_id}/add-produce-lot",
-            json={"produce_lot_id": first_lot_id},
+        added_to_board = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": first_lot_id},
+            source={"kind": "basket", "id": "produce_basket"},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
         cut = client.post(
             f"/experiments/{experiment_id}/workbench/produce-lots/{first_lot_id}/cut",
             json={"slot_id": "station_1"},
         )
-        discarded_from_board = client.post(
-            f"/experiments/{experiment_id}/workbench/produce-lots/{first_lot_id}/discard",
-            json={"slot_id": "station_1"},
+        discarded_from_board = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": first_lot_id},
+            source={"kind": "workbench", "id": "station_1"},
+            destination={"kind": "trash_bin", "id": "trash"},
         )
         trash_entry_id = discarded_from_board.json()["trash"]["produce_lots"][0]["id"]
-        restored_to_board = client.post(
-            f"/experiments/{experiment_id}/trash/produce-lots/{trash_entry_id}/restore-to-workbench-tool",
-            json={"target_slot_id": "station_1"},
+        restored_to_board = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": trash_entry_id},
+            source={"kind": "trash", "id": trash_entry_id},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
-        discarded_again = client.post(
-            f"/experiments/{experiment_id}/workbench/produce-lots/{first_lot_id}/discard",
-            json={"slot_id": "station_1"},
+        discarded_again = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": first_lot_id},
+            source={"kind": "workbench", "id": "station_1"},
+            destination={"kind": "trash_bin", "id": "trash"},
         )
         second_entry_id = discarded_again.json()["trash"]["produce_lots"][0]["id"]
         added_grinder = client.post(
             f"/experiments/{experiment_id}/workspace/widgets",
             json={"widget_id": "grinder", "anchor": "top-right", "offset_x": 0, "offset_y": 420},
         )
-        restored_to_widget = client.post(
-            f"/experiments/{experiment_id}/trash/produce-lots/{second_entry_id}/restore-to-widget",
-            json={"widget_id": "grinder"},
+        restored_to_widget = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": second_entry_id},
+            source={"kind": "trash", "id": second_entry_id},
+            destination={"kind": "workspace_widget", "id": "grinder"},
         )
-        moved_to_bench = client.post(
-            f"/experiments/{experiment_id}/workspace/widgets/grinder/produce-lots/{first_lot_id}/move-to-workbench-tool",
-            json={"target_slot_id": "station_2"},
+        moved_to_bench = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": first_lot_id},
+            source={"kind": "grinder", "id": "grinder"},
+            destination={"kind": "workbench_tool", "id": "station_2"},
         )
-        discarded_from_widget_target = client.post(
-            f"/experiments/{experiment_id}/workbench/produce-lots/{first_lot_id}/discard",
-            json={"slot_id": "station_2"},
+        discarded_from_widget_target = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": first_lot_id},
+            source={"kind": "workbench", "id": "station_2"},
+            destination={"kind": "trash_bin", "id": "trash"},
         )
         third_entry_id = discarded_from_widget_target.json()["trash"]["produce_lots"][0]["id"]
-        restored_to_widget_again = client.post(
-            f"/experiments/{experiment_id}/trash/produce-lots/{third_entry_id}/restore-to-widget",
-            json={"widget_id": "grinder"},
+        restored_to_widget_again = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": third_entry_id},
+            source={"kind": "trash", "id": third_entry_id},
+            destination={"kind": "workspace_widget", "id": "grinder"},
         )
-        discarded_from_widget = client.post(f"/experiments/{experiment_id}/workspace/widgets/grinder/produce-lots/{first_lot_id}/discard")
+        discarded_from_widget = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": first_lot_id},
+            source={"kind": "grinder", "id": "grinder"},
+            destination={"kind": "trash_bin", "id": "trash"},
+        )
 
     assert added_to_board.status_code == 200
     assert cut.status_code == 200
@@ -1268,22 +1340,27 @@ def test_workspace_move_workbench_produce_lot_to_widget_over_http() -> None:
             json={"produce_type": "apple"},
         )
         produce_lot_id = created.json()["basket_tools"][-1]["produce_lots"][0]["id"]
-        placed_board = client.post(
+        client.post(
             f"/experiments/{experiment_id}/workbench/slots/station_1/place-tool",
             json={"tool_id": "cutting_board_hdpe"},
         )
-        board_id = placed_board.json()["workbench"]["slots"][0]["tool"]["id"]
-        client.post(
-            f"/experiments/{experiment_id}/workbench/tools/{board_id}/add-produce-lot",
-            json={"produce_lot_id": produce_lot_id},
+        _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "basket", "id": "produce_basket"},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
         client.post(
             f"/experiments/{experiment_id}/workspace/widgets",
             json={"widget_id": "grinder", "anchor": "top-right", "offset_x": 0, "offset_y": 420},
         )
-        moved = client.post(
-            f"/experiments/{experiment_id}/workspace/widgets/grinder/move-workbench-produce-lot",
-            json={"source_slot_id": "station_1", "produce_lot_id": produce_lot_id},
+        moved = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "workbench", "id": "station_1"},
+            destination={"kind": "workspace_widget", "id": "grinder"},
         )
 
     assert moved.status_code == 200
@@ -1308,9 +1385,12 @@ def test_workspace_move_grinder_produce_lot_to_storage_jar_over_http() -> None:
         )
         produce_lot_id = _find_widget(produced.json(), "grinder")["produce_lots"][0]["id"]
 
-        moved = client.post(
-            f"/experiments/{experiment_id}/workspace/widgets/grinder/produce-lots/{produce_lot_id}/move-to-workbench-tool",
-            json={"target_slot_id": "station_1"},
+        moved = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "grinder", "id": "grinder"},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
 
     assert moved.status_code == 200
@@ -1339,9 +1419,12 @@ def test_move_gross_balance_produce_lot_to_workbench_over_http() -> None:
             json={"widget_id": "gross_balance", "total_mass_g": 10},
         )
         produce_lot_id = _find_widget(produced.json(), "gross_balance")["produce_lots"][0]["id"]
-        moved = client.post(
-            f"/experiments/{experiment_id}/gross-balance/move-produce-lot-to-workbench",
-            json={"target_slot_id": "station_1", "produce_lot_id": produce_lot_id},
+        moved = _dnd_move(
+            client,
+            experiment_id,
+            entity={"kind": "produce_lot", "id": produce_lot_id},
+            source={"kind": "gross_balance", "id": "gross_balance"},
+            destination={"kind": "workbench_tool", "id": "station_1"},
         )
 
     assert moved.status_code == 200

@@ -5,14 +5,24 @@ from typing import Literal
 
 import pytest
 
+from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
 from app.services.domain_services.analytical_balance import (
+    ApplySampleLabelToAnalyticalBalanceToolService,
+    EmptyRequest as AnalyticalBalanceEmptyRequest,
     PlaceToolOnAnalyticalBalanceRequest,
     PlaceToolOnAnalyticalBalanceService,
+)
+from app.services.domain_services.gross_balance import (
+    ApplySampleLabelToGrossBalanceToolService,
+    EmptyRequest as GrossBalanceEmptyRequest,
+    PlaceToolOnGrossBalanceRequest,
+    PlaceToolOnGrossBalanceService,
 )
 from app.services.domain_services.reception import (
     ApplyPrintedLimsLabelRequest,
     ApplyPrintedLimsLabelService,
     ApplyPrintedLimsLabelToAnalyticalBalanceToolService,
+    ApplyPrintedLimsLabelToGrossBalanceBagService,
     CreateLimsReceptionRequest,
     CreateLimsReceptionService,
     DiscardPrintedLimsLabelService,
@@ -28,12 +38,8 @@ from app.services.domain_services.workbench import (
     DiscardSampleLabelFromPaletteRequest,
     DiscardSampleLabelFromPaletteService,
     DiscardSampleLabelFromWorkbenchToolService,
-    MoveSampleLabelBetweenWorkbenchToolsRequest,
-    MoveSampleLabelBetweenWorkbenchToolsService,
     PlaceToolOnWorkbenchRequest,
     PlaceToolOnWorkbenchService,
-    RestoreTrashedSampleLabelToWorkbenchToolRequest,
-    RestoreTrashedSampleLabelToWorkbenchToolService,
     WorkbenchSampleLabelRequest,
     WorkbenchSlotRequest,
 )
@@ -45,8 +51,15 @@ from app.services.domain_services.workspace import (
 )
 from app.services.experiment_service import ExperimentRuntimeService
 
-LabelSource = Literal["palette_sample_label", "workbench_sample_label", "trash_sample_label", "lims_ticket"]
-LabelTarget = Literal["workbench_tool", "analytical_balance_tool", "empty_workbench", "trash"]
+LabelSource = Literal[
+    "palette_sample_label",
+    "workbench_sample_label",
+    "trash_sample_label",
+    "lims_ticket",
+    "gross_balance_sample_label",
+    "analytical_balance_sample_label",
+]
+LabelTarget = Literal["workbench_tool", "analytical_balance_tool", "gross_balance_tool", "empty_workbench", "trash"]
 LiquidSource = Literal["palette_standard_liquid", "palette_dry_ice", "grinder_liquid"]
 LiquidTarget = Literal["open_tube", "sealed_tube", "storage_jar", "grinder", "trash"]
 
@@ -67,17 +80,35 @@ class LiquidDndCase:
 
 LABEL_DND_CASES: tuple[LabelDndCase, ...] = (
     LabelDndCase("palette_sample_label", "workbench_tool", True),
+    LabelDndCase("palette_sample_label", "analytical_balance_tool", True),
+    LabelDndCase("palette_sample_label", "gross_balance_tool", True),
     LabelDndCase("palette_sample_label", "empty_workbench", False),
     LabelDndCase("palette_sample_label", "trash", True),
     LabelDndCase("workbench_sample_label", "workbench_tool", True),
+    LabelDndCase("workbench_sample_label", "analytical_balance_tool", True),
+    LabelDndCase("workbench_sample_label", "gross_balance_tool", True),
     LabelDndCase("workbench_sample_label", "empty_workbench", False),
     LabelDndCase("workbench_sample_label", "trash", True),
     LabelDndCase("trash_sample_label", "workbench_tool", True),
+    LabelDndCase("trash_sample_label", "analytical_balance_tool", True),
+    LabelDndCase("trash_sample_label", "gross_balance_tool", True),
     LabelDndCase("trash_sample_label", "empty_workbench", False),
+    LabelDndCase("trash_sample_label", "trash", False),
     LabelDndCase("lims_ticket", "workbench_tool", True),
     LabelDndCase("lims_ticket", "analytical_balance_tool", True),
+    LabelDndCase("lims_ticket", "gross_balance_tool", True),
     LabelDndCase("lims_ticket", "empty_workbench", False),
     LabelDndCase("lims_ticket", "trash", True),
+    LabelDndCase("gross_balance_sample_label", "workbench_tool", True),
+    LabelDndCase("gross_balance_sample_label", "analytical_balance_tool", True),
+    LabelDndCase("gross_balance_sample_label", "gross_balance_tool", False),
+    LabelDndCase("gross_balance_sample_label", "empty_workbench", False),
+    LabelDndCase("gross_balance_sample_label", "trash", True),
+    LabelDndCase("analytical_balance_sample_label", "workbench_tool", True),
+    LabelDndCase("analytical_balance_sample_label", "analytical_balance_tool", False),
+    LabelDndCase("analytical_balance_sample_label", "gross_balance_tool", True),
+    LabelDndCase("analytical_balance_sample_label", "empty_workbench", False),
+    LabelDndCase("analytical_balance_sample_label", "trash", True),
 )
 
 LIQUID_DND_CASES: tuple[LiquidDndCase, ...] = (
@@ -104,9 +135,13 @@ def _prepare_label_target(service: ExperimentRuntimeService, experiment_id: str,
         PlaceToolOnWorkbenchService(service).run(experiment_id, PlaceToolOnWorkbenchRequest(slot_id="station_2", tool_id="sealed_sampling_bag"))
     if target == "analytical_balance_tool":
         PlaceToolOnAnalyticalBalanceService(service).run(experiment_id, PlaceToolOnAnalyticalBalanceRequest(tool_id="centrifuge_tube_50ml"))
+    if target == "gross_balance_tool":
+        PlaceToolOnGrossBalanceService(service).run(experiment_id, PlaceToolOnGrossBalanceRequest(tool_id="centrifuge_tube_50ml"))
 
 
-def _prepare_label_source(service: ExperimentRuntimeService, experiment_id: str, source: LabelSource) -> tuple[str | None, str | None]:
+def _prepare_label_source(
+    service: ExperimentRuntimeService, experiment_id: str, source: LabelSource
+) -> tuple[str | None, str | None]:
     if source == "palette_sample_label":
         return None, None
     if source == "workbench_sample_label":
@@ -140,7 +175,47 @@ def _prepare_label_source(service: ExperimentRuntimeService, experiment_id: str,
         )
         PrintLimsLabelService(service).run(experiment_id, PrintLimsLabelRequest())
         return None, None
+    if source == "gross_balance_sample_label":
+        # Reuse tool already placed by _prepare_label_target if present, otherwise place one
+        current = service.get_experiment(experiment_id)
+        gross_balance = next(w for w in current.workspace.widgets if w.id == "gross_balance")
+        if gross_balance.tool is None:
+            PlaceToolOnGrossBalanceService(service).run(experiment_id, PlaceToolOnGrossBalanceRequest(tool_id="centrifuge_tube_50ml"))
+        labeled = ApplySampleLabelToGrossBalanceToolService(service).run(experiment_id, GrossBalanceEmptyRequest())
+        gross_balance = next(w for w in labeled.workspace.widgets if w.id == "gross_balance")
+        assert gross_balance.tool is not None
+        return gross_balance.tool.labels[0].id, None
+    if source == "analytical_balance_sample_label":
+        # Reuse tool already placed by _prepare_label_target if present, otherwise place one
+        current = service.get_experiment(experiment_id)
+        analytical_balance = next(w for w in current.workspace.widgets if w.id == "analytical_balance")
+        if analytical_balance.tool is None:
+            PlaceToolOnAnalyticalBalanceService(service).run(experiment_id, PlaceToolOnAnalyticalBalanceRequest(tool_id="centrifuge_tube_50ml"))
+        labeled = ApplySampleLabelToAnalyticalBalanceToolService(service).run(experiment_id, AnalyticalBalanceEmptyRequest())
+        analytical_balance = next(w for w in labeled.workspace.widgets if w.id == "analytical_balance")
+        assert analytical_balance.tool is not None
+        return analytical_balance.tool.labels[0].id, None
     raise AssertionError(f"Unhandled label source: {source}")
+
+
+def _move_sample_label(
+    service: ExperimentRuntimeService,
+    experiment_id: str,
+    *,
+    label_id: str,
+    source_kind: str,
+    source_id: str,
+    destination_kind: str,
+    destination_id: str,
+):
+    return DndMoveObjectService(service).run(
+        experiment_id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="sample_label", id=label_id),
+            source=DndObjectRef(kind=source_kind, id=source_id),
+            destination=DndObjectRef(kind=destination_kind, id=destination_id),
+        ),
+    )
 
 
 def _execute_label_drop(
@@ -156,38 +231,149 @@ def _execute_label_drop(
             return ApplySampleLabelToWorkbenchToolService(service).run(experiment_id, WorkbenchSlotRequest(slot_id="station_2"))
         if source == "workbench_sample_label":
             assert label_id is not None
-            return MoveSampleLabelBetweenWorkbenchToolsService(service).run(
-                experiment_id,
-                MoveSampleLabelBetweenWorkbenchToolsRequest(source_slot_id="station_1", target_slot_id="station_2", label_id=label_id),
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="workbench", source_id="station_1",
+                destination_kind="workbench_tool", destination_id="station_2",
             )
         if source == "trash_sample_label":
             assert trash_label_id is not None
-            return RestoreTrashedSampleLabelToWorkbenchToolService(service).run(
-                experiment_id,
-                RestoreTrashedSampleLabelToWorkbenchToolRequest(trash_sample_label_id=trash_label_id, target_slot_id="station_2"),
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=trash_label_id,
+                source_kind="trash", source_id=trash_label_id,
+                destination_kind="workbench_tool", destination_id="station_2",
             )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelService(service).run(experiment_id, ApplyPrintedLimsLabelRequest(slot_id="station_2"))
+        if source == "gross_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="gross_balance", source_id="gross_balance",
+                destination_kind="workbench_tool", destination_id="station_2",
+            )
+        if source == "analytical_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="analytical_balance", source_id="analytical_balance",
+                destination_kind="workbench_tool", destination_id="station_2",
+            )
     if target == "analytical_balance_tool":
+        if source == "palette_sample_label":
+            return ApplySampleLabelToAnalyticalBalanceToolService(service).run(experiment_id, AnalyticalBalanceEmptyRequest())
+        if source == "workbench_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="workbench", source_id="station_1",
+                destination_kind="analytical_balance", destination_id="analytical_balance",
+            )
+        if source == "trash_sample_label":
+            assert trash_label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=trash_label_id,
+                source_kind="trash", source_id=trash_label_id,
+                destination_kind="analytical_balance", destination_id="analytical_balance",
+            )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelToAnalyticalBalanceToolService(service).run(experiment_id, EmptyReceptionRequest())
+        if source == "gross_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="gross_balance", source_id="gross_balance",
+                destination_kind="analytical_balance", destination_id="analytical_balance",
+            )
+        if source == "analytical_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="analytical_balance", source_id="analytical_balance",
+                destination_kind="analytical_balance", destination_id="analytical_balance",
+            )
+    if target == "gross_balance_tool":
+        if source == "palette_sample_label":
+            return ApplySampleLabelToGrossBalanceToolService(service).run(experiment_id, GrossBalanceEmptyRequest())
+        if source == "workbench_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="workbench", source_id="station_1",
+                destination_kind="gross_balance", destination_id="gross_balance",
+            )
+        if source == "trash_sample_label":
+            assert trash_label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=trash_label_id,
+                source_kind="trash", source_id=trash_label_id,
+                destination_kind="gross_balance", destination_id="gross_balance",
+            )
+        if source == "lims_ticket":
+            return ApplyPrintedLimsLabelToGrossBalanceBagService(service).run(experiment_id, EmptyReceptionRequest())
+        if source == "gross_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="gross_balance", source_id="gross_balance",
+                destination_kind="gross_balance", destination_id="gross_balance",
+            )
+        if source == "analytical_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="analytical_balance", source_id="analytical_balance",
+                destination_kind="gross_balance", destination_id="gross_balance",
+            )
     if target == "empty_workbench":
         if source == "palette_sample_label":
             return ApplySampleLabelToWorkbenchToolService(service).run(experiment_id, WorkbenchSlotRequest(slot_id="station_2"))
         if source == "workbench_sample_label":
             assert label_id is not None
-            return MoveSampleLabelBetweenWorkbenchToolsService(service).run(
-                experiment_id,
-                MoveSampleLabelBetweenWorkbenchToolsRequest(source_slot_id="station_1", target_slot_id="station_2", label_id=label_id),
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="workbench", source_id="station_1",
+                destination_kind="workbench_tool", destination_id="station_2",
             )
         if source == "trash_sample_label":
             assert trash_label_id is not None
-            return RestoreTrashedSampleLabelToWorkbenchToolService(service).run(
-                experiment_id,
-                RestoreTrashedSampleLabelToWorkbenchToolRequest(trash_sample_label_id=trash_label_id, target_slot_id="station_2"),
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=trash_label_id,
+                source_kind="trash", source_id=trash_label_id,
+                destination_kind="workbench_tool", destination_id="station_2",
             )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelService(service).run(experiment_id, ApplyPrintedLimsLabelRequest(slot_id="station_2"))
+        if source == "gross_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="gross_balance", source_id="gross_balance",
+                destination_kind="workbench_tool", destination_id="station_2",
+            )
+        if source == "analytical_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="analytical_balance", source_id="analytical_balance",
+                destination_kind="workbench_tool", destination_id="station_2",
+            )
     if target == "trash":
         if source == "palette_sample_label":
             return DiscardSampleLabelFromPaletteService(service).run(
@@ -198,8 +384,32 @@ def _execute_label_drop(
             return DiscardSampleLabelFromWorkbenchToolService(service).run(
                 experiment_id, WorkbenchSampleLabelRequest(slot_id="station_1", label_id=label_id)
             )
+        if source == "trash_sample_label":
+            assert trash_label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=trash_label_id,
+                source_kind="trash", source_id=trash_label_id,
+                destination_kind="trash_bin", destination_id="trash_bin",
+            )
         if source == "lims_ticket":
             return DiscardPrintedLimsLabelService(service).run(experiment_id, EmptyReceptionRequest())
+        if source == "gross_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="gross_balance", source_id="gross_balance",
+                destination_kind="trash_bin", destination_id="trash_bin",
+            )
+        if source == "analytical_balance_sample_label":
+            assert label_id is not None
+            return _move_sample_label(
+                service, experiment_id,
+                label_id=label_id,
+                source_kind="analytical_balance", source_id="analytical_balance",
+                destination_kind="trash_bin", destination_id="trash_bin",
+            )
     raise ValueError(f"Unsupported label drop: {source} -> {target}")
 
 
@@ -230,6 +440,11 @@ def test_label_dnd_matrix(source: LabelSource, target: LabelTarget, allowed: boo
         analytical_balance = next(widget for widget in updated.workspace.widgets if widget.id == "analytical_balance")
         assert analytical_balance.tool is not None
         assert analytical_balance.tool.labels
+        return
+    if target == "gross_balance_tool":
+        gross_balance = next(widget for widget in updated.workspace.widgets if widget.id == "gross_balance")
+        assert gross_balance.tool is not None
+        assert gross_balance.tool.labels
         return
     if target == "trash":
         assert updated.trash.sample_labels

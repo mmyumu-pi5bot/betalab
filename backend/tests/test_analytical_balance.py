@@ -1,6 +1,7 @@
 import pytest
 
 from app.domain.models import ProduceFraction, ProduceMaterialState, TrashSampleLabelEntry
+from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
 from app.services.domain_services.analytical_balance import (
     AddLiquidToAnalyticalBalanceToolRequest,
     AddLiquidToAnalyticalBalanceToolService,
@@ -9,14 +10,10 @@ from app.services.domain_services.analytical_balance import (
     EmptyRequest,
     MoveAnalyticalBalanceToolToWorkbenchRequest,
     MoveAnalyticalBalanceToolToWorkbenchService,
-    MoveWorkbenchSampleLabelToAnalyticalBalanceRequest,
-    MoveWorkbenchSampleLabelToAnalyticalBalanceService,
     OpenAnalyticalBalanceToolService,
     PlaceToolOnAnalyticalBalanceRequest,
     PlaceToolOnAnalyticalBalanceService,
     RecordAnalyticalSampleMassService,
-    RestoreTrashedSampleLabelToAnalyticalBalanceRequest,
-    RestoreTrashedSampleLabelToAnalyticalBalanceService,
     TareAnalyticalBalanceService,
     UpdateAnalyticalBalanceToolSampleLabelTextRequest,
     UpdateAnalyticalBalanceToolSampleLabelTextService,
@@ -297,11 +294,13 @@ def test_sample_label_can_move_from_workbench_and_trash_to_analytical_balance() 
     runtime_experiment.workbench.slots[0].tool = build_workbench_tool("sample_vial_lcms")
     runtime_experiment.workbench.slots[0].tool.labels.append(build_manual_label(text="WB-1"))
 
-    moved = MoveWorkbenchSampleLabelToAnalyticalBalanceService(service).run(
+    label_id = runtime_experiment.workbench.slots[0].tool.labels[0].id
+    moved = DndMoveObjectService(service).run(
         experiment.id,
-        MoveWorkbenchSampleLabelToAnalyticalBalanceRequest(
-            source_slot_id="station_1",
-            label_id=runtime_experiment.workbench.slots[0].tool.labels[0].id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="sample_label", id=label_id),
+            source=DndObjectRef(kind="workbench", id="station_1"),
+            destination=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
         ),
     )
     moved_tool = _get_analytical_balance_tool(moved)
@@ -319,16 +318,74 @@ def test_sample_label_can_move_from_workbench_and_trash_to_analytical_balance() 
         )
     )
 
-    restored = RestoreTrashedSampleLabelToAnalyticalBalanceService(service).run(
+    restored = DndMoveObjectService(service).run(
         experiment.id,
-        RestoreTrashedSampleLabelToAnalyticalBalanceRequest(
-            trash_sample_label_id="trash_sample_label_1",
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="sample_label", id="trash_sample_label_1"),
+            source=DndObjectRef(kind="trash", id="trash_sample_label_1"),
+            destination=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
         ),
     )
     restored_tool = _get_analytical_balance_tool(restored)
     assert restored_tool is not None
     assert [label.text for label in restored_tool.labels] == ["WB-1", "TRASH-1"]
     assert restored.trash.sample_labels == []
+
+
+def test_sample_label_moves_through_generic_dnd_object_command() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    PlaceToolOnAnalyticalBalanceService(service).run(
+        experiment.id,
+        PlaceToolOnAnalyticalBalanceRequest(tool_id="centrifuge_tube_50ml"),
+    )
+    runtime_experiment = service._require_experiment(experiment.id)
+    runtime_experiment.workbench.slots[0].tool = build_workbench_tool("sample_vial_lcms")
+    runtime_experiment.workbench.slots[0].tool.labels.append(build_manual_label(text="GENERIC-1"))
+
+    label_id = runtime_experiment.workbench.slots[0].tool.labels[0].id
+    moved_to_balance = DndMoveObjectService(service).run(
+        experiment.id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="sample_label", id=label_id),
+            source=DndObjectRef(kind="workbench", id="station_1"),
+            destination=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
+        ),
+    )
+
+    balance_tool = _get_analytical_balance_tool(moved_to_balance)
+    assert balance_tool is not None
+    assert [label.text for label in balance_tool.labels] == ["GENERIC-1"]
+    assert moved_to_balance.workbench.slots[0].tool is not None
+    assert moved_to_balance.workbench.slots[0].tool.labels == []
+
+    moved_to_trash = DndMoveObjectService(service).run(
+        experiment.id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="sample_label", id=label_id),
+            source=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
+            destination=DndObjectRef(kind="trash_bin", id="trash_bin"),
+        ),
+    )
+
+    assert _get_analytical_balance_tool(moved_to_trash) is not None
+    assert _get_analytical_balance_tool(moved_to_trash).labels == []
+    assert [entry.label.text for entry in moved_to_trash.trash.sample_labels] == ["GENERIC-1"]
+
+    trash_entry_id = moved_to_trash.trash.sample_labels[0].id
+    restored = DndMoveObjectService(service).run(
+        experiment.id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="sample_label", id=trash_entry_id),
+            source=DndObjectRef(kind="trash", id=trash_entry_id),
+            destination=DndObjectRef(kind="workbench_tool", id="station_1"),
+        ),
+    )
+
+    assert restored.trash.sample_labels == []
+    assert restored.workbench.slots[0].tool is not None
+    assert [label.text for label in restored.workbench.slots[0].tool.labels] == ["GENERIC-1"]
 
 
 def test_printed_lims_ticket_can_apply_to_analytical_balance_tool() -> None:

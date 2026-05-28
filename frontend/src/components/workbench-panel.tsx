@@ -25,9 +25,9 @@ import type {
   ExperimentProduceLot,
   LimsLabelTicketDragPayload,
   ProduceDragPayload,
-  SampleLabelDragPayload,
   ToolbarDragPayload,
 } from "@/types/workbench";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 type ToolDropPayload = EquipmentToolDragPayload;
 
@@ -44,13 +44,12 @@ export type WorkbenchPanelHandlers = {
   onBenchToolIllustrationClick?: (slotId: string, tool: BenchToolInstance, event: MouseEvent<HTMLButtonElement>) => void;
   onBenchToolPointerDown?: (slotId: string, tool: BenchToolInstance, event: PointerEvent<HTMLElement>) => void;
   onBenchToolPointerUp?: (slotId: string, tool: BenchToolInstance, event: PointerEvent<HTMLElement>) => void;
-  onMoveSampleLabel?: (targetSlotId: string, payload: SampleLabelDragPayload) => void;
+  onMoveObject?: (payload: MoveObjectPayload) => void;
   onProduceDrop?: (targetSlotId: string, payload: ProduceDragPayload) => void;
   onProduceLotClick?: (slotId: string, produceLot: ExperimentProduceLot) => void;
   onProduceLotDragStart?: (slotId: string, produceLot: ExperimentProduceLot, dataTransfer: DataTransfer) => void;
   onRemoveLiquid?: (slotId: string, liquidId: string) => void;
   onRemoveWorkbenchSlot?: (slotId: string) => void;
-  onRestoreTrashedSampleLabel?: (targetSlotId: string, payload: SampleLabelDragPayload) => void;
   onSampleLabelDragEnd?: () => void;
   onSampleLabelDragStart?: (slotId: string, label: BenchLabel, dataTransfer: DataTransfer) => void;
   onSampleLabelTextChange?: (slotId: string, labelId: string, sampleLabelText: string) => void;
@@ -91,13 +90,12 @@ export function WorkbenchPanel({
     onBenchToolIllustrationClick,
     onBenchToolPointerDown,
     onBenchToolPointerUp,
-    onMoveSampleLabel,
+    onMoveObject,
     onProduceDrop,
     onProduceLotClick,
     onProduceLotDragStart,
     onRemoveLiquid,
     onRemoveWorkbenchSlot,
-    onRestoreTrashedSampleLabel,
     onSampleLabelDragEnd,
     onSampleLabelDragStart,
     onSampleLabelTextChange,
@@ -175,14 +173,8 @@ export function WorkbenchPanel({
         applySampleLabelToWorkbenchTool: (payload) => {
           onApplySampleLabel?.(payload.slot_id);
         },
-        moveSampleLabelBetweenWorkbenchTools: (payload) => {
-          onMoveSampleLabel?.(payload.target_slot_id, labelDragPayload.payload as SampleLabelDragPayload);
-        },
-        restoreTrashedSampleLabelToWorkbenchTool: (payload) => {
-          onRestoreTrashedSampleLabel?.(
-            payload.target_slot_id,
-            labelDragPayload.payload as SampleLabelDragPayload,
-          );
+        moveObject: (payload) => {
+          onMoveObject?.(payload);
         },
       });
       return;

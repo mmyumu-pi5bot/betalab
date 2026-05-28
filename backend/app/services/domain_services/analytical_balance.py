@@ -12,7 +12,6 @@ from app.services.helpers.lookups import (
     build_manual_label,
     find_rack_slot,
     find_tool_label,
-    find_trash_sample_label,
     find_trash_tool,
     find_workbench_slot,
     find_workspace_widget,
@@ -27,7 +26,7 @@ from app.services.helpers.produce_canonical import (
     split_tool_powder_into_spatula,
 )
 from app.services.helpers.tool_liquids import add_liquid_to_tool
-from app.services.helpers.workbench import build_workbench_tool, pop_tool_label
+from app.services.helpers.workbench import build_workbench_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 _ANALYTICAL_BALANCE_MAX_G = 220.0
@@ -88,17 +87,6 @@ class MoveAnalyticalBalanceToolToRackRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class MoveWorkbenchSampleLabelToAnalyticalBalanceRequest:
-    source_slot_id: str
-    label_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class RestoreTrashedSampleLabelToAnalyticalBalanceRequest:
-    trash_sample_label_id: str
-
-
-@dataclass(frozen=True, slots=True)
 class UpdateAnalyticalBalanceToolSampleLabelTextRequest:
     label_id: str
     sample_label_text: str
@@ -129,7 +117,7 @@ class AnalyticalBalanceServiceBase(WriteDomainService[object]):
         if widget.tool is not None:
             raise ValueError(f"{widget.label} already contains a tool.")
 
-    def _require_balance_tool(self, experiment: Experiment) -> WorkbenchTool:
+    def require_balance_tool(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_analytical_balance_widget(experiment)
         if widget.tool is None:
             raise ValueError(f"{widget.label} does not contain a tube.")
@@ -147,7 +135,7 @@ class AnalyticalBalanceServiceBase(WriteDomainService[object]):
             3,
         )
 
-    def _place_tool_on_balance(
+    def place_tool_on_balance(
         self,
         experiment: Experiment,
         tool: WorkbenchTool,
@@ -160,7 +148,7 @@ class AnalyticalBalanceServiceBase(WriteDomainService[object]):
         widget.tool = tool
         experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
 
-    def _take_tool_from_balance(self, experiment: Experiment) -> WorkbenchTool:
+    def take_tool_from_balance(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_analytical_balance_widget(experiment)
         if widget.tool is None:
             raise ValueError(f"{widget.label} does not contain a tube.")
@@ -176,13 +164,13 @@ class MoveWorkbenchToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
             raise ValueError(f"Place a tool on {source_slot.label} before moving it.")
         moved_tool = source_slot.tool
         source_slot.tool = None
-        self._place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
 
 
 class PlaceToolOnAnalyticalBalanceService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: PlaceToolOnAnalyticalBalanceRequest) -> None:
         tool = build_workbench_tool(request.tool_id)
-        self._place_tool_on_balance(experiment, tool)
+        self.place_tool_on_balance(experiment, tool)
 
 
 class MoveRackToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -192,7 +180,7 @@ class MoveRackToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
             raise ValueError(f"{rack_slot.label} does not contain a tool.")
         moved_tool = rack_slot.tool
         rack_slot.tool = None
-        self._place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
 
 
 class RestoreTrashedToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -200,7 +188,7 @@ class RestoreTrashedToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase)
         tool = find_trash_tool(experiment.trash, request.trash_tool_id)
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
-        self._place_tool_on_balance(experiment, tool, action_verb="restored to")
+        self.place_tool_on_balance(experiment, tool, action_verb="restored to")
 
 
 class MoveGrossBalanceToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -211,7 +199,7 @@ class MoveGrossBalanceToolToAnalyticalBalanceService(AnalyticalBalanceServiceBas
         moved_tool = gross_balance.tool
         gross_balance.tool = None
         experiment.lims_reception.measured_gross_mass_g = None
-        self._place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
 
 
 class MoveAnalyticalBalanceToolToWorkbenchService(AnalyticalBalanceServiceBase):
@@ -219,7 +207,7 @@ class MoveAnalyticalBalanceToolToWorkbenchService(AnalyticalBalanceServiceBase):
         target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
         if target_slot.tool is not None or target_slot.surface_produce_lots:
             raise ValueError(f"{target_slot.label} already contains a tool")
-        moved_tool = self._take_tool_from_balance(experiment)
+        moved_tool = self.take_tool_from_balance(experiment)
         target_slot.tool = moved_tool
         experiment.audit_log.append(f"{moved_tool.label} moved from Analytical balance to {target_slot.label}.")
 
@@ -229,14 +217,14 @@ class MoveAnalyticalBalanceToolToRackService(AnalyticalBalanceServiceBase):
         target_slot = find_rack_slot(experiment.rack, request.rack_slot_id)
         if target_slot.tool is not None:
             raise ValueError(f"{target_slot.label} already contains a tool")
-        moved_tool = self._take_tool_from_balance(experiment)
+        moved_tool = self.take_tool_from_balance(experiment)
         target_slot.tool = moved_tool
         experiment.audit_log.append(f"{moved_tool.label} moved from Analytical balance to {target_slot.label}.")
 
 
 class DiscardAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        discarded_tool = self._take_tool_from_balance(experiment)
+        discarded_tool = self.take_tool_from_balance(experiment)
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Analytical balance"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Analytical balance.")
@@ -252,7 +240,7 @@ class TareAnalyticalBalanceService(AnalyticalBalanceServiceBase):
 
 class OpenAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         if not can_tool_be_sealed(tool.tool_type):
             raise ValueError(f"{tool.label} does not support sealing.")
 
@@ -273,7 +261,7 @@ class OpenAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
 
 class CloseAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         if not can_tool_be_sealed(tool.tool_type):
             raise ValueError(f"{tool.label} does not support sealing.")
 
@@ -285,7 +273,7 @@ class CloseAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
 
 class AddLiquidToAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: AddLiquidToAnalyticalBalanceToolRequest) -> None:
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         add_liquid_to_tool(
             experiment,
             tool,
@@ -296,36 +284,14 @@ class AddLiquidToAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
 
 class ApplySampleLabelToAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         tool.labels.append(build_manual_label())
         experiment.audit_log.append(f"Manual label applied to {tool.label} on Analytical balance.")
 
 
-class MoveWorkbenchSampleLabelToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
-    def _run(self, experiment: Experiment, request: MoveWorkbenchSampleLabelToAnalyticalBalanceRequest) -> None:
-        source_slot = find_workbench_slot(experiment.workbench, request.source_slot_id)
-        if source_slot.tool is None:
-            raise ValueError(f"Place a tool on {source_slot.label} before moving its sample label.")
-
-        source_tool = source_slot.tool
-        target_tool = self._require_balance_tool(experiment)
-        label = pop_tool_label(source_tool, request.label_id)
-        target_tool.labels.append(label)
-        experiment.audit_log.append(f"Label moved from {source_tool.label} on {source_slot.label} to {target_tool.label} on Analytical balance.")
-
-
-class RestoreTrashedSampleLabelToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
-    def _run(self, experiment: Experiment, request: RestoreTrashedSampleLabelToAnalyticalBalanceRequest) -> None:
-        trashed_sample_label = find_trash_sample_label(experiment.trash, request.trash_sample_label_id)
-        target_tool = self._require_balance_tool(experiment)
-        target_tool.labels.append(trashed_sample_label.label)
-        experiment.trash.sample_labels = [entry for entry in experiment.trash.sample_labels if entry.id != trashed_sample_label.id]
-        experiment.audit_log.append(f"Label restored from trash to {target_tool.label} on Analytical balance.")
-
-
 class UpdateAnalyticalBalanceToolSampleLabelTextService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: UpdateAnalyticalBalanceToolSampleLabelTextRequest) -> None:
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         label = find_tool_label(tool, request.label_id)
         if label.label_kind != "manual":
             raise ValueError("Only manual labels can be edited.")
@@ -342,7 +308,7 @@ class UpdateAnalyticalBalanceToolSampleLabelTextService(AnalyticalBalanceService
 class PourSpatulaIntoAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: PourSpatulaIntoAnalyticalBalanceToolRequest) -> None:
         widget = self._find_analytical_balance_widget(experiment)
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         if not can_spatula_pour_into_tool(tool.tool_type):
             raise ValueError("The spatula can only pour into an autosampler vial or centrifuge tube.")
         if tool.is_sealed:
@@ -382,7 +348,7 @@ class LoadSpatulaFromAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         from app.services.domain_services.workbench import SPATULA_CAPACITY_G
 
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         if not can_spatula_load_from_tool(tool.tool_type):
             raise ValueError("The spatula cannot be loaded from this container.")
         if tool.is_sealed:
@@ -411,7 +377,7 @@ class LoadSpatulaFromAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
 
 class RecordAnalyticalSampleMassService(AnalyticalBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_balance_tool(experiment)
+        tool = self.require_balance_tool(experiment)
         measured_mass_g = self._calculate_tool_mass_g(tool)
         if measured_mass_g > _ANALYTICAL_BALANCE_MAX_G:
             raise ValueError("ERR_OVER: OVERLOAD : Retirez l'objet immediatement du plateau.")

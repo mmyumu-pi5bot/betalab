@@ -89,7 +89,7 @@ class VortexServiceBase(WriteDomainService[object]):
         if tool.tool_type not in {"centrifuge_tube", "cleanup_tube"}:
             raise ValueError(f"{tool.label} cannot be vortexed (only centrifuge or cleanup tubes).")
 
-    def _place_tool_on_vortex(
+    def place_tool_on_vortex(
         self,
         experiment: Experiment,
         tool: WorkbenchTool,
@@ -102,7 +102,7 @@ class VortexServiceBase(WriteDomainService[object]):
         widget.tool = tool
         experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
 
-    def _take_tool_from_vortex(self, experiment: Experiment) -> WorkbenchTool:
+    def take_tool_from_vortex(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_vortex_widget(experiment)
         if widget.tool is None:
             raise ValueError(f"{widget.label} does not contain a tube.")
@@ -116,7 +116,7 @@ class VortexServiceBase(WriteDomainService[object]):
 class PlaceToolOnVortexService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: PlaceToolOnVortexRequest) -> None:
         new_tool = build_workbench_tool(request.tool_id)
-        self._place_tool_on_vortex(experiment, new_tool, action_verb="placed on")
+        self.place_tool_on_vortex(experiment, new_tool, action_verb="placed on")
 
 
 class MoveWorkbenchToolToVortexService(VortexServiceBase):
@@ -126,7 +126,7 @@ class MoveWorkbenchToolToVortexService(VortexServiceBase):
             raise ValueError(f"Place a tool on {source_slot.label} before moving it.")
         moved_tool = source_slot.tool
         source_slot.tool = None
-        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
 
 
 class MoveRackToolToVortexService(VortexServiceBase):
@@ -136,13 +136,13 @@ class MoveRackToolToVortexService(VortexServiceBase):
             raise ValueError(f"{rack_slot.label} does not contain a tool.")
         moved_tool = rack_slot.tool
         rack_slot.tool = None
-        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
 
 
 class RestoreTrashedToolToVortexService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: RestoreTrashedToolToVortexRequest) -> None:
         tool = find_trash_tool(experiment.trash, request.trash_tool_id)
-        self._place_tool_on_vortex(experiment, tool, action_verb="restored to")
+        self.place_tool_on_vortex(experiment, tool, action_verb="restored to")
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
 
@@ -152,14 +152,14 @@ class MoveVortexToolToWorkbenchService(VortexServiceBase):
         target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
         if target_slot.tool is not None or target_slot.surface_produce_lots:
             raise ValueError(f"{target_slot.label} already contains a tool.")
-        moved_tool = self._take_tool_from_vortex(experiment)
+        moved_tool = self.take_tool_from_vortex(experiment)
         target_slot.tool = moved_tool
         experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to {target_slot.label}.")
 
 
 class DiscardVortexToolService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        discarded_tool = self._take_tool_from_vortex(experiment)
+        discarded_tool = self.take_tool_from_vortex(experiment)
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Vortex mixer"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Vortex mixer.")
@@ -172,7 +172,7 @@ class MoveAnalyticalBalanceToolToVortexService(VortexServiceBase):
             raise ValueError("Analytical balance does not contain a tool.")
         moved_tool = analytical_balance.tool
         analytical_balance.tool = None
-        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
 
 
 class MoveGrossBalanceToolToVortexService(VortexServiceBase):
@@ -182,7 +182,7 @@ class MoveGrossBalanceToolToVortexService(VortexServiceBase):
             raise ValueError("Gross balance does not contain a tool.")
         moved_tool = gross_balance.tool
         gross_balance.tool = None
-        self._place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
 
 
 class MoveVortexToolToAnalyticalBalanceService(VortexServiceBase):
@@ -190,7 +190,7 @@ class MoveVortexToolToAnalyticalBalanceService(VortexServiceBase):
         analytical_balance = find_workspace_widget(experiment.workspace, "analytical_balance")
         if analytical_balance.tool is not None:
             raise ValueError("Analytical balance already contains a tool.")
-        moved_tool = self._take_tool_from_vortex(experiment)
+        moved_tool = self.take_tool_from_vortex(experiment)
         analytical_balance.tool = moved_tool
         experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to Analytical balance.")
 
@@ -200,7 +200,7 @@ class MoveVortexToolToGrossBalanceService(VortexServiceBase):
         gross_balance = find_workspace_widget(experiment.workspace, "gross_balance")
         if gross_balance.tool is not None:
             raise ValueError("Gross balance already contains a tool.")
-        moved_tool = self._take_tool_from_vortex(experiment)
+        moved_tool = self.take_tool_from_vortex(experiment)
         gross_balance.tool = moved_tool
         experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to Gross balance.")
 

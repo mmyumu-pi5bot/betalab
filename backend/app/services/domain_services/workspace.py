@@ -29,18 +29,8 @@ from app.services.helpers.produce_material_states import (
 )
 from app.services.physical_simulation_service import PhysicalSimulationService
 from app.services.received_sample_generation import build_received_sampling_bag
-from app.services.transfer import (
-    GrinderProduceLotSource,
-    GrinderProduceLotTarget,
-    ProduceLotTransferService,
-    TrashProduceLotSource,
-    WorkbenchProduceLotSource,
-    WorkbenchProduceLotTarget,
-    WorkspaceProduceLotSource,
-)
 
 physical_simulation_service = PhysicalSimulationService()
-produce_lot_transfer_service = ProduceLotTransferService()
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,25 +72,6 @@ class AdvanceWorkspaceCryogenicsRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class AddWorkspaceProduceLotToWidgetRequest:
-    widget_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveWorkbenchProduceLotToWidgetRequest:
-    widget_id: str
-    source_slot_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class RestoreTrashedProduceLotToWidgetRequest:
-    trash_produce_lot_id: str
-    widget_id: str
-
-
-@dataclass(frozen=True, slots=True)
 class CreateProduceLotRequest:
     produce_type: str
 
@@ -108,13 +79,6 @@ class CreateProduceLotRequest:
 @dataclass(frozen=True, slots=True)
 class DiscardWorkspaceProduceLotRequest:
     produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveWidgetProduceLotToWorkbenchToolRequest:
-    widget_id: str
-    produce_lot_id: str
-    target_slot_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -360,70 +324,6 @@ class AdvanceWorkspaceCryogenicsService(WriteDomainService[AdvanceWorkspaceCryog
 
     def _run(self, experiment: Experiment, request: AdvanceWorkspaceCryogenicsRequest) -> None:
         advance_workspace_cryogenics_state(experiment, request.elapsed_ms)
-
-
-class AddWorkspaceProduceLotToWidgetService(WriteDomainService[AddWorkspaceProduceLotToWidgetRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: AddWorkspaceProduceLotToWidgetRequest) -> None:
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            WorkspaceProduceLotSource(produce_lot_id=request.produce_lot_id),
-            GrinderProduceLotTarget(widget_id=request.widget_id),
-        )
-        experiment.audit_log.append(f"{transfer.entity.label} added to {transfer.location_label}.")
-
-
-class MoveWorkbenchProduceLotToWidgetService(WriteDomainService[MoveWorkbenchProduceLotToWidgetRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: MoveWorkbenchProduceLotToWidgetRequest) -> None:
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            WorkbenchProduceLotSource(
-                slot_id=request.source_slot_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-            GrinderProduceLotTarget(widget_id=request.widget_id),
-        )
-        experiment.audit_log.append(f"{transfer.entity.label} moved to {transfer.location_label}.")
-
-
-class RestoreTrashedProduceLotToWidgetService(WriteDomainService[RestoreTrashedProduceLotToWidgetRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: RestoreTrashedProduceLotToWidgetRequest) -> None:
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            TrashProduceLotSource(trash_produce_lot_id=request.trash_produce_lot_id),
-            GrinderProduceLotTarget(widget_id=request.widget_id),
-        )
-        experiment.audit_log.append(f"{transfer.entity.label} restored from trash to {transfer.location_label}.")
-
-
-class MoveWidgetProduceLotToWorkbenchToolService(WriteDomainService[MoveWidgetProduceLotToWorkbenchToolRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: MoveWidgetProduceLotToWorkbenchToolRequest) -> None:
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            GrinderProduceLotSource(
-                widget_id=request.widget_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-            WorkbenchProduceLotTarget(slot_id=request.target_slot_id),
-        )
-        if transfer.contamination_applied:
-            experiment.audit_log.append(
-                f"{transfer.entity.label} moved from {transfer.source_label} to {transfer.target_label} and marked contaminated."
-            )
-            return
-
-        experiment.audit_log.append(f"{transfer.entity.label} moved from {transfer.source_label} to {transfer.target_label}.")
 
 
 class DiscardWorkspaceProduceLotService(WriteDomainService[DiscardWorkspaceProduceLotRequest]):

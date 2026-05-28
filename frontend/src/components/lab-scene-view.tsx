@@ -34,6 +34,7 @@ import type {
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
 } from "@/types/workbench";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 type LabSceneViewProps = {
   experiment: Experiment;
@@ -120,10 +121,9 @@ type LabSceneViewProps = {
     handleAddWorkbenchSlot: () => void;
     handleApplyLimsLabelTicket: (payload: { basketBag?: true; grossBalanceBag?: true; slotId?: string }) => void;
     handleApplySampleLabel: (slotId: string) => void;
-    handleMoveSampleLabel: (targetSlotId: string, payload: { label?: BenchLabel; sourceSlotId?: string }) => void;
+    handleMoveObject: (payload: MoveObjectPayload) => void;
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
-    handleRestoreTrashedSampleLabel: (targetSlotId: string, payload: { trashSampleLabelId?: string }) => void;
     handleStoreWorkbenchTool: (slotId: string) => void;
     handleSampleLabelTextChange: (slotId: string, labelId: string, text: string) => void;
     handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.domain.dnd_contracts import DndEntityContract, get_dnd_contract, source_kind_to_drop_target_type
-from app.domain.models import Experiment, WorkbenchTool
+from app.domain.models import ContainerLabel, Experiment, TrashProduceLotEntry, TrashSampleLabelEntry, WorkbenchTool, new_id
 from app.services.domain_services.analytical_balance import AnalyticalBalanceServiceBase
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.gross_balance import (
@@ -15,11 +15,12 @@ from app.services.domain_services.gross_balance import (
 from app.services.domain_services.vortex import VortexServiceBase
 from app.services.helpers.lookups import (
     find_rack_slot,
+    find_trash_sample_label,
     find_trash_tool,
     find_workbench_slot,
 )
-from app.services.helpers.produce_canonical import sync_canonical_produce_model
-from app.services.helpers.workbench import build_workbench_tool
+from app.services.helpers.produce_canonical import mark_surface_fractions_contaminated, sync_canonical_produce_model
+from app.services.helpers.workbench import build_workbench_tool, pop_tool_label, require_slot_tool
 from app.services.transfer import (
     GrinderProduceLotSource,
     GrinderProduceLotTarget,
@@ -86,6 +87,9 @@ class MoveSourceBase:
         elif request.entity.kind == "produce_lot":
             contract = get_dnd_contract("produce_lot", "produce_lot")
             _assert_entity_can_move(contract, "Produce lot", destination)
+        elif request.entity.kind == "sample_label":
+            contract = get_dnd_contract("sample_label", "sample_label")
+            _assert_entity_can_move(contract, "Sample label", destination)
         else:
             raise ValueError(f"Entity kind {request.entity.kind!r} is not supported by the object move command.")
 
@@ -109,6 +113,14 @@ class MoveSourceBase:
                 source_ref=request.source,
                 source_label=removal.source_label,
             )
+        if request.entity.kind == "sample_label":
+            label, source_label = self._remove_sample_label(experiment, request)
+            return DndMovedObject(
+                entity=label,
+                entity_ref=request.entity,
+                source_ref=request.source,
+                source_label=source_label,
+            )
         raise ValueError(f"{self._source.kind} cannot move {request.entity.kind}.")
 
     def after_remove(self, experiment: Experiment, moved: DndMovedObject) -> None:
@@ -119,6 +131,9 @@ class MoveSourceBase:
 
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         raise ValueError(f"{self._source.kind} cannot move tools.")
+
+    def _remove_sample_label(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[ContainerLabel, str]:
+        raise ValueError(f"{self._source.kind} cannot move sample labels.")
 
 
 class PaletteMoveSource(MoveSourceBase):
@@ -169,6 +184,11 @@ class WorkbenchMoveSource(MoveSourceBase):
     def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
         return WorkbenchProduceLotSource(request.source.id, request.entity.id).remove(experiment)
 
+    def _remove_sample_label(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[ContainerLabel, str]:
+        slot = find_workbench_slot(experiment.workbench, request.source.id)
+        tool = require_slot_tool(slot, "moving its sample label")
+        return pop_tool_label(tool, request.entity.id), f"{tool.label} on {slot.label}"
+
 
 class RackMoveSource(MoveSourceBase):
     def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
@@ -202,10 +222,14 @@ class GrossBalanceMoveSource(MoveSourceBase):
 
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
         service = _DndGrossBalanceService(self._runtime)
-        return service._take_tool_from_balance(experiment), "Gross balance"
+        return service.take_tool_from_balance(experiment), "Gross balance"
 
     def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
         return GrossBalanceProduceLotSource(_DndGrossBalanceService(self._runtime), request.entity.id).remove(experiment)
+
+    def _remove_sample_label(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[ContainerLabel, str]:
+        tool = _DndGrossBalanceService(self._runtime).require_gross_balance_tool(experiment)
+        return pop_tool_label(tool, request.entity.id), f"{tool.label} on Gross balance"
 
 
 class AnalyticalBalanceMoveSource(MoveSourceBase):
@@ -218,10 +242,14 @@ class AnalyticalBalanceMoveSource(MoveSourceBase):
         _assert_entity_can_move(get_dnd_contract("tool", widget.tool.tool_type), widget.tool.label, destination)
 
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
-        return _DndAnalyticalBalanceService(self._runtime)._take_tool_from_balance(experiment), "Analytical balance"
+        return _DndAnalyticalBalanceService(self._runtime).take_tool_from_balance(experiment), "Analytical balance"
 
     def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
         raise ValueError("Analytical balance cannot move produce lots.")
+
+    def _remove_sample_label(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[ContainerLabel, str]:
+        tool = _DndAnalyticalBalanceService(self._runtime).require_balance_tool(experiment)
+        return pop_tool_label(tool, request.entity.id), f"{tool.label} on Analytical balance"
 
 
 class VortexMoveSource(MoveSourceBase):
@@ -234,7 +262,7 @@ class VortexMoveSource(MoveSourceBase):
         _assert_entity_can_move(get_dnd_contract("tool", widget.tool.tool_type), widget.tool.label, destination)
 
     def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
-        return _DndVortexService(self._runtime)._take_tool_from_vortex(experiment), "Vortex mixer"
+        return _DndVortexService(self._runtime).take_tool_from_vortex(experiment), "Vortex mixer"
 
     def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
         raise ValueError("Vortex cannot move produce lots.")
@@ -260,6 +288,11 @@ class TrashMoveSource(MoveSourceBase):
     def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
         return TrashProduceLotSource(request.source.id).remove(experiment)
 
+    def _remove_sample_label(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[ContainerLabel, str]:
+        entry = find_trash_sample_label(experiment.trash, request.source.id)
+        experiment.trash.sample_labels = [sample_label for sample_label in experiment.trash.sample_labels if sample_label.id != entry.id]
+        return entry.label, entry.origin_label
+
 
 class MoveDestinationBase:
     def __init__(self, runtime: ExperimentRuntime, destination: DndObjectRef) -> None:
@@ -284,6 +317,9 @@ class MoveDestinationBase:
         if moved.entity_ref.kind == "produce_lot":
             self._place_produce_lot(experiment, moved)
             return
+        if moved.entity_ref.kind == "sample_label":
+            self._place_sample_label(experiment, moved)
+            return
         raise ValueError(f"{self._destination.kind} cannot place {moved.entity_ref.kind}.")
 
     def after_place(self, experiment: Experiment, moved: DndMovedObject) -> None:
@@ -294,6 +330,9 @@ class MoveDestinationBase:
 
     def _place_produce_lot(self, experiment: Experiment, moved: DndMovedObject) -> None:
         raise ValueError(f"{self._destination.kind} cannot place produce lots.")
+
+    def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
+        raise ValueError(f"{self._destination.kind} cannot place sample labels.")
 
 
 class WorkbenchSlotMoveDestination(MoveDestinationBase):
@@ -320,6 +359,12 @@ class WorkbenchToolMoveDestination(MoveDestinationBase):
     def _place_produce_lot(self, experiment: Experiment, moved: DndMovedObject) -> None:
         _place_produce_lot(experiment, moved, self._produce_target)
 
+    def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
+        target_slot = find_workbench_slot(experiment.workbench, self._destination.id)
+        target_tool = require_slot_tool(target_slot, "adding a sample label")
+        target_tool.labels.append(_require_sample_label(moved))
+        _append_sample_label_move_audit(experiment, moved, f"{target_tool.label} on {target_slot.label}")
+
 
 class RackSlotMoveDestination(MoveDestinationBase):
     def _place_tool(self, experiment: Experiment, moved: DndMovedObject) -> None:
@@ -343,7 +388,7 @@ class GrossBalanceMoveDestination(MoveDestinationBase):
             self._produce_target.validate(experiment)
 
     def _place_tool(self, experiment: Experiment, moved: DndMovedObject) -> None:
-        _DndGrossBalanceService(self._runtime)._place_tool_on_balance(
+        _DndGrossBalanceService(self._runtime).place_tool_on_balance(
             experiment,
             _require_tool(moved),
             action_verb=_tool_action_verb(moved, restored="restored onto"),
@@ -352,19 +397,29 @@ class GrossBalanceMoveDestination(MoveDestinationBase):
     def _place_produce_lot(self, experiment: Experiment, moved: DndMovedObject) -> None:
         _place_produce_lot(experiment, moved, self._produce_target)
 
+    def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
+        target_tool = _DndGrossBalanceService(self._runtime).require_gross_balance_tool(experiment)
+        target_tool.labels.append(_require_sample_label(moved))
+        _append_sample_label_move_audit(experiment, moved, f"{target_tool.label} on Gross balance")
+
 
 class AnalyticalBalanceMoveDestination(MoveDestinationBase):
     def _place_tool(self, experiment: Experiment, moved: DndMovedObject) -> None:
-        _DndAnalyticalBalanceService(self._runtime)._place_tool_on_balance(
+        _DndAnalyticalBalanceService(self._runtime).place_tool_on_balance(
             experiment,
             _require_tool(moved),
             action_verb=_tool_action_verb(moved, restored="restored to"),
         )
 
+    def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
+        target_tool = _DndAnalyticalBalanceService(self._runtime).require_balance_tool(experiment)
+        target_tool.labels.append(_require_sample_label(moved))
+        _append_sample_label_move_audit(experiment, moved, f"{target_tool.label} on Analytical balance")
+
 
 class VortexMoveDestination(MoveDestinationBase):
     def _place_tool(self, experiment: Experiment, moved: DndMovedObject) -> None:
-        _DndVortexService(self._runtime)._place_tool_on_vortex(
+        _DndVortexService(self._runtime).place_tool_on_vortex(
             experiment,
             _require_tool(moved),
             action_verb=_tool_action_verb(moved, restored="restored to"),
@@ -395,7 +450,28 @@ class TrashBinMoveDestination(MoveDestinationBase):
         experiment.audit_log.append(f"{tool.label} discarded from {moved.source_label or moved.source_ref.kind}.")
 
     def _place_produce_lot(self, experiment: Experiment, moved: DndMovedObject) -> None:
-        raise ValueError("Produce lot trash moves use discard commands.")
+        removal = _require_produce_lot_removal(moved)
+        experiment.trash.produce_lots.append(
+            TrashProduceLotEntry(
+                id=new_id("trash_produce_lot"),
+                origin_label=removal.source_label,
+                produce_lot=removal.entity,
+                origin=removal.origin,
+            )
+        )
+        sync_canonical_produce_model(experiment)
+        experiment.audit_log.append(f"{removal.entity.label} discarded from {removal.source_label}.")
+
+    def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
+        label = _require_sample_label(moved)
+        experiment.trash.sample_labels.append(
+            TrashSampleLabelEntry(
+                id=new_id("trash_sample_label"),
+                origin_label=moved.source_label,
+                label=label,
+            )
+        )
+        experiment.audit_log.append(f"Label discarded from {moved.source_label}.")
 
 
 class DndMoveObjectService(WriteDomainService[DndMoveObjectRequest]):
@@ -464,6 +540,10 @@ def _place_produce_lot(
         verb = "restored from trash"
 
     if placement.contamination_applied:
+        mark_surface_fractions_contaminated(experiment, removal.entity.id)
+        if moved.source_ref.kind == "basket":
+            experiment.audit_log.append(f"{removal.entity.label} placed directly on {placement.target_label} and marked contaminated.")
+            return
         experiment.audit_log.append(f"{removal.entity.label} {verb} from {removal.source_label} to {placement.target_label} and marked contaminated.")
         return
     if moved.source_ref.kind == "basket":
@@ -479,6 +559,12 @@ def _require_tool(moved: DndMovedObject) -> WorkbenchTool:
     if isinstance(moved.entity, WorkbenchTool):
         return moved.entity
     raise TypeError(f"Expected workbench tool, got {type(moved.entity).__name__}.")
+
+
+def _require_sample_label(moved: DndMovedObject) -> ContainerLabel:
+    if isinstance(moved.entity, ContainerLabel):
+        return moved.entity
+    raise TypeError(f"Expected sample label, got {type(moved.entity).__name__}.")
 
 
 def _get_drop_target_type(destination_kind: str) -> str:
@@ -543,6 +629,13 @@ def _append_tool_move_audit(experiment: Experiment, moved: DndMovedObject, targe
         experiment.audit_log.append(f"{tool.label} restored from trash to {target_label}.")
         return
     experiment.audit_log.append(f"{tool.label} moved from {moved.source_label} to {target_label}.")
+
+
+def _append_sample_label_move_audit(experiment: Experiment, moved: DndMovedObject, target_label: str) -> None:
+    if moved.source_ref.kind == "trash":
+        experiment.audit_log.append(f"Label restored from trash to {target_label}.")
+        return
+    experiment.audit_log.append(f"Label moved from {moved.source_label} to {target_label}.")
 
 
 def _require_produce_lot_removal(moved: DndMovedObject) -> ProduceLotRemoval:

@@ -435,7 +435,7 @@ function requireDndObjectRef(payload: Record<string, unknown>, fieldName: string
   throw new Error(`Missing ${fieldName}`);
 }
 
-// All drag-and-drop moves (tools and produce lots) go through moveObject → POST /dnd/move.
+// All drag-and-drop moves go through moveObject -> POST /dnd/move.
 // Explicit UI actions that are not drag-based (balance measurements, dedicated operation buttons)
 // use their own typed endpoints below. Do not call moveObject for those.
 export function moveObject(experimentId: string, payload: MutationPayload): Promise<Experiment> {
@@ -596,35 +596,6 @@ export async function startGrinderCycle(experimentId: string, payload: MutationP
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/workspace/widgets/${requireString(body, "widget_id")}/start-grinder-cycle`,
-  });
-}
-
-export async function addWorkspaceProduceLotToWidget(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "basket", id: "produce_basket" },
-    destination: { kind: "workspace_widget", id: requireString(body, "widget_id") },
-  });
-}
-
-export async function moveWorkbenchProduceLotToWidget(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "workbench", id: requireString(body, "source_slot_id") },
-    destination: { kind: "workspace_widget", id: requireString(body, "widget_id") },
-  });
-}
-
-export async function restoreTrashedProduceLotToWidget(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: requireString(body, "trash_produce_lot_id") },
-    source: { kind: "trash", id: requireString(body, "trash_produce_lot_id") },
-    destination: { kind: "workspace_widget", id: requireString(body, "widget_id") },
   });
 }
 
@@ -963,96 +934,6 @@ export async function setGrossBalanceContainerOffset(
   });
 }
 
-export async function moveWorkspaceProduceLotToGrossBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "basket", id: "produce_basket" },
-    destination: { kind: "gross_balance", id: "gross_balance" },
-  });
-}
-
-export async function moveWorkbenchProduceLotToGrossBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "workbench", id: requireString(body, "source_slot_id") },
-    destination: { kind: "gross_balance", id: "gross_balance" },
-  });
-}
-
-export async function moveWidgetProduceLotToGrossBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "grinder", id: "grinder" },
-    destination: { kind: "gross_balance", id: "gross_balance" },
-  });
-}
-
-export async function restoreTrashedProduceLotToGrossBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: requireString(body, "trash_produce_lot_id") },
-    source: { kind: "trash", id: requireString(body, "trash_produce_lot_id") },
-    destination: { kind: "gross_balance", id: "gross_balance" },
-  });
-}
-
-export async function moveGrossBalanceProduceLotToWorkbench(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/gross-balance/move-produce-lot-to-workbench`,
-    body: {
-      target_slot_id: requireString(body, "target_slot_id"),
-      produce_lot_id: requireString(body, "produce_lot_id"),
-    },
-  });
-}
-
-export async function moveGrossBalanceProduceLotToWidget(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/gross-balance/move-produce-lot-to-widget`,
-    body: { produce_lot_id: requireString(body, "produce_lot_id") },
-  });
-}
-
-export async function discardGrossBalanceProduceLot(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/gross-balance/discard-produce-lot`,
-    body: { produce_lot_id: requireString(body, "produce_lot_id") },
-  });
-}
-
 export async function createLimsReception(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {
@@ -1174,31 +1055,6 @@ export async function createDebugProduceLotToWidget(
   });
 }
 
-export async function discardWorkspaceProduceLot(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workspace/produce-lots/${requireString(body, "produce_lot_id")}/discard`,
-  });
-}
-
-export async function moveWidgetProduceLotToWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workspace/widgets/${requireString(body, "widget_id")}/produce-lots/${requireString(body, "produce_lot_id")}/move-to-workbench-tool`,
-    body: { target_slot_id: requireString(body, "target_slot_id") },
-  });
-}
-
-export async function discardWidgetProduceLot(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workspace/widgets/${requireString(body, "widget_id")}/produce-lots/${requireString(body, "produce_lot_id")}/discard`,
-  });
-}
-
 export async function placeToolInRackSlot(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {
@@ -1264,50 +1120,12 @@ export async function addLiquidToWorkbenchTool(experimentId: string, payload: Mu
   });
 }
 
-export async function addProduceLotToWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "basket", id: "produce_basket" },
-    destination: { kind: "workbench_tool", id: requireString(body, "slot_id") },
-  });
-}
-
-export async function discardProduceLotFromWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workbench/produce-lots/${requireString(body, "produce_lot_id")}/discard`,
-    body: { slot_id: requireString(body, "slot_id") },
-  });
-}
-
 export async function cutWorkbenchProduceLot(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/workbench/produce-lots/${requireString(body, "produce_lot_id")}/cut`,
     body: { slot_id: requireString(body, "slot_id") },
-  });
-}
-
-export async function moveProduceLotBetweenWorkbenchTools(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  const produceLotId = requireString(body, "produce_lot_id");
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: produceLotId },
-    source: { kind: "workbench", id: requireString(body, "source_slot_id") },
-    destination: { kind: "workbench_tool", id: requireString(body, "target_slot_id") },
-  });
-}
-
-export async function restoreTrashedProduceLotToWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return moveObject(experimentId, {
-    entity: { kind: "produce_lot", id: requireString(body, "trash_produce_lot_id") },
-    source: { kind: "trash", id: requireString(body, "trash_produce_lot_id") },
-    destination: { kind: "workbench_tool", id: requireString(body, "target_slot_id") },
   });
 }
 
@@ -1424,78 +1242,6 @@ export async function updateAnalyticalBalanceToolSampleLabelText(
     method: "PATCH",
     path: `/experiments/${experimentId}/analytical-balance/sample-labels/${requireString(body, "label_id")}`,
     body: { sample_label_text: requireString(body, "sample_label_text") },
-  });
-}
-
-export async function moveSampleLabelBetweenWorkbenchTools(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "source_slot_id"))}/sample-labels/${requireString(body, "label_id")}/move-to-tool`,
-    body: { target_tool_id: findWorkbenchToolId(experimentId, requireString(body, "target_slot_id")) },
-  });
-}
-
-export async function discardSampleLabelFromWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "DELETE",
-    path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "slot_id"))}/sample-labels/${requireString(body, "label_id")}`,
-  });
-}
-
-export async function restoreTrashedSampleLabelToWorkbenchTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/trash/sample-labels/${requireString(body, "trash_sample_label_id")}/restore-to-workbench-tool`,
-    body: { target_tool_id: findWorkbenchToolId(experimentId, requireString(body, "target_slot_id")) },
-  });
-}
-
-export async function moveWorkbenchSampleLabelToGrossBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/gross-balance/sample-labels/${requireString(body, "label_id")}/move-from-workbench-tool`,
-    body: { slot_id: requireString(body, "source_slot_id") },
-  });
-}
-
-export async function moveWorkbenchSampleLabelToAnalyticalBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/analytical-balance/sample-labels/${requireString(body, "label_id")}/move-from-workbench-tool`,
-    body: { slot_id: requireString(body, "source_slot_id") },
-  });
-}
-
-export async function restoreTrashedSampleLabelToGrossBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/gross-balance/restore-trash-sample-label/${requireString(body, "trash_sample_label_id")}`,
-  });
-}
-
-export async function restoreTrashedSampleLabelToAnalyticalBalance(
-  experimentId: string,
-  payload: MutationPayload,
-): Promise<Experiment> {
-  const body = requirePayload(payload);
-  return sendMutationRequest(experimentId, {
-    method: "POST",
-    path: `/experiments/${experimentId}/analytical-balance/restore-trash-sample-label/${requireString(body, "trash_sample_label_id")}`,
   });
 }
 

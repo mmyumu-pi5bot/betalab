@@ -8,7 +8,6 @@ import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { canResolveActiveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
 import type { MoveObjectPayload } from "@/types/api-payloads";
 import type {
-  BenchLabel,
   BenchSlot,
   BenchToolInstance,
   DragDescriptor,
@@ -23,19 +22,10 @@ export type WorkbenchHandlersExperimentApi = {
   applyPrintedLimsLabelToBasketBag: () => void;
   applyPrintedLimsLabelToGrossBalanceBag: () => void;
   closeWorkbenchTool: (payload: { slot_id: string }) => void;
-  moveSampleLabelBetweenWorkbenchTools: (payload: {
-    label_id: string;
-    source_slot_id: string;
-    target_slot_id: string;
-  }) => void;
   moveObject: (payload: MoveObjectPayload) => void;
   openWorkbenchTool: (payload: { slot_id: string }) => void;
   removeLiquidFromWorkbenchTool: (payload: { slot_id: string; liquid_entry_id: string }) => void;
   removeWorkbenchSlot: (payload: { slot_id: string }) => void;
-  restoreTrashedSampleLabelToWorkbenchTool: (payload: {
-    target_slot_id: string;
-    trash_sample_label_id: string;
-  }) => void;
   storeWorkbenchTool: (payload: { slot_id: string }) => void;
   updateWorkbenchToolSampleLabelText: (payload: {
     label_id?: string;
@@ -63,16 +53,9 @@ type WorkbenchHandlers = {
     slotId?: string;
   }) => void;
   handleApplySampleLabel: (slotId: string) => void;
-  handleMoveSampleLabel: (
-    targetSlotId: string,
-    payload: { label?: BenchLabel; sourceSlotId?: string },
-  ) => void;
+  handleMoveObject: (payload: MoveObjectPayload) => void;
   handleRemoveLiquid: (slotId: string, liquidId: string) => void;
   handleRemoveWorkbenchSlot: (slotId: string) => void;
-  handleRestoreTrashedSampleLabel: (
-    targetSlotId: string,
-    payload: { trashSampleLabelId?: string },
-  ) => void;
   handleStoreWorkbenchTool: (slotId: string) => void;
   handleSampleLabelTextChange: (slotId: string, labelId: string, text: string) => void;
   handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;
@@ -162,37 +145,9 @@ export function useWorkbenchHandlers({
     void experimentApi.closeWorkbenchTool({ slot_id: slotId });
   };
 
-  const handleMoveSampleLabel = (
-    targetSlotId: string,
-    payload: { label?: BenchLabel; sourceSlotId?: string },
-  ) => {
-    if (!payload.sourceSlotId || !payload.label) {
-      return;
-    }
-    if (payload.sourceSlotId === targetSlotId) {
-      clearDropTargets();
-      return;
-    }
+  const handleMoveObject = (payload: MoveObjectPayload) => {
     clearDropTargets();
-    void experimentApi.moveSampleLabelBetweenWorkbenchTools({
-      label_id: payload.label.id,
-      source_slot_id: payload.sourceSlotId,
-      target_slot_id: targetSlotId,
-    });
-  };
-
-  const handleRestoreTrashedSampleLabel = (
-    targetSlotId: string,
-    payload: { trashSampleLabelId?: string },
-  ) => {
-    if (!payload.trashSampleLabelId) {
-      return;
-    }
-    clearDropTargets();
-    void experimentApi.restoreTrashedSampleLabelToWorkbenchTool({
-      target_slot_id: targetSlotId,
-      trash_sample_label_id: payload.trashSampleLabelId,
-    });
+    void experimentApi.moveObject(payload);
   };
 
   const handleRemoveLiquid = (slotId: string, liquidId: string) => {
@@ -264,10 +219,9 @@ export function useWorkbenchHandlers({
     handleAddWorkbenchSlot,
     handleApplyLimsLabelTicket,
     handleApplySampleLabel,
-    handleMoveSampleLabel,
+    handleMoveObject,
     handleRemoveLiquid,
     handleRemoveWorkbenchSlot,
-    handleRestoreTrashedSampleLabel,
     handleStoreWorkbenchTool,
     handleSampleLabelTextChange,
     handleToggleToolSeal,

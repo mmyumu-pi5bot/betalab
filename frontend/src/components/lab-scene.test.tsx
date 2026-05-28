@@ -1770,8 +1770,12 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "add_produce_lot_to_workbench_tool",
-      { slot_id: "station_1", produce_lot_id: "produce_1" },
+      "move_object",
+      {
+        destination: { kind: "workbench_tool", id: "station_1" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "basket", id: "produce_basket" },
+      },
     );
     expect(screen.getByTestId("basket-count-badge")).toHaveTextContent("0");
   });
@@ -1815,8 +1819,12 @@ describe("LabScene", () => {
     expect(dragOverEvent.defaultPrevented).toBe(true);
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "add_produce_lot_to_workbench_tool",
-      { slot_id: "station_2", produce_lot_id: "produce_1" },
+      "move_object",
+      {
+        destination: { kind: "workbench_tool", id: "station_2" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "basket", id: "produce_basket" },
+      },
     );
 
     await waitFor(() => {
@@ -1862,8 +1870,12 @@ describe("LabScene", () => {
     expect(dragOverEvent.defaultPrevented).toBe(true);
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "add_workspace_produce_lot_to_widget",
-      { widget_id: "grinder", produce_lot_id: "produce_1" },
+      "move_object",
+      {
+        destination: { kind: "workspace_widget", id: "grinder" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "basket", id: "produce_basket" },
+      },
     );
 
     await waitFor(() => {
@@ -3500,10 +3512,11 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "move_gross_balance_produce_lot_to_workbench",
+        "move_object",
         {
-          target_slot_id: "station_1",
-          produce_lot_id: "produce_1",
+          destination: { kind: "workbench_tool", id: "station_1" },
+          entity: { kind: "produce_lot", id: "produce_1" },
+          source: { kind: "gross_balance", id: "gross_balance" },
         },
       );
     });
@@ -3549,10 +3562,11 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "move_gross_balance_produce_lot_to_workbench",
+        "move_object",
         {
-          target_slot_id: "station_1",
-          produce_lot_id: "produce_1",
+          destination: { kind: "workbench_tool", id: "station_1" },
+          entity: { kind: "produce_lot", id: "produce_1" },
+          source: { kind: "gross_balance", id: "gross_balance" },
         },
       );
     });
@@ -3598,9 +3612,11 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "discard_gross_balance_produce_lot",
+        "move_object",
         {
-          produce_lot_id: "produce_1",
+          destination: { kind: "trash_bin", id: "trash_bin" },
+          entity: { kind: "produce_lot", id: "produce_1" },
+          source: { kind: "gross_balance", id: "gross_balance" },
         },
       );
     });
@@ -3733,8 +3749,12 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "discard_sample_label_from_workbench_tool",
-        { label_id: "bench_tool_1-sample-label", slot_id: "station_1" },
+        "move_object",
+        {
+          destination: { kind: "trash_bin", id: "trash_bin" },
+          entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+          source: { kind: "workbench", id: "station_1" },
+        },
       );
     });
   });
@@ -3770,10 +3790,11 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(
         "experiment_pesticides",
-        "restore_trashed_sample_label_to_workbench_tool",
+        "move_object",
         {
-          target_slot_id: "station_1",
-          trash_sample_label_id: "trash_sample_label_1",
+          destination: { kind: "workbench_tool", id: "station_1" },
+          entity: { kind: "sample_label", id: "trash_sample_label_1" },
+          source: { kind: "trash", id: "trash_sample_label_1" },
         },
       );
     });
@@ -3817,8 +3838,12 @@ describe("LabScene", () => {
     expect(within(dialog).getByTestId("trash-produce-lot-trash_produce_lot_1")).toBeInTheDocument();
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "discard_workspace_produce_lot",
-      { produce_lot_id: "produce_1" },
+      "move_object",
+      {
+        destination: { kind: "trash_bin", id: "trash_bin" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "basket", id: "produce_basket" },
+      },
     );
   });
 
@@ -3874,11 +3899,11 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "move_produce_lot_between_workbench_tools",
+      "move_object",
       {
-        source_slot_id: "station_1",
-        target_slot_id: "station_2",
-        produce_lot_id: "produce_1",
+        destination: { kind: "workbench_tool", id: "station_2" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "workbench", id: "station_1" },
       },
     );
   });
@@ -3996,8 +4021,12 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "discard_produce_lot_from_workbench_tool",
-      { slot_id: "station_1", produce_lot_id: "produce_1" },
+      "move_object",
+      {
+        destination: { kind: "trash_bin", id: "trash_bin" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "workbench", id: "station_1" },
+      },
     );
   });
 
@@ -4045,8 +4074,12 @@ describe("LabScene", () => {
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "restore_trashed_produce_lot_to_workbench_tool",
-      { target_slot_id: "station_1", trash_produce_lot_id: "trash_produce_lot_1" },
+      "move_object",
+      {
+        destination: { kind: "workbench_tool", id: "station_1" },
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "trash", id: "trash_produce_lot_1" },
+      },
     );
   });
 

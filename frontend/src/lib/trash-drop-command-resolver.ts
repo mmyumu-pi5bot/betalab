@@ -1,4 +1,6 @@
 import type { ProduceDragPayload, WorkspaceLiquidDragPayload } from "@/types/workbench";
+import type { MoveObjectPayload } from "@/types/api-payloads";
+import { resolveProduceMoveObjectPayload } from "@/lib/produce-dnd-object-command";
 
 import type { LabelDragPayload } from "@/lib/label-drop-command-resolver";
 import { resolveLabelDropCommand, type LabelDropCommand } from "@/lib/label-drop-command-resolver";
@@ -7,13 +9,7 @@ type TrashDropPayload = LabelDragPayload | ProduceDragPayload | WorkspaceLiquidD
 
 export type TrashDropCommand =
   | LabelDropCommand
-  | { kind: "discard_gross_balance_produce_lot"; payload: { produce_lot_id: string } }
-  | {
-      kind: "discard_produce_lot_from_workbench_tool";
-      payload: { produce_lot_id: string; slot_id: string };
-    }
-  | { kind: "discard_widget_produce_lot"; payload: { produce_lot_id: string; widget_id: "grinder" } }
-  | { kind: "discard_workspace_produce_lot"; payload: { produce_lot_id: string } }
+  | { kind: "move_object"; payload: MoveObjectPayload }
   | {
       kind: "remove_liquid_from_workspace_widget";
       payload: { liquid_entry_id: string; widget_id: string };
@@ -50,34 +46,11 @@ export function resolveTrashDropCommand(
     };
   }
 
-  if (payload.sourceKind === "basket") {
+  const movePayload = resolveProduceMoveObjectPayload(payload, { kind: "trash_bin" });
+  if (movePayload !== null) {
     return {
-      kind: "discard_workspace_produce_lot",
-      payload: { produce_lot_id: payload.produceLotId },
-    };
-  }
-  if (payload.sourceKind === "grinder") {
-    return {
-      kind: "discard_widget_produce_lot",
-      payload: {
-        widget_id: "grinder",
-        produce_lot_id: payload.produceLotId,
-      },
-    };
-  }
-  if (payload.sourceKind === "gross_balance") {
-    return {
-      kind: "discard_gross_balance_produce_lot",
-      payload: { produce_lot_id: payload.produceLotId },
-    };
-  }
-  if (payload.sourceKind === "workbench" && payload.sourceSlotId) {
-    return {
-      kind: "discard_produce_lot_from_workbench_tool",
-      payload: {
-        slot_id: payload.sourceSlotId,
-        produce_lot_id: payload.produceLotId,
-      },
+      kind: "move_object",
+      payload: movePayload,
     };
   }
 

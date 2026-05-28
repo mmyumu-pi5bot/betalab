@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.domain.models import ProduceFraction, ProduceLot, ProduceMaterialState
+from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
 from app.services.domain_services.debug import (
     CreateDebugProduceLotOnWorkbenchRequest,
     CreateDebugProduceLotOnWorkbenchService,
@@ -19,10 +20,6 @@ from app.services.domain_services.gross_balance import (
     EmptyRequest,
     MoveBasketToolToGrossBalanceRequest,
     MoveBasketToolToGrossBalanceService,
-    MoveGrossBalanceProduceLotToWidgetRequest,
-    MoveGrossBalanceProduceLotToWidgetService,
-    MoveGrossBalanceProduceLotToWorkbenchRequest,
-    MoveGrossBalanceProduceLotToWorkbenchService,
     MoveGrossBalanceToolToRackRequest,
     MoveGrossBalanceToolToRackService,
     MoveGrossBalanceToolToWorkbenchRequest,
@@ -31,13 +28,9 @@ from app.services.domain_services.gross_balance import (
     MoveRackToolToGrossBalanceService,
     MoveWorkbenchToolToGrossBalanceRequest,
     MoveWorkbenchToolToGrossBalanceService,
-    MoveWorkspaceProduceLotToGrossBalanceRequest,
-    MoveWorkspaceProduceLotToGrossBalanceService,
     OpenGrossBalanceToolService,
     PlaceToolOnGrossBalanceRequest,
     PlaceToolOnGrossBalanceService,
-    RestoreTrashedProduceLotToGrossBalanceRequest,
-    RestoreTrashedProduceLotToGrossBalanceService,
     RestoreTrashedToolToGrossBalanceRequest,
     RestoreTrashedToolToGrossBalanceService,
 )
@@ -77,8 +70,6 @@ from app.services.domain_services.trash import DiscardBasketToolRequest, Discard
 from app.services.domain_services.workbench import (
     AddLiquidToWorkbenchToolRequest,
     AddLiquidToWorkbenchToolService,
-    AddProduceLotToWorkbenchToolRequest,
-    AddProduceLotToWorkbenchToolService,
     AddWorkbenchSlotService,
     ApplySampleLabelToWorkbenchToolService,
     CloseWorkbenchToolService,
@@ -92,10 +83,6 @@ from app.services.domain_services.workbench import (
     DiscardWorkbenchToolService,
     EmptyWorkbenchRequest,
     LoadSpatulaFromWorkbenchToolService,
-    MoveProduceLotBetweenWorkbenchToolsRequest,
-    MoveProduceLotBetweenWorkbenchToolsService,
-    MoveSampleLabelBetweenWorkbenchToolsRequest,
-    MoveSampleLabelBetweenWorkbenchToolsService,
     MoveToolBetweenWorkbenchSlotsRequest,
     MoveToolBetweenWorkbenchSlotsService,
     OpenWorkbenchToolService,
@@ -105,10 +92,6 @@ from app.services.domain_services.workbench import (
     PourSpatulaIntoWorkbenchToolService,
     RemoveLiquidFromWorkbenchToolService,
     RemoveWorkbenchSlotService,
-    RestoreTrashedProduceLotToWorkbenchToolRequest,
-    RestoreTrashedProduceLotToWorkbenchToolService,
-    RestoreTrashedSampleLabelToWorkbenchToolRequest,
-    RestoreTrashedSampleLabelToWorkbenchToolService,
     RestoreTrashedToolToWorkbenchSlotRequest,
     RestoreTrashedToolToWorkbenchSlotService,
     StoreWorkbenchToolService,
@@ -124,8 +107,6 @@ from app.services.domain_services.workbench import (
 from app.services.domain_services.workspace import (
     AddLiquidToWorkspaceWidgetRequest,
     AddLiquidToWorkspaceWidgetService,
-    AddWorkspaceProduceLotToWidgetRequest,
-    AddWorkspaceProduceLotToWidgetService,
     AddWorkspaceWidgetService,
     AdvanceWorkspaceCryogenicsRequest,
     AdvanceWorkspaceCryogenicsService,
@@ -136,14 +117,8 @@ from app.services.domain_services.workspace import (
     DiscardWidgetProduceLotService,
     DiscardWorkspaceProduceLotRequest,
     DiscardWorkspaceProduceLotService,
-    MoveWidgetProduceLotToWorkbenchToolRequest,
-    MoveWidgetProduceLotToWorkbenchToolService,
-    MoveWorkbenchProduceLotToWidgetRequest,
-    MoveWorkbenchProduceLotToWidgetService,
     MoveWorkspaceWidgetService,
     RemoveLiquidFromWorkspaceWidgetService,
-    RestoreTrashedProduceLotToWidgetRequest,
-    RestoreTrashedProduceLotToWidgetService,
     StartGrinderCycleService,
     StoreWorkspaceWidgetService,
     UpdateWorkspaceWidgetLiquidVolumeRequest,
@@ -313,17 +288,50 @@ def discard_gross_balance_produce_lot(service: ExperimentRuntimeService, experim
     )
 
 
-def move_workspace_produce_lot_to_gross_balance(service: ExperimentRuntimeService, experiment_id: str, produce_lot_id: str):
-    return MoveWorkspaceProduceLotToGrossBalanceService(service).run(
+def move_object(
+    service: ExperimentRuntimeService,
+    experiment_id: str,
+    *,
+    entity_kind: str,
+    entity_id: str,
+    source_kind: str,
+    source_id: str,
+    destination_kind: str,
+    destination_id: str,
+):
+    return DndMoveObjectService(service).run(
         experiment_id,
-        MoveWorkspaceProduceLotToGrossBalanceRequest(produce_lot_id=produce_lot_id),
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind=entity_kind, id=entity_id),
+            source=DndObjectRef(kind=source_kind, id=source_id),
+            destination=DndObjectRef(kind=destination_kind, id=destination_id),
+        ),
+    )
+
+
+def move_workspace_produce_lot_to_gross_balance(service: ExperimentRuntimeService, experiment_id: str, produce_lot_id: str):
+    return move_object(
+        service,
+        experiment_id,
+        entity_kind="produce_lot",
+        entity_id=produce_lot_id,
+        source_kind="basket",
+        source_id="produce_basket",
+        destination_kind="gross_balance",
+        destination_id="gross_balance",
     )
 
 
 def restore_trashed_produce_lot_to_gross_balance(service: ExperimentRuntimeService, experiment_id: str, trash_produce_lot_id: str):
-    return RestoreTrashedProduceLotToGrossBalanceService(service).run(
+    return move_object(
+        service,
         experiment_id,
-        RestoreTrashedProduceLotToGrossBalanceRequest(trash_produce_lot_id=trash_produce_lot_id),
+        entity_kind="produce_lot",
+        entity_id=trash_produce_lot_id,
+        source_kind="trash",
+        source_id=trash_produce_lot_id,
+        destination_kind="gross_balance",
+        destination_id="gross_balance",
     )
 
 
@@ -342,16 +350,28 @@ def move_rack_tool_to_gross_balance(service: ExperimentRuntimeService, experimen
 
 
 def move_gross_balance_produce_lot_to_workbench(service: ExperimentRuntimeService, experiment_id: str, target_slot_id: str, produce_lot_id: str):
-    return MoveGrossBalanceProduceLotToWorkbenchService(service).run(
+    return move_object(
+        service,
         experiment_id,
-        MoveGrossBalanceProduceLotToWorkbenchRequest(target_slot_id=target_slot_id, produce_lot_id=produce_lot_id),
+        entity_kind="produce_lot",
+        entity_id=produce_lot_id,
+        source_kind="gross_balance",
+        source_id="gross_balance",
+        destination_kind="workbench_tool",
+        destination_id=target_slot_id,
     )
 
 
 def move_gross_balance_produce_lot_to_widget(service: ExperimentRuntimeService, experiment_id: str, widget_id: str, produce_lot_id: str):
-    return MoveGrossBalanceProduceLotToWidgetService(service).run(
+    return move_object(
+        service,
         experiment_id,
-        MoveGrossBalanceProduceLotToWidgetRequest(widget_id=widget_id, produce_lot_id=produce_lot_id),
+        entity_kind="produce_lot",
+        entity_id=produce_lot_id,
+        source_kind="gross_balance",
+        source_id="gross_balance",
+        destination_kind="workspace_widget",
+        destination_id=widget_id,
     )
 
 
@@ -450,27 +470,35 @@ def apply_command(
         "advance_workspace_cryogenics": lambda: AdvanceWorkspaceCryogenicsService(service).run(
             experiment_id, AdvanceWorkspaceCryogenicsRequest(elapsed_ms=payload["elapsed_ms"])
         ),
-        "add_workspace_produce_lot_to_widget": lambda: AddWorkspaceProduceLotToWidgetService(service).run(
+        "add_workspace_produce_lot_to_widget": lambda: move_object(
+            service,
             experiment_id,
-            AddWorkspaceProduceLotToWidgetRequest(
-                widget_id=payload["widget_id"],
-                produce_lot_id=payload["produce_lot_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["produce_lot_id"],
+            source_kind="basket",
+            source_id="produce_basket",
+            destination_kind="workspace_widget",
+            destination_id=payload["widget_id"],
         ),
-        "move_workbench_produce_lot_to_widget": lambda: MoveWorkbenchProduceLotToWidgetService(service).run(
+        "move_workbench_produce_lot_to_widget": lambda: move_object(
+            service,
             experiment_id,
-            MoveWorkbenchProduceLotToWidgetRequest(
-                widget_id=payload["widget_id"],
-                source_slot_id=payload["source_slot_id"],
-                produce_lot_id=payload["produce_lot_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["produce_lot_id"],
+            source_kind="workbench",
+            source_id=payload["source_slot_id"],
+            destination_kind="workspace_widget",
+            destination_id=payload["widget_id"],
         ),
-        "restore_trashed_produce_lot_to_widget": lambda: RestoreTrashedProduceLotToWidgetService(service).run(
+        "restore_trashed_produce_lot_to_widget": lambda: move_object(
+            service,
             experiment_id,
-            RestoreTrashedProduceLotToWidgetRequest(
-                trash_produce_lot_id=payload["trash_produce_lot_id"],
-                widget_id=payload["widget_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["trash_produce_lot_id"],
+            source_kind="trash",
+            source_id=payload["trash_produce_lot_id"],
+            destination_kind="workspace_widget",
+            destination_id=payload["widget_id"],
         ),
         "create_produce_lot": lambda: CreateOrInitProduceLotService(service).run(
             experiment_id, CreateProduceLotRequest(produce_type=payload["produce_type"])
@@ -535,13 +563,15 @@ def apply_command(
         "discard_workspace_produce_lot": lambda: DiscardWorkspaceProduceLotService(service).run(
             experiment_id, DiscardWorkspaceProduceLotRequest(produce_lot_id=payload["produce_lot_id"])
         ),
-        "move_widget_produce_lot_to_workbench_tool": lambda: MoveWidgetProduceLotToWorkbenchToolService(service).run(
+        "move_widget_produce_lot_to_workbench_tool": lambda: move_object(
+            service,
             experiment_id,
-            MoveWidgetProduceLotToWorkbenchToolRequest(
-                widget_id=payload["widget_id"],
-                produce_lot_id=payload["produce_lot_id"],
-                target_slot_id=payload["target_slot_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["produce_lot_id"],
+            source_kind="grinder",
+            source_id=payload["widget_id"],
+            destination_kind="workbench_tool",
+            destination_id=payload["target_slot_id"],
         ),
         "discard_widget_produce_lot": lambda: DiscardWidgetProduceLotService(service).run(
             experiment_id,
@@ -594,12 +624,15 @@ def apply_command(
                 volume_ml=payload.get("volume_ml"),
             ),
         ),
-        "add_produce_lot_to_workbench_tool": lambda: AddProduceLotToWorkbenchToolService(service).run(
+        "add_produce_lot_to_workbench_tool": lambda: move_object(
+            service,
             experiment_id,
-            AddProduceLotToWorkbenchToolRequest(
-                slot_id=payload["slot_id"],
-                produce_lot_id=payload["produce_lot_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["produce_lot_id"],
+            source_kind="basket",
+            source_id="produce_basket",
+            destination_kind="workbench_tool",
+            destination_id=payload["slot_id"],
         ),
         "discard_produce_lot_from_workbench_tool": lambda: DiscardProduceLotFromWorkbenchToolService(service).run(
             experiment_id,
@@ -615,20 +648,25 @@ def apply_command(
                 produce_lot_id=payload["produce_lot_id"],
             ),
         ),
-        "move_produce_lot_between_workbench_tools": lambda: MoveProduceLotBetweenWorkbenchToolsService(service).run(
+        "move_produce_lot_between_workbench_tools": lambda: move_object(
+            service,
             experiment_id,
-            MoveProduceLotBetweenWorkbenchToolsRequest(
-                source_slot_id=payload["source_slot_id"],
-                target_slot_id=payload["target_slot_id"],
-                produce_lot_id=payload["produce_lot_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["produce_lot_id"],
+            source_kind="workbench",
+            source_id=payload["source_slot_id"],
+            destination_kind="workbench_tool",
+            destination_id=payload["target_slot_id"],
         ),
-        "restore_trashed_produce_lot_to_workbench_tool": lambda: RestoreTrashedProduceLotToWorkbenchToolService(service).run(
+        "restore_trashed_produce_lot_to_workbench_tool": lambda: move_object(
+            service,
             experiment_id,
-            RestoreTrashedProduceLotToWorkbenchToolRequest(
-                trash_produce_lot_id=payload["trash_produce_lot_id"],
-                target_slot_id=payload["target_slot_id"],
-            ),
+            entity_kind="produce_lot",
+            entity_id=payload["trash_produce_lot_id"],
+            source_kind="trash",
+            source_id=payload["trash_produce_lot_id"],
+            destination_kind="workbench_tool",
+            destination_id=payload["target_slot_id"],
         ),
         "remove_liquid_from_workbench_tool": lambda: RemoveLiquidFromWorkbenchToolService(service).run(
             experiment_id,
@@ -657,13 +695,15 @@ def apply_command(
             ),
         ),
         "close_workbench_tool": lambda: CloseWorkbenchToolService(service).run(experiment_id, WorkbenchSlotRequest(slot_id=payload["slot_id"])),
-        "move_sample_label_between_workbench_tools": lambda: MoveSampleLabelBetweenWorkbenchToolsService(service).run(
+        "move_sample_label_between_workbench_tools": lambda: move_object(
+            service,
             experiment_id,
-            MoveSampleLabelBetweenWorkbenchToolsRequest(
-                source_slot_id=payload["source_slot_id"],
-                target_slot_id=payload["target_slot_id"],
-                label_id=_get_first_label_id(service, experiment_id, payload["source_slot_id"]),
-            ),
+            entity_kind="sample_label",
+            entity_id=_get_first_label_id(service, experiment_id, payload["source_slot_id"]),
+            source_kind="workbench",
+            source_id=payload["source_slot_id"],
+            destination_kind="workbench_tool",
+            destination_id=payload["target_slot_id"],
         ),
         "discard_sample_label_from_workbench_tool": lambda: DiscardSampleLabelFromWorkbenchToolService(service).run(
             experiment_id,
@@ -672,12 +712,15 @@ def apply_command(
                 label_id=_get_first_label_id(service, experiment_id, payload["slot_id"]),
             ),
         ),
-        "restore_trashed_sample_label_to_workbench_tool": lambda: RestoreTrashedSampleLabelToWorkbenchToolService(service).run(
+        "restore_trashed_sample_label_to_workbench_tool": lambda: move_object(
+            service,
             experiment_id,
-            RestoreTrashedSampleLabelToWorkbenchToolRequest(
-                trash_sample_label_id=payload["trash_sample_label_id"],
-                target_slot_id=payload["target_slot_id"],
-            ),
+            entity_kind="sample_label",
+            entity_id=payload["trash_sample_label_id"],
+            source_kind="trash",
+            source_id=payload["trash_sample_label_id"],
+            destination_kind="workbench_tool",
+            destination_id=payload["target_slot_id"],
         ),
     }
     return handlers[command_type]()
@@ -3844,7 +3887,7 @@ def test_restore_trashed_produce_lot_to_gross_balance_updates_mass() -> None:
     assert gross_balance.produce_lots[0].id == produce_lot_id
     assert updated.trash.produce_lots == []
     assert updated.lims_reception.measured_gross_mass_g == pytest.approx(12.3, abs=0.01)
-    assert updated.audit_log[-1] == "Apple powder lot moved from Gross balance to Gross balance."
+    assert updated.audit_log[-1] == "Apple powder lot restored from trash to Gross balance."
 
 
 def test_move_workbench_tool_to_gross_balance_moves_tool_and_clears_source_slot() -> None:
@@ -3999,7 +4042,7 @@ def test_move_workspace_produce_lot_to_gross_balance_places_loose_produce_and_up
     assert updated.workspace.produce_basket_lots == []
     assert gross_balance.produce_lots[0].id == produce_lot_id
     assert updated.lims_reception.measured_gross_mass_g == pytest.approx(2450.0, abs=0.01)
-    assert updated.audit_log[-1] == "Apple lot 1 moved from Produce basket to Gross balance."
+    assert updated.audit_log[-1] == "Apple lot 1 added to Gross balance."
 
 
 def test_move_workspace_produce_lot_to_gross_balance_rejects_existing_loose_produce() -> None:
@@ -4054,7 +4097,7 @@ def test_move_workspace_produce_lot_to_gross_balance_places_produce_into_open_ba
     gross_balance = next(widget for widget in updated.workspace.widgets if widget.id == "gross_balance")
     assert gross_balance.tool is not None
     assert gross_balance.tool.produce_lots[0].id == produce_lot_id
-    assert updated.audit_log[-1] == "Apple lot 1 moved from Produce basket to Wide-neck HDPE jar."
+    assert updated.audit_log[-1] == "Apple lot 1 added to Wide-neck HDPE jar."
 
 
 def test_move_gross_balance_produce_lot_to_workbench_moves_loose_produce_to_target_slot() -> None:

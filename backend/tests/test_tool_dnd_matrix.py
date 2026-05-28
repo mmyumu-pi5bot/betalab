@@ -42,7 +42,31 @@ from app.services.domain_services.reception import (
     PlaceReceivedBagOnWorkbenchRequest,
     PlaceReceivedBagOnWorkbenchService,
 )
+from app.services.domain_services.analytical_balance import (
+    MoveGrossBalanceToolToAnalyticalBalanceRequest,
+    MoveGrossBalanceToolToAnalyticalBalanceService,
+    MoveRackToolToAnalyticalBalanceRequest,
+    MoveRackToolToAnalyticalBalanceService,
+    MoveWorkbenchToolToAnalyticalBalanceRequest,
+    MoveWorkbenchToolToAnalyticalBalanceService,
+    PlaceToolOnAnalyticalBalanceRequest,
+    PlaceToolOnAnalyticalBalanceService,
+    RestoreTrashedToolToAnalyticalBalanceRequest,
+    RestoreTrashedToolToAnalyticalBalanceService,
+)
 from app.services.domain_services.trash import DiscardBasketToolRequest, DiscardBasketToolService
+from app.services.domain_services.vortex import (
+    MoveGrossBalanceToolToVortexRequest,
+    MoveGrossBalanceToolToVortexService,
+    MoveRackToolToVortexRequest,
+    MoveRackToolToVortexService,
+    MoveWorkbenchToolToVortexRequest,
+    MoveWorkbenchToolToVortexService,
+    PlaceToolOnVortexRequest,
+    PlaceToolOnVortexService,
+    RestoreTrashedToolToVortexRequest,
+    RestoreTrashedToolToVortexService,
+)
 from app.services.domain_services.workbench import (
     DiscardToolFromPaletteRequest,
     DiscardToolFromPaletteService,
@@ -69,8 +93,19 @@ ToolSource = Literal[
     "trash_vial",
     "trash_storage_jar",
     "gross_balance_vial",
+    "analytical_balance_vial",
+    "vortex_centrifuge",
 ]
-ToolTarget = Literal["empty_workbench", "occupied_workbench", "empty_rack", "occupied_rack", "gross_balance", "trash"]
+ToolTarget = Literal[
+    "empty_workbench",
+    "occupied_workbench",
+    "empty_rack",
+    "occupied_rack",
+    "gross_balance",
+    "analytical_balance",
+    "vortex",
+    "trash",
+]
 
 
 @dataclass(frozen=True)
@@ -143,12 +178,54 @@ TOOL_DND_CASES: tuple[ToolDndCase, ...] = (
     ToolDndCase("gross_balance_vial", "occupied_workbench", False),
     ToolDndCase("gross_balance_vial", "empty_rack", True),
     ToolDndCase("gross_balance_vial", "occupied_rack", False),
+    ToolDndCase("gross_balance_vial", "analytical_balance", True),
+    ToolDndCase("gross_balance_vial", "vortex", False),
     ToolDndCase("gross_balance_vial", "trash", True),
+    # analytical_balance target — existing sources
+    ToolDndCase("palette_vial", "analytical_balance", True),
+    ToolDndCase("palette_storage_jar", "analytical_balance", True),
+    ToolDndCase("palette_cutting_board", "analytical_balance", False),
+    ToolDndCase("basket_bag", "analytical_balance", False),
+    ToolDndCase("workbench_vial", "analytical_balance", True),
+    ToolDndCase("workbench_storage_jar", "analytical_balance", True),
+    ToolDndCase("workbench_cutting_board", "analytical_balance", False),
+    ToolDndCase("rack_vial", "analytical_balance", True),
+    ToolDndCase("trash_vial", "analytical_balance", True),
+    ToolDndCase("trash_storage_jar", "analytical_balance", True),
+    # vortex target — existing sources (all False: only centrifuge/cleanup tubes allowed)
+    ToolDndCase("palette_vial", "vortex", False),
+    ToolDndCase("palette_storage_jar", "vortex", False),
+    ToolDndCase("palette_cutting_board", "vortex", False),
+    ToolDndCase("basket_bag", "vortex", False),
+    ToolDndCase("workbench_vial", "vortex", False),
+    ToolDndCase("workbench_storage_jar", "vortex", False),
+    ToolDndCase("workbench_cutting_board", "vortex", False),
+    ToolDndCase("rack_vial", "vortex", False),
+    ToolDndCase("trash_vial", "vortex", False),
+    ToolDndCase("trash_storage_jar", "vortex", False),
+    # analytical_balance_vial source (sample_vial_lcms placed on analytical balance)
+    ToolDndCase("analytical_balance_vial", "empty_workbench", True),
+    ToolDndCase("analytical_balance_vial", "occupied_workbench", False),
+    ToolDndCase("analytical_balance_vial", "empty_rack", True),
+    ToolDndCase("analytical_balance_vial", "occupied_rack", False),
+    ToolDndCase("analytical_balance_vial", "gross_balance", True),
+    ToolDndCase("analytical_balance_vial", "analytical_balance", False),
+    ToolDndCase("analytical_balance_vial", "vortex", False),
+    ToolDndCase("analytical_balance_vial", "trash", True),
+    # vortex_centrifuge source (centrifuge_tube_50ml placed on vortex)
+    ToolDndCase("vortex_centrifuge", "empty_workbench", True),
+    ToolDndCase("vortex_centrifuge", "occupied_workbench", False),
+    ToolDndCase("vortex_centrifuge", "empty_rack", False),
+    ToolDndCase("vortex_centrifuge", "occupied_rack", False),
+    ToolDndCase("vortex_centrifuge", "gross_balance", True),
+    ToolDndCase("vortex_centrifuge", "analytical_balance", True),
+    ToolDndCase("vortex_centrifuge", "vortex", False),
+    ToolDndCase("vortex_centrifuge", "trash", True),
 )
 
 
 def _tool_id_for_source(source: ToolSource) -> str:
-    if source in {"palette_vial", "workbench_vial", "rack_vial", "trash_vial", "gross_balance_vial"}:
+    if source in {"palette_vial", "workbench_vial", "rack_vial", "trash_vial", "gross_balance_vial", "analytical_balance_vial"}:
         return "sample_vial_lcms"
     if source in {"palette_storage_jar", "workbench_storage_jar", "trash_storage_jar"}:
         return "hdpe_storage_jar_2l"
@@ -156,6 +233,8 @@ def _tool_id_for_source(source: ToolSource) -> str:
         return "cutting_board_hdpe"
     if source == "basket_bag":
         return "sealed_sampling_bag"
+    if source == "vortex_centrifuge":
+        return "centrifuge_tube_50ml"
     raise AssertionError(f"Unhandled source: {source}")
 
 
@@ -186,7 +265,29 @@ def _prepare_source(service: ExperimentRuntimeService, experiment_id: str, sourc
     if source == "gross_balance_vial":
         PlaceToolOnGrossBalanceService(service).run(experiment_id, PlaceToolOnGrossBalanceRequest(tool_id=tool_id))
         return None
+    if source == "analytical_balance_vial":
+        PlaceToolOnAnalyticalBalanceService(service).run(experiment_id, PlaceToolOnAnalyticalBalanceRequest(tool_id=tool_id))
+        return None
+    if source == "vortex_centrifuge":
+        PlaceToolOnVortexService(service).run(experiment_id, PlaceToolOnVortexRequest(tool_id=tool_id))
+        return None
     raise AssertionError(f"Unhandled source: {source}")
+
+
+def _dnd_dest_ref(target: ToolTarget) -> DndObjectRef:
+    if target in {"empty_workbench", "occupied_workbench"}:
+        return DndObjectRef(kind="workbench_slot", id="station_2")
+    if target in {"empty_rack", "occupied_rack"}:
+        return DndObjectRef(kind="rack_slot", id="rack_slot_2")
+    if target == "gross_balance":
+        return DndObjectRef(kind="gross_balance", id="gross_balance")
+    if target == "analytical_balance":
+        return DndObjectRef(kind="analytical_balance", id="analytical_balance")
+    if target == "vortex":
+        return DndObjectRef(kind="vortex", id="vortex")
+    if target == "trash":
+        return DndObjectRef(kind="trash_bin", id="trash")
+    raise AssertionError(f"Unhandled target: {target}")
 
 
 def _execute_drop(
@@ -225,6 +326,8 @@ def _execute_drop(
             return MoveGrossBalanceToolToWorkbenchService(service).run(
                 experiment_id, MoveGrossBalanceToolToWorkbenchRequest(target_slot_id="station_2")
             )
+        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+            return _execute_dnd_drop(service, experiment_id, source, target)
     if target in {"empty_rack", "occupied_rack"}:
         if source.startswith("palette_"):
             return PlaceToolInRackSlotService(service).run(experiment_id, PlaceToolInRackSlotRequest(rack_slot_id="rack_slot_2", tool_id=tool_id))
@@ -246,6 +349,8 @@ def _execute_drop(
             )
         if source == "gross_balance_vial":
             return MoveGrossBalanceToolToRackService(service).run(experiment_id, MoveGrossBalanceToolToRackRequest(rack_slot_id="rack_slot_2"))
+        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+            return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "gross_balance":
         if source.startswith("palette_"):
             return PlaceToolOnGrossBalanceService(service).run(experiment_id, PlaceToolOnGrossBalanceRequest(tool_id=tool_id))
@@ -263,6 +368,66 @@ def _execute_drop(
             return RestoreTrashedToolToGrossBalanceService(service).run(
                 experiment_id, RestoreTrashedToolToGrossBalanceRequest(trash_tool_id=trash_tool_id)
             )
+        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+            return _execute_dnd_drop(service, experiment_id, source, target)
+    if target == "analytical_balance":
+        if source.startswith("palette_"):
+            return PlaceToolOnAnalyticalBalanceService(service).run(experiment_id, PlaceToolOnAnalyticalBalanceRequest(tool_id=tool_id))
+        if source == "basket_bag":
+            basket_tool_id = service.get_experiment(experiment_id).basket_tools[0].id
+            return DndMoveObjectService(service).run(experiment_id, DndMoveObjectRequest(
+                entity=DndObjectRef(kind="tool", id=basket_tool_id),
+                source=DndObjectRef(kind="basket", id="produce_basket"),
+                destination=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
+            ))
+        if source.startswith("workbench_"):
+            return MoveWorkbenchToolToAnalyticalBalanceService(service).run(
+                experiment_id, MoveWorkbenchToolToAnalyticalBalanceRequest(source_slot_id="station_1")
+            )
+        if source == "rack_vial":
+            return MoveRackToolToAnalyticalBalanceService(service).run(
+                experiment_id, MoveRackToolToAnalyticalBalanceRequest(rack_slot_id="rack_slot_1")
+            )
+        if source.startswith("trash_"):
+            assert trash_tool_id is not None
+            return RestoreTrashedToolToAnalyticalBalanceService(service).run(
+                experiment_id, RestoreTrashedToolToAnalyticalBalanceRequest(trash_tool_id=trash_tool_id)
+            )
+        if source == "gross_balance_vial":
+            return MoveGrossBalanceToolToAnalyticalBalanceService(service).run(
+                experiment_id, MoveGrossBalanceToolToAnalyticalBalanceRequest()
+            )
+        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+            return _execute_dnd_drop(service, experiment_id, source, target)
+    if target == "vortex":
+        if source.startswith("palette_"):
+            return PlaceToolOnVortexService(service).run(experiment_id, PlaceToolOnVortexRequest(tool_id=tool_id))
+        if source == "basket_bag":
+            basket_tool_id = service.get_experiment(experiment_id).basket_tools[0].id
+            return DndMoveObjectService(service).run(experiment_id, DndMoveObjectRequest(
+                entity=DndObjectRef(kind="tool", id=basket_tool_id),
+                source=DndObjectRef(kind="basket", id="produce_basket"),
+                destination=DndObjectRef(kind="vortex", id="vortex"),
+            ))
+        if source.startswith("workbench_"):
+            return MoveWorkbenchToolToVortexService(service).run(
+                experiment_id, MoveWorkbenchToolToVortexRequest(source_slot_id="station_1")
+            )
+        if source == "rack_vial":
+            return MoveRackToolToVortexService(service).run(
+                experiment_id, MoveRackToolToVortexRequest(rack_slot_id="rack_slot_1")
+            )
+        if source.startswith("trash_"):
+            assert trash_tool_id is not None
+            return RestoreTrashedToolToVortexService(service).run(
+                experiment_id, RestoreTrashedToolToVortexRequest(trash_tool_id=trash_tool_id)
+            )
+        if source == "gross_balance_vial":
+            return MoveGrossBalanceToolToVortexService(service).run(
+                experiment_id, MoveGrossBalanceToolToVortexRequest()
+            )
+        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+            return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "trash":
         if source.startswith("palette_"):
             return DiscardToolFromPaletteService(service).run(experiment_id, DiscardToolFromPaletteRequest(tool_id=tool_id))
@@ -275,7 +440,38 @@ def _execute_drop(
             return DiscardRackToolService(service).run(experiment_id, DiscardRackToolRequest(rack_slot_id="rack_slot_1"))
         if source == "gross_balance_vial":
             return DiscardGrossBalanceToolService(service).run(experiment_id, EmptyRequest())
+        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+            return _execute_dnd_drop(service, experiment_id, source, target)
     raise ValueError(f"Unsupported tool drop: {source} -> {target}")
+
+
+def _execute_dnd_drop(
+    service: ExperimentRuntimeService,
+    experiment_id: str,
+    source: ToolSource,
+    target: ToolTarget,
+):
+    experiment_state = service.get_experiment(experiment_id)
+    if source == "analytical_balance_vial":
+        ab = next(w for w in experiment_state.workspace.widgets if w.id == "analytical_balance")
+        assert ab.tool is not None
+        entity_id = ab.tool.id
+        source_ref = DndObjectRef(kind="analytical_balance", id="analytical_balance")
+    elif source == "vortex_centrifuge":
+        vortex_w = next(w for w in experiment_state.workspace.widgets if w.id == "vortex")
+        assert vortex_w.tool is not None
+        entity_id = vortex_w.tool.id
+        source_ref = DndObjectRef(kind="vortex", id="vortex")
+    else:
+        raise AssertionError(f"_execute_dnd_drop called for unexpected source: {source}")
+    return DndMoveObjectService(service).run(
+        experiment_id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="tool", id=entity_id),
+            source=source_ref,
+            destination=_dnd_dest_ref(target),
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -306,6 +502,14 @@ def test_tool_dnd_matrix(source: ToolSource, target: ToolTarget, allowed: bool) 
     if target == "gross_balance":
         gross_balance = next(widget for widget in updated.workspace.widgets if widget.id == "gross_balance")
         assert gross_balance.tool is not None
+        return
+    if target == "analytical_balance":
+        ab = next(widget for widget in updated.workspace.widgets if widget.id == "analytical_balance")
+        assert ab.tool is not None
+        return
+    if target == "vortex":
+        vortex = next(widget for widget in updated.workspace.widgets if widget.id == "vortex")
+        assert vortex.tool is not None
         return
     if target == "trash":
         assert updated.trash.children

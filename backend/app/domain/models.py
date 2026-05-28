@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 from uuid import uuid4
 
 T = TypeVar("T")
@@ -98,7 +98,20 @@ class ProduceFraction:
     # Invariant: location_kind and location_id are always set together (or both None).
     # container_id and container_label are set for tool fractions; container_id may be
     # None for surface fractions while container_label carries the display name.
-    location_kind: str | None = None
+    location_kind: (
+        Literal[
+            "basket_tool",
+            "produce_basket",
+            "rack_tool",
+            "spatula",
+            "trash",
+            "workbench_surface",
+            "workbench_tool",
+            "workspace_widget",
+            "workspace_widget_tool",
+        ]
+        | None
+    ) = None
     location_id: str | None = None
     container_id: str | None = None
     container_label: str | None = None
@@ -215,6 +228,11 @@ class Trash:
     sample_labels: list[TrashSampleLabelEntry] = field(default_factory=list)
 
 
+STORABLE_WIDGET_IDS: frozenset[str] = frozenset(
+    {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}
+)
+
+
 @dataclass
 class WorkspaceWidget:
     id: str
@@ -234,6 +252,15 @@ class WorkspaceWidget:
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
+
+    def can_store(self, rack_has_tools: bool = False) -> bool:
+        if self.id not in STORABLE_WIDGET_IDS:
+            return False
+        if self.id == "rack" and rack_has_tools:
+            return False
+        if self.is_trashed:
+            return True
+        return self.tool is None and not self.produce_lots and not self.liquids
 
 
 @dataclass

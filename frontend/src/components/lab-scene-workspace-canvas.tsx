@@ -43,6 +43,7 @@ import type {
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
 } from "@/types/workbench";
+import type { MoveObjectPayload } from "@/types/api-payloads";
 
 type LabSceneWorkspaceCanvasProps = {
   balances: {
@@ -115,10 +116,9 @@ type LabSceneWorkspaceCanvasProps = {
     handleAddWorkbenchSlot: () => void;
     handleApplyLimsLabelTicket: (payload: { basketBag?: true; grossBalanceBag?: true; slotId?: string }) => void;
     handleApplySampleLabel: (slotId: string) => void;
-    handleMoveSampleLabel: (targetSlotId: string, payload: { label?: BenchLabel; sourceSlotId?: string }) => void;
+    handleMoveObject: (payload: MoveObjectPayload) => void;
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
-    handleRestoreTrashedSampleLabel: (targetSlotId: string, payload: { trashSampleLabelId?: string }) => void;
     handleStoreWorkbenchTool: (slotId: string) => void;
     handleSampleLabelTextChange: (slotId: string, labelId: string, text: string) => void;
     handleToggleToolSeal: (slotId: string, tool: BenchToolInstance) => void;
@@ -609,13 +609,12 @@ export function LabSceneWorkspaceCanvas({
               onBenchToolIllustrationClick: spatula.handleSpatulaToolIllustrationClick,
               onBenchToolPointerDown: spatula.handleSpatulaToolPointerDown,
               onBenchToolPointerUp: spatula.handleSpatulaToolPointerUp,
-              onMoveSampleLabel: workbench.handleMoveSampleLabel,
+              onMoveObject: workbench.handleMoveObject,
               onProduceDrop: dnd.workbench.handleProduceDrop,
               onProduceLotClick: dnd.workbench.handleWorkbenchProduceLotClick,
               onProduceLotDragStart: dnd.workbench.handleWorkbenchProduceLotDragStart,
               onRemoveLiquid: workbench.handleRemoveLiquid,
               onRemoveWorkbenchSlot: workbench.handleRemoveWorkbenchSlot,
-              onRestoreTrashedSampleLabel: workbench.handleRestoreTrashedSampleLabel,
               onSampleLabelDragEnd: dnd.clearDropTargets,
               onSampleLabelDragStart: dnd.workbench.handleWorkbenchSampleLabelDragStart,
               onSampleLabelTextChange: workbench.handleSampleLabelTextChange,

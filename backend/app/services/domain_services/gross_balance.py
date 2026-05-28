@@ -15,7 +15,6 @@ from app.services.domain_services.base import ExperimentRuntime, WriteDomainServ
 from app.services.helpers.lookups import (
     build_manual_label,
     find_rack_slot,
-    find_trash_sample_label,
     find_trash_tool,
     find_workbench_slot,
     find_workspace_widget,
@@ -25,21 +24,12 @@ from app.services.helpers.produce_canonical import (
     get_widget_total_produce_mass_g,
     sync_canonical_produce_model,
 )
-from app.services.helpers.workbench import build_workbench_tool, pop_tool_label
+from app.services.helpers.workbench import build_workbench_tool
 from app.services.received_sample_generation import resolve_received_bag_gross_mass_g
 from app.services.transfer import (
-    GrinderProduceLotSource,
-    GrinderProduceLotTarget,
     ProduceLotPlacement,
     ProduceLotRemoval,
-    ProduceLotTransferService,
-    TrashProduceLotSource,
-    WorkbenchProduceLotSource,
-    WorkbenchProduceLotTarget,
-    WorkspaceProduceLotSource,
 )
-
-produce_lot_transfer_service = ProduceLotTransferService()
 
 _TARE_BY_TOOL_TYPE_G: dict[str, float] = {
     "volumetric_flask": 140,
@@ -95,51 +85,6 @@ class MoveGrossBalanceToolToRackRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class MoveWorkbenchSampleLabelToGrossBalanceRequest:
-    source_slot_id: str
-    label_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class RestoreTrashedSampleLabelToGrossBalanceRequest:
-    trash_sample_label_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveWorkspaceProduceLotToGrossBalanceRequest:
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveWorkbenchProduceLotToGrossBalanceRequest:
-    source_slot_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveWidgetProduceLotToGrossBalanceRequest:
-    widget_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class RestoreTrashedProduceLotToGrossBalanceRequest:
-    trash_produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveGrossBalanceProduceLotToWorkbenchRequest:
-    target_slot_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveGrossBalanceProduceLotToWidgetRequest:
-    widget_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
 class DiscardGrossBalanceProduceLotRequest:
     produce_lot_id: str
 
@@ -158,13 +103,13 @@ class GrossBalanceServiceBase(WriteDomainService[object]):
         if widget.tool is not None or widget.produce_lots:
             raise ValueError(f"{widget.label} already contains an item.")
 
-    def _require_gross_balance_tool(self, experiment: Experiment) -> WorkbenchTool:
+    def require_gross_balance_tool(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_gross_balance_widget(experiment)
         if widget.tool is None:
             raise ValueError(f"{widget.label} does not contain a tool.")
         return widget.tool
 
-    def _place_tool_on_balance(
+    def place_tool_on_balance(
         self,
         experiment: Experiment,
         tool: WorkbenchTool,
@@ -177,7 +122,7 @@ class GrossBalanceServiceBase(WriteDomainService[object]):
         self._update_balance_measured_mass(experiment)
         experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
 
-    def _take_tool_from_balance(self, experiment: Experiment) -> WorkbenchTool:
+    def take_tool_from_balance(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_gross_balance_widget(experiment)
         if widget.tool is None:
             raise ValueError(f"{widget.label} does not contain a tool.")
@@ -333,7 +278,7 @@ class MoveWorkbenchToolToGrossBalanceService(GrossBalanceServiceBase):
             raise ValueError(f"{source_slot.label} does not contain a tool.")
         moved_tool = source_slot.tool
         source_slot.tool = None
-        self._place_tool_on_balance(experiment, moved_tool)
+        self.place_tool_on_balance(experiment, moved_tool)
 
 
 @dataclass(frozen=True, slots=True)
@@ -350,7 +295,7 @@ class MoveBasketToolToGrossBalanceService(GrossBalanceServiceBase):
         if tool_index is None:
             raise ValueError("The specified bag is not in the produce basket.")
         moved_tool = experiment.basket_tools.pop(tool_index)
-        self._place_tool_on_balance(experiment, moved_tool)
+        self.place_tool_on_balance(experiment, moved_tool)
 
 
 class PlaceToolOnGrossBalanceService(GrossBalanceServiceBase):
@@ -359,7 +304,7 @@ class PlaceToolOnGrossBalanceService(GrossBalanceServiceBase):
         experiment: Experiment,
         request: PlaceToolOnGrossBalanceRequest,
     ) -> None:
-        self._place_tool_on_balance(experiment, build_workbench_tool(request.tool_id))
+        self.place_tool_on_balance(experiment, build_workbench_tool(request.tool_id))
 
 
 class MoveRackToolToGrossBalanceService(GrossBalanceServiceBase):
@@ -373,7 +318,7 @@ class MoveRackToolToGrossBalanceService(GrossBalanceServiceBase):
             raise ValueError(f"{rack_slot.label} does not contain a tool.")
         moved_tool = rack_slot.tool
         rack_slot.tool = None
-        self._place_tool_on_balance(experiment, moved_tool)
+        self.place_tool_on_balance(experiment, moved_tool)
 
 
 class RestoreTrashedToolToGrossBalanceService(GrossBalanceServiceBase):
@@ -385,7 +330,7 @@ class RestoreTrashedToolToGrossBalanceService(GrossBalanceServiceBase):
         tool = find_trash_tool(experiment.trash, request.trash_tool_id)
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
-        self._place_tool_on_balance(
+        self.place_tool_on_balance(
             experiment,
             tool,
             action_verb="restored onto",
@@ -403,7 +348,7 @@ class MoveAnalyticalBalanceToolToGrossBalanceService(GrossBalanceServiceBase):
             raise ValueError("Analytical balance does not contain a tool.")
         moved_tool = analytical_balance.tool
         analytical_balance.tool = None
-        self._place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
 
 
 class MoveGrossBalanceToolToWorkbenchService(GrossBalanceServiceBase):
@@ -415,7 +360,7 @@ class MoveGrossBalanceToolToWorkbenchService(GrossBalanceServiceBase):
         target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
         if target_slot.tool is not None or target_slot.surface_produce_lots:
             raise ValueError(f"{target_slot.label} already contains a tool")
-        moved_tool = self._take_tool_from_balance(experiment)
+        moved_tool = self.take_tool_from_balance(experiment)
         target_slot.tool = moved_tool
         self._append_tool_moved_from_balance_audit(experiment, moved_tool.label, target_slot.label)
 
@@ -427,19 +372,19 @@ class MoveGrossBalanceToolToRackService(GrossBalanceServiceBase):
         request: MoveGrossBalanceToolToRackRequest,
     ) -> None:
         rack_slot = find_rack_slot(experiment.rack, request.rack_slot_id)
-        moved_tool = self._require_gross_balance_tool(experiment)
+        moved_tool = self.require_gross_balance_tool(experiment)
         if moved_tool.tool_type != "sample_vial":
             raise ValueError(f"{moved_tool.label} does not fit in the rack.")
         if rack_slot.tool is not None:
             raise ValueError(f"{rack_slot.label} already contains a tool.")
-        rack_slot.tool = self._take_tool_from_balance(experiment)
+        rack_slot.tool = self.take_tool_from_balance(experiment)
         self._append_tool_moved_from_balance_audit(experiment, rack_slot.tool.label, rack_slot.label)
 
 
 class DiscardGrossBalanceToolService(GrossBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         widget = self._find_gross_balance_widget(experiment)
-        removed_tool = self._take_tool_from_balance(experiment)
+        removed_tool = self.take_tool_from_balance(experiment)
         experiment.trash.children.append(removed_tool)
         experiment.trash.discarded_from[removed_tool.id] = widget.label
         experiment.audit_log.append(f"{removed_tool.label} discarded from {widget.label}.")
@@ -447,7 +392,7 @@ class DiscardGrossBalanceToolService(GrossBalanceServiceBase):
 
 class OpenGrossBalanceToolService(GrossBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_gross_balance_tool(experiment)
+        tool = self.require_gross_balance_tool(experiment)
         if not can_tool_be_sealed(tool.tool_type):
             raise ValueError(f"{tool.label} does not support sealing.")
         tool.is_sealed = False
@@ -456,7 +401,7 @@ class OpenGrossBalanceToolService(GrossBalanceServiceBase):
 
 class CloseGrossBalanceToolService(GrossBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_gross_balance_tool(experiment)
+        tool = self.require_gross_balance_tool(experiment)
         if not can_tool_be_sealed(tool.tool_type):
             raise ValueError(f"{tool.label} does not support sealing.")
         tool.is_sealed = True
@@ -465,115 +410,9 @@ class CloseGrossBalanceToolService(GrossBalanceServiceBase):
 
 class ApplySampleLabelToGrossBalanceToolService(GrossBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
-        tool = self._require_gross_balance_tool(experiment)
+        tool = self.require_gross_balance_tool(experiment)
         tool.labels.append(build_manual_label())
         experiment.audit_log.append(f"Manual label applied to {tool.label} on Gross balance.")
-
-
-class MoveWorkbenchSampleLabelToGrossBalanceService(GrossBalanceServiceBase):
-    def _run(self, experiment: Experiment, request: MoveWorkbenchSampleLabelToGrossBalanceRequest) -> None:
-        source_slot = find_workbench_slot(experiment.workbench, request.source_slot_id)
-        if source_slot.tool is None:
-            raise ValueError(f"Place a tool on {source_slot.label} before moving its sample label.")
-
-        source_tool = source_slot.tool
-        target_tool = self._require_gross_balance_tool(experiment)
-        label = pop_tool_label(source_tool, request.label_id)
-        target_tool.labels.append(label)
-        experiment.audit_log.append(f"Label moved from {source_tool.label} on {source_slot.label} to {target_tool.label} on Gross balance.")
-
-
-class RestoreTrashedSampleLabelToGrossBalanceService(GrossBalanceServiceBase):
-    def _run(self, experiment: Experiment, request: RestoreTrashedSampleLabelToGrossBalanceRequest) -> None:
-        trashed_sample_label = find_trash_sample_label(experiment.trash, request.trash_sample_label_id)
-        target_tool = self._require_gross_balance_tool(experiment)
-        target_tool.labels.append(trashed_sample_label.label)
-        experiment.trash.sample_labels = [entry for entry in experiment.trash.sample_labels if entry.id != trashed_sample_label.id]
-        experiment.audit_log.append(f"Label restored from trash to {target_tool.label} on Gross balance.")
-
-
-class MoveWorkspaceProduceLotToGrossBalanceService(GrossBalanceServiceBase):
-    def _run(
-        self,
-        experiment: Experiment,
-        request: MoveWorkspaceProduceLotToGrossBalanceRequest,
-    ) -> None:
-        result = produce_lot_transfer_service.transfer(
-            experiment,
-            WorkspaceProduceLotSource(request.produce_lot_id),
-            GrossBalanceProduceLotTarget(self),
-        )
-        experiment.audit_log.append(f"{result.entity.label} moved from {result.source_label} to {result.target_label}.")
-
-
-class MoveWorkbenchProduceLotToGrossBalanceService(GrossBalanceServiceBase):
-    def _run(
-        self,
-        experiment: Experiment,
-        request: MoveWorkbenchProduceLotToGrossBalanceRequest,
-    ) -> None:
-        result = produce_lot_transfer_service.transfer(
-            experiment,
-            WorkbenchProduceLotSource(request.source_slot_id, request.produce_lot_id),
-            GrossBalanceProduceLotTarget(self),
-        )
-        experiment.audit_log.append(f"{result.entity.label} moved from {result.source_label} to {result.target_label}.")
-
-
-class MoveWidgetProduceLotToGrossBalanceService(GrossBalanceServiceBase):
-    def _run(
-        self,
-        experiment: Experiment,
-        request: MoveWidgetProduceLotToGrossBalanceRequest,
-    ) -> None:
-        result = produce_lot_transfer_service.transfer(
-            experiment,
-            GrinderProduceLotSource(request.widget_id, request.produce_lot_id),
-            GrossBalanceProduceLotTarget(self),
-        )
-        experiment.audit_log.append(f"{result.entity.label} moved from {result.source_label} to {result.target_label}.")
-
-
-class RestoreTrashedProduceLotToGrossBalanceService(GrossBalanceServiceBase):
-    def _run(
-        self,
-        experiment: Experiment,
-        request: RestoreTrashedProduceLotToGrossBalanceRequest,
-    ) -> None:
-        result = produce_lot_transfer_service.transfer(
-            experiment,
-            TrashProduceLotSource(request.trash_produce_lot_id),
-            GrossBalanceProduceLotTarget(self),
-        )
-        experiment.audit_log.append(f"{result.entity.label} moved from {result.source_label} to {result.target_label}.")
-
-
-class MoveGrossBalanceProduceLotToWorkbenchService(GrossBalanceServiceBase):
-    def _run(
-        self,
-        experiment: Experiment,
-        request: MoveGrossBalanceProduceLotToWorkbenchRequest,
-    ) -> None:
-        result = produce_lot_transfer_service.transfer(
-            experiment,
-            GrossBalanceProduceLotSource(self, request.produce_lot_id),
-            WorkbenchProduceLotTarget(request.target_slot_id),
-        )
-        experiment.audit_log.append(f"{result.entity.label} moved from {result.source_label} to {result.target_label}.")
-
-
-class MoveGrossBalanceProduceLotToWidgetService(GrossBalanceServiceBase):
-    def _run(
-        self,
-        experiment: Experiment,
-        request: MoveGrossBalanceProduceLotToWidgetRequest,
-    ) -> None:
-        result = produce_lot_transfer_service.transfer(
-            experiment,
-            GrossBalanceProduceLotSource(self, request.produce_lot_id),
-            GrinderProduceLotTarget(request.widget_id),
-        )
-        experiment.audit_log.append(f"{result.entity.label} moved from {result.source_label} to {result.target_label}.")
 
 
 class DiscardGrossBalanceProduceLotService(GrossBalanceServiceBase):

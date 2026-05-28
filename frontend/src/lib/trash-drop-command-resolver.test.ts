@@ -54,10 +54,11 @@ function createProducePayload(
 describe("resolveTrashDropCommand", () => {
   it("routes sample labels through the shared label resolver", () => {
     expect(resolveTrashDropCommand(workbenchLabelPayload, { isGrinderRunning: false })).toEqual({
-      kind: "discard_sample_label_from_workbench_tool",
+      kind: "move_object",
       payload: {
-        label_id: "bench_tool_1-sample-label",
-        slot_id: "station_1",
+        destination: { kind: "trash_bin", id: "trash_bin" },
+        entity: { kind: "sample_label", id: "bench_tool_1-sample-label" },
+        source: { kind: "workbench", id: "station_1" },
       },
     });
   });
@@ -73,22 +74,38 @@ describe("resolveTrashDropCommand", () => {
     });
   });
 
-  it("routes produce discard by provenance", () => {
+  it("routes produce discard through generic object moves", () => {
     expect(resolveTrashDropCommand(createProducePayload({ sourceKind: "basket" }), { isGrinderRunning: false })).toEqual({
-      kind: "discard_workspace_produce_lot",
-      payload: { produce_lot_id: "produce_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "basket", id: "produce_basket" },
+        destination: { kind: "trash_bin", id: "trash_bin" },
+      },
     });
     expect(resolveTrashDropCommand(createProducePayload({ sourceKind: "grinder" }), { isGrinderRunning: false })).toEqual({
-      kind: "discard_widget_produce_lot",
-      payload: { widget_id: "grinder", produce_lot_id: "produce_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "grinder", id: "grinder" },
+        destination: { kind: "trash_bin", id: "trash_bin" },
+      },
     });
     expect(resolveTrashDropCommand(createProducePayload({ sourceKind: "gross_balance" }), { isGrinderRunning: false })).toEqual({
-      kind: "discard_gross_balance_produce_lot",
-      payload: { produce_lot_id: "produce_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "gross_balance", id: "gross_balance" },
+        destination: { kind: "trash_bin", id: "trash_bin" },
+      },
     });
     expect(resolveTrashDropCommand(createProducePayload({ sourceKind: "workbench", sourceSlotId: "station_1" }), { isGrinderRunning: false })).toEqual({
-      kind: "discard_produce_lot_from_workbench_tool",
-      payload: { slot_id: "station_1", produce_lot_id: "produce_1" },
+      kind: "move_object",
+      payload: {
+        entity: { kind: "produce_lot", id: "produce_1" },
+        source: { kind: "workbench", id: "station_1" },
+        destination: { kind: "trash_bin", id: "trash_bin" },
+      },
     });
   });
 });

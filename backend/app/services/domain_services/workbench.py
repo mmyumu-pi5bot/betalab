@@ -19,7 +19,6 @@ from app.services.domain_services.base import ExperimentRuntime, WriteDomainServ
 from app.services.helpers.lookups import (
     build_manual_label,
     find_tool_label,
-    find_trash_sample_label,
     find_trash_tool,
     find_workbench_slot,
     format_volume,
@@ -49,15 +48,10 @@ from app.services.helpers.workbench import (
 )
 from app.services.physical_simulation_service import PhysicalSimulationService
 from app.services.transfer import (
-    ProduceLotTransferService,
-    TrashProduceLotSource,
     WorkbenchProduceLotSource,
-    WorkbenchProduceLotTarget,
-    WorkspaceProduceLotSource,
 )
 
 physical_simulation_service = PhysicalSimulationService()
-produce_lot_transfer_service = ProduceLotTransferService()
 SPATULA_CAPACITY_G = 5.0
 
 
@@ -120,28 +114,9 @@ class UpdateWorkbenchLiquidVolumeRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class AddProduceLotToWorkbenchToolRequest:
-    slot_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
 class WorkbenchProduceLotRequest:
     slot_id: str
     produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class MoveProduceLotBetweenWorkbenchToolsRequest:
-    source_slot_id: str
-    target_slot_id: str
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class RestoreTrashedProduceLotToWorkbenchToolRequest:
-    trash_produce_lot_id: str
-    target_slot_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,22 +127,9 @@ class UpdateWorkbenchToolSampleLabelTextRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class MoveSampleLabelBetweenWorkbenchToolsRequest:
-    source_slot_id: str
-    target_slot_id: str
-    label_id: str
-
-
-@dataclass(frozen=True, slots=True)
 class WorkbenchSampleLabelRequest:
     slot_id: str
     label_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class RestoreTrashedSampleLabelToWorkbenchToolRequest:
-    trash_sample_label_id: str
-    target_slot_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -482,42 +444,6 @@ def _iter_experiment_produce_fractions(experiment: Experiment):
             yield entry.produce_fraction
 
 
-class AddProduceLotToWorkbenchToolService(WriteDomainService[AddProduceLotToWorkbenchToolRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: AddProduceLotToWorkbenchToolRequest) -> None:
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            WorkspaceProduceLotSource(produce_lot_id=request.produce_lot_id),
-            WorkbenchProduceLotTarget(slot_id=request.slot_id),
-        )
-        experiment.audit_log.append(
-            f"{transfer.entity.label} added to {transfer.target_label}."
-            if not transfer.contamination_applied
-            else f"{transfer.entity.label} placed directly on {transfer.target_label} and marked contaminated."
-        )
-
-
-class MoveProduceLotBetweenWorkbenchToolsService(WriteDomainService[MoveProduceLotBetweenWorkbenchToolsRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: MoveProduceLotBetweenWorkbenchToolsRequest) -> None:
-        if request.source_slot_id == request.target_slot_id:
-            return
-
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            WorkbenchProduceLotSource(
-                slot_id=request.source_slot_id,
-                produce_lot_id=request.produce_lot_id,
-            ),
-            WorkbenchProduceLotTarget(slot_id=request.target_slot_id),
-        )
-        experiment.audit_log.append(f"{transfer.entity.label} moved from {transfer.source_label} to {transfer.target_label}.")
-
-
 class DiscardProduceLotFromWorkbenchToolService(WriteDomainService[WorkbenchProduceLotRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
@@ -557,19 +483,6 @@ class CutWorkbenchProduceLotService(WriteDomainService[WorkbenchProduceLotReques
         experiment.audit_log.append(f"{produce_lot.label} cut on {origin_label}.")
 
 
-class RestoreTrashedProduceLotToWorkbenchToolService(WriteDomainService[RestoreTrashedProduceLotToWorkbenchToolRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: RestoreTrashedProduceLotToWorkbenchToolRequest) -> None:
-        transfer = produce_lot_transfer_service.transfer(
-            experiment,
-            TrashProduceLotSource(trash_produce_lot_id=request.trash_produce_lot_id),
-            WorkbenchProduceLotTarget(slot_id=request.target_slot_id),
-        )
-        experiment.audit_log.append(f"{transfer.entity.label} restored from trash to {transfer.location_label}.")
-
-
 class ApplySampleLabelToWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
@@ -601,23 +514,6 @@ class UpdateWorkbenchToolSampleLabelTextService(WriteDomainService[UpdateWorkben
         experiment.audit_log.append(f"Sample label cleared on {tool.label}.")
 
 
-class MoveSampleLabelBetweenWorkbenchToolsService(WriteDomainService[MoveSampleLabelBetweenWorkbenchToolsRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: MoveSampleLabelBetweenWorkbenchToolsRequest) -> None:
-        source_slot = find_workbench_slot(experiment.workbench, request.source_slot_id)
-        target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
-
-        if source_slot.id == target_slot.id:
-            return
-        source_tool = require_slot_tool(source_slot, "moving its sample label")
-        target_tool = require_slot_tool(target_slot, "adding a sample label")
-        label = pop_tool_label(source_tool, request.label_id)
-        target_tool.labels.append(label)
-        experiment.audit_log.append(f"Label moved from {source_tool.label} on {source_slot.label} to {target_tool.label} on {target_slot.label}.")
-
-
 class DiscardSampleLabelFromWorkbenchToolService(WriteDomainService[WorkbenchSampleLabelRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
@@ -634,20 +530,6 @@ class DiscardSampleLabelFromWorkbenchToolService(WriteDomainService[WorkbenchSam
             )
         )
         experiment.audit_log.append(f"Label discarded from {tool.label}.")
-
-
-class RestoreTrashedSampleLabelToWorkbenchToolService(WriteDomainService[RestoreTrashedSampleLabelToWorkbenchToolRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: RestoreTrashedSampleLabelToWorkbenchToolRequest) -> None:
-        trashed_sample_label = find_trash_sample_label(experiment.trash, request.trash_sample_label_id)
-        target_slot = find_workbench_slot(experiment.workbench, request.target_slot_id)
-
-        target_tool = require_slot_tool(target_slot, "adding a sample label")
-        target_tool.labels.append(trashed_sample_label.label)
-        experiment.trash.sample_labels = [entry for entry in experiment.trash.sample_labels if entry.id != trashed_sample_label.id]
-        experiment.audit_log.append(f"Label restored from trash to {target_tool.label} on {target_slot.label}.")
 
 
 class CloseWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):

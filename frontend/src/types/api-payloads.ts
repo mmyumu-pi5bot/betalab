@@ -14,11 +14,6 @@ export type AddLiquidToAnalyticalBalanceToolPayload = {
   volume_ml: number;
 };
 
-export type AddProduceLotToWorkbenchToolPayload = {
-  slot_id: string;
-  produce_lot_id: string;
-};
-
 export type ApplyPrintedLimsLabelPayload = { slot_id: string };
 export type ApplyPrintedLimsLabelToAnalyticalBalanceToolPayload = Record<string, never>;
 export type ApplySampleLabelToGrossBalanceToolPayload = Record<string, never>;
@@ -33,38 +28,15 @@ export type CutWorkbenchProduceLotPayload = {
   slot_id: string;
 };
 
-export type DiscardProduceLotFromWorkbenchToolPayload = {
-  produce_lot_id: string;
-  slot_id: string;
-};
-
-export type DiscardSampleLabelFromWorkbenchToolPayload = {
-  slot_id: string;
-  label_id?: string;
-};
-
 export type DiscardWorkbenchToolPayload = { slot_id: string };
 
 export type StoreWorkbenchToolPayload = { slot_id: string };
 
 export type LoadSpatulaFromWorkbenchToolPayload = { slot_id: string };
 
-export type MoveSampleLabelBetweenWorkbenchToolsPayload = {
-  source_slot_id: string;
-  label_id: string;
-  target_slot_id: string;
-};
-
-export type MoveProduceLotBetweenWorkbenchToolsPayload = {
-  produce_lot_id: string;
-  source_slot_id: string;
-  target_slot_id: string;
-};
-
-
 export type MoveObjectPayload = {
   entity: {
-    kind: "tool" | "produce_lot";
+    kind: "tool" | "produce_lot" | "sample_label";
     id: string;
   };
   source: {
@@ -94,12 +66,6 @@ export type MoveObjectPayload = {
   };
 };
 
-export type MoveWidgetProduceLotToWorkbenchToolPayload = {
-  widget_id: string;
-  produce_lot_id: string;
-  target_slot_id: string;
-};
-
 export type OpenWorkbenchToolPayload = { slot_id: string };
 
 export type PlaceReceivedBagOnWorkbenchPayload = { target_slot_id: string; tool_id: string };
@@ -121,16 +87,6 @@ export type RemoveLiquidFromWorkbenchToolPayload = {
 
 export type RemoveWorkbenchSlotPayload = { slot_id: string };
 
-export type RestoreTrashedProduceLotToWorkbenchToolPayload = {
-  trash_produce_lot_id: string;
-  target_slot_id: string;
-};
-
-export type RestoreTrashedSampleLabelToWorkbenchToolPayload = {
-  trash_sample_label_id: string;
-  target_slot_id: string;
-};
-
 export type RestoreTrashedToolToWorkbenchSlotPayload = {
   trash_tool_id: string;
   target_slot_id: string;
@@ -150,11 +106,6 @@ export type AddLiquidToWorkspaceWidgetPayload = {
   volume_ml: number;
 };
 
-export type AddWorkspaceProduceLotToWidgetPayload = {
-  widget_id: string;
-  produce_lot_id: string;
-};
-
 export type AddWorkspaceWidgetPayload = {
   widget_id: string;
   anchor: string;
@@ -164,32 +115,7 @@ export type AddWorkspaceWidgetPayload = {
 
 export type CompleteGrinderCyclePayload = { widget_id: string };
 
-export type DiscardWidgetProduceLotPayload = {
-  widget_id: string;
-  produce_lot_id: string;
-};
-
-export type DiscardWorkspaceProduceLotPayload = { produce_lot_id: string };
-
 export type StoreWorkspaceWidgetPayload = { widget_id: string };
-
-export type MoveGrossBalanceProduceLotToWidgetPayload = {
-  produce_lot_id: string;
-};
-
-export type MoveWidgetProduceLotToGrossBalancePayload = {
-  produce_lot_id: string;
-};
-
-export type MoveWorkbenchProduceLotToWidgetPayload = {
-  widget_id: string;
-  source_slot_id: string;
-  produce_lot_id: string;
-};
-
-export type MoveWorkspaceProduceLotToGrossBalancePayload = {
-  produce_lot_id: string;
-};
 
 export type MoveWorkspaceWidgetPayload = {
   widget_id: string;
@@ -203,11 +129,6 @@ export type RemoveLiquidFromWorkspaceWidgetPayload = {
   liquid_entry_id: string;
 };
 
-export type RestoreTrashedProduceLotToWidgetPayload = {
-  trash_produce_lot_id: string;
-  widget_id: string;
-};
-
 export type StartGrinderCyclePayload = { widget_id: string };
 
 // ── Produce ──────────────────────────────────────────────────────────────────
@@ -216,30 +137,13 @@ export type CreateProduceLotPayload = { produce_type: string };
 
 // ── Gross balance ────────────────────────────────────────────────────────────
 
-export type DiscardGrossBalanceProduceLotPayload = { produce_lot_id: string };
-
-export type MoveGrossBalanceProduceLotToWorkbenchPayload = {
-  target_slot_id: string;
-  produce_lot_id: string;
-};
-
 export type MoveGrossBalanceToolToRackPayload = { rack_slot_id: string };
 
 export type MoveGrossBalanceToolToWorkbenchPayload = {
   target_slot_id: string;
 };
 
-export type MoveWorkbenchSampleLabelToGrossBalancePayload = {
-  source_slot_id: string;
-  label_id: string;
-};
-
 export type MoveRackToolToGrossBalancePayload = { rack_slot_id: string };
-
-export type MoveWorkbenchProduceLotToGrossBalancePayload = {
-  source_slot_id: string;
-  produce_lot_id: string;
-};
 
 export type MoveWorkbenchToolToGrossBalancePayload = {
   source_slot_id: string;
@@ -248,14 +152,6 @@ export type MoveWorkbenchToolToGrossBalancePayload = {
 export type PlaceToolOnGrossBalancePayload = { tool_id: string };
 
 export type RecordGrossWeightPayload = { measured_gross_mass_g?: number };
-
-export type RestoreTrashedProduceLotToGrossBalancePayload = {
-  trash_produce_lot_id: string;
-};
-
-export type RestoreTrashedSampleLabelToGrossBalancePayload = {
-  trash_sample_label_id: string;
-};
 
 export type RestoreTrashedToolToGrossBalancePayload = { trash_tool_id: string };
 
@@ -281,15 +177,6 @@ export type PlaceToolOnAnalyticalBalancePayload = { tool_id: string };
 
 export type RestoreTrashedToolToAnalyticalBalancePayload = {
   trash_tool_id: string;
-};
-
-export type MoveWorkbenchSampleLabelToAnalyticalBalancePayload = {
-  source_slot_id: string;
-  label_id: string;
-};
-
-export type RestoreTrashedSampleLabelToAnalyticalBalancePayload = {
-  trash_sample_label_id: string;
 };
 
 export type UpdateAnalyticalBalanceToolSampleLabelTextPayload = {
