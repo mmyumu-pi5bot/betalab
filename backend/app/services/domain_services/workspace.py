@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from app.domain.models import (
     Experiment,
     ProduceLot,
-    TrashProduceLotEntry,
     WorkbenchLiquid,
     WorkspaceWidget,
     new_id,
@@ -74,17 +73,6 @@ class AdvanceWorkspaceCryogenicsRequest:
 @dataclass(frozen=True, slots=True)
 class CreateProduceLotRequest:
     produce_type: str
-
-
-@dataclass(frozen=True, slots=True)
-class DiscardWorkspaceProduceLotRequest:
-    produce_lot_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class DiscardWidgetProduceLotRequest:
-    widget_id: str
-    produce_lot_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,51 +312,6 @@ class AdvanceWorkspaceCryogenicsService(WriteDomainService[AdvanceWorkspaceCryog
 
     def _run(self, experiment: Experiment, request: AdvanceWorkspaceCryogenicsRequest) -> None:
         advance_workspace_cryogenics_state(experiment, request.elapsed_ms)
-
-
-class DiscardWorkspaceProduceLotService(WriteDomainService[DiscardWorkspaceProduceLotRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: DiscardWorkspaceProduceLotRequest) -> None:
-        produce_lot: ProduceLot | None = next((lot for lot in experiment.workspace.produce_basket_lots if lot.id == request.produce_lot_id), None)
-        if produce_lot is not None:
-            experiment.workspace.produce_basket_lots = [lot for lot in experiment.workspace.produce_basket_lots if lot.id != produce_lot.id]
-        else:
-            for bag in experiment.basket_tools:
-                produce_lot = next((lot for lot in bag.produce_lots if lot.id == request.produce_lot_id), None)
-                if produce_lot is not None:
-                    bag.produce_lots = [lot for lot in bag.produce_lots if lot.id != produce_lot.id]
-                    break
-        if produce_lot is None:
-            raise ValueError("Unknown produce lot")
-        experiment.trash.produce_lots.append(
-            TrashProduceLotEntry(
-                id=new_id("trash_produce_lot"),
-                origin_label="Produce basket",
-                produce_lot=produce_lot,
-            )
-        )
-        sync_canonical_produce_model(experiment)
-        experiment.audit_log.append(f"{produce_lot.label} discarded from Produce basket.")
-
-
-class DiscardWidgetProduceLotService(WriteDomainService[DiscardWidgetProduceLotRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: DiscardWidgetProduceLotRequest) -> None:
-        widget = _find_grinder_widget(experiment, request.widget_id)
-        produce_lot = _remove_widget_produce_lot(widget, request.produce_lot_id)
-        experiment.trash.produce_lots.append(
-            TrashProduceLotEntry(
-                id=new_id("trash_produce_lot"),
-                origin_label=widget.label,
-                produce_lot=produce_lot,
-            )
-        )
-        sync_canonical_produce_model(experiment)
-        experiment.audit_log.append(f"{produce_lot.label} discarded from {widget.label}.")
 
 
 def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float) -> None:

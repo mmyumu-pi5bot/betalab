@@ -21,8 +21,6 @@ from app.services.domain_services.workbench import (
 from app.services.domain_services.workspace import (
     CreateOrInitProduceLotService,
     CreateProduceLotRequest,
-    DiscardWorkspaceProduceLotRequest,
-    DiscardWorkspaceProduceLotService,
 )
 from app.services.experiment_service import ExperimentRuntimeService
 
@@ -223,7 +221,7 @@ def _prepare_source(service: ExperimentRuntimeService, experiment_id: str, sourc
         )
         return produce_lot_id, None
     if source == "trash":
-        discarded = DiscardWorkspaceProduceLotService(service).run(experiment_id, DiscardWorkspaceProduceLotRequest(produce_lot_id=produce_lot_id))
+        discarded = _move_produce_lot(service, experiment_id, produce_lot_id=produce_lot_id, source_kind="basket", source_id="produce_basket", destination_kind="trash_bin", destination_id="trash")
         return produce_lot_id, discarded.trash.produce_lots[0].id
     if source == "gross_balance":
         _move_produce_lot(

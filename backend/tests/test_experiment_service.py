@@ -74,7 +74,6 @@ from app.services.domain_services.workbench import (
     ApplySampleLabelToWorkbenchToolService,
     CloseWorkbenchToolService,
     CutWorkbenchProduceLotService,
-    DiscardProduceLotFromWorkbenchToolService,
     DiscardSampleLabelFromPaletteRequest,
     DiscardSampleLabelFromPaletteService,
     DiscardSampleLabelFromWorkbenchToolService,
@@ -113,10 +112,6 @@ from app.services.domain_services.workspace import (
     CompleteGrinderCycleService,
     CreateOrInitProduceLotService,
     CreateProduceLotRequest,
-    DiscardWidgetProduceLotRequest,
-    DiscardWidgetProduceLotService,
-    DiscardWorkspaceProduceLotRequest,
-    DiscardWorkspaceProduceLotService,
     MoveWorkspaceWidgetService,
     RemoveLiquidFromWorkspaceWidgetService,
     StartGrinderCycleService,
@@ -560,9 +555,6 @@ def apply_command(
                 residual_co2_mass_g=payload.get("residual_co2_mass_g"),
             ),
         ),
-        "discard_workspace_produce_lot": lambda: DiscardWorkspaceProduceLotService(service).run(
-            experiment_id, DiscardWorkspaceProduceLotRequest(produce_lot_id=payload["produce_lot_id"])
-        ),
         "move_widget_produce_lot_to_workbench_tool": lambda: move_object(
             service,
             experiment_id,
@@ -572,13 +564,6 @@ def apply_command(
             source_id=payload["widget_id"],
             destination_kind="workbench_tool",
             destination_id=payload["target_slot_id"],
-        ),
-        "discard_widget_produce_lot": lambda: DiscardWidgetProduceLotService(service).run(
-            experiment_id,
-            DiscardWidgetProduceLotRequest(
-                widget_id=payload["widget_id"],
-                produce_lot_id=payload["produce_lot_id"],
-            ),
         ),
         "place_tool_in_rack_slot": lambda: PlaceToolInRackSlotService(service).run(
             experiment_id,
@@ -633,13 +618,6 @@ def apply_command(
             source_id="produce_basket",
             destination_kind="workbench_tool",
             destination_id=payload["slot_id"],
-        ),
-        "discard_produce_lot_from_workbench_tool": lambda: DiscardProduceLotFromWorkbenchToolService(service).run(
-            experiment_id,
-            WorkbenchProduceLotRequest(
-                slot_id=payload["slot_id"],
-                produce_lot_id=payload["produce_lot_id"],
-            ),
         ),
         "cut_workbench_produce_lot": lambda: CutWorkbenchProduceLotService(service).run(
             experiment_id,
@@ -3168,14 +3146,15 @@ def test_discard_produce_lot_from_sampling_bag() -> None:
         },
     )
 
-    updated = apply_command(
+    updated = move_object(
         service,
         experiment.id,
-        "discard_produce_lot_from_workbench_tool",
-        {
-            "slot_id": "station_1",
-            "produce_lot_id": created.basket_tools[-1].produce_lots[0].id,
-        },
+        entity_kind="produce_lot",
+        entity_id=created.basket_tools[-1].produce_lots[0].id,
+        source_kind="workbench",
+        source_id="station_1",
+        destination_kind="trash_bin",
+        destination_id="trash",
     )
 
     slot = next(slot for slot in updated.workbench.slots if slot.id == "station_1")
@@ -3201,13 +3180,15 @@ def test_discard_produce_lot_from_basket_moves_it_to_trash() -> None:
         },
     )
 
-    updated = apply_command(
+    updated = move_object(
         service,
         experiment.id,
-        "discard_workspace_produce_lot",
-        {
-            "produce_lot_id": created.basket_tools[-1].produce_lots[0].id,
-        },
+        entity_kind="produce_lot",
+        entity_id=created.basket_tools[-1].produce_lots[0].id,
+        source_kind="basket",
+        source_id="produce_basket",
+        destination_kind="trash_bin",
+        destination_id="trash",
     )
 
     assert updated.workspace.produce_basket_lots == []
@@ -3241,14 +3222,15 @@ def test_discard_workbench_surface_produce_lot_preserves_structured_origin() -> 
             "produce_lot_id": created.basket_tools[-1].produce_lots[0].id,
         },
     )
-    discarded = apply_command(
+    discarded = move_object(
         service,
         experiment.id,
-        "discard_produce_lot_from_workbench_tool",
-        {
-            "slot_id": "station_1",
-            "produce_lot_id": placed_on_surface.workbench.slots[0].surface_produce_lots[0].id,
-        },
+        entity_kind="produce_lot",
+        entity_id=placed_on_surface.workbench.slots[0].surface_produce_lots[0].id,
+        source_kind="workbench",
+        source_id="station_1",
+        destination_kind="trash_bin",
+        destination_id="trash",
     )
 
     trashed_entry = discarded.trash.produce_lots[0]
@@ -4373,14 +4355,15 @@ def test_discard_grinder_produce_lot_moves_it_to_trash() -> None:
         },
     )
 
-    updated = apply_command(
+    updated = move_object(
         service,
         experiment.id,
-        "discard_widget_produce_lot",
-        {
-            "widget_id": "grinder",
-            "produce_lot_id": produce_lot_id,
-        },
+        entity_kind="produce_lot",
+        entity_id=produce_lot_id,
+        source_kind="grinder",
+        source_id="grinder",
+        destination_kind="trash_bin",
+        destination_id="trash",
     )
 
     grinder = next(widget for widget in updated.workspace.widgets if widget.id == "grinder")
@@ -4406,13 +4389,15 @@ def test_restore_trashed_produce_lot_to_sampling_bag() -> None:
             "produce_type": "apple",
         },
     )
-    discarded = apply_command(
+    discarded = move_object(
         service,
         experiment.id,
-        "discard_workspace_produce_lot",
-        {
-            "produce_lot_id": created.basket_tools[-1].produce_lots[0].id,
-        },
+        entity_kind="produce_lot",
+        entity_id=created.basket_tools[-1].produce_lots[0].id,
+        source_kind="basket",
+        source_id="produce_basket",
+        destination_kind="trash_bin",
+        destination_id="trash",
     )
     apply_command(
         service,

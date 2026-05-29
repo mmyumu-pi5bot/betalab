@@ -1621,12 +1621,7 @@ function normalizeProduceFractions(raw: unknown): ProduceFraction[] {
       exposureContainerIds: Array.isArray(exposureIdsRaw)
         ? exposureIdsRaw.map((id: unknown) => String(id))
         : [],
-      locationKind:
-        fraction.locationKind !== undefined
-          ? (fraction.locationKind as string | null)
-          : fraction.location_kind !== undefined
-            ? (fraction.location_kind as string | null)
-            : null,
+      locationKind: (fraction.locationKind ?? fraction.location_kind ?? null) as ProduceFraction["locationKind"],
       locationId:
         fraction.locationId !== undefined
           ? (fraction.locationId as string | null)
@@ -1889,7 +1884,7 @@ function normalizeWorkspaceWidget(
     isDraggable: Boolean(widget.isDraggable ?? widget.is_draggable ?? false),
     allowedDropTargets: normalizeAllowedDropTargets(widget.allowedDropTargets ?? widget.allowed_drop_targets),
     isStorable: Boolean(widget.isStorable ?? widget.is_storable ?? false),
-    canStore: Boolean(widget.canStore ?? widget.can_store ?? widget.isDraggable ?? widget.is_draggable ?? false),
+    canStore: Boolean(widget.canStore ?? widget.can_store ?? false),
     anchor: String(widget.anchor ?? "top-left") as WidgetAnchor,
     grinderRunDurationMs: Number(widget.grinderRunDurationMs ?? widget.grinder_run_duration_ms ?? 0),
     grinderRunRemainingMs: Number(widget.grinderRunRemainingMs ?? widget.grinder_run_remaining_ms ?? 0),

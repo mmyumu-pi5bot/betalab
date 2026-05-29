@@ -6,6 +6,8 @@ from enum import StrEnum
 from typing import Generic, Literal, TypeVar
 from uuid import uuid4
 
+from app.domain.rules import can_workspace_widget_store_now
+
 T = TypeVar("T")
 
 
@@ -228,11 +230,6 @@ class Trash:
     sample_labels: list[TrashSampleLabelEntry] = field(default_factory=list)
 
 
-STORABLE_WIDGET_IDS: frozenset[str] = frozenset(
-    {"lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"}
-)
-
-
 @dataclass
 class WorkspaceWidget:
     id: str
@@ -254,13 +251,13 @@ class WorkspaceWidget:
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
 
     def can_store(self, rack_has_tools: bool = False) -> bool:
-        if self.id not in STORABLE_WIDGET_IDS:
-            return False
-        if self.id == "rack" and rack_has_tools:
-            return False
-        if self.is_trashed:
-            return True
-        return self.tool is None and not self.produce_lots and not self.liquids
+        return can_workspace_widget_store_now(
+            self.id,
+            is_trashed=self.is_trashed,
+            has_tool=(self.tool is not None) or (self.id == "rack" and rack_has_tools),
+            has_produce=bool(self.produce_lots),
+            has_liquids=bool(self.liquids),
+        )
 
 
 @dataclass

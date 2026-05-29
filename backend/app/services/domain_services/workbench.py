@@ -444,27 +444,6 @@ def _iter_experiment_produce_fractions(experiment: Experiment):
             yield entry.produce_fraction
 
 
-class DiscardProduceLotFromWorkbenchToolService(WriteDomainService[WorkbenchProduceLotRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
-        super().__init__(runtime)
-
-    def _run(self, experiment: Experiment, request: WorkbenchProduceLotRequest) -> None:
-        removal = WorkbenchProduceLotSource(
-            slot_id=request.slot_id,
-            produce_lot_id=request.produce_lot_id,
-        ).remove(experiment)
-        experiment.trash.produce_lots.append(
-            TrashProduceLotEntry(
-                id=new_id("trash_produce_lot"),
-                origin_label=removal.source_label,
-                produce_lot=removal.entity,
-                origin=removal.origin,
-            )
-        )
-        sync_canonical_produce_model(experiment)
-        experiment.audit_log.append(f"{removal.entity.label} discarded from {removal.source_label}.")
-
-
 class CutWorkbenchProduceLotService(WriteDomainService[WorkbenchProduceLotRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)

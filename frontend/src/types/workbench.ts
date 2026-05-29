@@ -61,7 +61,7 @@ export type ExperimentWorkspaceWidgetId =
   | "vortex";
 export type ExperimentWorkspaceWidgetType = "workbench" | "trash" | WorkspaceWidgetType;
 export type WidgetAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
-export type ProduceLotType = "apple";
+export type ProduceLotType = string;
 export type ProduceMaterialKind = "whole" | "cut" | "ground" | "slurry" | "waste";
 export type DragEntityKind =
   | "tool"
@@ -431,7 +431,17 @@ export type ProduceFraction = {
   isContaminated?: boolean;
   impurityMassMg?: number;
   exposureContainerIds?: string[];
-  locationKind?: string | null;
+  locationKind?:
+    | "basket_tool"
+    | "produce_basket"
+    | "rack_tool"
+    | "spatula"
+    | "trash"
+    | "workbench_surface"
+    | "workbench_tool"
+    | "workspace_widget"
+    | "workspace_widget_tool"
+    | null;
   locationId?: string | null;
   containerId?: string | null;
   containerLabel?: string | null;
