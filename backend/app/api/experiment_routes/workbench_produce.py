@@ -54,5 +54,3 @@ def cut_workbench_produce_lot(
             WorkbenchProduceLotRequest(slot_id=request.slot_id, produce_lot_id=produce_lot_id),
         )
     )
-
-

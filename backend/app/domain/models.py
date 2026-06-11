@@ -87,6 +87,19 @@ class ProduceMaterialState:
     grinding_temperature_integral: float = 0.0
 
 
+ProduceFractionLocationKind = Literal[
+    "basket_tool",
+    "produce_basket",
+    "rack_tool",
+    "spatula",
+    "trash",
+    "workbench_surface",
+    "workbench_tool",
+    "workspace_widget",
+    "workspace_widget_tool",
+]
+
+
 @dataclass
 class ProduceFraction:
     id: str
@@ -101,20 +114,7 @@ class ProduceFraction:
     # Invariant: location_kind and location_id are always set together (or both None).
     # container_id and container_label are set for tool fractions; container_id may be
     # None for surface fractions while container_label carries the display name.
-    location_kind: (
-        Literal[
-            "basket_tool",
-            "produce_basket",
-            "rack_tool",
-            "spatula",
-            "trash",
-            "workbench_surface",
-            "workbench_tool",
-            "workspace_widget",
-            "workspace_widget_tool",
-        ]
-        | None
-    ) = None
+    location_kind: ProduceFractionLocationKind | None = None
     location_id: str | None = None
     container_id: str | None = None
     container_label: str | None = None
@@ -140,6 +140,7 @@ class WorkbenchTool:
     def __post_init__(self) -> None:
         if self.closure_fault is not None and self.closure_fault != "pressure_pop" and not self.is_sealed:
             raise ValueError("closure_fault must be None when is_sealed=False unless the tool popped open")
+
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0  # Non-zero only for sealed containers with CO2 inside
     field_label_text: str | None = None

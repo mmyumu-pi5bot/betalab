@@ -319,7 +319,7 @@ def test_dnd_move_rejects_cutting_board_to_trash_over_http() -> None:
                 "source": {"kind": "palette", "id": "lab_tools"},
                 "destination": {"kind": "trash_bin", "id": "trash_bin"},
             },
-    )
+        )
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Cutting board cannot be dropped on trash."

@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from app.domain.models import (
     Experiment,
     ProduceFraction,
+    ProduceFractionLocationKind,
     ProduceLot,
     ProduceMaterialState,
     SpatulaState,
@@ -298,7 +299,7 @@ def _build_tool_produce_fractions(
     ensure_material_state_id,
     get_material_state_for_lot,
     *,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
     container_label: str | None,
@@ -340,7 +341,7 @@ def _build_surface_produce_fractions(
     existing_fractions: list[ProduceFraction],
     ensure_material_state_id,
     *,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_label: str | None,
 ) -> list[ProduceFraction]:
@@ -392,7 +393,7 @@ def _select_canonical_powder_fractions(
     existing_states_by_lot_id: dict[str, ProduceMaterialState],
     produce_lots_by_id: dict[str, ProduceLot],
     ensure_material_state_id,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
     container_label: str | None,
@@ -443,7 +444,7 @@ def _normalize_existing_particulate_fraction(
     existing_states_by_lot_id: dict[str, ProduceMaterialState],
     produce_lots_by_id: dict[str, ProduceLot],
     ensure_material_state_id,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
     container_label: str | None,
@@ -487,7 +488,7 @@ def _find_matching_fraction(
     fractions: list[ProduceFraction],
     *,
     produce_lot_id: str,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
 ) -> ProduceFraction | None:
@@ -620,7 +621,7 @@ def pour_spatula_into_tool(
     *,
     transferred_mass_g: float,
     material_states: list[ProduceMaterialState],
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
 ) -> None:
     total_loaded_g = get_spatula_total_produce_mass_g(spatula)
@@ -646,7 +647,7 @@ def _split_produce_fraction(
     fraction: ProduceFraction,
     ratio: float,
     *,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
     container_label: str | None,
@@ -681,7 +682,7 @@ def _pour_produce_fractions_proportional(
     ratio: float,
     target_tool: WorkbenchTool,
     *,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
 ) -> None:
     for fraction in source:

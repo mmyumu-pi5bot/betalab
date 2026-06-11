@@ -145,9 +145,7 @@ def get_dnd_contract(entity_kind: DndEntityKind, entity_type: str) -> DndEntityC
     if entity_kind == "liquid":
         return DndEntityContract(
             entity_kind="liquid",
-            allowed_drop_targets=("grinder_widget",)
-            if entity_type == "dry_ice_pellets"
-            else ("workbench_slot", "analytical_balance_widget"),
+            allowed_drop_targets=("grinder_widget",) if entity_type == "dry_ice_pellets" else ("workbench_slot", "analytical_balance_widget"),
         )
     if entity_kind == "workspace_widget":
         return DndEntityContract(

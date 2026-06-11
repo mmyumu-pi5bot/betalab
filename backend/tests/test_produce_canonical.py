@@ -126,7 +126,7 @@ def test_gross_balance_estimates_tool_mass_from_canonical_fractions() -> None:
             produce_lot_id="lot_1",
             produce_material_state_id="state_1",
             mass_g=123.4,
-            location_kind="gross_balance_tool",
+            location_kind="workspace_widget_tool",
             location_id=widget.id,
             container_id=tool.id,
             container_label=tool.label,

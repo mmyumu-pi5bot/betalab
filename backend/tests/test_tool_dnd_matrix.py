@@ -6,6 +6,18 @@ from typing import Literal
 import pytest
 
 from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
+from app.services.domain_services.analytical_balance import (
+    MoveGrossBalanceToolToAnalyticalBalanceRequest,
+    MoveGrossBalanceToolToAnalyticalBalanceService,
+    MoveRackToolToAnalyticalBalanceRequest,
+    MoveRackToolToAnalyticalBalanceService,
+    MoveWorkbenchToolToAnalyticalBalanceRequest,
+    MoveWorkbenchToolToAnalyticalBalanceService,
+    PlaceToolOnAnalyticalBalanceRequest,
+    PlaceToolOnAnalyticalBalanceService,
+    RestoreTrashedToolToAnalyticalBalanceRequest,
+    RestoreTrashedToolToAnalyticalBalanceService,
+)
 from app.services.domain_services.gross_balance import (
     DiscardGrossBalanceToolService,
     EmptyRequest,
@@ -41,18 +53,6 @@ from app.services.domain_services.rack import (
 from app.services.domain_services.reception import (
     PlaceReceivedBagOnWorkbenchRequest,
     PlaceReceivedBagOnWorkbenchService,
-)
-from app.services.domain_services.analytical_balance import (
-    MoveGrossBalanceToolToAnalyticalBalanceRequest,
-    MoveGrossBalanceToolToAnalyticalBalanceService,
-    MoveRackToolToAnalyticalBalanceRequest,
-    MoveRackToolToAnalyticalBalanceService,
-    MoveWorkbenchToolToAnalyticalBalanceRequest,
-    MoveWorkbenchToolToAnalyticalBalanceService,
-    PlaceToolOnAnalyticalBalanceRequest,
-    PlaceToolOnAnalyticalBalanceService,
-    RestoreTrashedToolToAnalyticalBalanceRequest,
-    RestoreTrashedToolToAnalyticalBalanceService,
 )
 from app.services.domain_services.trash import DiscardBasketToolRequest, DiscardBasketToolService
 from app.services.domain_services.vortex import (
@@ -375,11 +375,14 @@ def _execute_drop(
             return PlaceToolOnAnalyticalBalanceService(service).run(experiment_id, PlaceToolOnAnalyticalBalanceRequest(tool_id=tool_id))
         if source == "basket_bag":
             basket_tool_id = service.get_experiment(experiment_id).basket_tools[0].id
-            return DndMoveObjectService(service).run(experiment_id, DndMoveObjectRequest(
-                entity=DndObjectRef(kind="tool", id=basket_tool_id),
-                source=DndObjectRef(kind="basket", id="produce_basket"),
-                destination=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
-            ))
+            return DndMoveObjectService(service).run(
+                experiment_id,
+                DndMoveObjectRequest(
+                    entity=DndObjectRef(kind="tool", id=basket_tool_id),
+                    source=DndObjectRef(kind="basket", id="produce_basket"),
+                    destination=DndObjectRef(kind="analytical_balance", id="analytical_balance"),
+                ),
+            )
         if source.startswith("workbench_"):
             return MoveWorkbenchToolToAnalyticalBalanceService(service).run(
                 experiment_id, MoveWorkbenchToolToAnalyticalBalanceRequest(source_slot_id="station_1")
@@ -394,9 +397,7 @@ def _execute_drop(
                 experiment_id, RestoreTrashedToolToAnalyticalBalanceRequest(trash_tool_id=trash_tool_id)
             )
         if source == "gross_balance_vial":
-            return MoveGrossBalanceToolToAnalyticalBalanceService(service).run(
-                experiment_id, MoveGrossBalanceToolToAnalyticalBalanceRequest()
-            )
+            return MoveGrossBalanceToolToAnalyticalBalanceService(service).run(experiment_id, MoveGrossBalanceToolToAnalyticalBalanceRequest())
         if source in {"analytical_balance_vial", "vortex_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "vortex":
@@ -404,28 +405,23 @@ def _execute_drop(
             return PlaceToolOnVortexService(service).run(experiment_id, PlaceToolOnVortexRequest(tool_id=tool_id))
         if source == "basket_bag":
             basket_tool_id = service.get_experiment(experiment_id).basket_tools[0].id
-            return DndMoveObjectService(service).run(experiment_id, DndMoveObjectRequest(
-                entity=DndObjectRef(kind="tool", id=basket_tool_id),
-                source=DndObjectRef(kind="basket", id="produce_basket"),
-                destination=DndObjectRef(kind="vortex", id="vortex"),
-            ))
+            return DndMoveObjectService(service).run(
+                experiment_id,
+                DndMoveObjectRequest(
+                    entity=DndObjectRef(kind="tool", id=basket_tool_id),
+                    source=DndObjectRef(kind="basket", id="produce_basket"),
+                    destination=DndObjectRef(kind="vortex", id="vortex"),
+                ),
+            )
         if source.startswith("workbench_"):
-            return MoveWorkbenchToolToVortexService(service).run(
-                experiment_id, MoveWorkbenchToolToVortexRequest(source_slot_id="station_1")
-            )
+            return MoveWorkbenchToolToVortexService(service).run(experiment_id, MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"))
         if source == "rack_vial":
-            return MoveRackToolToVortexService(service).run(
-                experiment_id, MoveRackToolToVortexRequest(rack_slot_id="rack_slot_1")
-            )
+            return MoveRackToolToVortexService(service).run(experiment_id, MoveRackToolToVortexRequest(rack_slot_id="rack_slot_1"))
         if source.startswith("trash_"):
             assert trash_tool_id is not None
-            return RestoreTrashedToolToVortexService(service).run(
-                experiment_id, RestoreTrashedToolToVortexRequest(trash_tool_id=trash_tool_id)
-            )
+            return RestoreTrashedToolToVortexService(service).run(experiment_id, RestoreTrashedToolToVortexRequest(trash_tool_id=trash_tool_id))
         if source == "gross_balance_vial":
-            return MoveGrossBalanceToolToVortexService(service).run(
-                experiment_id, MoveGrossBalanceToolToVortexRequest()
-            )
+            return MoveGrossBalanceToolToVortexService(service).run(experiment_id, MoveGrossBalanceToolToVortexRequest())
         if source in {"analytical_balance_vial", "vortex_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "trash":

@@ -77,7 +77,7 @@ class ExperimentRuntimeService:
         workspace = asdict(experiment.workspace)
         rack_has_tools = any(slot.tool is not None for slot in experiment.rack.slots)
         produce_material_states = [asdict(state) for state in experiment.produce_material_states]
-        for widget_obj, widget_dict in zip(experiment.workspace.widgets, workspace["widgets"]):
+        for widget_obj, widget_dict in zip(experiment.workspace.widgets, workspace["widgets"], strict=False):
             widget_dict["store_allowed_override"] = widget_obj.can_store(rack_has_tools)
             widget_dict["produce_material_states"] = produce_material_states
         return ExperimentSchema.model_validate(

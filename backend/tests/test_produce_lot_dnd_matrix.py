@@ -221,7 +221,15 @@ def _prepare_source(service: ExperimentRuntimeService, experiment_id: str, sourc
         )
         return produce_lot_id, None
     if source == "trash":
-        discarded = _move_produce_lot(service, experiment_id, produce_lot_id=produce_lot_id, source_kind="basket", source_id="produce_basket", destination_kind="trash_bin", destination_id="trash")
+        discarded = _move_produce_lot(
+            service,
+            experiment_id,
+            produce_lot_id=produce_lot_id,
+            source_kind="basket",
+            source_id="produce_basket",
+            destination_kind="trash_bin",
+            destination_id="trash",
+        )
         return produce_lot_id, discarded.trash.produce_lots[0].id
     if source == "gross_balance":
         _move_produce_lot(

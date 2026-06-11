@@ -8,15 +8,19 @@ import pytest
 from app.services.dnd_move_service import DndMoveObjectRequest, DndMoveObjectService, DndObjectRef
 from app.services.domain_services.analytical_balance import (
     ApplySampleLabelToAnalyticalBalanceToolService,
-    EmptyRequest as AnalyticalBalanceEmptyRequest,
     PlaceToolOnAnalyticalBalanceRequest,
     PlaceToolOnAnalyticalBalanceService,
 )
+from app.services.domain_services.analytical_balance import (
+    EmptyRequest as AnalyticalBalanceEmptyRequest,
+)
 from app.services.domain_services.gross_balance import (
     ApplySampleLabelToGrossBalanceToolService,
-    EmptyRequest as GrossBalanceEmptyRequest,
     PlaceToolOnGrossBalanceRequest,
     PlaceToolOnGrossBalanceService,
+)
+from app.services.domain_services.gross_balance import (
+    EmptyRequest as GrossBalanceEmptyRequest,
 )
 from app.services.domain_services.reception import (
     ApplyPrintedLimsLabelRequest,
@@ -139,9 +143,7 @@ def _prepare_label_target(service: ExperimentRuntimeService, experiment_id: str,
         PlaceToolOnGrossBalanceService(service).run(experiment_id, PlaceToolOnGrossBalanceRequest(tool_id="centrifuge_tube_50ml"))
 
 
-def _prepare_label_source(
-    service: ExperimentRuntimeService, experiment_id: str, source: LabelSource
-) -> tuple[str | None, str | None]:
+def _prepare_label_source(service: ExperimentRuntimeService, experiment_id: str, source: LabelSource) -> tuple[str | None, str | None]:
     if source == "palette_sample_label":
         return None, None
     if source == "workbench_sample_label":
@@ -232,36 +234,48 @@ def _execute_label_drop(
         if source == "workbench_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="workbench", source_id="station_1",
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="workbench",
+                source_id="station_1",
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
         if source == "trash_sample_label":
             assert trash_label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=trash_label_id,
-                source_kind="trash", source_id=trash_label_id,
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="trash",
+                source_id=trash_label_id,
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelService(service).run(experiment_id, ApplyPrintedLimsLabelRequest(slot_id="station_2"))
         if source == "gross_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="gross_balance", source_id="gross_balance",
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="gross_balance",
+                source_id="gross_balance",
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
         if source == "analytical_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="analytical_balance", source_id="analytical_balance",
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="analytical_balance",
+                source_id="analytical_balance",
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
     if target == "analytical_balance_tool":
         if source == "palette_sample_label":
@@ -269,36 +283,48 @@ def _execute_label_drop(
         if source == "workbench_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="workbench", source_id="station_1",
-                destination_kind="analytical_balance", destination_id="analytical_balance",
+                source_kind="workbench",
+                source_id="station_1",
+                destination_kind="analytical_balance",
+                destination_id="analytical_balance",
             )
         if source == "trash_sample_label":
             assert trash_label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=trash_label_id,
-                source_kind="trash", source_id=trash_label_id,
-                destination_kind="analytical_balance", destination_id="analytical_balance",
+                source_kind="trash",
+                source_id=trash_label_id,
+                destination_kind="analytical_balance",
+                destination_id="analytical_balance",
             )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelToAnalyticalBalanceToolService(service).run(experiment_id, EmptyReceptionRequest())
         if source == "gross_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="gross_balance", source_id="gross_balance",
-                destination_kind="analytical_balance", destination_id="analytical_balance",
+                source_kind="gross_balance",
+                source_id="gross_balance",
+                destination_kind="analytical_balance",
+                destination_id="analytical_balance",
             )
         if source == "analytical_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="analytical_balance", source_id="analytical_balance",
-                destination_kind="analytical_balance", destination_id="analytical_balance",
+                source_kind="analytical_balance",
+                source_id="analytical_balance",
+                destination_kind="analytical_balance",
+                destination_id="analytical_balance",
             )
     if target == "gross_balance_tool":
         if source == "palette_sample_label":
@@ -306,36 +332,48 @@ def _execute_label_drop(
         if source == "workbench_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="workbench", source_id="station_1",
-                destination_kind="gross_balance", destination_id="gross_balance",
+                source_kind="workbench",
+                source_id="station_1",
+                destination_kind="gross_balance",
+                destination_id="gross_balance",
             )
         if source == "trash_sample_label":
             assert trash_label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=trash_label_id,
-                source_kind="trash", source_id=trash_label_id,
-                destination_kind="gross_balance", destination_id="gross_balance",
+                source_kind="trash",
+                source_id=trash_label_id,
+                destination_kind="gross_balance",
+                destination_id="gross_balance",
             )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelToGrossBalanceBagService(service).run(experiment_id, EmptyReceptionRequest())
         if source == "gross_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="gross_balance", source_id="gross_balance",
-                destination_kind="gross_balance", destination_id="gross_balance",
+                source_kind="gross_balance",
+                source_id="gross_balance",
+                destination_kind="gross_balance",
+                destination_id="gross_balance",
             )
         if source == "analytical_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="analytical_balance", source_id="analytical_balance",
-                destination_kind="gross_balance", destination_id="gross_balance",
+                source_kind="analytical_balance",
+                source_id="analytical_balance",
+                destination_kind="gross_balance",
+                destination_id="gross_balance",
             )
     if target == "empty_workbench":
         if source == "palette_sample_label":
@@ -343,36 +381,48 @@ def _execute_label_drop(
         if source == "workbench_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="workbench", source_id="station_1",
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="workbench",
+                source_id="station_1",
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
         if source == "trash_sample_label":
             assert trash_label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=trash_label_id,
-                source_kind="trash", source_id=trash_label_id,
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="trash",
+                source_id=trash_label_id,
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
         if source == "lims_ticket":
             return ApplyPrintedLimsLabelService(service).run(experiment_id, ApplyPrintedLimsLabelRequest(slot_id="station_2"))
         if source == "gross_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="gross_balance", source_id="gross_balance",
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="gross_balance",
+                source_id="gross_balance",
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
         if source == "analytical_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="analytical_balance", source_id="analytical_balance",
-                destination_kind="workbench_tool", destination_id="station_2",
+                source_kind="analytical_balance",
+                source_id="analytical_balance",
+                destination_kind="workbench_tool",
+                destination_id="station_2",
             )
     if target == "trash":
         if source == "palette_sample_label":
@@ -387,28 +437,37 @@ def _execute_label_drop(
         if source == "trash_sample_label":
             assert trash_label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=trash_label_id,
-                source_kind="trash", source_id=trash_label_id,
-                destination_kind="trash_bin", destination_id="trash_bin",
+                source_kind="trash",
+                source_id=trash_label_id,
+                destination_kind="trash_bin",
+                destination_id="trash_bin",
             )
         if source == "lims_ticket":
             return DiscardPrintedLimsLabelService(service).run(experiment_id, EmptyReceptionRequest())
         if source == "gross_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="gross_balance", source_id="gross_balance",
-                destination_kind="trash_bin", destination_id="trash_bin",
+                source_kind="gross_balance",
+                source_id="gross_balance",
+                destination_kind="trash_bin",
+                destination_id="trash_bin",
             )
         if source == "analytical_balance_sample_label":
             assert label_id is not None
             return _move_sample_label(
-                service, experiment_id,
+                service,
+                experiment_id,
                 label_id=label_id,
-                source_kind="analytical_balance", source_id="analytical_balance",
-                destination_kind="trash_bin", destination_id="trash_bin",
+                source_kind="analytical_balance",
+                source_id="analytical_balance",
+                destination_kind="trash_bin",
+                destination_id="trash_bin",
             )
     raise ValueError(f"Unsupported label drop: {source} -> {target}")
 
