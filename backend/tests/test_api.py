@@ -11,6 +11,7 @@ from app.api.experiment_routes import dnd as experiment_routes_dnd
 from app.api.experiment_routes import gross_balance as experiment_routes_gross_balance
 from app.api.experiment_routes import rack as experiment_routes_rack
 from app.api.experiment_routes import reception as experiment_routes_reception
+from app.api.experiment_routes import vortex as experiment_routes_vortex
 from app.api.experiment_routes import workbench as experiment_routes_workbench
 from app.api.experiment_routes import workbench_labels as experiment_routes_workbench_labels
 from app.api.experiment_routes import workbench_liquids as experiment_routes_workbench_liquids
@@ -40,6 +41,7 @@ def isolated_api_experiment_service(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(experiment_routes_rack, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_reception, "experiment_service", isolated_service)
+    monkeypatch.setattr(experiment_routes_vortex, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench_labels, "experiment_service", isolated_service)
     monkeypatch.setattr(experiment_routes_workbench_liquids, "experiment_service", isolated_service)
@@ -768,6 +770,21 @@ def test_analytical_balance_tool_can_be_closed_and_opened_over_http() -> None:
     assert closed.json()["workspace"]["widgets"][2]["tool"]["is_sealed"] is True
     assert opened.status_code == 200
     assert opened.json()["workspace"]["widgets"][2]["tool"]["is_sealed"] is False
+
+
+def test_vortex_tool_can_be_closed_over_http() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        experiment = experiment_service._require_experiment(experiment_id)
+        vortex = next(widget for widget in experiment.workspace.widgets if widget.id == "vortex")
+        vortex.tool = build_workbench_tool("centrifuge_tube_50ml")
+        experiment_service._persist_mutation_and_to_schema(experiment)
+
+        closed = client.post(f"/experiments/{experiment_id}/vortex/tool/close")
+
+    assert closed.status_code == 200
+    assert _find_widget(closed.json(), "vortex")["tool"]["is_sealed"] is True
+    assert closed.json()["audit_log"][-1] == "50 mL centrifuge tube sealed on Vortex mixer."
 
 
 def test_list_experiments_returns_saved_sessions_over_http() -> None:

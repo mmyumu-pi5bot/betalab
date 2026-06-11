@@ -460,7 +460,8 @@ def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> N
     widget.vortex_run_remaining_ms = 0.0
     if widget.tool is None:
         return
-    widget.tool.is_mixed = True
+    for fraction in widget.tool.produce_fractions:
+        fraction.is_mixed = True
     experiment.audit_log.append(f"{widget.tool.label} successfully vortexed on {widget.label}.")
 
 

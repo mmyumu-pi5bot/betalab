@@ -584,6 +584,67 @@ describe("api client", () => {
     ]);
   });
 
+  it("normalizes mixed state on the produce fraction only", async () => {
+    const experiment = {
+      ...makeExperiment(),
+      produceMaterialStates: [
+        {
+          id: "state_slurry",
+          produce_lot_id: "lot_1",
+          material_state: "slurry",
+        },
+      ],
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              id: "bench_tool_1",
+              tool_id: "centrifuge_tube_50ml",
+              label: "50 mL centrifuge tube",
+              subtitle: "Extraction ready",
+              accent: "sky",
+              tool_type: "centrifuge_tube",
+              capacity_ml: 50,
+              produce_lots: [
+                {
+                  id: "lot_1",
+                  label: "Apple slurry lot",
+                  produce_type: "apple",
+                  total_mass_g: 8,
+                },
+              ],
+              produce_fractions: [
+                {
+                  id: "fraction_1",
+                  produce_lot_id: "lot_1",
+                  produce_material_state_id: "state_slurry",
+                  mass_g: 8,
+                  is_mixed: true,
+                },
+              ],
+              liquids: [],
+              labels: [],
+            },
+          },
+        ],
+      },
+    } as Experiment;
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const normalized = await getExperiment("experiment_123");
+    expect("isMixed" in ((normalized.produceMaterialStates?.[0] ?? {}) as Record<string, unknown>)).toBe(false);
+    expect(normalized.workbench.slots[0].tool?.produceFractions?.[0]?.isMixed).toBe(true);
+    expect("isMixed" in ((normalized.workbench.slots[0].tool ?? {}) as Record<string, unknown>)).toBe(false);
+  });
+
   it("prefers the fraction material state over the lot-level state when normalizing produce lots", async () => {
     const experiment = {
       ...makeExperiment(),

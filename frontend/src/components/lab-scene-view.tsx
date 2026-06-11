@@ -157,6 +157,7 @@ type LabSceneViewProps = {
     }) => void;
     onStartVortex: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
+    onToggleVortexToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onTareAnalyticalBalance: () => void;

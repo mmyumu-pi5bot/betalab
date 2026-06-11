@@ -94,6 +94,7 @@ class ProduceFraction:
     produce_material_state_id: str
     mass_g: float
     unit_count: int | None = None
+    is_mixed: bool = False
     is_contaminated: bool = False
     impurity_mass_mg: float = 0.0
     exposure_container_ids: list[str] = field(default_factory=list)
@@ -142,7 +143,6 @@ class WorkbenchTool:
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0  # Non-zero only for sealed containers with CO2 inside
     field_label_text: str | None = None
-    is_mixed: bool = False
     labels: list[ContainerLabel] = field(default_factory=list)
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)

@@ -3,16 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
+from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
     find_rack_slot,
     find_trash_tool,
     find_workbench_slot,
     find_workspace_widget,
+    format_volume,
 )
 from app.services.helpers.workbench import build_workbench_tool
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 _VORTEX_CYCLE_DURATION_MS = 3000.0
+physical_simulation_service = PhysicalSimulationService()
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +167,42 @@ class DiscardVortexToolService(VortexServiceBase):
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Vortex mixer"
         experiment.audit_log.append(f"{discarded_tool.label} discarded from Vortex mixer.")
+
+
+class CloseVortexToolService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
+        widget = self._find_vortex_widget(experiment)
+        tool = self._require_vortex_tool(experiment)
+        if not can_tool_be_sealed(tool.tool_type):
+            raise ValueError(f"{tool.label} cannot be sealed.")
+
+        tool.is_sealed = True
+        tool.closure_fault = None
+        tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
+        experiment.audit_log.append(f"{tool.label} sealed on {widget.label}.")
+
+
+class OpenVortexToolService(VortexServiceBase):
+    def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
+        widget = self._find_vortex_widget(experiment)
+        tool = self._require_vortex_tool(experiment)
+        if not can_tool_be_sealed(tool.tool_type):
+            raise ValueError(f"{tool.label} cannot be opened.")
+
+        vent_event = physical_simulation_service.vent_opened_tool(
+            tool,
+            material_states=experiment.produce_material_states,
+        )
+        tool.is_sealed = False
+        tool.closure_fault = None
+        if vent_event is not None and vent_event.lost_mass_g > 0:
+            experiment.audit_log.append(
+                f"{tool.label} vented at {format_volume(vent_event.pressure_bar)} bar on {widget.label}; "
+                f"{format_volume(vent_event.lost_mass_g)} g of powder was lost."
+            )
+            return
+
+        experiment.audit_log.append(f"{tool.label} opened on {widget.label}.")
 
 
 class MoveAnalyticalBalanceToolToVortexService(VortexServiceBase):

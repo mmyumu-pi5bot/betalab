@@ -61,6 +61,7 @@ class ProduceFractionSchema(BaseModel):
     produce_material_state_id: str
     mass_g: float
     unit_count: int | None = None
+    is_mixed: bool = False
     is_contaminated: bool = False
     impurity_mass_mg: float = 0.0
     exposure_container_ids: list[str] = Field(default_factory=list)
@@ -261,7 +262,6 @@ class WorkbenchToolSchema(BaseModel):
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0
     field_label_text: str | None = None
-    is_mixed: bool = False
     labels: list[ContainerLabelSchema] = Field(default_factory=list)
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)

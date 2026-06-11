@@ -1,5 +1,6 @@
 from app.schemas.experiment import ExperimentSchema
 from app.services.domain_services.vortex import (
+    CloseVortexToolService,
     DiscardVortexToolService,
     EmptyRequest,
     MoveAnalyticalBalanceToolToVortexRequest,
@@ -16,6 +17,7 @@ from app.services.domain_services.vortex import (
     MoveVortexToolToWorkbenchService,
     MoveWorkbenchToolToVortexRequest,
     MoveWorkbenchToolToVortexService,
+    OpenVortexToolService,
     PlaceToolOnVortexRequest,
     PlaceToolOnVortexService,
     RestoreTrashedToolToVortexRequest,
@@ -165,6 +167,32 @@ def move_vortex_tool_to_workbench(
 def discard_vortex_tool(experiment_id: str) -> ExperimentSchema:
     return handle_service_errors(
         lambda: DiscardVortexToolService(experiment_service).run(
+            experiment_id,
+            EmptyRequest(),
+        )
+    )
+
+
+@router.post(
+    "/{experiment_id}/vortex/tool/close",
+    response_model=ExperimentSchema,
+)
+def close_vortex_tool(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: CloseVortexToolService(experiment_service).run(
+            experiment_id,
+            EmptyRequest(),
+        )
+    )
+
+
+@router.post(
+    "/{experiment_id}/vortex/tool/open",
+    response_model=ExperimentSchema,
+)
+def open_vortex_tool(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: OpenVortexToolService(experiment_service).run(
             experiment_id,
             EmptyRequest(),
         )

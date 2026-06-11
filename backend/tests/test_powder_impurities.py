@@ -101,6 +101,51 @@ def test_pour_fractions_keeps_distinct_exposure_histories_separate() -> None:
     }
 
 
+def test_pour_fractions_preserves_mixed_state_and_keeps_it_separate() -> None:
+    source = [
+        ProduceFraction(
+            id="produce_fraction_source",
+            produce_lot_id="lot_a",
+            produce_material_state_id="state_ground",
+            mass_g=1.0,
+            is_mixed=True,
+            exposure_container_ids=["jar_source"],
+        )
+    ]
+    target_tool = build_workbench_tool("sample_vial_lcms")
+    target_tool.id = "vial_1"
+    dest = [
+        ProduceFraction(
+            id="produce_fraction_existing",
+            produce_lot_id="lot_a",
+            produce_material_state_id="state_ground",
+            mass_g=0.5,
+            is_mixed=False,
+            exposure_container_ids=["jar_source", "vial_1"],
+            location_kind="workbench_tool",
+            location_id="station_1",
+            container_id="vial_1",
+            container_label=target_tool.label,
+        )
+    ]
+
+    _pour_produce_fractions_proportional(
+        source,
+        dest,
+        0.5,
+        target_tool,
+        location_kind="workbench_tool",
+        location_id="station_1",
+    )
+
+    assert source[0].is_mixed is True
+    assert len(dest) == 2
+    assert sorted((fraction.mass_g, fraction.is_mixed) for fraction in dest) == [
+        (0.5, False),
+        (0.5, True),
+    ]
+
+
 def test_experiment_roundtrip_preserves_powder_impurity_state() -> None:
     service = ExperimentRuntimeService()
     created = service.create_experiment()
@@ -115,6 +160,7 @@ def test_experiment_roundtrip_preserves_powder_impurity_state() -> None:
             produce_lot_id="lot_a",
             produce_material_state_id="state_ground_1",
             mass_g=1.25,
+            is_mixed=True,
             impurity_mass_mg=0.08,
             exposure_container_ids=["jar_a", "tube_a"],
             location_kind="workbench_tool",
@@ -134,5 +180,6 @@ def test_experiment_roundtrip_preserves_powder_impurity_state() -> None:
     assert len(restored_tool.produce_fractions) == 1
     assert restored_tool.produce_fractions[0].produce_lot_id == "lot_a"
     assert restored_tool.produce_fractions[0].mass_g == 1.25
+    assert restored_tool.produce_fractions[0].is_mixed is True
     assert restored_tool.produce_fractions[0].impurity_mass_mg == pytest.approx(0.08)
     assert restored_tool.produce_fractions[0].exposure_container_ids == ["jar_a", "tube_a"]

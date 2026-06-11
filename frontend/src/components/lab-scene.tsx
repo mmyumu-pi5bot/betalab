@@ -560,6 +560,16 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
           clearDropTargets();
           void experimentApi.workspace.storeWidget({ widget_id: widgetId });
         },
+        onToggleVortexToolSeal: () => {
+          if (!vortexTool) {
+            return;
+          }
+          if (vortexTool.isSealed) {
+            void experimentApi.vortex.openTool();
+            return;
+          }
+          void experimentApi.vortex.closeTool();
+        },
       }}
     />
   );

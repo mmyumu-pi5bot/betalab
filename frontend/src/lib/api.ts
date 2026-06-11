@@ -1355,6 +1355,28 @@ export async function discardVortexTool(
   });
 }
 
+export async function closeVortexTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/close`,
+  });
+}
+
+export async function openVortexTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/vortex/tool/open`,
+  });
+}
+
 export async function startVortexCycle(
   experimentId: string,
   payload?: MutationPayload,
@@ -1513,7 +1535,15 @@ function normalizeBenchTool(
   const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
   const statesById = new Map(materialStates.map((state) => [state.id, state]));
   const rawProduceLots = (tool.produceLots ?? tool.produce_lots ?? []) as unknown[];
-  const produceFractions = normalizeProduceFractions(tool.produceFractions ?? tool.produce_fractions);
+  const produceFractions = normalizeProduceFractions(tool.produceFractions ?? tool.produce_fractions).map(
+    (fraction) => {
+      const materialState = statesById.get(fraction.produceMaterialStateId);
+      return {
+        ...fraction,
+        materialState: materialState?.materialState,
+      };
+    },
+  );
   const produceLotContext = buildProduceLotNormalizationContext(statesByLotId, statesById, produceFractions);
   const produceLots = rawProduceLots.map((lot) =>
     normalizeProduceLot(lot as ExperimentProduceLot & Record<string, unknown>, produceLotContext),
@@ -1538,7 +1568,6 @@ function normalizeBenchTool(
     contactImpurityMgPerG: Number(tool.contactImpurityMgPerG ?? tool.contact_impurity_mg_per_g ?? 0),
     internalPressureBar: Number(tool.internalPressureBar ?? tool.internal_pressure_bar ?? 1.0),
     trappedCo2MassG: Number(tool.trappedCo2MassG ?? tool.trapped_co2_mass_g ?? 0),
-    isMixed: Boolean(tool.isMixed ?? tool.is_mixed ?? false),
     isSealed: Boolean(tool.isSealed ?? tool.is_sealed ?? false),
     closureFault:
       tool.closureFault !== undefined
@@ -1609,6 +1638,7 @@ function normalizeProduceFractions(raw: unknown): ProduceFraction[] {
       produceMaterialStateId: String(
         fraction.produceMaterialStateId ?? fraction.produce_material_state_id ?? "",
       ),
+      isMixed: Boolean(fraction.isMixed ?? fraction.is_mixed ?? false),
       massG: Number(fraction.massG ?? fraction.mass_g ?? 0),
       unitCount:
         fraction.unitCount !== undefined && fraction.unitCount !== null

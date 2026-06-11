@@ -322,6 +322,7 @@ def _build_tool_produce_fractions(
                 produce_material_state_id=state_id,
                 mass_g=produce_lot.total_mass_g,
                 unit_count=(existing_fraction.unit_count if existing_fraction is not None else produce_lot.unit_count),
+                is_mixed=(existing_fraction.is_mixed if existing_fraction is not None else False),
                 is_contaminated=(existing_fraction.is_contaminated if existing_fraction is not None else False),
                 impurity_mass_mg=(round(produce_lot.total_mass_g * contact_impurity_mg_per_g, 6) if material_state == "ground" else 0.0),
                 exposure_container_ids=[container_id] if material_state == "ground" and container_id is not None else [],
@@ -359,6 +360,7 @@ def _build_surface_produce_fractions(
                 produce_material_state_id=ensure_material_state_id(produce_lot),
                 mass_g=produce_lot.total_mass_g,
                 unit_count=(existing_fraction.unit_count if existing_fraction is not None else produce_lot.unit_count),
+                is_mixed=(existing_fraction.is_mixed if existing_fraction is not None else False),
                 is_contaminated=(existing_fraction.is_contaminated if existing_fraction is not None else False),
                 location_kind=location_kind,
                 location_id=location_id,
@@ -375,6 +377,7 @@ def _build_trash_produce_fraction(entry: TrashProduceLotEntry, ensure_material_s
         produce_material_state_id=ensure_material_state_id(entry.produce_lot),
         mass_g=entry.produce_lot.total_mass_g,
         unit_count=entry.produce_lot.unit_count,
+        is_mixed=entry.produce_fraction.is_mixed if entry.produce_fraction is not None else False,
         is_contaminated=entry.produce_fraction.is_contaminated if entry.produce_fraction is not None else False,
         location_kind="trash",
         location_id=entry.id,
@@ -469,6 +472,7 @@ def _normalize_existing_particulate_fraction(
         ),
         mass_g=fraction.mass_g,
         unit_count=fraction.unit_count,
+        is_mixed=fraction.is_mixed,
         is_contaminated=fraction.is_contaminated,
         impurity_mass_mg=fraction.impurity_mass_mg,
         exposure_container_ids=list(fraction.exposure_container_ids),
@@ -660,6 +664,7 @@ def _split_produce_fraction(
         produce_material_state_id=fraction.produce_material_state_id,
         mass_g=taken_mass_g,
         unit_count=fraction.unit_count,
+        is_mixed=fraction.is_mixed,
         is_contaminated=fraction.is_contaminated,
         impurity_mass_mg=taken_impurity_mg,
         exposure_container_ids=list(fraction.exposure_container_ids),
@@ -696,6 +701,7 @@ def _pour_produce_fractions_proportional(
                 for item in dest
                 if item.produce_lot_id == fraction.produce_lot_id
                 and item.produce_material_state_id == fraction.produce_material_state_id
+                and item.is_mixed == fraction.is_mixed
                 and item.exposure_container_ids == exposure_container_ids
             ),
             None,
@@ -715,6 +721,7 @@ def _pour_produce_fractions_proportional(
                 produce_material_state_id=fraction.produce_material_state_id,
                 mass_g=to_transfer,
                 unit_count=fraction.unit_count,
+                is_mixed=fraction.is_mixed,
                 is_contaminated=fraction.is_contaminated,
                 impurity_mass_mg=round(transferred_impurity_mg + contact_impurity_mg, 6),
                 exposure_container_ids=exposure_container_ids,

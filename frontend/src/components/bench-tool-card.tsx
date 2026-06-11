@@ -74,6 +74,9 @@ export function BenchToolCard({
   const fillRatio = tool.capacity_ml > 0 ? Math.min(totalVolumeMl / tool.capacity_ml, 1) : 0;
   const powderMassG = tool.powderMassG ?? 0;
   const containsSlurry = tool.containsSlurry ?? false;
+  const containsMixedSlurry = (tool.produceFractions ?? []).some(
+    (fraction) => fraction.materialState === "slurry" && fraction.isMixed === true,
+  );
   const liquidVisualState = getContainerLiquidVisualState(tool.liquids, tool.accent);
   const liquidSegments = liquidVisualState.segments;
   const isSampleBag = tool.toolType === "sample_bag";
@@ -212,7 +215,7 @@ export function BenchToolCard({
                         ? "Powder reservoir loaded"
                         : "Ready for spatula loading"
                       : containsSlurry
-                        ? (tool.isMixed ? "Slurry mixed" : "Slurry present")
+                        ? (containsMixedSlurry ? "Slurry mixed" : "Slurry present")
                       : powderMassG > 0
                         ? "Powder deposit present"
                         : "Ready for powder dosing"

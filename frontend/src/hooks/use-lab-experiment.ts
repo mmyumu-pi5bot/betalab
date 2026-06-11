@@ -313,8 +313,10 @@ export function useLabExperiment({
 
     // ── Vortex ────────────────────────────────────────────────────────────────
     vortex: {
+      closeTool: () => exec(mutationFns.closeVortexTool),
       placeTool: (p: PlaceToolOnVortexPayload) => exec(mutationFns.placeToolOnVortex, p),
       discard: () => exec(mutationFns.discardVortexTool),
+      openTool: () => exec(mutationFns.openVortexTool),
       start: () => exec(mutationFns.startVortexCycle),
       moveToolToWorkbench: (p: MoveVortexToolToWorkbenchPayload) => exec(mutationFns.moveVortexToolToWorkbench, p),
       moveToolToGrossBalance: () => exec(mutationFns.moveVortexToolToGrossBalance),

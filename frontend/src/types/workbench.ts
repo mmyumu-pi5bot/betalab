@@ -380,7 +380,6 @@ export type BenchToolInstance = {
   isSealed?: boolean;
   closureFault?: string | null;
   fieldLabelText?: string | null;
-  isMixed?: boolean;
   isDraggable: boolean;
   isDiscardable?: boolean;
   isStorable?: boolean;
@@ -426,6 +425,8 @@ export type ProduceFraction = {
   id: string;
   produceLotId: string;
   produceMaterialStateId: string;
+  materialState?: ProduceMaterialKind;
+  isMixed?: boolean;
   massG: number;
   unitCount?: number | null;
   isContaminated?: boolean;

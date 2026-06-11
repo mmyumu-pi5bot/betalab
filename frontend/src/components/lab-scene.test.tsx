@@ -334,6 +334,17 @@ function makeWorkspaceWidgets(
       isPresent: false,
       isTrashed: false,
     },
+    {
+      id: "vortex",
+      widgetType: "vortex_mixer",
+      label: "Vortex mixer",
+      dropTargetTypes: ["vortex_widget"],
+      anchor: "top-left",
+      offsetX: 1444,
+      offsetY: 886,
+      isPresent: false,
+      isTrashed: false,
+    },
   ];
 
   const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"]);
@@ -598,6 +609,12 @@ function makeWorkspaceWithAnalyticalBalanceVisible(
   overrides: Partial<ExperimentWorkspaceWidget> = {},
 ) {
   return makeWorkspaceWidgets([{}, {}, { isPresent: true, ...overrides }, {}, {}, {}, {}, {}, {}]);
+}
+
+function makeWorkspaceWithVortexVisible(
+  overrides: Partial<ExperimentWorkspaceWidget> = {},
+) {
+  return makeWorkspaceWidgets([{}, {}, {}, {}, {}, {}, {}, {}, {}, { isPresent: true, ...overrides }]);
 }
 
 afterEach(() => {
@@ -5284,6 +5301,60 @@ describe("LabScene", () => {
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
       "close_analytical_balance_tool",
+      {},
+    );
+  });
+
+  it("closes a tube from the vortex card", async () => {
+    const vortexTube = makeTool({
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL centrifuge tube",
+      subtitle: "QuEChERS extraction",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      isSealed: false,
+    });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        workspaceWidgets: makeWorkspaceWithVortexVisible({ tool: vortexTube }),
+      }) as Experiment,
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment() as Experiment);
+
+    render(<PesticideWorkbench />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close 50 mL centrifuge tube" }));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "close_vortex_tool",
+      {},
+    );
+  });
+
+  it("opens a sealed tube from the vortex card", async () => {
+    const vortexTube = makeTool({
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL centrifuge tube",
+      subtitle: "QuEChERS extraction",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      isSealed: true,
+    });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        workspaceWidgets: makeWorkspaceWithVortexVisible({ tool: vortexTube }),
+      }) as Experiment,
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment() as Experiment);
+
+    render(<PesticideWorkbench />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open 50 mL centrifuge tube" }));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "open_vortex_tool",
       {},
     );
   });

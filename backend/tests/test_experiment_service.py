@@ -67,6 +67,14 @@ from app.services.domain_services.reception import (
     SetGrossMassOffsetService,
 )
 from app.services.domain_services.trash import DiscardBasketToolRequest, DiscardBasketToolService
+from app.services.domain_services.vortex import (
+    EmptyRequest as EmptyVortexRequest,
+)
+from app.services.domain_services.vortex import (
+    MoveWorkbenchToolToVortexRequest,
+    MoveWorkbenchToolToVortexService,
+    StartVortexCycleService,
+)
 from app.services.domain_services.workbench import (
     AddLiquidToWorkbenchToolRequest,
     AddLiquidToWorkbenchToolService,
@@ -125,6 +133,7 @@ from app.services.domain_services.workspace import (
 from app.services.experiment_repository import SqliteExperimentRepository
 from app.services.experiment_service import ExperimentRuntimeService
 from app.services.helpers.produce_material_states import set_material_state_name
+from app.services.helpers.workbench import build_workbench_tool
 from app.services.received_sample_generation import (
     SAMPLE_BAG_TARE_MASS_G,
 )
@@ -4560,6 +4569,71 @@ def test_remove_liquid_from_workbench_tool_updates_tool_contents() -> None:
     assert updated.workbench.slots[0].tool is not None
     assert updated.workbench.slots[0].tool.liquids == []
     assert updated.audit_log[-1] == "Acetonitrile removed from 50 mL centrifuge tube."
+
+
+def test_vortex_cycle_marks_only_the_tube_powder_fraction_as_mixed() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(
+            slot_id="station_1",
+            tool_id="centrifuge_tube_50ml",
+        ),
+    )
+
+    runtime_experiment = service._require_experiment(experiment.id)
+    tube = runtime_experiment.workbench.slots[0].tool
+    assert tube is not None
+    tube.produce_fractions = [
+        ProduceFraction(
+            id="tube_fraction",
+            produce_lot_id="lot_1",
+            produce_material_state_id="shared_ground_state",
+            mass_g=2.5,
+        )
+    ]
+    jar = build_workbench_tool("hdpe_storage_jar_2l")
+    jar.produce_fractions = [
+        ProduceFraction(
+            id="jar_fraction",
+            produce_lot_id="lot_1",
+            produce_material_state_id="shared_ground_state",
+            mass_g=100.0,
+        )
+    ]
+    runtime_experiment.workbench.slots[1].tool = jar
+    runtime_experiment.produce_material_states = [
+        ProduceMaterialState(
+            id="shared_ground_state",
+            produce_lot_id="lot_1",
+            material_state="ground",
+        ),
+    ]
+
+    MoveWorkbenchToolToVortexService(service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+    started = StartVortexCycleService(service).run(experiment.id, EmptyVortexRequest())
+    vortex_tool = next(widget.tool for widget in started.workspace.widgets if widget.id == "vortex")
+    assert vortex_tool is not None
+    assert vortex_tool.produce_fractions[0].is_mixed is False
+    assert started.workbench.slots[1].tool is not None
+    assert started.workbench.slots[1].tool.produce_fractions[0].is_mixed is False
+
+    finished = AdvanceWorkspaceCryogenicsService(service).run(
+        experiment.id,
+        AdvanceWorkspaceCryogenicsRequest(elapsed_ms=3000),
+    )
+
+    vortex_tool = next(widget.tool for widget in finished.workspace.widgets if widget.id == "vortex")
+    assert vortex_tool is not None
+    assert vortex_tool.produce_fractions[0].is_mixed is True
+    assert finished.workbench.slots[1].tool is not None
+    assert finished.workbench.slots[1].tool.produce_fractions[0].is_mixed is False
+    assert not hasattr(finished.produce_material_states[0], "is_mixed")
 
 
 def test_mixed_slurry_liquid_cannot_be_removed_or_edited() -> None:

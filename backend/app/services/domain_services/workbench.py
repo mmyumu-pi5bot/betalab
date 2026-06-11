@@ -7,7 +7,6 @@ from app.domain.dnd_rules import can_tool_be_discarded, can_tool_be_stored
 from app.domain.models import (
     Experiment,
     ProduceMaterialState,
-    TrashProduceLotEntry,
     TrashSampleLabelEntry,
     WorkbenchSlot,
     WorkbenchTool,
@@ -47,9 +46,6 @@ from app.services.helpers.workbench import (
     require_slot_tool,
 )
 from app.services.physical_simulation_service import PhysicalSimulationService
-from app.services.transfer import (
-    WorkbenchProduceLotSource,
-)
 
 physical_simulation_service = PhysicalSimulationService()
 SPATULA_CAPACITY_G = 5.0
@@ -403,6 +399,7 @@ def _convert_ground_produce_to_slurry(experiment: Experiment, tool: WorkbenchToo
             fraction.produce_material_state_id = cloned_state.id
             state = cloned_state
         state.material_state = "slurry"
+        fraction.is_mixed = False
         converted_any = True
     if not converted_any:
         return

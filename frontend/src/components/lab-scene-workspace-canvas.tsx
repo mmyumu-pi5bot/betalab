@@ -152,6 +152,7 @@ type LabSceneWorkspaceCanvasProps = {
     }) => void;
     onStartVortex: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
+    onToggleVortexToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onTareAnalyticalBalance: () => void;
@@ -326,6 +327,7 @@ export function LabSceneWorkspaceCanvas({
         onDragOver={dnd.vortex.handleVortexDragOver}
         onDrop={dnd.vortex.handleVortexDrop}
         onRemoveLiquid={() => {}}
+        onToggleSeal={workspaceActions.onToggleVortexToolSeal}
         tool={{ ...vortexTool, id: `vortex-${vortexTool.id}` }}
       />
     </div>
