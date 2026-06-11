@@ -1,7 +1,7 @@
 import type { MoveObjectPayload } from "@/types/api-payloads";
 import type { SampleLabelDragPayload } from "@/types/workbench";
 
-export type LabelMoveDestination =
+type LabelMoveDestination =
   | { kind: "analytical_balance" }
   | { kind: "gross_balance" }
   | { kind: "trash_bin" }

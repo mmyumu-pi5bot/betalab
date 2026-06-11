@@ -70,19 +70,19 @@ export function ToolbarPanel({
           >
             <div className="flex items-start justify-between gap-2">
               <button
-                aria-expanded={!collapsedCategories[category.id]}
+                aria-expanded={!(collapsedCategories[category.id] ?? true)}
                 className="flex w-full items-center justify-between gap-3 rounded-[0.8rem] text-left"
                 onClick={() => {
                   setCollapsedCategories((current) => ({
                     ...current,
-                    [category.id]: !current[category.id],
+                    [category.id]: !(current[category.id] ?? true),
                   }));
                 }}
                 type="button"
               >
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 text-xs font-semibold leading-none text-slate-400">
-                    {collapsedCategories[category.id] ? "+" : "-"}
+                    {(collapsedCategories[category.id] ?? true) ? "+" : "-"}
                   </span>
                   <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-900">
                     {category.label}
@@ -92,8 +92,8 @@ export function ToolbarPanel({
             </div>
 
             <div
-              aria-hidden={collapsedCategories[category.id]}
-              className={collapsedCategories[category.id] ? "hidden" : "mt-2.5 space-y-2"}
+              aria-hidden={collapsedCategories[category.id] ?? true}
+              className={(collapsedCategories[category.id] ?? true) ? "hidden" : "mt-2.5 space-y-2"}
               data-testid={`toolbar-category-panel-${category.id}`}
             >
                 {category.items.map((item) => (

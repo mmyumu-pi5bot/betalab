@@ -31,7 +31,6 @@ import type { WidgetLayout } from "@/hooks/use-workspace-layout";
 import { isWorkspaceEquipmentWidgetId } from "@/lib/workspace-widget-ids";
 import type { Experiment } from "@/types/experiment";
 import type {
-  BenchLabel,
   BenchSlot,
   BenchToolInstance,
   DragDescriptor,

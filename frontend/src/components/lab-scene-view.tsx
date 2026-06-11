@@ -20,7 +20,6 @@ import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
 import type { Experiment } from "@/types/experiment";
 import type {
-  BenchLabel,
   BenchSlot,
   BenchToolInstance,
   DragDescriptor,

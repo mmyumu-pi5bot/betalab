@@ -1,7 +1,7 @@
 import type { MoveObjectPayload } from "@/types/api-payloads";
 import type { ProduceDragPayload } from "@/types/workbench";
 
-export type ProduceMoveDestination =
+type ProduceMoveDestination =
   | { kind: "gross_balance" }
   | { kind: "trash_bin" }
   | { kind: "workbench_tool"; slotId: string }

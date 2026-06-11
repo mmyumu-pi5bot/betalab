@@ -30,10 +30,25 @@ const defaultAuditLog = [
   "Start by dragging an extraction tool onto the bench.",
 ];
 
+function makeEmptyBenchSlotContainment() {
+  return {
+    accepts: [
+      { entityKind: "tool" as const },
+      { entityKind: "produce" as const },
+    ],
+    blockedReason: null,
+    canReceive: true,
+    capacity: 1,
+    children: [],
+    remainingCapacity: 1,
+  };
+}
+
 function makeSlots(count = 2): BenchSlot[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `station_${index + 1}`,
     label: `Station ${index + 1}`,
+    containment: makeEmptyBenchSlotContainment(),
     dropTargetTypes: ["workbench_slot"] as DropTargetType[],
     tool: null,
   }));
