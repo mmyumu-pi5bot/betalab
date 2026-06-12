@@ -16,6 +16,11 @@ import type {
 } from "@/types/workbench";
 
 export type WorkbenchHandlersExperimentApi = {
+  addLiquidToWorkbenchTool: (payload: {
+    slot_id: string;
+    liquid_id: string;
+    volume_ml: number;
+  }) => void;
   addWorkbenchSlot: () => void;
   applySampleLabelToWorkbenchTool: (payload: { slot_id: string }) => void;
   applyPrintedLimsLabel: (payload: { slot_id: string }) => void;
@@ -103,6 +108,14 @@ export function useWorkbenchHandlers({
     }
 
     const liquidDefinition = labLiquidCatalog[payload.itemId];
+    if (payload.itemId === "quechers_salts") {
+      void experimentApi.addLiquidToWorkbenchTool({
+        slot_id: slotId,
+        liquid_id: payload.itemId,
+        volume_ml: 1,
+      });
+      return;
+    }
     setPendingDropDraft({
       commandType: "add_liquid_to_workbench_tool",
       fields: [

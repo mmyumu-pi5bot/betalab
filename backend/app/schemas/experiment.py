@@ -43,6 +43,20 @@ class WorkbenchLiquidSchema(BaseModel):
     accent: str
 
 
+class QuechersStateSchema(BaseModel):
+    salts_added: bool = False
+    phase: str = "idle"
+    temperature_c: float = 20.0
+    cementation_progress: float = 0.0
+    thermal_degradation_progress: float = 0.0
+    reaction_elapsed_seconds: float = 0.0
+    fault: str | None = None
+
+    @computed_field
+    def is_usable(self) -> bool:
+        return self.phase not in {"cemented", "contaminated"}
+
+
 class ProduceMaterialStateSchema(BaseModel):
     id: str
     produce_lot_id: str
@@ -266,6 +280,7 @@ class WorkbenchToolSchema(BaseModel):
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
+    quechers_state: QuechersStateSchema = Field(default_factory=QuechersStateSchema)
 
     @computed_field
     def sample_label_text(self) -> str | None:

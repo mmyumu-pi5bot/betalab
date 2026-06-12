@@ -65,8 +65,8 @@ export const labWorkflowCategories: ToolbarCategory[] = [
   },
   {
     id: "workflow_liquids",
-    label: "Liquids",
-    description: "Starting liquids for the first pesticide extraction simulation.",
+    label: "Reagents & materials",
+    description: "Reagents and supporting materials for the pesticide extraction workflow.",
     items: [
       {
         id: "acetonitrile_extraction",
@@ -111,6 +111,17 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         accent: "sky",
         liquidType: "dry_ice_pellets",
         transfer_volume_ml: 1000,
+      },
+      {
+        id: "quechers_salts",
+        allowedDropTargets: [],
+        itemType: "liquid",
+        name: "QuEChERS salts packet",
+        subtitle: "Extraction salts packet",
+        description: "Pre-portioned extraction salts that trigger the exothermic QuEChERS partitioning reaction.",
+        accent: "violet",
+        liquidType: "quechers_salts",
+        transfer_volume_ml: 1,
       },
     ],
   },

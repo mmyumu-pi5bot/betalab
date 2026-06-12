@@ -6,6 +6,7 @@ from app.domain.models import (
     Experiment,
     ProduceLot,
     WorkbenchLiquid,
+    WorkbenchTool,
     WorkspaceWidget,
     new_id,
 )
@@ -320,6 +321,23 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
         return
 
     elapsed_seconds = elapsed_ms / 1000.0
+    quechers_tools: dict[str, WorkbenchTool] = {}
+    for slot in experiment.workbench.slots:
+        if slot.tool is not None:
+            quechers_tools[slot.tool.id] = slot.tool
+    for slot in experiment.rack.slots:
+        if slot.tool is not None:
+            quechers_tools[slot.tool.id] = slot.tool
+    for tool in experiment.trash.children:
+        quechers_tools[tool.id] = tool
+    for tool in experiment.basket_tools:
+        quechers_tools[tool.id] = tool
+    for widget in experiment.workspace.widgets:
+        if widget.tool is not None:
+            quechers_tools[widget.tool.id] = widget.tool
+    for tool in quechers_tools.values():
+        physical_simulation_service.advance_quechers_tool(tool, elapsed_seconds)
+
     for widget in experiment.workspace.widgets:
         remaining_seconds = elapsed_seconds
         if widget.grinder_run_remaining_ms > 0:
@@ -460,6 +478,10 @@ def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> N
     widget.vortex_run_remaining_ms = 0.0
     if widget.tool is None:
         return
+    if widget.tool.quechers_state.phase == "contaminated":
+        return
+    if widget.tool.quechers_state.phase == "mixing":
+        widget.tool.quechers_state.phase = "mixed"
     for fraction in widget.tool.produce_fractions:
         fraction.is_mixed = True
     experiment.audit_log.append(f"{widget.tool.label} successfully vortexed on {widget.label}.")

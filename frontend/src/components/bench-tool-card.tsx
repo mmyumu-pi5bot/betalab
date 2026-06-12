@@ -5,6 +5,7 @@ import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
+import { StatusGauge } from "@/components/status-gauge";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
 import {
   getContainerLiquidVisualState,
@@ -102,6 +103,29 @@ export function BenchToolCard({
       : isSealed
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
         : "border-slate-200 bg-slate-100 text-slate-600";
+  const quechers = tool.quechersState ?? {
+    saltsAdded: false,
+    phase: "idle",
+    temperatureC: 20,
+    cementationProgress: 0,
+    thermalDegradationProgress: 0,
+    reactionElapsedSeconds: 0,
+    fault: null,
+    isUsable: true,
+  };
+  const showQuechersState = quechers.saltsAdded || quechers.phase === "contaminated";
+  const quechersStatusLabel =
+    quechers.phase === "cemented"
+      ? "Cemented"
+      : quechers.phase === "contaminated"
+        ? "Contaminated"
+        : quechers.phase === "mixed"
+          ? "Mixed"
+          : quechers.phase === "armed"
+            ? "Salts armed"
+            : quechers.phase === "mixing"
+              ? "Mixing"
+              : "Reacting";
 
   return (
     <article
@@ -292,6 +316,34 @@ export function BenchToolCard({
                 )}
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {showQuechersState ? (
+          <div
+            className="space-y-2 rounded-[0.95rem] border border-violet-200 bg-violet-50/70 px-2.5 py-2"
+            data-testid={`quechers-state-${tool.id}`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+                {quechersStatusLabel}
+              </span>
+              <span className="text-xs font-bold tabular-nums text-rose-700">
+                {quechers.temperatureC.toFixed(1)}°C
+              </span>
+            </div>
+            <StatusGauge
+              label="Cementation"
+              percent={quechers.cementationProgress * 100}
+              testId={`quechers-cementation-${tool.id}`}
+              tone={quechers.cementationProgress >= 1 ? "rose" : "amber"}
+            />
+            <StatusGauge
+              label="Thermal degradation"
+              percent={quechers.thermalDegradationProgress * 100}
+              testId={`quechers-degradation-${tool.id}`}
+              tone="violet"
+            />
           </div>
         ) : null}
 

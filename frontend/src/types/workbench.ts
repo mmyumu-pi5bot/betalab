@@ -37,7 +37,8 @@ export type LiquidType =
   | "formic_acid"
   | "matrix_blank"
   | "apple_extract"
-  | "dry_ice_pellets";
+  | "dry_ice_pellets"
+  | "quechers_salts";
 
 export type WorkspaceWidgetType =
   | "autosampler_rack"
@@ -393,6 +394,18 @@ export type BenchToolInstance = {
   powderMassG?: number;
   containsSlurry?: boolean;
   liquids: BenchLiquidPortion[];
+  quechersState?: QuechersState;
+};
+
+export type QuechersState = {
+  saltsAdded: boolean;
+  phase: "idle" | "armed" | "reacting" | "mixing" | "mixed" | "cemented" | "contaminated";
+  temperatureC: number;
+  cementationProgress: number;
+  thermalDegradationProgress: number;
+  reactionElapsedSeconds: number;
+  fault: string | null;
+  isUsable: boolean;
 };
 
 export type SpatulaState = {

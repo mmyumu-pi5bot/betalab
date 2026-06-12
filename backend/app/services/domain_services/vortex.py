@@ -12,6 +12,7 @@ from app.services.helpers.lookups import (
     find_workspace_widget,
     format_volume,
 )
+from app.services.helpers.produce_material_states import get_material_state_name
 from app.services.helpers.workbench import build_workbench_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
 
@@ -252,6 +253,26 @@ class StartVortexCycleService(VortexServiceBase):
             raise ValueError(f"Place a tube on {widget.label} before starting it.")
         if widget.vortex_run_remaining_ms > 0:
             raise ValueError(f"{widget.label} is already running.")
+        state = widget.tool.quechers_state
+        if not state.is_usable:
+            raise ValueError(f"{widget.tool.label} is contaminated and cannot be vortexed.")
+        produce_state_ids = {fraction.produce_material_state_id for fraction in widget.tool.produce_fractions}
+        has_slurry = any(
+            state.id in produce_state_ids and state.material_state == "slurry"
+            for state in experiment.produce_material_states
+        ) or any(
+            get_material_state_name(experiment.produce_material_states, lot.id) == "slurry"
+            for lot in widget.tool.produce_lots
+        )
+        has_wet_contents = bool(widget.tool.liquids or has_slurry)
+        if has_wet_contents and not state.salts_added:
+            state.phase = "contaminated"
+            state.fault = "vortexed_without_salts"
+            experiment.audit_log.append(
+                f"{widget.tool.label} was vortexed without QuEChERS salts; its walls are contaminated and it is unusable."
+            )
+        elif state.phase == "reacting":
+            state.phase = "mixing"
         widget.vortex_run_duration_ms = _VORTEX_CYCLE_DURATION_MS
         widget.vortex_run_remaining_ms = _VORTEX_CYCLE_DURATION_MS
         experiment.audit_log.append(f"Vortex mixer started with {widget.tool.label}.")

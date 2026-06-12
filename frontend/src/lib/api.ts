@@ -1552,6 +1552,7 @@ function normalizeBenchTool(
   const containsSlurry =
     produceLots.some((lot) => lot.materialState === "slurry") ||
     produceFractions.some((fraction) => statesById.get(fraction.produceMaterialStateId)?.materialState === "slurry");
+  const rawQuechersState = (tool.quechersState ?? tool.quechers_state ?? {}) as Record<string, unknown>;
 
   return {
     id: tool.id,
@@ -1601,6 +1602,29 @@ function normalizeBenchTool(
       (tool.liquids as BenchLiquidPortion[] | undefined)?.map((liquid) =>
         normalizeBenchLiquid(liquid as BenchLiquidPortion & Record<string, unknown>),
       ) ?? [],
+    quechersState: {
+      saltsAdded: Boolean(rawQuechersState.saltsAdded ?? rawQuechersState.salts_added ?? false),
+      phase: String(rawQuechersState.phase ?? "idle") as NonNullable<
+        BenchToolInstance["quechersState"]
+      >["phase"],
+      temperatureC: Number(rawQuechersState.temperatureC ?? rawQuechersState.temperature_c ?? 20),
+      cementationProgress: Number(
+        rawQuechersState.cementationProgress ?? rawQuechersState.cementation_progress ?? 0,
+      ),
+      thermalDegradationProgress: Number(
+        rawQuechersState.thermalDegradationProgress ??
+          rawQuechersState.thermal_degradation_progress ??
+          0,
+      ),
+      reactionElapsedSeconds: Number(
+        rawQuechersState.reactionElapsedSeconds ?? rawQuechersState.reaction_elapsed_seconds ?? 0,
+      ),
+      fault:
+        rawQuechersState.fault === undefined || rawQuechersState.fault === null
+          ? null
+          : String(rawQuechersState.fault),
+      isUsable: Boolean(rawQuechersState.isUsable ?? rawQuechersState.is_usable ?? true),
+    },
   };
 }
 

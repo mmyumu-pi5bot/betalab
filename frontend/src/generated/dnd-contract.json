@@ -90,6 +90,18 @@
       "is_draggable": true,
       "is_storable": false
     },
+    "quechers_salts": {
+      "allowed_drop_targets": [
+        "workbench_slot",
+        "analytical_balance_widget"
+      ],
+      "can_receive_liquids": false,
+      "can_receive_produce": false,
+      "can_seal": false,
+      "is_discardable": false,
+      "is_draggable": true,
+      "is_storable": false
+    },
     "ultrapure_water": {
       "allowed_drop_targets": [
         "workbench_slot",

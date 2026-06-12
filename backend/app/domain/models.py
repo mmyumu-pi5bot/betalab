@@ -75,6 +75,21 @@ class WorkbenchLiquid:
 
 
 @dataclass
+class QuechersState:
+    salts_added: bool = False
+    phase: str = "idle"
+    temperature_c: float = 20.0
+    cementation_progress: float = 0.0
+    thermal_degradation_progress: float = 0.0
+    reaction_elapsed_seconds: float = 0.0
+    fault: str | None = None
+
+    @property
+    def is_usable(self) -> bool:
+        return self.phase not in {"cemented", "contaminated"}
+
+
+@dataclass
 class ProduceMaterialState:
     id: str
     produce_lot_id: str
@@ -148,6 +163,7 @@ class WorkbenchTool:
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
+    quechers_state: QuechersState = field(default_factory=QuechersState)
 
 
 @dataclass

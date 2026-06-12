@@ -119,6 +119,13 @@ export function useAnalyticalBalanceDnd({
       clearDropTargets();
 
       const liquidDefinition = labLiquidCatalog[toolbarPayload.itemId];
+      if (toolbarPayload.itemId === "quechers_salts") {
+        void experimentApi.addLiquidToAnalyticalBalanceTool({
+          liquid_id: toolbarPayload.itemId,
+          volume_ml: 1,
+        });
+        return;
+      }
       setPendingDropDraft({
         commandType: "add_liquid_to_analytical_balance_tool",
         fields: [

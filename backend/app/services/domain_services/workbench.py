@@ -36,7 +36,7 @@ from app.services.helpers.produce_material_states import (
     get_material_state_name,
     set_material_state_name,
 )
-from app.services.helpers.tool_liquids import add_liquid_to_tool
+from app.services.helpers.tool_liquids import add_liquid_to_tool, raise_if_quechers_unusable
 from app.services.helpers.workbench import (
     build_workbench_tool,
     find_produce_lot_in_slot,
@@ -305,6 +305,7 @@ class RemoveLiquidFromWorkbenchToolService(WriteDomainService[WorkbenchLiquidReq
     def _run(self, experiment: Experiment, request: WorkbenchLiquidRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "editing liquids")
+        raise_if_quechers_unusable(tool)
         _raise_if_tool_contains_slurry(
             experiment,
             tool,
@@ -322,6 +323,7 @@ class UpdateWorkbenchLiquidVolumeService(WriteDomainService[UpdateWorkbenchLiqui
     def _run(self, experiment: Experiment, request: UpdateWorkbenchLiquidVolumeRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "editing liquids")
+        raise_if_quechers_unusable(tool)
         _raise_if_tool_contains_slurry(
             experiment,
             tool,

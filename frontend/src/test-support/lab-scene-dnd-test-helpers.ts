@@ -489,6 +489,16 @@ function makeTool(item: ToolCatalogItem, overrides: Partial<BenchToolInstance> =
     labels: derivedLabels,
     produceLots: [],
     liquids: [],
+    quechersState: {
+      saltsAdded: false,
+      phase: "idle",
+      temperatureC: 20,
+      cementationProgress: 0,
+      thermalDegradationProgress: 0,
+      reactionElapsedSeconds: 0,
+      fault: null,
+      isUsable: true,
+    },
     ...overrides,
   };
   return {
@@ -627,7 +637,34 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
     targetExpectations: {
       "bench-slot-station_1": {
         compatible: item.itemType === "liquid" && item.id !== "dry_ice_pellets",
-        command: null,
+        command:
+          item.itemType === "liquid" && item.id === "quechers_salts"
+            ? {
+                type: "add_liquid_to_workbench_tool",
+                payload: {
+                  slot_id: "station_1",
+                  liquid_id: "quechers_salts",
+                  volume_ml: 1,
+                },
+              }
+            : null,
+      },
+      "analytical-balance-dropzone": {
+        compatible:
+          (item.itemType === "tool" &&
+            getToolDropTargets(item.toolType).includes("analytical_balance_widget")) ||
+          (item.itemType === "liquid" && item.id !== "dry_ice_pellets"),
+        command:
+          item.itemType === "tool" &&
+          getToolDropTargets(item.toolType).includes("analytical_balance_widget")
+            ? expectedToolMoveCommand({
+                entityId: item.id,
+                sourceKind: "palette",
+                sourceId: item.id,
+                destinationKind: "analytical_balance",
+                destinationId: "analytical_balance",
+              })
+            : null,
       },
       "bench-slot-station_2": {
         compatible: item.itemType === "tool",

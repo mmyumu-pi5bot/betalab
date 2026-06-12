@@ -813,6 +813,16 @@ describe("api client", () => {
                 accent: "sky",
                 tool_type: "sample_vial",
                 capacity_ml: 2,
+                quechers_state: {
+                  salts_added: true,
+                  phase: "reacting",
+                  temperature_c: 61.5,
+                  cementation_progress: 0.4,
+                  thermal_degradation_progress: 0.12,
+                  reaction_elapsed_seconds: 6,
+                  fault: null,
+                  is_usable: true,
+                },
                 liquids: [
                   {
                     id: "bench_liquid_1",
@@ -909,6 +919,14 @@ describe("api client", () => {
     expect(experiment.workbench.slots[0].tool?.liquids[0].liquidId).toBe(
       "acetonitrile_extraction",
     );
+    expect(experiment.workbench.slots[0].tool?.quechersState).toMatchObject({
+      saltsAdded: true,
+      phase: "reacting",
+      temperatureC: 61.5,
+      cementationProgress: 0.4,
+      thermalDegradationProgress: 0.12,
+      isUsable: true,
+    });
     expect(experiment.rack.slots[0].tool?.toolId).toBe("sample_vial_lcms");
     expect(experiment.trash.discardedFrom["bench_tool_3"]).toBe("Station 1");
     expect(experiment.trash.produceLots[0]?.originLabel).toBe("Sealed sampling bag");

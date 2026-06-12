@@ -118,6 +118,12 @@ WORKBENCH_LIQUIDS = {
         accent="sky",
         transfer_volume_ml=1000.0,
     ),
+    "quechers_salts": WorkbenchLiquidDefinition(
+        id="quechers_salts",
+        name="QuEChERS salts packet",
+        accent="violet",
+        transfer_volume_ml=1.0,
+    ),
 }
 
 
@@ -151,6 +157,11 @@ _LIQUID_DETAILS = {
         "description": "Solid CO2 pellets used for chilled handling and cold-chain prep in the cryogenic grinder.",
         "liquid_type": "dry_ice_pellets",
         "subtitle": "Cryogenic cooling",
+    },
+    "quechers_salts": {
+        "description": "Pre-portioned extraction salts that trigger the exothermic QuEChERS partitioning reaction.",
+        "liquid_type": "quechers_salts",
+        "subtitle": "Extraction salts packet",
     },
 }
 
@@ -221,16 +232,17 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
         "label": "Containers",
     },
     {
-        "description": "Starting liquids for the first pesticide extraction simulation.",
+        "description": "Reagents and supporting materials for the pesticide extraction workflow.",
         "id": "workflow_liquids",
         "item_ids": (
             "acetonitrile_extraction",
             "apple_extract",
             "ultrapure_water_rinse",
             "dry_ice_pellets",
+            "quechers_salts",
         ),
         "item_source": "liquids",
-        "label": "Liquids",
+        "label": "Reagents & materials",
     },
     {
         "description": "Large lab systems that can be dropped onto the open workspace canvas.",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from math import exp
 
@@ -53,6 +54,12 @@ class PhysicalSimulationService:
     atmospheric_pressure_bar = 1.0
     pressure_pop_homogeneity_cap = 0.25
     pressure_vent_homogeneity_cap = 0.55
+    quechers_peak_temperature_c = 65.0
+    quechers_heat_rise_seconds = 7.5
+    quechers_cementation_seconds = 15.0
+    quechers_degradation_threshold_c = 45.0
+    quechers_full_degradation_seconds_at_peak = 30.0
+    quechers_cooling_rate_per_second = 0.025
 
     def check_explosion_risk(
         self,
@@ -70,6 +77,52 @@ class PhysicalSimulationService:
         material_states: list[ProduceMaterialState] | None = None,
     ) -> None:
         self._advance_widget_cryogenics(widget, elapsed_seconds, material_states=material_states)
+
+    def advance_quechers_tool(self, tool: WorkbenchTool, elapsed_seconds: float) -> None:
+        state = tool.quechers_state
+        elapsed_seconds = max(float(elapsed_seconds), 0.0)
+        if elapsed_seconds <= 0 or not state.salts_added:
+            return
+        if state.phase == "armed" and (tool.liquids or tool.produce_lots or tool.produce_fractions):
+            state.phase = "cemented"
+            state.fault = "dry_salts_wetted"
+            state.cementation_progress = 1.0
+            return
+        if state.phase == "contaminated":
+            return
+        if state.phase == "armed" or (state.phase == "cemented" and state.reaction_elapsed_seconds <= 0):
+            return
+
+        state.reaction_elapsed_seconds += elapsed_seconds
+        if state.reaction_elapsed_seconds <= self.quechers_heat_rise_seconds:
+            ratio = state.reaction_elapsed_seconds / self.quechers_heat_rise_seconds
+            state.temperature_c = self.ambient_temperature_c + (
+                self.quechers_peak_temperature_c - self.ambient_temperature_c
+            ) * ratio
+        else:
+            cooling_seconds = state.reaction_elapsed_seconds - self.quechers_heat_rise_seconds
+            state.temperature_c = self.ambient_temperature_c + (
+                self.quechers_peak_temperature_c - self.ambient_temperature_c
+            ) * math.exp(-self.quechers_cooling_rate_per_second * cooling_seconds)
+
+        if state.phase == "reacting":
+            state.cementation_progress = min(
+                state.reaction_elapsed_seconds / self.quechers_cementation_seconds,
+                1.0,
+            )
+            if state.cementation_progress >= 1.0:
+                state.phase = "cemented"
+                state.fault = "cemented"
+
+        if state.temperature_c > self.quechers_degradation_threshold_c:
+            severity = (state.temperature_c - self.quechers_degradation_threshold_c) / (
+                self.quechers_peak_temperature_c - self.quechers_degradation_threshold_c
+            )
+            state.thermal_degradation_progress = min(
+                state.thermal_degradation_progress
+                + elapsed_seconds * severity / self.quechers_full_degradation_seconds_at_peak,
+                1.0,
+            )
 
     def advance_grinding_widget(
         self,

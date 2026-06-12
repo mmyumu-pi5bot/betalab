@@ -21,6 +21,7 @@ from app.domain.models import (
     ProduceFraction,
     ProduceLot,
     ProduceMaterialState,
+    QuechersState,
     Rack,
     RackSlot,
     SpatulaState,
@@ -387,6 +388,7 @@ def _deserialize_workbench_tool(tool_schema) -> WorkbenchTool | None:
         produce_lots=[_deserialize_produce_lot(lot) for lot in tool_schema.produce_lots],
         liquids=[WorkbenchLiquid(**liquid.model_dump()) for liquid in tool_schema.liquids],
         produce_fractions=[_deserialize_produce_fraction(fraction) for fraction in tool_schema.produce_fractions],
+        quechers_state=QuechersState(**tool_schema.quechers_state.model_dump(exclude={"is_usable"})),
     )
 
 

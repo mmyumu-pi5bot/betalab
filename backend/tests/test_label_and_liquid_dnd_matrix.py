@@ -64,7 +64,7 @@ LabelSource = Literal[
     "analytical_balance_sample_label",
 ]
 LabelTarget = Literal["workbench_tool", "analytical_balance_tool", "gross_balance_tool", "empty_workbench", "trash"]
-LiquidSource = Literal["palette_standard_liquid", "palette_dry_ice", "grinder_liquid"]
+LiquidSource = Literal["palette_standard_liquid", "palette_quechers_salts", "palette_dry_ice", "grinder_liquid"]
 LiquidTarget = Literal["open_tube", "sealed_tube", "storage_jar", "grinder", "trash"]
 
 
@@ -121,6 +121,11 @@ LIQUID_DND_CASES: tuple[LiquidDndCase, ...] = (
     LiquidDndCase("palette_standard_liquid", "storage_jar", False),
     LiquidDndCase("palette_standard_liquid", "grinder", False),
     LiquidDndCase("palette_standard_liquid", "trash", False),
+    LiquidDndCase("palette_quechers_salts", "open_tube", True),
+    LiquidDndCase("palette_quechers_salts", "sealed_tube", False),
+    LiquidDndCase("palette_quechers_salts", "storage_jar", False),
+    LiquidDndCase("palette_quechers_salts", "grinder", False),
+    LiquidDndCase("palette_quechers_salts", "trash", False),
     LiquidDndCase("palette_dry_ice", "open_tube", False),
     LiquidDndCase("palette_dry_ice", "sealed_tube", False),
     LiquidDndCase("palette_dry_ice", "storage_jar", False),
@@ -539,10 +544,13 @@ def _execute_liquid_drop(
     target: LiquidTarget,
     liquid_entry_id: str | None,
 ):
-    if source == "palette_standard_liquid" and target in {"open_tube", "sealed_tube", "storage_jar"}:
+    if source in {"palette_standard_liquid", "palette_quechers_salts"} and target in {"open_tube", "sealed_tube", "storage_jar"}:
         return AddLiquidToWorkbenchToolService(service).run(
             experiment_id,
-            AddLiquidToWorkbenchToolRequest(slot_id="station_2", liquid_id="acetonitrile_extraction"),
+            AddLiquidToWorkbenchToolRequest(
+                slot_id="station_2",
+                liquid_id="quechers_salts" if source == "palette_quechers_salts" else "acetonitrile_extraction",
+            ),
         )
     if source == "palette_dry_ice" and target == "grinder":
         return AddLiquidToWorkspaceWidgetService(service).run(
@@ -579,7 +587,10 @@ def test_liquid_dnd_matrix(source: LiquidSource, target: LiquidTarget, allowed: 
     if target == "open_tube":
         slot = next(slot for slot in updated.workbench.slots if slot.id == "station_2")
         assert slot.tool is not None
-        assert slot.tool.liquids
+        if source == "palette_quechers_salts":
+            assert slot.tool.quechers_state.salts_added is True
+        else:
+            assert slot.tool.liquids
         return
     if target == "grinder":
         grinder = next(widget for widget in updated.workspace.widgets if widget.id == "grinder")

@@ -385,6 +385,59 @@ function DryIcePelletsIcon({
   );
 }
 
+function QuechersSaltsPacketIcon({
+  glow,
+  label,
+  stroke,
+}: {
+  glow: string;
+  label: string;
+  stroke: string;
+}) {
+  return (
+    <svg
+      aria-label={label}
+      className="h-full w-full"
+      fill="none"
+      viewBox="0 0 88 120"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect fill={glow} height="120" rx="28" width="88" />
+      <path
+        d="M25 31H63L59 94C58.6 99.8 53.8 104 48 104H40C34.2 104 29.4 99.8 29 94L25 31Z"
+        fill="#f8fafc"
+        stroke={stroke}
+        strokeLinejoin="round"
+        strokeWidth="3"
+      />
+      <path d="M27 39H61" opacity="0.45" stroke={stroke} strokeWidth="2" />
+      <rect fill="#ede9fe" height="28" rx="5" width="26" x="31" y="51" />
+      <text
+        fill="#6d28d9"
+        fontFamily="sans-serif"
+        fontSize="8"
+        fontWeight="700"
+        textAnchor="middle"
+        x="44"
+        y="63"
+      >
+        QuE
+      </text>
+      <text
+        fill="#6d28d9"
+        fontFamily="sans-serif"
+        fontSize="7"
+        fontWeight="700"
+        textAnchor="middle"
+        x="44"
+        y="72"
+      >
+        SALTS
+      </text>
+    </svg>
+  );
+}
+
 function CuttingBoardIcon({
   glow,
   label,
@@ -836,6 +889,9 @@ export function LabAssetIcon({
       break;
     case "dry_ice_pellets":
       icon = <DryIcePelletsIcon glow={palette.glow} label={label} stroke={palette.stroke} />;
+      break;
+    case "quechers_salts":
+      icon = <QuechersSaltsPacketIcon glow={palette.glow} label={label} stroke={palette.stroke} />;
       break;
     default:
       icon = <ReagentBottleIcon {...sharedProps} />;
