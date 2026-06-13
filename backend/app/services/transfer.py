@@ -132,6 +132,7 @@ class WorkbenchProduceLotSource:
             produce_lot = next((lot for lot in slot.tool.produce_lots if lot.id == self.produce_lot_id), None)
             if produce_lot is not None:
                 slot.tool.produce_lots = [lot for lot in slot.tool.produce_lots if lot.id != produce_lot.id]
+                slot.tool.produce_fractions = [f for f in slot.tool.produce_fractions if f.produce_lot_id != produce_lot.id]
                 source_label = slot.tool.label
 
         if produce_lot is None:

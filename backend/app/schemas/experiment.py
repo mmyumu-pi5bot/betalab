@@ -50,7 +50,7 @@ class QuechersStateSchema(BaseModel):
     cementation_progress: float = 0.0
     thermal_degradation_progress: float = 0.0
     reaction_elapsed_seconds: float = 0.0
-    fault: str | None = None
+    faults: list[str] = Field(default_factory=list)
 
     @computed_field
     def is_usable(self) -> bool:
@@ -309,27 +309,16 @@ class WorkbenchToolSchema(BaseModel):
 
     @computed_field
     def can_store(self) -> bool:
-        return self.is_storable and not self.produce_lots and not self.produce_fractions and not self.liquids and not self.labels
+        return self.is_storable and not self._contained_entities()
 
     @computed_field
     def can_seal(self) -> bool:
         return can_tool_seal(self.tool_type)
 
     @computed_field
-    def can_receive_liquids(self) -> bool:
-        return can_tool_receive_liquids(self.tool_type)
-
-    @computed_field
     def can_receive_produce(self) -> bool:
         return can_tool_receive_produce(self.tool_type)
 
-    @computed_field
-    def can_receive_contents(self) -> bool:
-        return can_tool_receive_contents(self.tool_type, self.is_sealed)
-
-    @computed_field
-    def children(self) -> list[ContainedEntitySchema]:
-        return self._contained_entities()
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:
         return [

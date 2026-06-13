@@ -71,7 +71,7 @@ def add_liquid_to_tool(
 
     if salts_were_armed and volume_to_add > 0:
         tool.quechers_state.phase = "cemented"
-        tool.quechers_state.fault = "dry_salts_wetted"
+        tool.quechers_state.faults = ["dry_salts_wetted"]
         tool.quechers_state.cementation_progress = 1.0
         experiment.audit_log.append(
             f"Dry QuEChERS salts in {tool.label} cemented instantly when wetted; the container is unusable."

@@ -9,10 +9,8 @@ import {
   getToolDropTargets,
 } from "@/test-support/drop-targets";
 import {
-  canToolAcceptLiquids,
   canToolAcceptProduce,
   canToolBeSealed,
-  canToolReceiveContents,
   getOpenEmptyToolContainment,
 } from "@/test-support/tool-capabilities";
 import { getWorkspaceEquipmentWidgetId } from "@/lib/workspace-widget-ids";
@@ -479,8 +477,6 @@ function makeTool(item: ToolCatalogItem, overrides: Partial<BenchToolInstance> =
     accent: item.accent,
     toolType,
     capacity_ml: item.capacity_ml,
-    canReceiveContents: canToolReceiveContents(toolType, isSealed),
-    canReceiveLiquids: canToolAcceptLiquids(toolType),
     canReceiveProduce: canToolAcceptProduce(toolType),
     canSeal: canToolBeSealed(toolType),
     isSealed,
@@ -496,7 +492,7 @@ function makeTool(item: ToolCatalogItem, overrides: Partial<BenchToolInstance> =
       cementationProgress: 0,
       thermalDegradationProgress: 0,
       reactionElapsedSeconds: 0,
-      fault: null,
+      faults: [],
       isUsable: true,
     },
     ...overrides,

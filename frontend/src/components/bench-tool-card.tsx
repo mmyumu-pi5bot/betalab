@@ -107,7 +107,7 @@ export function BenchToolCard({
     cementationProgress: 0,
     thermalDegradationProgress: 0,
     reactionElapsedSeconds: 0,
-    fault: null,
+    faults: [],
     isUsable: true,
   };
   const isContainer = tool.capacity_ml > 0;
@@ -224,7 +224,9 @@ export function BenchToolCard({
                   : isProduceSurface
                     ? produceLots.length > 0
                       ? `${produceLots.length} produce lot${produceLots.length === 1 ? "" : "s"} staged`
-                      : "Ready for produce staging"
+                      : powderMassG > 0
+                        ? `${powderMassG.toFixed(0)} g powder residue`
+                        : "Ready for produce staging"
                   : isPowderTool
                     ? tool.toolType === "storage_jar"
                       ? powderMassG > 0

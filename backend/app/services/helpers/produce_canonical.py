@@ -14,6 +14,9 @@ from app.domain.models import (
     WorkspaceWidget,
     new_id,
 )
+from app.domain.spatula_rules import SPATULA_LOAD_SOURCE_TOOL_TYPES, SPATULA_POUR_TARGET_TOOL_TYPES
+
+_SPATULA_INVOLVED_TOOL_TYPES = frozenset(SPATULA_LOAD_SOURCE_TOOL_TYPES) | frozenset(SPATULA_POUR_TARGET_TOOL_TYPES)
 from app.services.helpers.produce_material_states import (
     PARTICULATE_MATERIAL_STATES,
     find_material_state,
@@ -144,6 +147,9 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             container_id=slot.tool.id,
             container_label=slot.tool.label,
         )
+        if slot.tool.tool_type not in _SPATULA_INVOLVED_TOOL_TYPES:
+            tool_lot_ids = {lot.id for lot in slot.tool.produce_lots}
+            canonical_powder_fractions = [f for f in canonical_powder_fractions if f.produce_lot_id in tool_lot_ids]
         powder_source_ids = {fraction.produce_lot_id for fraction in canonical_powder_fractions}
         slot.tool.produce_fractions = _build_tool_produce_fractions(
             produce_lots=[

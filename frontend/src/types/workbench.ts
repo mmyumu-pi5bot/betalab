@@ -372,8 +372,6 @@ export type BenchToolInstance = {
   accent: ToolbarAccent;
   toolType: ToolType;
   capacity_ml: number;
-  canReceiveContents: boolean;
-  canReceiveLiquids: boolean;
   canReceiveProduce: boolean;
   canSeal: boolean;
   contactImpurityMgPerG?: number;
@@ -387,7 +385,6 @@ export type BenchToolInstance = {
   isStorable?: boolean;
   canStore?: boolean;
   allowedDropTargets: DropTargetType[];
-  children?: ContainedEntity[];
   containment?: Containment | null;
   labels?: BenchLabel[];
   produceLots?: ExperimentProduceLot[];
@@ -405,7 +402,7 @@ export type QuechersState = {
   cementationProgress: number;
   thermalDegradationProgress: number;
   reactionElapsedSeconds: number;
-  fault: string | null;
+  faults: string[];
   isUsable: boolean;
 };
 

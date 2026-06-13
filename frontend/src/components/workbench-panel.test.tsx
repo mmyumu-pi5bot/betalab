@@ -12,10 +12,8 @@ import {
   writeToolbarDragPayload,
 } from "@/lib/workbench-dnd";
 import {
-  canToolAcceptLiquids,
   canToolAcceptProduce,
   canToolBeSealed,
-  canToolReceiveContents,
   getOpenEmptyToolContainment,
 } from "@/test-support/tool-capabilities";
 import type { BenchSlot, BenchToolInstance } from "@/types/workbench";
@@ -60,8 +58,6 @@ function withToolCapabilities(tool: BenchToolInstance): BenchToolInstance {
       (tool.labels?.length ?? 0) === 0);
   const toolWithCapabilities = {
     ...tool,
-    canReceiveContents: tool.canReceiveContents ?? canToolReceiveContents(tool.toolType, tool.isSealed ?? false),
-    canReceiveLiquids: tool.canReceiveLiquids ?? canToolAcceptLiquids(tool.toolType),
     canReceiveProduce: tool.canReceiveProduce ?? canToolAcceptProduce(tool.toolType),
     canSeal: tool.canSeal ?? canToolBeSealed(tool.toolType),
     isStorable,

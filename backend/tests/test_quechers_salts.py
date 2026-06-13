@@ -188,13 +188,31 @@ def test_vortexing_open_tube_with_wet_contents_contaminates_tool() -> None:
 
     state = _vortex_tool(service, experiment.id).quechers_state
     assert state.phase == "contaminated"
-    assert state.fault == "vortexed_open"
+    assert state.faults == ["vortexed_open", "vortexed_without_salts"]
     assert state.is_usable is False
 
     _advance(service, experiment.id, 3000)
     assert all(not fraction.is_mixed for fraction in _vortex_tool(service, experiment.id).produce_fractions)
     with pytest.raises(ValueError, match="contaminated"):
         StartVortexCycleService(service).run(experiment.id, EmptyRequest())
+
+
+def test_vortexing_open_tube_without_salts_records_both_faults() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    MoveWorkbenchToolToVortexService(service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+
+    StartVortexCycleService(service).run(experiment.id, EmptyRequest())
+
+    state = _vortex_tool(service, experiment.id).quechers_state
+    assert state.phase == "contaminated"
+    assert state.faults == ["vortexed_open", "vortexed_without_salts"]
+    assert state.is_usable is False
 
 
 def test_vortexing_sealed_tube_without_salts_contaminates_tool() -> None:
@@ -212,7 +230,7 @@ def test_vortexing_sealed_tube_without_salts_contaminates_tool() -> None:
 
     state = _vortex_tool(service, experiment.id).quechers_state
     assert state.phase == "contaminated"
-    assert state.fault == "vortexed_without_salts"
+    assert state.faults == ["vortexed_without_salts"]
     assert state.is_usable is False
 
 
@@ -230,7 +248,7 @@ def test_salts_added_dry_arm_then_instantly_cement_when_liquid_arrives() -> None
 
     state = _tube(service, experiment.id).quechers_state
     assert state.phase == "cemented"
-    assert state.fault == "dry_salts_wetted"
+    assert state.faults == ["dry_salts_wetted"]
     assert state.cementation_progress == 1
     assert state.is_usable is False
 

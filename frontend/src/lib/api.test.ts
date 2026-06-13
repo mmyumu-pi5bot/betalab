@@ -280,8 +280,6 @@ describe("api client", () => {
 
     expect(experiment.workbench.slots[0].tool).toMatchObject({
       isDraggable: false,
-      canReceiveContents: false,
-      canReceiveLiquids: false,
       canReceiveProduce: true,
       canSeal: true,
       isSealed: true,
@@ -389,7 +387,7 @@ describe("api client", () => {
               capacity_ml: 2000,
               contact_impurity_mg_per_g: 0,
               is_sealed: false,
-              closure_fault: null,
+              closure_faults: [],
               field_label_text: null,
               labels: [],
               produce_lots: [],
@@ -458,7 +456,7 @@ describe("api client", () => {
               capacity_ml: 2000,
               contact_impurity_mg_per_g: 0,
               is_sealed: true,
-              closure_fault: null,
+              closure_faults: [],
               field_label_text: null,
               labels: [],
               produce_lots: [],
@@ -878,7 +876,7 @@ describe("api client", () => {
                   cementation_progress: 0.4,
                   thermal_degradation_progress: 0.12,
                   reaction_elapsed_seconds: 6,
-                  fault: null,
+                  faults: [],
                   is_usable: true,
                 },
                 liquids: [

@@ -1595,8 +1595,6 @@ function normalizeBenchTool(
     accent: tool.accent,
     toolType: String(tool.toolType ?? tool.tool_type) as BenchToolInstance["toolType"],
     capacity_ml: Number(tool.capacity_ml),
-    canReceiveContents: Boolean(tool.canReceiveContents ?? tool.can_receive_contents),
-    canReceiveLiquids: Boolean(tool.canReceiveLiquids ?? tool.can_receive_liquids),
     canReceiveProduce: Boolean(tool.canReceiveProduce ?? tool.can_receive_produce),
     canSeal: Boolean(tool.canSeal ?? tool.can_seal),
     contactImpurityMgPerG: Number(tool.contactImpurityMgPerG ?? tool.contact_impurity_mg_per_g ?? 0),
@@ -1622,7 +1620,6 @@ function normalizeBenchTool(
     isStorable: Boolean(tool.isStorable ?? tool.is_storable ?? false),
     canStore: Boolean(tool.canStore ?? tool.can_store ?? false),
     allowedDropTargets: normalizeAllowedDropTargets(tool.allowedDropTargets ?? tool.allowed_drop_targets),
-    children: normalizeContainedEntities(tool.children),
     containment: normalizeContainment(tool.containment),
     labels: ((tool.labels ?? []) as Array<BenchLabel & Record<string, unknown>>).map((label) =>
       normalizeBenchLabel(label),
@@ -1652,10 +1649,9 @@ function normalizeBenchTool(
       reactionElapsedSeconds: Number(
         rawQuechersState.reactionElapsedSeconds ?? rawQuechersState.reaction_elapsed_seconds ?? 0,
       ),
-      fault:
-        rawQuechersState.fault === undefined || rawQuechersState.fault === null
-          ? null
-          : String(rawQuechersState.fault),
+      faults: Array.isArray(rawQuechersState.faults)
+        ? (rawQuechersState.faults as unknown[]).map(String)
+        : [],
       isUsable: Boolean(rawQuechersState.isUsable ?? rawQuechersState.is_usable ?? true),
     },
   };

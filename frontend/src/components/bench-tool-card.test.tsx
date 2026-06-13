@@ -27,7 +27,7 @@ function makeTool(): BenchToolInstance {
       cementationProgress: 1,
       thermalDegradationProgress: 0.42,
       reactionElapsedSeconds: 15,
-      fault: "cemented",
+      faults: ["cemented"],
       isUsable: false,
     },
   };
@@ -53,7 +53,7 @@ describe("BenchToolCard QuEChERS state", () => {
       temperatureC: 20,
       cementationProgress: 0,
       thermalDegradationProgress: 0,
-      fault: null,
+      faults: [],
       isUsable: true,
     };
 

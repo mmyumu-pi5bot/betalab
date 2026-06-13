@@ -265,18 +265,22 @@ class StartVortexCycleService(VortexServiceBase):
             for lot in widget.tool.produce_lots
         )
         has_wet_contents = bool(widget.tool.liquids or has_slurry)
+        faults: list[str] = []
         if has_wet_contents and not widget.tool.is_sealed:
+            faults.append("vortexed_open")
+        if has_wet_contents and not state.salts_added:
+            faults.append("vortexed_without_salts")
+        if faults:
             state.phase = "contaminated"
-            state.fault = "vortexed_open"
-            experiment.audit_log.append(
-                f"{widget.tool.label} was vortexed without being sealed; its contents spilled and it is unusable."
-            )
-        elif has_wet_contents and not state.salts_added:
-            state.phase = "contaminated"
-            state.fault = "vortexed_without_salts"
-            experiment.audit_log.append(
-                f"{widget.tool.label} was vortexed without QuEChERS salts; its walls are contaminated and it is unusable."
-            )
+            state.faults = faults
+            if "vortexed_open" in faults:
+                experiment.audit_log.append(
+                    f"{widget.tool.label} was vortexed without being sealed; its contents spilled and it is unusable."
+                )
+            elif "vortexed_without_salts" in faults:
+                experiment.audit_log.append(
+                    f"{widget.tool.label} was vortexed without QuEChERS salts; its walls are contaminated and it is unusable."
+                )
         elif state.phase == "reacting":
             state.phase = "mixing"
         widget.vortex_run_duration_ms = _VORTEX_CYCLE_DURATION_MS

@@ -9,10 +9,8 @@ import {
   getToolDropTargets,
 } from "@/test-support/drop-targets";
 import {
-  canToolAcceptLiquids,
   canToolAcceptProduce,
   canToolBeSealed,
-  canToolReceiveContents,
   getOpenEmptyToolContainment,
 } from "@/test-support/tool-capabilities";
 import type { Experiment } from "@/types/experiment";
@@ -170,8 +168,6 @@ function makeTool(overrides: Partial<BenchToolInstance> = {}): BenchToolInstance
     accent: "sky",
     toolType,
     capacity_ml: 2,
-    canReceiveContents: canToolReceiveContents(toolType, isSealed),
-    canReceiveLiquids: canToolAcceptLiquids(toolType),
     canReceiveProduce: canToolAcceptProduce(toolType),
     canSeal: canToolBeSealed(toolType),
     isSealed,

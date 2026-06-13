@@ -85,7 +85,7 @@ class PhysicalSimulationService:
             return
         if state.phase == "armed" and (tool.liquids or tool.produce_lots or tool.produce_fractions):
             state.phase = "cemented"
-            state.fault = "dry_salts_wetted"
+            state.faults = ["dry_salts_wetted"]
             state.cementation_progress = 1.0
             return
         if state.phase == "contaminated":
@@ -112,7 +112,7 @@ class PhysicalSimulationService:
             )
             if state.cementation_progress >= 1.0:
                 state.phase = "cemented"
-                state.fault = "cemented"
+                state.faults = ["cemented"]
 
         if state.temperature_c > self.quechers_degradation_threshold_c:
             severity = (state.temperature_c - self.quechers_degradation_threshold_c) / (

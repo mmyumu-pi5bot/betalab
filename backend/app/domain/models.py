@@ -82,7 +82,7 @@ class QuechersState:
     cementation_progress: float = 0.0
     thermal_degradation_progress: float = 0.0
     reaction_elapsed_seconds: float = 0.0
-    fault: str | None = None
+    faults: list[str] = field(default_factory=list)
 
     @property
     def is_usable(self) -> bool:

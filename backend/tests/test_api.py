@@ -235,10 +235,8 @@ def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
     assert applied_slot["drop_target_types"] == ["workbench_slot"]
     assert tool["is_draggable"] is True
     assert tool["can_seal"] is True
-    assert tool["can_receive_liquids"] is False
     assert tool["can_receive_produce"] is True
     assert tool["is_sealed"] is True
-    assert tool["can_receive_contents"] is False
     assert tool["allowed_drop_targets"] == [
         "workbench_slot",
         "trash_bin",
@@ -257,7 +255,7 @@ def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
         "tool_type": None,
         "liquid_type": None,
         "produce_type": None,
-    } in tool["children"]
+    } in tool["containment"]["children"]
     assert tool["containment"]["accepts"] == [
         {"entity_kind": "sample_label", "tool_type": None, "liquid_type": None},
     ]
