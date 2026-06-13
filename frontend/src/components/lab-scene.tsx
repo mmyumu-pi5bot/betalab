@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { LabSceneView } from "@/components/lab-scene-view";
 import type { FlatExperimentApi } from "@/types/flat-experiment-api";
+import { DebugInspectorPopup } from "@/components/debug-inspector-popup";
 import { DropDraftCard } from "@/components/drop-draft-card";
+import { useDebugInspector } from "@/hooks/use-debug-inspector";
 import { useAnalyticalBalanceDnd } from "@/hooks/use-analytical-balance-dnd";
 import { useDragState } from "@/hooks/use-drag-state";
 import { useGrinderDnd } from "@/hooks/use-grinder-dnd";
@@ -152,6 +154,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     setActiveDropTargets,
     showDropTargets,
   } = useDragState();
+  const { inspection: debugInspection, clear: clearDebugInspection } = useDebugInspector();
   const [isBasketOpen, setIsBasketOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [toolbarCategories, setToolbarCategories] = useState<ToolbarCategory[]>([]);
@@ -603,6 +606,9 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         },
       }}
       />
+      {debugInspection ? (
+        <DebugInspectorPopup inspection={debugInspection} onClose={clearDebugInspection} />
+      ) : null}
       {pendingDropDraft?.commandType === "create_debug_tool_preset" ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-md rounded-[1.5rem] bg-white p-3 shadow-2xl">

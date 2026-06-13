@@ -60,6 +60,8 @@ export function ProduceLotCard({
   return (
     <div
       className={`${draggable ? dragAffordanceClassName : ""} ${cardClassName} ${className}`.trim()}
+      data-debug-model={JSON.stringify(produceLot)}
+      data-debug-label={getProduceLotDisplayName(produceLot)}
       data-degassing={isDegassing ? "true" : "false"}
       data-testid={dataTestId}
       draggable={draggable}

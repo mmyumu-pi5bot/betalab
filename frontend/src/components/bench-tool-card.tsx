@@ -119,6 +119,8 @@ export function BenchToolCard({
           ? "border-sky-300 ring-2 ring-sky-200/80"
           : "border-slate-200"
       } ${className ?? ""}`.trim()}
+      data-debug-model={JSON.stringify(tool)}
+      data-debug-label={tool.label ?? tool.toolType}
       data-drop-highlighted={dataDropHighlighted ? "true" : "false"}
       onDragOverCapture={onDragOver}
       onDropCapture={onDrop}
