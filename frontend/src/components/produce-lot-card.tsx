@@ -4,6 +4,7 @@ import type { DragEvent, ReactNode } from "react";
 
 import { DegassingIndicator } from "@/components/degassing-indicator";
 import { AppleIllustration } from "@/components/illustrations/apple-illustration";
+import { PesticideResiduesIndicator } from "@/components/pesticide-residues-indicator";
 import { TemperatureIndicator } from "@/components/temperature-indicator";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
 import {
@@ -92,6 +93,12 @@ export function ProduceLotCard({
             </div>
             <div className="shrink-0 flex items-center gap-1">
               {isDegassing ? <DegassingIndicator progress={degassingProgress} /> : null}
+              {produceLot.pesticideResidues && Object.keys(produceLot.pesticideResidues).length > 0 ? (
+                <PesticideResiduesIndicator
+                  degradationFactors={produceLot.pesticideDegradationFactors ?? {}}
+                  residues={produceLot.pesticideResidues}
+                />
+              ) : null}
               <TemperatureIndicator
                 temperatureC={produceLot.temperatureC ?? ambientTemperatureC}
               />
@@ -120,6 +127,12 @@ export function ProduceLotCard({
           </div>
           <div className="self-stretch flex items-center gap-1">
             {isDegassing ? <DegassingIndicator progress={degassingProgress} /> : null}
+            {produceLot.pesticideResidues && Object.keys(produceLot.pesticideResidues).length > 0 ? (
+              <PesticideResiduesIndicator
+                degradationFactors={produceLot.pesticideDegradationFactors ?? {}}
+                residues={produceLot.pesticideResidues}
+              />
+            ) : null}
             <TemperatureIndicator
               temperatureC={produceLot.temperatureC ?? ambientTemperatureC}
             />

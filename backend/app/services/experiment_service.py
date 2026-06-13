@@ -9,7 +9,7 @@ from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
 from app.services.domain_services.workspace import advance_workspace_cryogenics_state
 from app.services.experiment_factory import build_experiment
 from app.services.experiment_repository import ExperimentRepository, InMemoryExperimentRepository
-from app.services.helpers.produce_canonical import sync_canonical_produce_model
+from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
 
 
 class ExperimentNotFoundError(KeyError):
@@ -74,6 +74,7 @@ class ExperimentRuntimeService:
 
     def _to_schema(self, experiment: Experiment) -> ExperimentSchema:
         sync_canonical_produce_model(experiment)
+        sync_pesticide_material_states(experiment)
         workspace = asdict(experiment.workspace)
         rack_has_tools = any(slot.tool is not None for slot in experiment.rack.slots)
         produce_material_states = [asdict(state) for state in experiment.produce_material_states]

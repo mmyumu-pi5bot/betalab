@@ -430,6 +430,7 @@ export type ProduceMaterialState = {
   grindQualityLabel?: string | null;
   homogeneityScore?: number | null;
   residualCo2MassG?: number;
+  pesticideDegradationFactors?: Record<string, number>;
 };
 
 export type ProduceFraction = {
@@ -561,4 +562,6 @@ export type ExperimentProduceLot = {
   temperatureC?: number;
   totalMassG: number;
   unitCount: number | null;
+  pesticideResidues?: Record<string, number>;
+  pesticideDegradationFactors?: Record<string, number>;
 };

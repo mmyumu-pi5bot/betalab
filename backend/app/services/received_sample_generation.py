@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.domain.models import ProduceLot, WorkbenchTool, new_id
+from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.helpers.produce_canonical import get_tool_total_produce_mass_g
 from app.services.helpers.workbench import sample_tool_contact_impurity_mg_per_g
 
@@ -100,6 +101,7 @@ def build_received_sampling_bag(label: str = "Sealed sampling bag") -> Workbench
         produce_type="apple",
         total_mass_g=sample_spec.actual_mass_g,
         unit_count=sample_spec.unit_count,
+        pesticide_residues=generate_pesticide_residues("apple", generator),
     )
     return WorkbenchTool(
         id=tool_id,

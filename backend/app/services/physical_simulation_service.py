@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from math import exp
 
 from app.domain.models import ProduceLot, ProduceMaterialState, WorkbenchTool, WorkspaceWidget
+from app.domain.pesticide_catalog import apply_degradation_step
 from app.services.helpers.lookups import round_volume
 from app.services.helpers.produce_material_states import find_material_state, get_material_state_name, get_temperature_c, update_material_state
 
@@ -60,6 +61,7 @@ class PhysicalSimulationService:
     quechers_degradation_threshold_c = 45.0
     quechers_full_degradation_seconds_at_peak = 30.0
     quechers_cooling_rate_per_second = 0.025
+    pesticide_degradation_threshold_c = 40.0
 
     def check_explosion_risk(
         self,
@@ -122,6 +124,31 @@ class PhysicalSimulationService:
                 state.thermal_degradation_progress
                 + elapsed_seconds * severity / self.quechers_full_degradation_seconds_at_peak,
                 1.0,
+            )
+
+    def advance_quechers_pesticide_degradation(
+        self,
+        tool: WorkbenchTool,
+        elapsed_seconds: float,
+        material_states: list[ProduceMaterialState],
+    ) -> None:
+        """Degrade pesticide residues in produce inside a QUECHERS tool based on its current temperature."""
+        quechers_temp = tool.quechers_state.temperature_c
+        if quechers_temp <= self.pesticide_degradation_threshold_c:
+            return
+        lot_ids = list(dict.fromkeys(
+            [lot.id for lot in tool.produce_lots]
+            + [f.produce_lot_id for f in tool.produce_fractions]
+        ))
+        for lot_id in lot_ids:
+            state = find_material_state(material_states, lot_id)
+            if state is None or not state.pesticide_degradation_factors:
+                continue
+            state.pesticide_degradation_factors = apply_degradation_step(
+                state.pesticide_degradation_factors,
+                quechers_temp,
+                elapsed_seconds,
+                threshold_c=self.pesticide_degradation_threshold_c,
             )
 
     def advance_grinding_widget(

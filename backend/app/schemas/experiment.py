@@ -67,6 +67,7 @@ class ProduceMaterialStateSchema(BaseModel):
     residual_co2_mass_g: float = 0.0
     grinding_elapsed_seconds: float = 0.0
     grinding_temperature_integral: float = 0.0
+    pesticide_degradation_factors: dict[str, float] = Field(default_factory=dict)
 
 
 class ProduceFractionSchema(BaseModel):
@@ -185,6 +186,7 @@ class ProduceLotSchema(BaseModel):
     produce_type: str
     total_mass_g: float
     unit_count: int | None = None
+    pesticide_residues: dict[str, float] = Field(default_factory=dict)
 
     @computed_field
     def is_draggable(self) -> bool:

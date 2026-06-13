@@ -36,7 +36,7 @@ from app.domain.models import (
     WorkspaceWidget,
 )
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
-from app.services.helpers.produce_canonical import sync_canonical_produce_model
+from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
 
 
 class ExperimentRepository(Protocol):
@@ -297,6 +297,7 @@ def _deserialize_experiment(payload: dict) -> Experiment:
         audit_log=list(schema.audit_log),
     )
     sync_canonical_produce_model(experiment)
+    sync_pesticide_material_states(experiment)
     return experiment
 
 

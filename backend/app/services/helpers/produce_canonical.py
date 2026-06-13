@@ -14,6 +14,7 @@ from app.domain.models import (
     WorkspaceWidget,
     new_id,
 )
+from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.domain.spatula_rules import SPATULA_LOAD_SOURCE_TOOL_TYPES, SPATULA_POUR_TARGET_TOOL_TYPES
 
 _SPATULA_INVOLVED_TOOL_TYPES = frozenset(SPATULA_LOAD_SOURCE_TOOL_TYPES) | frozenset(SPATULA_POUR_TARGET_TOOL_TYPES)
@@ -272,6 +273,28 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         entry.produce_fraction = _build_trash_produce_fraction(entry, ensure_material_state_id)
 
     experiment.produce_material_states = material_states
+
+
+def sync_pesticide_material_states(experiment: Experiment) -> None:
+    """Ensure every lot that has pesticide_residues has initialized degradation factors.
+
+    Called on each schema serialization so lots created before this feature
+    (or via paths that skip explicit initialization) are handled transparently.
+    """
+    from app.services.helpers.produce_material_states import ensure_material_state
+
+    for lot in _collect_produce_lots(experiment).values():
+        if not lot.pesticide_residues:
+            continue
+        state = ensure_material_state(experiment.produce_material_states, lot.id)
+        if not state.pesticide_degradation_factors:
+            state.pesticide_degradation_factors = {cid: 1.0 for cid in lot.pesticide_residues}
+
+
+def _generate_residues_if_missing(lot: ProduceLot) -> None:
+    """Backfill pesticide_residues on a lot that was created without them."""
+    if not lot.pesticide_residues:
+        lot.pesticide_residues = generate_pesticide_residues(lot.produce_type)
 
 
 def _collect_produce_lots(experiment: Experiment) -> dict[str, ProduceLot]:

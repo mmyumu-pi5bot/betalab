@@ -10,6 +10,7 @@ from app.domain.models import (
     WorkspaceWidget,
     new_id,
 )
+from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.domain.rules import can_tool_be_sealed, can_workspace_widget_be_stored
 from app.domain.workbench_catalog import get_workbench_liquid_definition
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
@@ -167,9 +168,15 @@ class CreateProduceLotService(WriteDomainService[CreateProduceLotRequest]):
             produce_type=produce_type,
             unit_count=12,
             total_mass_g=2450.0,
+            pesticide_residues=generate_pesticide_residues(produce_type),
         )
 
         experiment.workspace.produce_basket_lots.append(produce_lot)
+        update_material_state(
+            experiment.produce_material_states,
+            produce_lot.id,
+            pesticide_degradation_factors={cid: 1.0 for cid in produce_lot.pesticide_residues},
+        )
         experiment.audit_log.append(f"{produce_lot.label} created in Produce basket.")
 
 
@@ -193,6 +200,13 @@ class CreateOrInitProduceLotService(WriteDomainService[CreateProduceLotRequest])
             produce_type=produce_type,
             unit_count=12,
             total_mass_g=2450.0,
+            pesticide_residues=generate_pesticide_residues(produce_type),
+        )
+
+        update_material_state(
+            experiment.produce_material_states,
+            produce_lot.id,
+            pesticide_degradation_factors={cid: 1.0 for cid in produce_lot.pesticide_residues},
         )
 
         new_bag = build_received_sampling_bag(label="Received sampling bag")
@@ -337,6 +351,9 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
             quechers_tools[widget.tool.id] = widget.tool
     for tool in quechers_tools.values():
         physical_simulation_service.advance_quechers_tool(tool, elapsed_seconds)
+        physical_simulation_service.advance_quechers_pesticide_degradation(
+            tool, elapsed_seconds, experiment.produce_material_states
+        )
 
     for widget in experiment.workspace.widgets:
         remaining_seconds = elapsed_seconds

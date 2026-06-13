@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchLiquid, new_id
+from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.gross_balance import GrossBalanceProduceLotTarget
@@ -114,6 +115,7 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             produce_type="apple",
             total_mass_g=produce_mass_g,
             unit_count=None,
+            pesticide_residues=generate_pesticide_residues("apple"),
         )
         tool.produce_lots.append(produce_lot)
         set_material_state_name(experiment.produce_material_states, produce_lot.id, "slurry")
@@ -183,6 +185,7 @@ def _build_debug_produce_lot(
             produce_type="apple",
             total_mass_g=total_mass_g if total_mass_g is not None else 2450.0,
             unit_count=None,
+            pesticide_residues=generate_pesticide_residues("apple"),
         )
 
     raise ValueError("Unknown debug produce preset")

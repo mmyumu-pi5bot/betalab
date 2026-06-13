@@ -100,6 +100,9 @@ class ProduceMaterialState:
     residual_co2_mass_g: float = 0.0
     grinding_elapsed_seconds: float = 0.0
     grinding_temperature_integral: float = 0.0
+    # Degradation factor per compound in [0, 1]; 1.0 = intact, 0.0 = fully degraded.
+    # Keys match ProduceLot.pesticide_residues for the same lot.
+    pesticide_degradation_factors: dict[str, float] = field(default_factory=dict)
 
 
 ProduceFractionLocationKind = Literal[
@@ -284,6 +287,8 @@ class ProduceLot:
     produce_type: str
     total_mass_g: float
     unit_count: int | None = None
+    # Immutable residue profile set at lot creation (µg/kg per compound).
+    pesticide_residues: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass

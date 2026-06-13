@@ -1678,6 +1678,9 @@ function normalizeProduceMaterialState(
           ? Number(state.homogeneity_score)
           : null,
     residualCo2MassG: Number(state.residualCo2MassG ?? state.residual_co2_mass_g ?? 0),
+    pesticideDegradationFactors: (state.pesticideDegradationFactors ??
+      state.pesticide_degradation_factors ??
+      {}) as Record<string, number>,
   };
 }
 
@@ -2075,5 +2078,7 @@ function normalizeProduceLot(
       unitCountValue !== undefined && unitCountValue !== null
         ? Number(unitCountValue)
         : fractionRecord?.unitCount ?? null,
+    pesticideResidues: (lot.pesticideResidues ?? lot.pesticide_residues ?? {}) as Record<string, number>,
+    pesticideDegradationFactors: (stateRecord?.pesticideDegradationFactors ?? {}) as Record<string, number>,
   };
 }
