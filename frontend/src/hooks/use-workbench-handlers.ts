@@ -6,7 +6,7 @@ import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
 import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { canResolveActiveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
-import type { MoveObjectPayload } from "@/types/api-payloads";
+import type { AddLiquidToToolPayload, MoveObjectPayload } from "@/types/api-payloads";
 import type {
   BenchSlot,
   BenchToolInstance,
@@ -16,6 +16,7 @@ import type {
 } from "@/types/workbench";
 
 export type WorkbenchHandlersExperimentApi = {
+  addLiquidToTool: (payload: AddLiquidToToolPayload) => void;
   addLiquidToWorkbenchTool: (payload: {
     slot_id: string;
     liquid_id: string;
@@ -47,6 +48,7 @@ type UseWorkbenchHandlersOptions = {
   experimentApi: WorkbenchHandlersExperimentApi;
   hasPrintedLabelTicket: boolean;
   setPendingDropDraft: Dispatch<SetStateAction<DropDraft | null>>;
+  workbenchSlots: BenchSlot[];
 };
 
 type WorkbenchHandlers = {
@@ -76,6 +78,7 @@ export function useWorkbenchHandlers({
   experimentApi,
   hasPrintedLabelTicket,
   setPendingDropDraft,
+  workbenchSlots,
 }: UseWorkbenchHandlersOptions): WorkbenchHandlers {
   const canApplyLimsTicketToSlot = (slot: BenchSlot): boolean => {
     if (slot.tool === null || !hasPrintedLabelTicket) {
@@ -109,8 +112,12 @@ export function useWorkbenchHandlers({
 
     const liquidDefinition = labLiquidCatalog[payload.itemId];
     if (payload.itemId === "quechers_salts") {
-      void experimentApi.addLiquidToWorkbenchTool({
-        slot_id: slotId,
+      const tool = workbenchSlots.find((slot) => slot.id === slotId)?.tool;
+      if (tool === null || tool === undefined) {
+        return;
+      }
+      void experimentApi.addLiquidToTool({
+        tool_id: tool.id,
         liquid_id: payload.itemId,
         volume_ml: 1,
       });

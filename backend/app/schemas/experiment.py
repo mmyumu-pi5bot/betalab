@@ -794,6 +794,20 @@ class DebugProducePresetSpawnToWidgetSchema(BaseModel):
     residual_co2_mass_g: float | None = None
 
 
+class DebugToolPresetSpawnSchema(BaseModel):
+    destination_kind: Literal[
+        "analytical_balance",
+        "gross_balance",
+        "trash_bin",
+        "vortex",
+        "workbench_slot",
+    ]
+    destination_id: str
+    produce_mass_g: float | None = None
+    liquid_volume_ml: float | None = None
+    temperature_c: float | None = None
+
+
 class ReceivedBagPlacementSchema(BaseModel):
     target_slot_id: str
     tool_id: str

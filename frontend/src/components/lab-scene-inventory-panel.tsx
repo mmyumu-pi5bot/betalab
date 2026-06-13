@@ -5,13 +5,23 @@ import type { RefObject } from "react";
 import { DebugProducePalette, type DebugProducePreset } from "@/components/debug-produce-palette";
 import { ToolbarPanel } from "@/components/toolbar-panel";
 import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
-import { createToolbarDragPayload, toDragDescriptor } from "@/lib/workbench-dnd";
-import type { DragDescriptor, DropTargetType, ToolbarCategory } from "@/types/workbench";
+import {
+  createToolbarDragPayload,
+  toDragDescriptor,
+  writeToolbarDragPayload,
+} from "@/lib/workbench-dnd";
+import type {
+  DragDescriptor,
+  DropTargetType,
+  ToolbarCategory,
+  ToolbarItem,
+} from "@/types/workbench";
 
 type LabSceneInventoryPanelProps = {
   debug: {
     debugInventoryEnabled: boolean;
     debugProducePresets: DebugProducePreset[];
+    debugToolPresets: ToolbarItem[];
   };
   dnd: {
     clearDropTargets: () => void;
@@ -56,6 +66,15 @@ export function LabSceneInventoryPanel({ debug, dnd, toolbarCategories }: LabSce
             onItemDragEnd={dnd.clearDropTargets}
             onPresetDragStart={dnd.workbench.handleDebugProducePresetDragStart}
             presets={debug.debugProducePresets}
+            toolPresets={debug.debugToolPresets.filter(
+              (item): item is Extract<ToolbarItem, { itemType: "tool" }> => item.itemType === "tool",
+            )}
+            onToolPresetDragStart={(item, dataTransfer) => {
+              const payload = createToolbarDragPayload(item);
+              writeToolbarDragPayload(dataTransfer, payload);
+              dnd.showDropTargets(item.allowedDropTargets);
+              dnd.setActiveDragItem(toDragDescriptor(payload));
+            }}
           />
         </div>
       ) : null}

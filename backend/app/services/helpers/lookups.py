@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.domain.models import (
     ContainerLabel,
+    Experiment,
     LimsLabel,
     ManualLabel,
     ProduceLot,
@@ -18,6 +19,20 @@ from app.domain.models import (
     WorkspaceWidget,
     new_id,
 )
+
+
+def find_experiment_tool(experiment: Experiment, tool_id: str) -> WorkbenchTool:
+    candidates = [
+        *(slot.tool for slot in experiment.workbench.slots),
+        *(slot.tool for slot in experiment.rack.slots),
+        *(widget.tool for widget in experiment.workspace.widgets),
+        *experiment.basket_tools,
+        *experiment.trash.children,
+    ]
+    tool = next((entry for entry in candidates if entry is not None and entry.id == tool_id), None)
+    if tool is None:
+        raise ValueError("Unknown tool")
+    return tool
 
 
 def find_workbench_slot(workbench: Workbench, slot_id: str) -> WorkbenchSlot:

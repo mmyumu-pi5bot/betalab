@@ -8,6 +8,7 @@ import type {
   AddLiquidToWorkspaceWidgetPayload,
   CreateDebugProduceLotOnWorkbenchPayload,
   CreateDebugProduceLotToWidgetPayload,
+  CreateDebugToolPresetPayload,
 } from "@/types/api-payloads";
 
 export type DropDraft = {
@@ -16,11 +17,13 @@ export type DropDraft = {
     | "add_liquid_to_workbench_tool"
     | "add_liquid_to_workspace_widget"
     | "create_debug_produce_lot_on_workbench"
-    | "create_debug_produce_lot_to_widget";
+    | "create_debug_produce_lot_to_widget"
+    | "create_debug_tool_preset";
   confirmLabel?: string;
   fields: DropDraftField[];
   itemId?: string;
   presetId?: string;
+  destinationKind?: CreateDebugToolPresetPayload["destination_kind"];
   targetId: string;
   targetKind: "bench_slot" | "workspace_widget";
   title: string;
@@ -32,6 +35,7 @@ export type DropDraftExperimentApi = {
   addLiquidToWorkspaceWidget: (payload: AddLiquidToWorkspaceWidgetPayload) => void;
   createDebugProduceLotOnWorkbench: (payload: CreateDebugProduceLotOnWorkbenchPayload) => void;
   createDebugProduceLotToWidget: (payload: CreateDebugProduceLotToWidgetPayload) => void;
+  createDebugToolPreset: (payload: CreateDebugToolPresetPayload) => void;
 };
 
 type DropDraftApi = {
@@ -93,6 +97,23 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
         slot_id: pendingDropDraft.targetId,
         liquid_id: pendingDropDraft.itemId ?? "",
         volume_ml: getNumericFieldValue("volume_ml"),
+      });
+      setPendingDropDraft(null);
+      return;
+    }
+
+    if (
+      pendingDropDraft.commandType === "create_debug_tool_preset" &&
+      pendingDropDraft.presetId &&
+      pendingDropDraft.destinationKind
+    ) {
+      void experimentApi.createDebugToolPreset({
+        preset_id: pendingDropDraft.presetId,
+        destination_kind: pendingDropDraft.destinationKind,
+        destination_id: pendingDropDraft.targetId,
+        produce_mass_g: getNumericFieldValue("produce_mass_g"),
+        liquid_volume_ml: getNumericFieldValue("liquid_volume_ml"),
+        temperature_c: getNumericFieldValue("temperature_c"),
       });
       setPendingDropDraft(null);
       return;

@@ -38,6 +38,7 @@ export const addWorkspaceWidget = wrapCommand("add_workspace_widget");
 export const moveWorkspaceWidget = wrapCommand("move_workspace_widget");
 export const storeWorkspaceWidget = wrapCommand("store_workspace_widget");
 export const addLiquidToWorkspaceWidget = wrapCommand("add_liquid_to_workspace_widget");
+export const addLiquidToTool = wrapCommand("add_liquid_to_tool");
 export const updateWorkspaceWidgetLiquidVolume = wrapCommand("update_workspace_widget_liquid_volume");
 export const removeLiquidFromWorkspaceWidget = wrapCommand("remove_liquid_from_workspace_widget");
 export const completeGrinderCycle = wrapCommand("complete_grinder_cycle");
@@ -121,6 +122,7 @@ export const applySampleLabelToAnalyticalBalanceTool = vi.fn((experimentId: stri
 );
 export const createDebugProduceLotOnWorkbench = wrapCommand("create_debug_produce_lot_on_workbench");
 export const createDebugProduceLotToWidget = wrapCommand("create_debug_produce_lot_to_widget");
+export const createDebugToolPreset = wrapCommand("create_debug_tool_preset");
 export const placeToolInRackSlot = wrapCommand("place_tool_in_rack_slot");
 export const placeWorkbenchToolInRackSlot = wrapCommand("place_workbench_tool_in_rack_slot");
 export const moveRackToolBetweenSlots = wrapCommand("move_rack_tool_between_slots");

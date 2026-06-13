@@ -633,6 +633,24 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
     buildExperiment: () =>
       makeExperiment({
         slots: makeSlots([{ tool: makeTool(sampleVialItem) }]),
+        workspaceWidgets: makeWorkspaceWidgets([
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          {
+            tool: makeTool(sampleVialItem, {
+              id: "vortex_tube",
+              toolId: "centrifuge_tube_50ml",
+              toolType: "centrifuge_tube",
+              capacity_ml: 50,
+            }),
+          },
+        ]),
       }),
     targetExpectations: {
       "bench-slot-station_1": {
@@ -640,9 +658,9 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
         command:
           item.itemType === "liquid" && item.id === "quechers_salts"
             ? {
-                type: "add_liquid_to_workbench_tool",
+                type: "add_liquid_to_tool",
                 payload: {
-                  slot_id: "station_1",
+                  tool_id: "bench_tool_1",
                   liquid_id: "quechers_salts",
                   volume_ml: 1,
                 },
@@ -682,6 +700,23 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
       "grinder-dropzone": {
         compatible: item.itemType === "liquid" && item.id === "dry_ice_pellets",
         command: null,
+      },
+      "vortex-dropzone": {
+        compatible:
+          (item.itemType === "tool" &&
+            (item.toolType === "centrifuge_tube" || item.toolType === "cleanup_tube")) ||
+          (item.itemType === "liquid" && item.id === "quechers_salts"),
+        command:
+          item.itemType === "tool" &&
+          (item.toolType === "centrifuge_tube" || item.toolType === "cleanup_tube")
+            ? expectedToolMoveCommand({
+                entityId: item.id,
+                sourceKind: "palette",
+                sourceId: item.id,
+                destinationKind: "vortex",
+                destinationId: "vortex",
+              })
+            : null,
       },
       "rack-illustration-slot-1": {
         compatible: item.itemType === "tool" && item.toolType === "sample_vial",
@@ -855,6 +890,43 @@ function createDebugProducePresetSourceCase(): DndSourceCase {
         compatible: true,
         command: null,
       },
+    },
+  };
+}
+
+function createDebugSlurryTubePresetSourceCase(): DndSourceCase {
+  return {
+    id: "debug-palette-apple_slurry_centrifuge_tube",
+    label: "debug palette apple slurry centrifuge tube preset",
+    sourceTestId: "debug-palette-preset-apple_slurry_centrifuge_tube",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        slots: makeSlots([{ tool: makeTool(sampleVialItem) }]),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: false, command: null },
+      "bench-slot-station_2": { compatible: true, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: true, command: null },
+      "analytical-balance-dropzone": { compatible: true, command: null },
+      "rack-illustration-slot-1": { compatible: false, command: null },
+      "vortex-dropzone": { compatible: true, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: true, command: null },
     },
   };
 }
@@ -2022,6 +2094,7 @@ const baseDndSourceCases: DndSourceCase[] = [
   ...paletteItems.map(createPaletteSourceCase),
   createPaletteSampleLabelSourceCase(),
   createDebugProducePresetSourceCase(),
+  createDebugSlurryTubePresetSourceCase(),
   ...toolItems.map(createWorkbenchToolSourceCase),
   createBasketReceivedBagSourceCase(),
   createBasketProduceSourceCase(),

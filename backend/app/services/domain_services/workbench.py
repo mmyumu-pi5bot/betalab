@@ -284,18 +284,36 @@ class AddLiquidToWorkbenchToolService(WriteDomainService[AddLiquidToWorkbenchToo
     def _run(self, experiment: Experiment, request: AddLiquidToWorkbenchToolRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "adding liquids")
-        powder_present_before_addition = get_tool_total_powder_mass_g(
-            tool,
-            material_states=experiment.produce_material_states,
-        ) > 0 or any(get_material_state_name(experiment.produce_material_states, produce_lot.id) == "ground" for produce_lot in tool.produce_lots)
-        add_liquid_to_tool(
+        add_liquid_to_existing_tool(
             experiment,
             tool,
             liquid_id=request.liquid_id,
             volume_ml=request.volume_ml,
         )
-        if powder_present_before_addition:
-            _convert_ground_produce_to_slurry(experiment, tool)
+
+
+def add_liquid_to_existing_tool(
+    experiment: Experiment,
+    tool: WorkbenchTool,
+    *,
+    liquid_id: str,
+    volume_ml: float | None,
+) -> None:
+    powder_present_before_addition = get_tool_total_powder_mass_g(
+        tool,
+        material_states=experiment.produce_material_states,
+    ) > 0 or any(
+        get_material_state_name(experiment.produce_material_states, produce_lot.id) == "ground"
+        for produce_lot in tool.produce_lots
+    )
+    add_liquid_to_tool(
+        experiment,
+        tool,
+        liquid_id=liquid_id,
+        volume_ml=volume_ml,
+    )
+    if powder_present_before_addition:
+        _convert_ground_produce_to_slurry(experiment, tool)
 
 
 class RemoveLiquidFromWorkbenchToolService(WriteDomainService[WorkbenchLiquidRequest]):

@@ -143,6 +143,11 @@ def get_dnd_contract(entity_kind: DndEntityKind, entity_type: str) -> DndEntityC
             is_discardable=True,
         )
     if entity_kind == "liquid":
+        if entity_type == "quechers_salts":
+            return DndEntityContract(
+                entity_kind="liquid",
+                allowed_drop_targets=("workbench_slot", "analytical_balance_widget", "vortex_widget"),
+            )
         return DndEntityContract(
             entity_kind="liquid",
             allowed_drop_targets=("grinder_widget",) if entity_type == "dry_ice_pellets" else ("workbench_slot", "analytical_balance_widget"),

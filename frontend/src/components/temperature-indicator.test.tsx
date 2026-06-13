@@ -27,4 +27,10 @@ describe("TemperatureIndicator", () => {
     expect(screen.queryByText("Cooling fast")).not.toBeInTheDocument();
     expect(screen.getByRole("tooltip")).toHaveTextContent("Cooling fast • -20.0 C");
   });
+
+  it("describes elevated temperatures as hot rather than cooling", () => {
+    render(<TemperatureIndicator temperatureC={64.5} />);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Hot • 64.5 C");
+  });
 });

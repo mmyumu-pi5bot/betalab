@@ -490,6 +490,32 @@ class DndMoveObjectService(WriteDomainService[DndMoveObjectRequest]):
         destination.after_place(experiment, moved)
 
 
+def place_new_tool(
+    runtime: ExperimentRuntime,
+    experiment: Experiment,
+    tool: WorkbenchTool,
+    destination_ref: DndObjectRef,
+    *,
+    source_label: str,
+) -> None:
+    destination = _resolve_destination(runtime, destination_ref)
+    request = DndMoveObjectRequest(
+        entity=DndObjectRef(kind="tool", id=tool.id),
+        source=DndObjectRef(kind="debug_palette", id=tool.tool_id),
+        destination=destination_ref,
+    )
+    _assert_entity_can_move(get_dnd_contract("tool", tool.tool_type), tool.label, destination)
+    destination.validate_place(experiment, request)
+    moved = DndMovedObject(
+        entity=tool,
+        entity_ref=request.entity,
+        source_ref=request.source,
+        source_label=source_label,
+    )
+    destination.place(experiment, moved)
+    destination.after_place(experiment, moved)
+
+
 def _resolve_source(runtime: ExperimentRuntime, source: DndObjectRef) -> MoveSource:
     source_classes: dict[str, type[MoveSourceBase]] = {
         "analytical_balance": AnalyticalBalanceMoveSource,
@@ -613,7 +639,7 @@ def _validate_not_same_location(request: DndMoveObjectRequest, destination: Move
 
 
 def _tool_action_verb(moved: DndMovedObject, *, restored: str) -> str:
-    if moved.source_ref.kind in {"palette", "toolbar"}:
+    if moved.source_ref.kind in {"debug_palette", "palette", "toolbar"}:
         return "placed on"
     if moved.source_ref.kind == "trash":
         return restored
@@ -622,7 +648,7 @@ def _tool_action_verb(moved: DndMovedObject, *, restored: str) -> str:
 
 def _append_tool_move_audit(experiment: Experiment, moved: DndMovedObject, target_label: str) -> None:
     tool = _require_tool(moved)
-    if moved.source_ref.kind in {"palette", "toolbar"}:
+    if moved.source_ref.kind in {"debug_palette", "palette", "toolbar"}:
         experiment.audit_log.append(f"{tool.label} placed on {target_label}.")
         return
     if moved.source_ref.kind == "trash":

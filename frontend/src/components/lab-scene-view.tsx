@@ -29,6 +29,7 @@ import type {
   RackSlot,
   SpatulaState,
   ToolbarCategory,
+  ToolbarItem,
   ToolbarDragPayload,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
@@ -45,6 +46,7 @@ type LabSceneViewProps = {
   debug: {
     debugInventoryEnabled: boolean;
     debugProducePresets: DebugProducePreset[];
+    debugToolPresets: ToolbarItem[];
   };
   inventory: {
     toolbarCategories: ToolbarCategory[];

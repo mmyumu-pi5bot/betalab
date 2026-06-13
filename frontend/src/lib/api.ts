@@ -1055,6 +1055,24 @@ export async function createDebugProduceLotToWidget(
   });
 }
 
+export async function createDebugToolPreset(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/debug/tool-presets/${requireString(body, "preset_id")}/spawn`,
+    body: {
+      destination_kind: requireString(body, "destination_kind"),
+      destination_id: requireString(body, "destination_id"),
+      ...optionalNumberBody(body, "produce_mass_g"),
+      ...optionalNumberBody(body, "liquid_volume_ml"),
+      ...optionalNumberBody(body, "temperature_c"),
+    },
+  });
+}
+
 export async function placeToolInRackSlot(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {
@@ -1113,6 +1131,21 @@ export async function addLiquidToWorkbenchTool(experimentId: string, payload: Mu
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/workbench/tools/${findWorkbenchToolId(experimentId, requireString(body, "slot_id"))}/liquids`,
+    body: {
+      liquid_id: requireString(body, "liquid_id"),
+      ...optionalNumberBody(body, "volume_ml"),
+    },
+  });
+}
+
+export async function addLiquidToTool(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/tools/${requireString(body, "tool_id")}/liquids`,
     body: {
       liquid_id: requireString(body, "liquid_id"),
       ...optionalNumberBody(body, "volume_ml"),

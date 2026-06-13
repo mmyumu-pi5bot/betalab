@@ -2,7 +2,12 @@
 
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
-import type { DebugProducePresetId, ExperimentProduceLot } from "@/types/workbench";
+import { LabAssetIcon } from "@/components/icons/lab-asset-icon";
+import type {
+  DebugProducePresetId,
+  ExperimentProduceLot,
+  ToolCatalogItem,
+} from "@/types/workbench";
 
 export type DebugProducePreset = {
   id: DebugProducePresetId;
@@ -11,14 +16,18 @@ export type DebugProducePreset = {
 
 type DebugProducePaletteProps = {
   onPresetDragStart?: (preset: DebugProducePreset, dataTransfer: DataTransfer) => void;
+  onToolPresetDragStart?: (preset: ToolCatalogItem, dataTransfer: DataTransfer) => void;
   onItemDragEnd?: () => void;
   presets: DebugProducePreset[];
+  toolPresets?: ToolCatalogItem[];
 };
 
 export function DebugProducePalette({
   onPresetDragStart,
+  onToolPresetDragStart,
   onItemDragEnd,
   presets,
+  toolPresets = [],
 }: DebugProducePaletteProps) {
   return (
     <section className="overflow-hidden rounded-[1.7rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(241,245,249,0.95))] shadow-[0_18px_40px_rgba(15,23,42,0.1)]">
@@ -28,6 +37,48 @@ export function DebugProducePalette({
         </p>
       </div>
       <div className="space-y-3 px-4 py-4">
+        {toolPresets.map((preset) => (
+          <div
+            className="flex cursor-grab items-center gap-3 rounded-[1rem] border border-rose-200 bg-[linear-gradient(180deg,#fff7f7,#fff1f2)] p-3 active:cursor-grabbing"
+            data-testid={`debug-palette-preset-${preset.id}`}
+            draggable={Boolean(onToolPresetDragStart)}
+            key={preset.id}
+            onDragEnd={onItemDragEnd}
+            onDragStart={
+              onToolPresetDragStart
+                ? (event) => onToolPresetDragStart(preset, event.dataTransfer)
+                : undefined
+            }
+          >
+            <div className="h-16 w-12 shrink-0">
+              <LabAssetIcon
+                accent={preset.accent}
+                containsSlurry
+                fillRatio={0.4}
+                kind={preset.toolType}
+                produceLots={[
+                  {
+                    id: "debug_slurry_preview",
+                    label: "Apple slurry",
+                    produceType: "apple",
+                    totalMassG: 10,
+                    unitCount: null,
+                    materialState: "slurry",
+                    isDraggable: true,
+                    allowedDropTargets: [],
+                  },
+                ]}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">{preset.name}</p>
+              <p className="text-xs text-slate-500">{preset.subtitle}</p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-700">
+                10 g apple slurry
+              </p>
+            </div>
+          </div>
+        ))}
         {presets.map((preset) => (
           <ProduceLotCard
             className="rounded-[1rem] border-amber-200 bg-[linear-gradient(180deg,#fffdf5,#fff7e8)]"

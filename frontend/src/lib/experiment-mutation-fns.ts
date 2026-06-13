@@ -1,5 +1,6 @@
 import {
   addLiquidToAnalyticalBalanceTool,
+  addLiquidToTool,
   addLiquidToWorkbenchTool,
   discardAnalyticalBalanceTool,
   addLiquidToWorkspaceWidget,
@@ -20,6 +21,7 @@ import {
   createLimsReception,
   createDebugProduceLotOnWorkbench,
   createDebugProduceLotToWidget,
+  createDebugToolPreset,
   createProduceLot,
   cutWorkbenchProduceLot,
   discardBasketTool,
@@ -92,6 +94,7 @@ export type MutationFn = (experimentId: string, payload?: Record<string, unknown
 
 export const mutationFns = {
   addLiquidToAnalyticalBalanceTool,
+  addLiquidToTool,
   addLiquidToWorkbenchTool,
   discardAnalyticalBalanceTool,
   addLiquidToWorkspaceWidget,
@@ -113,6 +116,7 @@ export const mutationFns = {
   createProduceLot,
   createDebugProduceLotOnWorkbench,
   createDebugProduceLotToWidget,
+  createDebugToolPreset,
   cutWorkbenchProduceLot,
   discardBasketTool,
   discardGrossBalanceTool,

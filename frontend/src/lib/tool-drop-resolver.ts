@@ -25,7 +25,10 @@ function canDescriptorResolveOnTool(
     return false;
   }
 
-  if (!parentDropTargetTypes.some((targetType) => descriptor.allowedDropTargets.includes(targetType))) {
+  if (
+    descriptor.entityKind !== "liquid" &&
+    !parentDropTargetTypes.some((targetType) => descriptor.allowedDropTargets.includes(targetType))
+  ) {
     return false;
   }
 

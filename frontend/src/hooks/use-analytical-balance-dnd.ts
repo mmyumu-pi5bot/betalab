@@ -20,10 +20,12 @@ import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
+  AddLiquidToToolPayload,
   MoveObjectPayload,
 } from "@/types/api-payloads";
 
 export type AnalyticalBalanceDndExperimentApi = {
+  addLiquidToTool: (payload: AddLiquidToToolPayload) => void;
   addLiquidToAnalyticalBalanceTool: (payload: AddLiquidToAnalyticalBalanceToolPayload) => void;
   applyPrintedLimsLabelToAnalyticalBalanceTool: () => void;
   applySampleLabelToAnalyticalBalanceTool: () => void;
@@ -120,7 +122,11 @@ export function useAnalyticalBalanceDnd({
 
       const liquidDefinition = labLiquidCatalog[toolbarPayload.itemId];
       if (toolbarPayload.itemId === "quechers_salts") {
-        void experimentApi.addLiquidToAnalyticalBalanceTool({
+        if (analyticalBalanceTool === null) {
+          return;
+        }
+        void experimentApi.addLiquidToTool({
+          tool_id: analyticalBalanceTool.id,
           liquid_id: toolbarPayload.itemId,
           volume_ml: 1,
         });

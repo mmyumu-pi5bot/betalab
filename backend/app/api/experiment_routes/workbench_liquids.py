@@ -3,6 +3,10 @@ from app.schemas.experiment import (
     WorkbenchToolLiquidCreateSchema,
     WorkbenchToolLiquidUpdateSchema,
 )
+from app.services.domain_services.tool_contents import (
+    AddLiquidToToolRequest,
+    AddLiquidToToolService,
+)
 from app.services.domain_services.workbench import (
     AddLiquidToWorkbenchToolRequest,
     AddLiquidToWorkbenchToolService,
@@ -31,6 +35,24 @@ def add_liquid_to_workbench_tool(
             experiment_id,
             AddLiquidToWorkbenchToolRequest(
                 slot_id=find_tool_slot(experiment_id, tool_id),
+                liquid_id=request.liquid_id,
+                volume_ml=request.volume_ml,
+            ),
+        )
+    )
+
+
+@router.post("/{experiment_id}/tools/{tool_id}/liquids", response_model=ExperimentSchema)
+def add_liquid_to_tool(
+    experiment_id: str,
+    tool_id: str,
+    request: WorkbenchToolLiquidCreateSchema,
+) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: AddLiquidToToolService(experiment_service).run(
+            experiment_id,
+            AddLiquidToToolRequest(
+                tool_id=tool_id,
                 liquid_id=request.liquid_id,
                 volume_ml=request.volume_ml,
             ),

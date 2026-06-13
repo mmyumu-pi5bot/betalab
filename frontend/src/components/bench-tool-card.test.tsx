@@ -34,12 +34,48 @@ function makeTool(): BenchToolInstance {
 }
 
 describe("BenchToolCard QuEChERS state", () => {
-  it("shows temperature and both chemistry gauges", () => {
+  it("shows only the temperature indicator", () => {
     render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={makeTool()} />);
 
-    expect(screen.getByText("Cemented")).toBeInTheDocument();
+    expect(screen.queryByText("Cemented")).not.toBeInTheDocument();
     expect(screen.getByText("64.5°C")).toBeInTheDocument();
-    expect(screen.getByTestId("quechers-cementation-tube_1")).toHaveTextContent("100%");
-    expect(screen.getByTestId("quechers-degradation-tube_1")).toHaveTextContent("42%");
+    expect(screen.getByTestId("temperature-indicator-fill")).toBeInTheDocument();
+    expect(screen.queryByText("Cementation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thermal degradation")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quechers-state-tube_1")).not.toBeInTheDocument();
+  });
+
+  it("keeps the temperature indicator visible at ambient temperature", () => {
+    const tool = makeTool();
+    tool.quechersState = {
+      ...tool.quechersState!,
+      phase: "mixed",
+      temperatureC: 20,
+      cementationProgress: 0,
+      thermalDegradationProgress: 0,
+      fault: null,
+      isUsable: true,
+    };
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    expect(screen.queryByText("Mixed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Slurry mixed")).not.toBeInTheDocument();
+    expect(screen.getByText("20.0°C")).toBeInTheDocument();
+    expect(screen.getByTestId("temperature-indicator-fill")).toBeInTheDocument();
+  });
+
+  it("shows an ambient temperature indicator on any container", () => {
+    const tool = makeTool();
+    tool.toolId = "beaker_rinse";
+    tool.toolType = "beaker";
+    tool.label = "Bench beaker";
+    tool.quechersState = undefined;
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    expect(screen.getByText("20.0°C")).toBeInTheDocument();
+    expect(screen.queryByText("Cementation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thermal degradation")).not.toBeInTheDocument();
   });
 });

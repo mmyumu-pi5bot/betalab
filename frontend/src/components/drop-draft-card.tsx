@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineQuantityInput } from "@/components/inline-quantity-input";
+import { TemperatureIndicator } from "@/components/temperature-indicator";
 
 export type DropDraftField = {
   ariaLabel: string;
@@ -11,6 +12,7 @@ export type DropDraftField = {
   stepAmount: number;
   unitLabel: string;
   value: number;
+  visual?: "temperature";
   wheelStep?: number;
 };
 
@@ -54,6 +56,9 @@ export function DropDraftCard({
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {field.visual === "temperature" ? (
+                <TemperatureIndicator temperatureC={field.value} />
+              ) : null}
               <InlineQuantityInput
                 ariaLabel={field.ariaLabel}
                 inputStep={field.inputStep ?? 0.1}

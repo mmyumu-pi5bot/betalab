@@ -24,7 +24,9 @@ import {
 } from "@/hooks/use-workspace-layout";
 import {
   buildDebugProduceDraftFields,
+  buildDebugSlurryTubeDraftFields,
   debugProducePresets,
+  debugSlurryTubePreset,
   formatProduceLotMetadata,
   getApproximateToolMassG,
   getRackIllustrationSlotPosition,
@@ -96,6 +98,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     loadSpatulaFromWorkbenchTool: experimentApi.spatula.load,
     pourSpatulaIntoWorkbenchTool: experimentApi.spatula.pour,
     // DnD
+    addLiquidToTool: experimentApi.dnd.addLiquidToTool,
     moveObject: experimentApi.dnd.moveObject,
     // LIMS
     applyPrintedLimsLabel: experimentApi.lims.applyLabel,
@@ -106,6 +109,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     // Produce / debug
     createDebugProduceLotOnWorkbench: experimentApi.produce.debugSpawnOnWorkbench,
     createDebugProduceLotToWidget: experimentApi.produce.debugSpawnToWidget,
+    createDebugToolPreset: experimentApi.produce.debugSpawnTool,
     createProduceLot: experimentApi.produce.create,
   };
 
@@ -115,6 +119,30 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     handleUpdateDropDraftField,
     handleConfirmDropDraft,
   } = useDropDraft(flatApi);
+  const dndApi: FlatExperimentApi = {
+    ...flatApi,
+    moveObject: (payload) => {
+      if (payload.source.kind !== "palette" || payload.entity.id !== "apple_slurry_centrifuge_tube") {
+        flatApi.moveObject(payload);
+        return;
+      }
+      setPendingDropDraft({
+        commandType: "create_debug_tool_preset",
+        confirmLabel: "Spawn",
+        destinationKind: payload.destination.kind as
+          | "analytical_balance"
+          | "gross_balance"
+          | "trash_bin"
+          | "vortex"
+          | "workbench_slot",
+        fields: buildDebugSlurryTubeDraftFields(),
+        presetId: "apple_slurry_centrifuge_tube",
+        targetId: payload.destination.id,
+        targetKind: "workspace_widget",
+        title: "Configure Apple slurry tube",
+      });
+    },
+  };
   const {
     activeDropTargets,
     activeDragItem,
@@ -170,7 +198,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     spatulaCursorPosition,
     spatulaHintMessage,
     stopSpatulaPour,
-  } = useActionMode({ clearDropTargets, experimentApi: flatApi, spatula });
+  } = useActionMode({ clearDropTargets, experimentApi: dndApi, spatula });
 
   const liveWidgetIds: WidgetId[] =
     state.status === "ready"
@@ -264,7 +292,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const rackDnd = useRackDnd({
     dndDisabledByAction,
     dragState: { activeDragItem, activeDropTargets, clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     rackSlots,
   });
 
@@ -272,7 +300,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     buildDebugProduceDraftFields,
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     grinderWidget,
     isCommandPending,
     pendingDropDraft,
@@ -283,7 +311,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     buildDebugProduceDraftFields,
     dndDisabledByAction,
     dragState: { activeDropTargets, activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     grossBalanceProduceLot,
     grossBalanceTool,
     hasPrintedLabelTicket,
@@ -294,14 +322,14 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     analyticalBalanceTool,
     dndDisabledByAction,
     dragState: { activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     setPendingDropDraft,
   });
 
   const trashDnd = useTrashDnd({
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     isGrinderRunning: grinderDnd.isGrinderRunning,
   });
 
@@ -309,7 +337,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     buildDebugProduceDraftFields,
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     isKnifeMode,
     setPendingDropDraft,
   });
@@ -318,13 +346,13 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     vortexTool,
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
-    experimentApi: flatApi,
+    experimentApi: dndApi,
   });
 
   const { handleWorkspaceDragOver, handleWorkspaceDrop } = useWorkspaceDrop({
     clearDropTargets,
     dndDisabledByAction,
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     widgetHeights,
     widgetLayout,
     workspaceRef,
@@ -342,14 +370,15 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     activeDropTargets,
     clearDropTargets,
     dndDisabledByAction,
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     hasPrintedLabelTicket,
     setPendingDropDraft,
+    workbenchSlots: readyExperiment?.workbench.slots ?? [],
   });
 
   const workspaceActions = useWorkspaceActions({
     analyticalBalanceTool,
-    experimentApi: flatApi,
+    experimentApi: dndApi,
     grossBalanceTool,
     grossBalanceNetMassG,
     measuredSampleMassG: readyExperiment?.limsReception.measuredSampleMassG ?? null,
@@ -445,7 +474,8 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const debugInventoryEnabled = process.env.NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY === "true";
 
   return (
-    <LabSceneView
+    <>
+      <LabSceneView
       balances={{
         analyticalBalanceMeasuredMassG,
         analyticalBalanceNetMassG,
@@ -454,6 +484,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       debug={{
         debugInventoryEnabled,
         debugProducePresets,
+        debugToolPresets: [debugSlurryTubePreset],
       }}
       inventory={{
         toolbarCategories,
@@ -571,6 +602,21 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
           void experimentApi.vortex.closeTool();
         },
       }}
-    />
+      />
+      {pendingDropDraft?.commandType === "create_debug_tool_preset" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-md rounded-[1.5rem] bg-white p-3 shadow-2xl">
+            <DropDraftCard
+              confirmLabel={pendingDropDraft.confirmLabel}
+              fields={pendingDropDraft.fields}
+              onCancel={() => setPendingDropDraft(null)}
+              onChangeField={handleUpdateDropDraftField}
+              onConfirm={handleConfirmDropDraft}
+              title={pendingDropDraft.title}
+            />
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

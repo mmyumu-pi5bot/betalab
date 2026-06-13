@@ -9,6 +9,12 @@ export type AddLiquidToWorkbenchToolPayload = {
   volume_ml: number;
 };
 
+export type AddLiquidToToolPayload = {
+  tool_id: string;
+  liquid_id: string;
+  volume_ml: number;
+};
+
 export type AddLiquidToAnalyticalBalanceToolPayload = {
   liquid_id: string;
   volume_ml: number;
@@ -242,6 +248,20 @@ export type CreateDebugProduceLotToWidgetPayload = {
   total_mass_g?: number;
   temperature_c?: number;
   residual_co2_mass_g?: number;
+};
+
+export type CreateDebugToolPresetPayload = {
+  preset_id: string;
+  destination_kind:
+    | "analytical_balance"
+    | "gross_balance"
+    | "trash_bin"
+    | "vortex"
+    | "workbench_slot";
+  destination_id: string;
+  produce_mass_g?: number;
+  liquid_volume_ml?: number;
+  temperature_c?: number;
 };
 
 export type PlaceToolOnVortexPayload = {

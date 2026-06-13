@@ -12,6 +12,14 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function getCryogenicStatus(temperatureC: number) {
+  if (temperatureC >= 55) {
+    return { label: "Hot", toneClassName: "text-rose-700" };
+  }
+
+  if (temperatureC >= 30) {
+    return { label: "Warm", toneClassName: "text-amber-700" };
+  }
+
   if (temperatureC <= -45) {
     return { label: "Cryogenic", toneClassName: "text-sky-700" };
   }
@@ -20,7 +28,7 @@ function getCryogenicStatus(temperatureC: number) {
     return { label: "Cooling fast", toneClassName: "text-cyan-700" };
   }
 
-  return { label: "Cooling", toneClassName: "text-amber-700" };
+  return { label: "Near ambient", toneClassName: "text-slate-600" };
 }
 
 export function TemperatureIndicator({ temperatureC }: TemperatureIndicatorProps) {

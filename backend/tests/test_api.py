@@ -81,6 +81,27 @@ def _dnd_move(client: TestClient, experiment_id: str, *, entity: dict, source: d
     )
 
 
+def test_add_liquid_to_tool_route_targets_container_identity_on_vortex() -> None:
+    client = TestClient(app)
+    experiment_id = _create_experiment(client)
+    placed = client.post(
+        f"/experiments/{experiment_id}/vortex/tool/place",
+        params={"tool_id": "centrifuge_tube_50ml"},
+    )
+    assert placed.status_code == 200
+    tool = _find_widget(placed.json(), "vortex")["tool"]
+
+    response = client.post(
+        f"/experiments/{experiment_id}/tools/{tool['id']}/liquids",
+        json={"liquid_id": "quechers_salts", "volume_ml": 1},
+    )
+
+    assert response.status_code == 200
+    updated_tool = _find_widget(response.json(), "vortex")["tool"]
+    assert updated_tool["id"] == tool["id"]
+    assert updated_tool["quechers_state"]["salts_added"] is True
+
+
 def test_settings_defaults_are_exposed() -> None:
     configured = Settings()
 
@@ -972,6 +993,31 @@ def test_debug_produce_preset_route_spawns_powder_on_workbench() -> None:
     assert tool["produce_lots"][0]["total_mass_g"] == 2450.0
     assert lot_state["residual_co2_mass_g"] == 18.0
     assert lot_state["temperature_c"] == -62.0
+
+
+def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        spawned = client.post(
+            f"/experiments/{experiment_id}/debug/tool-presets/apple_slurry_centrifuge_tube/spawn",
+            json={
+                "destination_kind": "workbench_slot",
+                "destination_id": "station_1",
+                "produce_mass_g": 10.0,
+                "liquid_volume_ml": 8.0,
+                "temperature_c": 4.0,
+            },
+        )
+
+    assert spawned.status_code == 200
+    tool = spawned.json()["workbench"]["slots"][0]["tool"]
+    assert tool["tool_id"] == "centrifuge_tube_50ml"
+    assert tool["produce_fractions"][0]["mass_g"] == 10.0
+    assert tool["produce_fractions"][0]["is_mixed"] is True
+    assert tool["liquids"][0]["volume_ml"] == 8.0
+    lot_state = _find_material_state(spawned.json(), tool["produce_lots"][0]["id"])
+    assert lot_state["material_state"] == "slurry"
+    assert lot_state["temperature_c"] == 4.0
 
 
 def test_open_workbench_tool_route_unseals_a_jar() -> None:

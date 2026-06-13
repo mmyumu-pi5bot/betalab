@@ -6,6 +6,7 @@ import type {
   DropTargetType,
   ExperimentProduceLot,
   ExperimentWorkspaceWidgetId,
+  ToolCatalogItem,
   ToolType,
 } from "@/types/workbench";
 
@@ -78,6 +79,24 @@ export const debugProducePresets: DebugProducePreset[] = [
     },
   },
 ];
+
+export const debugSlurryTubePreset: ToolCatalogItem = {
+  id: "apple_slurry_centrifuge_tube",
+  name: "Apple slurry tube",
+  subtitle: "50 mL centrifuge tube",
+  description: "Debug tube prefilled with apple slurry.",
+  accent: "rose",
+  itemType: "tool",
+  toolType: "centrifuge_tube",
+  capacity_ml: 50,
+  allowedDropTargets: [
+    "workbench_slot",
+    "trash_bin",
+    "gross_balance_widget",
+    "analytical_balance_widget",
+    "vortex_widget",
+  ],
+};
 
 export const knifeCursor =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none'%3E%3Cg transform='rotate(-142 12 12)'%3E%3Crect x='4.1' y='9.9' width='8.6' height='4.2' rx='1.2' fill='%230f172a'/%3E%3Crect x='4.1' y='9.9' width='8.6' height='4.2' rx='1.2' stroke='%230f172a' stroke-width='1.15'/%3E%3Cpath d='M12.7 9.9H15.9L19.8 12L15.9 14.1H12.7V9.9Z' fill='%23e2e8f0' stroke='%230f172a' stroke-width='1.15' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E\") 22 8, auto";
@@ -152,6 +171,7 @@ export function buildDebugProduceDraftFields(): DropDraftField[] {
       stepAmount: 5,
       unitLabel: "C",
       value: -62,
+      visual: "temperature",
       wheelStep: 5,
     },
     {
@@ -163,6 +183,45 @@ export function buildDebugProduceDraftFields(): DropDraftField[] {
       unitLabel: "g",
       value: 18,
       wheelStep: 1,
+    },
+  ];
+}
+
+export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
+  return [
+    {
+      ariaLabel: "Debug slurry apple mass",
+      id: "produce_mass_g",
+      inputStep: 0.1,
+      label: "Apple mass",
+      minValue: 0.1,
+      stepAmount: 1,
+      unitLabel: "g",
+      value: 10,
+      wheelStep: 1,
+    },
+    {
+      ariaLabel: "Debug slurry liquid volume",
+      id: "liquid_volume_ml",
+      inputStep: 0.1,
+      label: "Liquid volume",
+      minValue: 0,
+      stepAmount: 1,
+      unitLabel: "mL",
+      value: 10,
+      wheelStep: 1,
+    },
+    {
+      ariaLabel: "Debug slurry temperature",
+      id: "temperature_c",
+      inputStep: 1,
+      label: "Temperature",
+      minValue: -120,
+      stepAmount: 5,
+      unitLabel: "C",
+      value: 20,
+      visual: "temperature",
+      wheelStep: 5,
     },
   ];
 }

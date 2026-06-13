@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addLiquidToTool,
   closeWorkbenchTool,
   createDebugProduceLotOnWorkbench,
   createDebugProduceLotToWidget,
+  createDebugToolPreset,
   createExperiment,
   deleteExperiment,
   getExperiment,
@@ -69,6 +71,29 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("adds liquid to a container by tool identity", async () => {
+    const experiment = makeExperiment();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addLiquidToTool("experiment_test", {
+      tool_id: "tool_42",
+      liquid_id: "quechers_salts",
+      volume_ml: 1,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/experiment_test/tools/tool_42/liquids",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ liquid_id: "quechers_salts", volume_ml: 1 }),
+      }),
+    );
+  });
+
   it("creates an empty experiment", async () => {
     const experiment = makeExperiment();
     const fetchMock = vi.fn().mockResolvedValue({
@@ -777,6 +802,39 @@ describe("api client", () => {
           total_mass_g: 2450,
           temperature_c: -55,
           residual_co2_mass_g: 12,
+        }),
+      },
+    );
+  });
+
+  it("sends debug slurry tube attributes and destination", async () => {
+    const experiment = makeExperiment();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createDebugToolPreset("experiment_123", {
+      preset_id: "apple_slurry_centrifuge_tube",
+      destination_kind: "workbench_slot",
+      destination_id: "station_1",
+      produce_mass_g: 10,
+      liquid_volume_ml: 8,
+      temperature_c: 4,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/experiment_123/debug/tool-presets/apple_slurry_centrifuge_tube/spawn",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination_kind: "workbench_slot",
+          destination_id: "station_1",
+          produce_mass_g: 10,
+          liquid_volume_ml: 8,
+          temperature_c: 4,
         }),
       },
     );

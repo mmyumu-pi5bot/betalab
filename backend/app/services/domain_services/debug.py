@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, ProduceLot, new_id
+from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchLiquid, new_id
+from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.gross_balance import GrossBalanceProduceLotTarget
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
+from app.services.helpers.workbench import build_workbench_tool
 from app.services.transfer import GrinderProduceLotTarget, WorkbenchProduceLotTarget
 
 
@@ -25,6 +27,16 @@ class CreateDebugProduceLotToWidgetRequest:
     total_mass_g: float | None = None
     temperature_c: float | None = None
     residual_co2_mass_g: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CreateDebugToolPresetRequest:
+    preset_id: str
+    destination_kind: str
+    destination_id: str
+    produce_mass_g: float | None = None
+    liquid_volume_ml: float | None = None
+    temperature_c: float | None = None
 
 
 class CreateDebugProduceLotOnWorkbenchService(WriteDomainService[CreateDebugProduceLotOnWorkbenchRequest]):
@@ -80,6 +92,81 @@ class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduce
         target.validate(experiment)
         placement = target.place(experiment, produce_lot)
         experiment.audit_log.append(f"Debug preset {produce_lot.label} spawned in {placement.target_label}.")
+
+
+class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetRequest]):
+    def _run(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
+        if request.preset_id != "apple_slurry_centrifuge_tube":
+            raise ValueError("Unknown debug tool preset")
+
+        produce_mass_g = request.produce_mass_g if request.produce_mass_g is not None else 10.0
+        liquid_volume_ml = request.liquid_volume_ml if request.liquid_volume_ml is not None else 10.0
+        temperature_c = request.temperature_c if request.temperature_c is not None else 20.0
+        if produce_mass_g <= 0:
+            raise ValueError("Produce mass must be greater than zero.")
+        if liquid_volume_ml < 0:
+            raise ValueError("Liquid volume cannot be negative.")
+
+        tool = build_workbench_tool("centrifuge_tube_50ml")
+        produce_lot = ProduceLot(
+            id=new_id("produce"),
+            label="Apple slurry",
+            produce_type="apple",
+            total_mass_g=produce_mass_g,
+            unit_count=None,
+        )
+        tool.produce_lots.append(produce_lot)
+        set_material_state_name(experiment.produce_material_states, produce_lot.id, "slurry")
+        state = next(state for state in experiment.produce_material_states if state.produce_lot_id == produce_lot.id)
+        state.temperature_c = temperature_c
+        state.grind_quality_label = "slurry"
+        state.homogeneity_score = 1.0
+        tool.produce_fractions.append(
+            ProduceFraction(
+                id=new_id("produce_fraction"),
+                produce_lot_id=produce_lot.id,
+                produce_material_state_id=state.id,
+                mass_g=produce_mass_g,
+                is_mixed=True,
+                location_kind="workbench_tool",
+                location_id=tool.id,
+                container_id=tool.id,
+                container_label=tool.label,
+            )
+        )
+        if liquid_volume_ml > 0:
+            tool.liquids.append(
+                WorkbenchLiquid(
+                    id=new_id("liquid"),
+                    liquid_id="apple_extract",
+                    name="Apple extract",
+                    volume_ml=liquid_volume_ml,
+                    accent="rose",
+                )
+            )
+
+        place_new_tool(
+            self._runtime,
+            experiment,
+            tool,
+            DndObjectRef(kind=request.destination_kind, id=request.destination_id),
+            source_label="Debug palette",
+        )
+        location_kind = {
+            "analytical_balance": "workspace_widget_tool",
+            "gross_balance": "workspace_widget_tool",
+            "trash_bin": "trash",
+            "vortex": "workspace_widget_tool",
+            "workbench_slot": "workbench_tool",
+        }[request.destination_kind]
+        location_id = (
+            tool.id
+            if request.destination_kind == "trash_bin"
+            else request.destination_id
+        )
+        for fraction in tool.produce_fractions:
+            fraction.location_kind = location_kind
+            fraction.location_id = location_id
 
 
 def _build_debug_produce_lot(

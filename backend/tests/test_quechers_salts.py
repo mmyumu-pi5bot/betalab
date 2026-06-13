@@ -2,6 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from app.services.domain_services.tool_contents import (
+    AddLiquidToToolRequest,
+    AddLiquidToToolService,
+)
 from app.services.domain_services.vortex import (
     EmptyRequest,
     MoveWorkbenchToolToVortexRequest,
@@ -11,10 +15,12 @@ from app.services.domain_services.vortex import (
 from app.services.domain_services.workbench import (
     AddLiquidToWorkbenchToolRequest,
     AddLiquidToWorkbenchToolService,
+    CloseWorkbenchToolService,
     PlaceToolOnWorkbenchRequest,
     PlaceToolOnWorkbenchService,
     RemoveLiquidFromWorkbenchToolService,
     WorkbenchLiquidRequest,
+    WorkbenchSlotRequest,
 )
 from app.services.domain_services.workspace import (
     AdvanceWorkspaceCryogenicsRequest,
@@ -105,6 +111,31 @@ def test_salts_can_be_added_to_every_open_liquid_container(tool_id: str) -> None
     assert state.phase == "armed"
 
 
+def test_salts_can_be_added_to_a_wet_tube_on_the_vortex() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    MoveWorkbenchToolToVortexService(service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+
+    vortex_tool = _vortex_tool(service, experiment.id)
+    AddLiquidToToolService(service).run(
+        experiment.id,
+        AddLiquidToToolRequest(
+            tool_id=vortex_tool.id,
+            liquid_id="quechers_salts",
+            volume_ml=1,
+        ),
+    )
+
+    state = _vortex_tool(service, experiment.id).quechers_state
+    assert state.salts_added is True
+    assert state.phase == "reacting"
+
+
 def test_unmixed_salted_tube_cements_after_fifteen_seconds() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()
@@ -127,6 +158,7 @@ def test_starting_vortex_in_time_stops_cementation_and_cycle_marks_mixed() -> No
     _add(service, experiment.id, "acetonitrile_extraction", 10)
     _add(service, experiment.id, "quechers_salts")
     _advance(service, experiment.id, 10000)
+    CloseWorkbenchToolService(service).run(experiment.id, WorkbenchSlotRequest(slot_id="station_1"))
     MoveWorkbenchToolToVortexService(service).run(
         experiment.id,
         MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
@@ -142,7 +174,7 @@ def test_starting_vortex_in_time_stops_cementation_and_cycle_marks_mixed() -> No
     assert state.is_usable is True
 
 
-def test_vortexing_wet_content_without_salts_irreversibly_contaminates_tool() -> None:
+def test_vortexing_open_tube_with_wet_contents_contaminates_tool() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()
     _place_tube(service, experiment.id)
@@ -156,13 +188,32 @@ def test_vortexing_wet_content_without_salts_irreversibly_contaminates_tool() ->
 
     state = _vortex_tool(service, experiment.id).quechers_state
     assert state.phase == "contaminated"
-    assert state.fault == "vortexed_without_salts"
+    assert state.fault == "vortexed_open"
     assert state.is_usable is False
 
     _advance(service, experiment.id, 3000)
     assert all(not fraction.is_mixed for fraction in _vortex_tool(service, experiment.id).produce_fractions)
     with pytest.raises(ValueError, match="contaminated"):
         StartVortexCycleService(service).run(experiment.id, EmptyRequest())
+
+
+def test_vortexing_sealed_tube_without_salts_contaminates_tool() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    CloseWorkbenchToolService(service).run(experiment.id, WorkbenchSlotRequest(slot_id="station_1"))
+    MoveWorkbenchToolToVortexService(service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+
+    StartVortexCycleService(service).run(experiment.id, EmptyRequest())
+
+    state = _vortex_tool(service, experiment.id).quechers_state
+    assert state.phase == "contaminated"
+    assert state.fault == "vortexed_without_salts"
+    assert state.is_usable is False
 
 
 def test_salts_added_dry_arm_then_instantly_cement_when_liquid_arrives() -> None:

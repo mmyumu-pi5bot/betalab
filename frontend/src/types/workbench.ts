@@ -85,6 +85,7 @@ type DragSourceKind =
   | "lims";
 
 export type DebugProducePresetId = "apple_powder_residual_co2";
+export type DebugToolPresetId = "apple_slurry_centrifuge_tube";
 
 export type ToolCatalogItem = ToolbarBaseItem & {
   canReceiveLiquids?: boolean;

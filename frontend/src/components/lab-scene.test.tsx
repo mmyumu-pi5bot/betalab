@@ -849,6 +849,112 @@ describe("LabScene", () => {
     );
   });
 
+  it("configures and spawns the debug apple slurry tube on its first drop", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId(
+      "debug-palette-preset-apple_slurry_centrifuge_tube",
+    );
+    expect(preset).toHaveTextContent("Apple slurry tube");
+    expect(preset).toHaveTextContent("10 g apple slurry");
+
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(await screen.findByLabelText("Debug slurry apple mass")).toHaveValue(10);
+    expect(screen.getByLabelText("Debug slurry liquid volume")).toHaveValue(10);
+    expect(screen.getByLabelText("Debug slurry temperature")).toHaveValue(20);
+
+    fireEvent.change(screen.getByLabelText("Debug slurry apple mass"), {
+      target: { value: "12.5" },
+    });
+    fireEvent.click(screen.getByText("Spawn"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      {
+        destination_id: "station_1",
+        destination_kind: "workbench_slot",
+        liquid_volume_ml: 10,
+        preset_id: "apple_slurry_centrifuge_tube",
+        produce_mass_g: 12.5,
+        temperature_c: 20,
+      },
+    );
+  });
+
+  it("adds QuEChERS salts to a debug apple slurry tube on the workbench", async () => {
+    const debugTube = makeTool({
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL centrifuge tube",
+      subtitle: "QuEChERS extraction",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      containsSlurry: true,
+      produceLots: [
+        makeProduceLot({
+          id: "debug_slurry_1",
+          label: "Apple slurry",
+          materialState: "slurry",
+          temperatureC: 20,
+          total_mass_g: 10,
+          unitCount: null,
+        }),
+      ],
+      liquids: [
+        {
+          id: "debug_extract_1",
+          liquidId: "apple_extract",
+          name: "Apple extract",
+          volume_ml: 10,
+          accent: "rose",
+        },
+      ],
+    });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({ slots: makeSlots([{ tool: debugTube }]) }),
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(
+      makeWorkbenchExperiment({
+        slots: makeSlots([
+          {
+            tool: {
+              ...debugTube,
+              quechersState: {
+                ...debugTube.quechersState!,
+                saltsAdded: true,
+                phase: "reacting",
+              },
+            },
+          },
+        ]),
+      }),
+    );
+
+    render(<PesticideWorkbench />);
+
+    const salts = await screen.findByTestId("toolbar-item-quechers_salts");
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(salts, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "add_liquid_to_tool",
+      {
+        tool_id: debugTube.id,
+        liquid_id: "quechers_salts",
+        volume_ml: 1,
+      },
+    );
+  });
+
   it("closes a sealable jar from the workbench card", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
@@ -5302,6 +5408,49 @@ describe("LabScene", () => {
       "experiment_pesticides",
       "close_analytical_balance_tool",
       {},
+    );
+  });
+
+  it("adds QuEChERS salts to a debug tube on the vortex", async () => {
+    const vortexTube = makeTool({
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL centrifuge tube",
+      subtitle: "QuEChERS extraction",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      containsSlurry: true,
+      liquids: [
+        {
+          id: "debug_extract_1",
+          liquidId: "apple_extract",
+          name: "Apple extract",
+          volume_ml: 10,
+          accent: "rose",
+        },
+      ],
+    });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        workspaceWidgets: makeWorkspaceWithVortexVisible({ tool: vortexTube }),
+      }) as Experiment,
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment() as Experiment);
+
+    render(<PesticideWorkbench />);
+
+    const salts = await screen.findByTestId("toolbar-item-quechers_salts");
+    const vortexItem = screen.getByTestId("vortex-staged-item");
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(salts, { dataTransfer: transfer });
+    const dragOverEvent = createEvent.dragOver(vortexItem, { dataTransfer: transfer });
+    fireEvent(vortexItem, dragOverEvent);
+    fireEvent.drop(vortexItem, { dataTransfer: transfer });
+
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "add_liquid_to_tool",
+      { tool_id: vortexTube.id, liquid_id: "quechers_salts", volume_ml: 1 },
     );
   });
 

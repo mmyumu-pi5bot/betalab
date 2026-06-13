@@ -5,7 +5,7 @@ import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
-import { StatusGauge } from "@/components/status-gauge";
+import { TemperatureIndicator } from "@/components/temperature-indicator";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
 import {
   getContainerLiquidVisualState,
@@ -75,9 +75,6 @@ export function BenchToolCard({
   const fillRatio = tool.capacity_ml > 0 ? Math.min(totalVolumeMl / tool.capacity_ml, 1) : 0;
   const powderMassG = tool.powderMassG ?? 0;
   const containsSlurry = tool.containsSlurry ?? false;
-  const containsMixedSlurry = (tool.produceFractions ?? []).some(
-    (fraction) => fraction.materialState === "slurry" && fraction.isMixed === true,
-  );
   const liquidVisualState = getContainerLiquidVisualState(tool.liquids, tool.accent);
   const liquidSegments = liquidVisualState.segments;
   const isSampleBag = tool.toolType === "sample_bag";
@@ -113,19 +110,7 @@ export function BenchToolCard({
     fault: null,
     isUsable: true,
   };
-  const showQuechersState = quechers.saltsAdded || quechers.phase === "contaminated";
-  const quechersStatusLabel =
-    quechers.phase === "cemented"
-      ? "Cemented"
-      : quechers.phase === "contaminated"
-        ? "Contaminated"
-        : quechers.phase === "mixed"
-          ? "Mixed"
-          : quechers.phase === "armed"
-            ? "Salts armed"
-            : quechers.phase === "mixing"
-              ? "Mixing"
-              : "Reacting";
+  const isContainer = tool.capacity_ml > 0;
 
   return (
     <article
@@ -223,7 +208,12 @@ export function BenchToolCard({
               />
             </button>
             <div className="min-w-0">
-              <p className="text-xs text-slate-600">{tool.subtitle}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 text-xs text-slate-600">{tool.subtitle}</p>
+                {isContainer ? (
+                  <TemperatureIndicator temperatureC={quechers.temperatureC} />
+                ) : null}
+              </div>
               <p className="mt-1.5 text-[11px] font-medium text-slate-500">
                 {isSampleBag
                   ? produceLots.length > 0
@@ -239,7 +229,7 @@ export function BenchToolCard({
                         ? "Powder reservoir loaded"
                         : "Ready for spatula loading"
                       : containsSlurry
-                        ? (containsMixedSlurry ? "Slurry mixed" : "Slurry present")
+                        ? "Slurry present"
                       : powderMassG > 0
                         ? "Powder deposit present"
                         : "Ready for powder dosing"
@@ -316,34 +306,6 @@ export function BenchToolCard({
                 )}
               </div>
             ))}
-          </div>
-        ) : null}
-
-        {showQuechersState ? (
-          <div
-            className="space-y-2 rounded-[0.95rem] border border-violet-200 bg-violet-50/70 px-2.5 py-2"
-            data-testid={`quechers-state-${tool.id}`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700">
-                {quechersStatusLabel}
-              </span>
-              <span className="text-xs font-bold tabular-nums text-rose-700">
-                {quechers.temperatureC.toFixed(1)}°C
-              </span>
-            </div>
-            <StatusGauge
-              label="Cementation"
-              percent={quechers.cementationProgress * 100}
-              testId={`quechers-cementation-${tool.id}`}
-              tone={quechers.cementationProgress >= 1 ? "rose" : "amber"}
-            />
-            <StatusGauge
-              label="Thermal degradation"
-              percent={quechers.thermalDegradationProgress * 100}
-              testId={`quechers-degradation-${tool.id}`}
-              tone="violet"
-            />
           </div>
         ) : null}
 

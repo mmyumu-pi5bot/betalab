@@ -93,7 +93,8 @@
     "quechers_salts": {
       "allowed_drop_targets": [
         "workbench_slot",
-        "analytical_balance_widget"
+        "analytical_balance_widget",
+        "vortex_widget"
       ],
       "can_receive_liquids": false,
       "can_receive_produce": false,

@@ -8,6 +8,7 @@ import { useCommandPending } from "@/hooks/use-command-pending";
 import type { Experiment } from "@/types/experiment";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
+  AddLiquidToToolPayload,
   AddLiquidToWorkbenchToolPayload,
   AddLiquidToWorkspaceWidgetPayload,
   AddWorkspaceWidgetPayload,
@@ -21,6 +22,7 @@ import type {
   CompleteGrinderCyclePayload,
   CreateDebugProduceLotOnWorkbenchPayload,
   CreateDebugProduceLotToWidgetPayload,
+  CreateDebugToolPresetPayload,
   CreateLimsReceptionPayload,
   CreateProduceLotPayload,
   CutWorkbenchProduceLotPayload,
@@ -339,6 +341,7 @@ export function useLabExperiment({
 
     // ── DnD (generic move) ───────────────────────────────────────────────────
     dnd: {
+      addLiquidToTool: (p: AddLiquidToToolPayload) => exec(mutationFns.addLiquidToTool, p),
       moveObject: (p: MoveObjectPayload) => exec(mutationFns.moveObject, p),
     },
 
@@ -358,6 +361,7 @@ export function useLabExperiment({
       create: (p: CreateProduceLotPayload) => exec(mutationFns.createProduceLot, p),
       debugSpawnOnWorkbench: (p: CreateDebugProduceLotOnWorkbenchPayload) => exec(mutationFns.createDebugProduceLotOnWorkbench, p),
       debugSpawnToWidget: (p: CreateDebugProduceLotToWidgetPayload) => exec(mutationFns.createDebugProduceLotToWidget, p),
+      debugSpawnTool: (p: CreateDebugToolPresetPayload) => exec(mutationFns.createDebugToolPreset, p),
     },
   };
 }
