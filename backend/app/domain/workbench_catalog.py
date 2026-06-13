@@ -124,6 +124,12 @@ WORKBENCH_LIQUIDS = {
         accent="violet",
         transfer_volume_ml=1.0,
     ),
+    "istd_solution": WorkbenchLiquidDefinition(
+        id="istd_solution",
+        name="ISTD solution",
+        accent="emerald",
+        transfer_volume_ml=0.1,
+    ),
 }
 
 
@@ -162,6 +168,15 @@ _LIQUID_DETAILS = {
         "description": "Pre-portioned extraction salts that trigger the exothermic QuEChERS partitioning reaction.",
         "liquid_type": "quechers_salts",
         "subtitle": "Extraction salts packet",
+    },
+    "istd_solution": {
+        "description": (
+            "Pre-mixed internal standard solution — atrazine-d5, imidaclopride-d4 and deltaméthrine-d6 "
+            "at 100 ng/mL each in acetonitrile. Added to the final extract before LC-MS/MS injection "
+            "for matrix effect correction and analyte quantification."
+        ),
+        "liquid_type": "istd_solution",
+        "subtitle": "100 ng/mL · atrazine-d5 / imidaclopride-d4 / deltaméthrine-d6",
     },
 }
 
@@ -240,6 +255,7 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
             "ultrapure_water_rinse",
             "dry_ice_pellets",
             "quechers_salts",
+            "istd_solution",
         ),
         "item_source": "liquids",
         "label": "Reagents & materials",
