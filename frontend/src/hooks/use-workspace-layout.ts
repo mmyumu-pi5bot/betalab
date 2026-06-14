@@ -401,7 +401,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
     );
   }, [initialLayout, initialOrder, syncKey, workspaceSize]);
 
-  const handleWidgetHeightChange = (widgetId: string, height: number) => {
+  const handleWidgetHeightChange = useCallback((widgetId: string, height: number) => {
     if (!(widgetId in initialLayout) || height <= 0) {
       return;
     }
@@ -417,7 +417,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
         [typedWidgetId]: height,
       };
     });
-  };
+  }, [initialLayout]);
 
   const handleWidgetDragStart = (
     widgetId: string,

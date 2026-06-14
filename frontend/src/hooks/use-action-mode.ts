@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSpatulaInteraction } from "@/hooks/use-spatula-interaction";
 import { knifeCursor, spatulaCursor } from "@/lib/lab-scene-config";
@@ -27,6 +27,27 @@ export function useActionMode({ clearDropTargets, experimentApi, spatula }: UseA
   const isSpatulaMode = activeActionId === "spatula";
   const dndDisabledByAction = isKnifeMode || isSpatulaMode;
   const workspaceCursor = isKnifeMode ? knifeCursor : isSpatulaMode ? spatulaCursor : undefined;
+
+  // Keep a ref so stable callbacks always call the latest experimentApi without
+  // being included in useCallback deps (which would recreate them every render).
+  const experimentApiRef = useRef(experimentApi);
+  experimentApiRef.current = experimentApi;
+
+  const onDiscardSpatula = useCallback(() => {
+    void experimentApiRef.current.discardSpatula();
+  }, []);
+  const onLoadFromTool = useCallback((payload: { slot_id: string }) => {
+    void experimentApiRef.current.loadSpatulaFromWorkbenchTool(payload);
+  }, []);
+  const onLoadFromAnalyticalBalance = useCallback(() => {
+    void experimentApiRef.current.loadSpatulaFromAnalyticalBalanceTool();
+  }, []);
+  const onPourIntoTool = useCallback((payload: { delta_mass_g: number; slot_id: string }) => {
+    void experimentApiRef.current.pourSpatulaIntoWorkbenchTool(payload);
+  }, []);
+  const onPourIntoAnalyticalBalanceTool = useCallback((payload: { delta_mass_g: number }) => {
+    void experimentApiRef.current.pourSpatulaIntoAnalyticalBalanceTool(payload);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -61,11 +82,11 @@ export function useActionMode({ clearDropTargets, experimentApi, spatula }: UseA
 
   const spatulaInteraction = useSpatulaInteraction({
     isSpatulaMode,
-    onDiscardSpatula: () => { void experimentApi.discardSpatula(); },
-    onLoadFromTool: (payload) => { void experimentApi.loadSpatulaFromWorkbenchTool(payload); },
-    onLoadFromAnalyticalBalance: () => { void experimentApi.loadSpatulaFromAnalyticalBalanceTool(); },
-    onPourIntoTool: (payload) => { void experimentApi.pourSpatulaIntoWorkbenchTool(payload); },
-    onPourIntoAnalyticalBalanceTool: (payload) => { void experimentApi.pourSpatulaIntoAnalyticalBalanceTool(payload); },
+    onDiscardSpatula,
+    onLoadFromTool,
+    onLoadFromAnalyticalBalance,
+    onPourIntoTool,
+    onPourIntoAnalyticalBalanceTool,
     spatula,
   });
 

@@ -122,6 +122,14 @@ export function useSpatulaInteraction({
     );
   }, [isSpatulaMode, spatula.isLoaded]);
 
+  // Use refs so the pointermove listener always reads the latest rate constants
+  // without those values appearing in the effect dep array (which would cause
+  // the listener to be torn down and re-added on every render that updates spatula).
+  const holdLiftRateGPerPxRef = useRef(holdLiftRateGPerPx);
+  holdLiftRateGPerPxRef.current = holdLiftRateGPerPx;
+  const holdMaxRateGRef = useRef(holdMaxRateG);
+  holdMaxRateGRef.current = holdMaxRateG;
+
   useEffect(() => {
     if (!isSpatulaMode) {
       setSpatulaCursorPosition(null);
@@ -137,7 +145,7 @@ export function useSpatulaInteraction({
       }
 
       const liftPx = Math.max(pourState.startY - event.clientY, 0);
-      pourState.currentRateG = Math.min(holdMaxRateG, 0.06 + liftPx * holdLiftRateGPerPx);
+      pourState.currentRateG = Math.min(holdMaxRateGRef.current, 0.06 + liftPx * holdLiftRateGPerPxRef.current);
     };
 
     const handlePointerUp = () => {
@@ -155,7 +163,7 @@ export function useSpatulaInteraction({
       window.removeEventListener("pointerup", handlePointerUp);
       stopSpatulaPour();
     };
-  }, [holdLiftRateGPerPx, holdMaxRateG, isSpatulaMode, stopSpatulaPour]);
+  }, [isSpatulaMode, stopSpatulaPour]);
 
   const handleSpatulaToolPointerDown = useCallback(
     (slotId: string, tool: BenchToolInstance, event: ReactPointerEvent<HTMLElement>) => {

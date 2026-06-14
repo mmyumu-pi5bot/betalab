@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { DragDescriptor, DropTargetType } from "@/types/workbench";
@@ -17,18 +17,18 @@ export function useDragState(): DragStateApi {
   const [activeDropTargets, setActiveDropTargets] = useState<DropTargetType[]>([]);
   const [activeDragItem, setActiveDragItem] = useState<DragDescriptor | null>(null);
 
-  const showDropTargets = (dropTargets: readonly DropTargetType[]) => {
+  const showDropTargets = useCallback((dropTargets: readonly DropTargetType[]) => {
     setActiveDropTargets([...dropTargets]);
-  };
+  }, []);
 
-  const clearDropTargets = () => {
+  const clearDropTargets = useCallback(() => {
     setActiveDropTargets([]);
     setActiveDragItem(null);
-  };
+  }, []);
 
-  const isDropTargetHighlighted = (targetType: DropTargetType) => {
+  const isDropTargetHighlighted = useCallback((targetType: DropTargetType) => {
     return activeDropTargets.includes(targetType);
-  };
+  }, [activeDropTargets]);
 
   return {
     activeDropTargets,
