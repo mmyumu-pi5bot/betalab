@@ -393,6 +393,9 @@ export type BenchToolInstance = {
   containsSlurry?: boolean;
   liquids: BenchLiquidPortion[];
   quechersState?: QuechersState;
+  istdPhaseAdded?: "pre_solvent" | "pre_salts" | "post_salts" | null;
+  quechersExtractionResult?: QuechersExtractionResult | null;
+  injectionContext?: InjectionContext | null;
 };
 
 export type QuechersState = {
@@ -404,6 +407,46 @@ export type QuechersState = {
   reactionElapsedSeconds: number;
   faults: string[];
   isUsable: boolean;
+};
+
+export type QuechersExtractionResult = {
+  extractionManipFactor: number;
+  istdManipFactor: number | null;
+  istdPhase: "pre_solvent" | "pre_salts" | "post_salts" | null;
+};
+
+export type InjectionContext = {
+  sourceTubeId: string;
+  sampleMassG: number;
+  extractVolumeml: number;
+  effectiveResiduesUgPerKg: Record<string, number>;
+  extractionResult: QuechersExtractionResult | null;
+  istdVolumeMl: number | null;
+  istdReferenceConcNgPerMl: number;
+};
+
+export type CompoundMeasurement = {
+  compoundId: string;
+  trueEffectiveUgPerKg: number;
+  calculatedConcUgPerKg: number | null;
+  pesticideSignal: number;
+  istdSignal: number | null;
+  extractionManipFactor: number;
+  istdCorrectionApplied: boolean;
+  istdPhase: "pre_solvent" | "pre_salts" | "post_salts" | null;
+};
+
+export type InjectionMeasurement = {
+  vialId: string;
+  vialLabel: string;
+  rackSlotId: string;
+  status: "ok" | "no_extract_context";
+  compounds: CompoundMeasurement[];
+};
+
+export type SequenceRun = {
+  id: string;
+  injections: InjectionMeasurement[];
 };
 
 export type SpatulaState = {
@@ -546,6 +589,7 @@ export type ExperimentWorkspaceWidget = {
   tool?: BenchToolInstance | null;
   produceLots?: ExperimentProduceLot[];
   liquids?: BenchLiquidPortion[];
+  sequenceRuns?: SequenceRun[];
 };
 
 export type ExperimentProduceLot = {

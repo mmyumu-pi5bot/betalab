@@ -10,6 +10,7 @@ import { FloatingWidget } from "@/components/floating-widget";
 import { GrinderWidgetContent } from "@/components/grinder-widget-content";
 import { GrossBalanceWidget } from "@/components/gross-balance-widget";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
+import { LcMsMsResultsTable } from "@/components/lcmsms-results-table";
 import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon";
 import { LimsWidget } from "@/components/lims-widget";
 import { ProduceBasketWidget } from "@/components/produce-basket-widget";
@@ -116,6 +117,7 @@ type LabSceneWorkspaceCanvasProps = {
     handleApplyLimsLabelTicket: (payload: { basketBag?: true; grossBalanceBag?: true; slotId?: string }) => void;
     handleApplySampleLabel: (slotId: string) => void;
     handleMoveObject: (payload: MoveObjectPayload) => void;
+    handlePourExtract: (tubeToolId: string) => void;
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
     handleStoreWorkbenchTool: (slotId: string) => void;
@@ -154,6 +156,7 @@ type LabSceneWorkspaceCanvasProps = {
     onToggleVortexToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
+    onRunSequence: () => void;
     onTareAnalyticalBalance: () => void;
   };
 };
@@ -541,6 +544,19 @@ export function LabSceneWorkspaceCanvas({
                     status={rack.instrumentStatus}
                     testId="lc-msms-instrument-illustration"
                   />
+                  <div className="mt-3 flex justify-center">
+                    <button
+                      className="rounded-full bg-sky-600 px-5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 disabled:opacity-40"
+                      disabled={rack.instrumentStatus !== "ready" || ui.isCommandPending}
+                      onClick={workspaceActions.onRunSequence}
+                      type="button"
+                    >
+                      Run sequence
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <LcMsMsResultsTable runs={widget.sequenceRuns ?? []} />
+                  </div>
                 </WorkspaceEquipmentWidget>
               ) : widgetId === "vortex" ? (
                 <VortexWidget
@@ -611,6 +627,7 @@ export function LabSceneWorkspaceCanvas({
               onBenchToolPointerDown: spatula.handleSpatulaToolPointerDown,
               onBenchToolPointerUp: spatula.handleSpatulaToolPointerUp,
               onMoveObject: workbench.handleMoveObject,
+              onPourExtract: workbench.handlePourExtract,
               onProduceDrop: dnd.workbench.handleProduceDrop,
               onProduceLotClick: dnd.workbench.handleWorkbenchProduceLotClick,
               onProduceLotDragStart: dnd.workbench.handleWorkbenchProduceLotDragStart,

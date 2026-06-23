@@ -565,6 +565,18 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         handleApplyLimsLabelTicket: workbenchHandlers.handleApplyLimsLabelTicket,
         handleApplySampleLabel: workbenchHandlers.handleApplySampleLabel,
         handleMoveObject: workbenchHandlers.handleMoveObject,
+        handlePourExtract: (tubeToolId: string) => {
+          const allSlots = [
+            ...state.experiment.workbench.slots,
+            ...state.experiment.rack.slots,
+          ];
+          const vial = allSlots
+            .flatMap((s) => (s.tool ? [s.tool] : []))
+            .find((t) => t.toolType === "sample_vial" && !t.injectionContext);
+          if (vial) {
+            void experimentApi.lcmsms.pourExtract({ tube_tool_id: tubeToolId, vial_tool_id: vial.id });
+          }
+        },
         handleRemoveLiquid: workbenchHandlers.handleRemoveLiquid,
         handleRemoveWorkbenchSlot: workbenchHandlers.handleRemoveWorkbenchSlot,
         handleStoreWorkbenchTool: workbenchHandlers.handleStoreWorkbenchTool,
@@ -589,6 +601,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       }}
       workspaceActions={{
         ...workspaceActions,
+        onRunSequence: () => { void experimentApi.lcmsms.runSequence(); },
         onStartVortex: () => { void experimentApi.vortex.start(); },
         onStoreWorkspaceWidget: (widgetId) => {
           clearDropTargets();

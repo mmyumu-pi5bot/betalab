@@ -123,6 +123,7 @@ type LabSceneViewProps = {
     handleApplyLimsLabelTicket: (payload: { basketBag?: true; grossBalanceBag?: true; slotId?: string }) => void;
     handleApplySampleLabel: (slotId: string) => void;
     handleMoveObject: (payload: MoveObjectPayload) => void;
+    handlePourExtract: (tubeToolId: string) => void;
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
     handleStoreWorkbenchTool: (slotId: string) => void;
@@ -161,6 +162,7 @@ type LabSceneViewProps = {
     onToggleVortexToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
+    onRunSequence: () => void;
     onTareAnalyticalBalance: () => void;
   };
 };

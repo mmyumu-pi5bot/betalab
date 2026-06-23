@@ -1421,6 +1421,32 @@ export async function startVortexCycle(
   });
 }
 
+export async function pourExtractToVial(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lcmsms/pour-extract`,
+    body: {
+      tube_tool_id: requireString(body, "tube_tool_id"),
+      vial_tool_id: requireString(body, "vial_tool_id"),
+    },
+  });
+}
+
+export async function runSequence(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lcmsms/run-sequence`,
+  });
+}
+
 function normalizeExperiment(experiment: Experiment): Experiment {
   const rawTrash = experiment.trash as Experiment["trash"] & Record<string, unknown>;
   const rawWorkspace = experiment.workspace as Experiment["workspace"] & Record<string, unknown>;
@@ -1654,6 +1680,79 @@ function normalizeBenchTool(
         : [],
       isUsable: Boolean(rawQuechersState.isUsable ?? rawQuechersState.is_usable ?? true),
     },
+    istdPhaseAdded: (() => {
+      const v = tool.istdPhaseAdded ?? tool.istd_phase_added ?? null;
+      return v === null ? null : (v as BenchToolInstance["istdPhaseAdded"]);
+    })(),
+    quechersExtractionResult: (() => {
+      const raw = (tool.quechersExtractionResult ?? tool.quechers_extraction_result) as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (!raw) return null;
+      return {
+        extractionManipFactor: Number(
+          raw.extractionManipFactor ?? raw.extraction_manip_factor ?? 1,
+        ),
+        istdManipFactor:
+          raw.istdManipFactor != null
+            ? Number(raw.istdManipFactor)
+            : raw.istd_manip_factor != null
+              ? Number(raw.istd_manip_factor)
+              : null,
+        istdPhase: (raw.istdPhase ?? raw.istd_phase ?? null) as
+          | "pre_solvent"
+          | "pre_salts"
+          | "post_salts"
+          | null,
+      };
+    })(),
+    injectionContext: (() => {
+      const raw = (tool.injectionContext ?? tool.injection_context) as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (!raw) return null;
+      const exRaw = (raw.extractionResult ?? raw.extraction_result) as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      return {
+        sourceTubeId: String(raw.sourceTubeId ?? raw.source_tube_id ?? ""),
+        sampleMassG: Number(raw.sampleMassG ?? raw.sample_mass_g ?? 0),
+        extractVolumeml: Number(raw.extractVolumeMl ?? raw.extract_volume_ml ?? 10),
+        effectiveResiduesUgPerKg: (raw.effectiveResiduesUgPerKg ??
+          raw.effective_residues_ug_per_kg ??
+          {}) as Record<string, number>,
+        extractionResult: exRaw
+          ? {
+              extractionManipFactor: Number(
+                exRaw.extractionManipFactor ?? exRaw.extraction_manip_factor ?? 1,
+              ),
+              istdManipFactor:
+                exRaw.istdManipFactor != null
+                  ? Number(exRaw.istdManipFactor)
+                  : exRaw.istd_manip_factor != null
+                    ? Number(exRaw.istd_manip_factor)
+                    : null,
+              istdPhase: (exRaw.istdPhase ?? exRaw.istd_phase ?? null) as
+                | "pre_solvent"
+                | "pre_salts"
+                | "post_salts"
+                | null,
+            }
+          : null,
+        istdVolumeMl:
+          raw.istdVolumeMl != null
+            ? Number(raw.istdVolumeMl)
+            : raw.istd_volume_ml != null
+              ? Number(raw.istd_volume_ml)
+              : null,
+        istdReferenceConcNgPerMl: Number(
+          raw.istdReferenceConcNgPerMl ?? raw.istd_reference_conc_ng_per_ml ?? 100,
+        ),
+      };
+    })(),
   };
 }
 
@@ -2012,7 +2111,55 @@ function normalizeWorkspaceWidget(
       (widget.liquids as BenchLiquidPortion[] | undefined)?.map((liquid) =>
         normalizeBenchLiquid(liquid as BenchLiquidPortion & Record<string, unknown>),
       ) ?? [],
+    sequenceRuns: normalizeSequenceRuns(widget.sequenceRuns ?? widget.sequence_runs),
   };
+}
+
+function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").SequenceRun[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((run: Record<string, unknown>) => ({
+    id: String(run.id ?? ""),
+    injections: Array.isArray(run.injections)
+      ? run.injections.map((inj: Record<string, unknown>) => ({
+          vialId: String(inj.vialId ?? inj.vial_id ?? ""),
+          vialLabel: String(inj.vialLabel ?? inj.vial_label ?? ""),
+          rackSlotId: String(inj.rackSlotId ?? inj.rack_slot_id ?? ""),
+          status: String(inj.status ?? "ok") as "ok" | "no_extract_context",
+          compounds: Array.isArray(inj.compounds)
+            ? inj.compounds.map((c: Record<string, unknown>) => ({
+                compoundId: String(c.compoundId ?? c.compound_id ?? ""),
+                trueEffectiveUgPerKg: Number(
+                  c.trueEffectiveUgPerKg ?? c.true_effective_ug_per_kg ?? 0,
+                ),
+                calculatedConcUgPerKg:
+                  c.calculatedConcUgPerKg != null
+                    ? Number(c.calculatedConcUgPerKg)
+                    : c.calculated_conc_ug_per_kg != null
+                      ? Number(c.calculated_conc_ug_per_kg)
+                      : null,
+                pesticideSignal: Number(c.pesticideSignal ?? c.pesticide_signal ?? 0),
+                istdSignal:
+                  c.istdSignal != null
+                    ? Number(c.istdSignal)
+                    : c.istd_signal != null
+                      ? Number(c.istd_signal)
+                      : null,
+                extractionManipFactor: Number(
+                  c.extractionManipFactor ?? c.extraction_manip_factor ?? 1,
+                ),
+                istdCorrectionApplied: Boolean(
+                  c.istdCorrectionApplied ?? c.istd_correction_applied ?? false,
+                ),
+                istdPhase: (c.istdPhase ?? c.istd_phase ?? null) as
+                  | "pre_solvent"
+                  | "pre_salts"
+                  | "post_salts"
+                  | null,
+              }))
+            : [],
+        }))
+      : [],
+  }));
 }
 
 type ProduceLotNormalizationContext = {

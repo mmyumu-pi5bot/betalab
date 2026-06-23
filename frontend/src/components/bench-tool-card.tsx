@@ -34,6 +34,7 @@ type BenchToolCardProps = {
   onSampleLabelDragEnd?: (event: DragEvent<HTMLElement>) => void;
   onSampleLabelDragStart?: (label: BenchLabel, event: DragEvent<HTMLElement>) => void;
   onStore?: () => void;
+  onPourExtract?: () => void;
   onToolIllustrationClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   tool: BenchToolInstance;
 };
@@ -67,6 +68,7 @@ export function BenchToolCard({
   onSampleLabelDragEnd,
   onSampleLabelDragStart,
   onStore,
+  onPourExtract,
   onToolIllustrationClick,
   tool,
 }: BenchToolCardProps) {
@@ -310,6 +312,25 @@ export function BenchToolCard({
                 )}
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {onPourExtract &&
+        tool.toolType === "centrifuge_tube" &&
+        quechers.phase === "cemented" &&
+        !quechers.faults.includes("dry_salts_wetted") ? (
+          <div className="mt-1">
+            <button
+              className="w-full rounded-[0.85rem] border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 active:scale-[0.98]"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPourExtract();
+              }}
+              type="button"
+            >
+              Pipetter l&apos;extrait → vial
+            </button>
           </div>
         ) : null}
 

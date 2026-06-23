@@ -57,6 +57,46 @@ class QuechersStateSchema(BaseModel):
         return self.phase not in {"cemented", "contaminated"}
 
 
+class QuechersExtractionResultSchema(BaseModel):
+    extraction_manip_factor: float
+    istd_manip_factor: float | None = None
+    istd_phase: str | None = None
+
+
+class InjectionContextSchema(BaseModel):
+    source_tube_id: str
+    sample_mass_g: float
+    extract_volume_ml: float
+    effective_residues_ug_per_kg: dict[str, float] = Field(default_factory=dict)
+    extraction_result: QuechersExtractionResultSchema | None = None
+    istd_volume_ml: float | None = None
+    istd_reference_conc_ng_per_ml: float = 100.0
+
+
+class CompoundMeasurementSchema(BaseModel):
+    compound_id: str
+    true_effective_ug_per_kg: float
+    calculated_conc_ug_per_kg: float | None = None
+    pesticide_signal: float
+    istd_signal: float | None = None
+    extraction_manip_factor: float
+    istd_correction_applied: bool
+    istd_phase: str | None = None
+
+
+class InjectionMeasurementSchema(BaseModel):
+    vial_id: str
+    vial_label: str
+    rack_slot_id: str
+    status: str
+    compounds: list[CompoundMeasurementSchema] = Field(default_factory=list)
+
+
+class SequenceRunSchema(BaseModel):
+    id: str
+    injections: list[InjectionMeasurementSchema] = Field(default_factory=list)
+
+
 class ProduceMaterialStateSchema(BaseModel):
     id: str
     produce_lot_id: str
@@ -283,6 +323,9 @@ class WorkbenchToolSchema(BaseModel):
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
     quechers_state: QuechersStateSchema = Field(default_factory=QuechersStateSchema)
+    istd_phase_added: str | None = None
+    quechers_extraction_result: QuechersExtractionResultSchema | None = None
+    injection_context: InjectionContextSchema | None = None
 
     @computed_field
     def sample_label_text(self) -> str | None:
@@ -479,6 +522,7 @@ class WorkspaceWidgetSchema(BaseModel):
     tool: WorkbenchToolSchema | None = None
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
+    sequence_runs: list[SequenceRunSchema] = Field(default_factory=list)
     store_allowed_override: bool | None = Field(default=None, exclude=True)
     produce_material_states: list[ProduceMaterialStateSchema] = Field(default_factory=list, exclude=True)
 

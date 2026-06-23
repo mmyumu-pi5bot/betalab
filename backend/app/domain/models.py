@@ -90,6 +90,67 @@ class QuechersState:
 
 
 @dataclass
+class QuechersExtractionResult:
+    """Variance factors generated when QuEChERS extraction completes.
+
+    extraction_manip_factor is a single ε_manip draw shared by all substances
+    that were co-located in the tube during extraction.  istd_manip_factor is
+    the same value when ISTD was added at the right time, or an independent
+    draw when ISTD was added too late — meaning the ratio will be biased.
+    """
+    extraction_manip_factor: float
+    istd_manip_factor: float | None
+    istd_phase: str | None  # "pre_solvent" | "pre_salts" | "post_salts" | None
+
+
+@dataclass
+class InjectionContext:
+    """Extraction metadata snapshotted when extract is poured from a centrifuge tube to a vial.
+
+    Carries everything the LC-MS/MS calculation needs: the true pesticide concentrations
+    (post-degradation), the shared ε_manip factors from QuEChERS, and the ISTD amount.
+    """
+    source_tube_id: str
+    sample_mass_g: float       # g of apple powder extracted
+    extract_volume_ml: float   # mL of acetonitrile used (sets the dilution)
+    # True residues after thermal degradation at extraction time, per compound (µg/kg)
+    effective_residues_ug_per_kg: dict[str, float]
+    extraction_result: QuechersExtractionResult | None = None
+    istd_volume_ml: float | None = None           # mL of ISTD solution added to the tube
+    istd_reference_conc_ng_per_ml: float = 100.0  # ng/mL in the ISTD stock (catalog value)
+
+
+@dataclass
+class CompoundMeasurement:
+    """Single-compound result from an LC-MS/MS injection."""
+    compound_id: str
+    true_effective_ug_per_kg: float      # ground truth for transparency
+    calculated_conc_ug_per_kg: float | None
+    pesticide_signal: float              # raw signal in simulation units
+    istd_signal: float | None
+    extraction_manip_factor: float
+    istd_correction_applied: bool
+    istd_phase: str | None
+
+
+@dataclass
+class InjectionMeasurement:
+    """Per-vial result within a sequence run."""
+    vial_id: str
+    vial_label: str
+    rack_slot_id: str
+    status: str  # "ok" | "no_extract_context"
+    compounds: list[CompoundMeasurement]
+
+
+@dataclass
+class SequenceRun:
+    """One LC-MS/MS sequence run; stored on the instrument workspace widget."""
+    id: str
+    injections: list[InjectionMeasurement]
+
+
+@dataclass
 class ProduceMaterialState:
     id: str
     produce_lot_id: str
@@ -167,6 +228,12 @@ class WorkbenchTool:
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
     quechers_state: QuechersState = field(default_factory=QuechersState)
+    # Phase at which ISTD was first added (set on first istd_solution liquid addition).
+    istd_phase_added: Literal["pre_solvent", "pre_salts", "post_salts"] | None = None
+    # Set when QuEChERS extraction completes; carries the shared ε_manip factors.
+    quechers_extraction_result: QuechersExtractionResult | None = None
+    # Set when extract is poured from this tube into a vial (on the vial, not the tube).
+    injection_context: InjectionContext | None = None
 
 
 @dataclass
@@ -269,6 +336,7 @@ class WorkspaceWidget:
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
+    sequence_runs: list[SequenceRun] = field(default_factory=list)
 
     def can_store(self, rack_has_tools: bool = False) -> bool:
         return can_workspace_widget_store_now(

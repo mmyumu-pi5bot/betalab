@@ -7,6 +7,8 @@ from app.services.helpers.lookups import format_volume, round_volume
 from app.services.helpers.produce_canonical import get_tool_remaining_fill_capacity_ml
 
 QUECHERS_SALTS_ID = "quechers_salts"
+ISTD_SOLUTION_ID = "istd_solution"
+ACETONITRILE_ID = "acetonitrile_extraction"
 
 
 def _tool_has_wet_contents(tool: WorkbenchTool) -> bool:
@@ -39,6 +41,15 @@ def add_liquid_to_tool(
         tool.quechers_state.phase = "reacting" if _tool_has_wet_contents(tool) else "armed"
         experiment.audit_log.append(f"{liquid_definition.name} added to {tool.label}.")
         return
+
+    if liquid_id == ISTD_SOLUTION_ID and tool.istd_phase_added is None:
+        has_acetonitrile = any(liq.liquid_id == ACETONITRILE_ID for liq in tool.liquids)
+        if tool.quechers_state.phase == "idle" and not has_acetonitrile:
+            tool.istd_phase_added = "pre_solvent"
+        elif tool.quechers_state.phase == "idle":
+            tool.istd_phase_added = "pre_salts"
+        else:
+            tool.istd_phase_added = "post_salts"
 
     salts_were_armed = tool.quechers_state.phase == "armed"
     remaining_capacity = round_volume(get_tool_remaining_fill_capacity_ml(tool, material_states=experiment.produce_material_states))

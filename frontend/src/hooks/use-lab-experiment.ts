@@ -356,6 +356,13 @@ export function useLabExperiment({
       discardBasketTool: (p: BasketToolReferencePayload) => exec(mutationFns.discardBasketTool, p),
     },
 
+    // ── LC-MS/MS ──────────────────────────────────────────────────────────────
+    lcmsms: {
+      pourExtract: (p: { tube_tool_id: string; vial_tool_id: string }) =>
+        exec(mutationFns.pourExtractToVial, p),
+      runSequence: () => exec(mutationFns.runSequence),
+    },
+
     // ── Produce / debug ───────────────────────────────────────────────────────
     produce: {
       create: (p: CreateProduceLotPayload) => exec(mutationFns.createProduceLot, p),

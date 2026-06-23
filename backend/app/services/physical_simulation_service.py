@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass
 from math import exp
 
-from app.domain.models import ProduceLot, ProduceMaterialState, WorkbenchTool, WorkspaceWidget
+from app.domain.models import ProduceLot, ProduceMaterialState, QuechersExtractionResult, WorkbenchTool, WorkspaceWidget
 from app.domain.pesticide_catalog import apply_degradation_step
 from app.services.helpers.lookups import round_volume
 from app.services.helpers.produce_material_states import find_material_state, get_material_state_name, get_temperature_c, update_material_state
@@ -25,6 +26,11 @@ class ContainerPressureEvent:
 
 
 class PhysicalSimulationService:
+    extraction_manip_mu = 0.92      # mean extraction efficiency (8% mean loss)
+    extraction_manip_sigma = 0.04   # std dev (technician variability)
+    extraction_manip_min = 0.60
+    extraction_manip_max = 1.05
+
     grinder_cycle_duration_seconds = 30.0
     grinder_optimal_temperature_c = -40.0
     grinder_start_threshold_c = -20.0
@@ -115,6 +121,8 @@ class PhysicalSimulationService:
             if state.cementation_progress >= 1.0:
                 state.phase = "cemented"
                 state.faults = ["cemented"]
+                if tool.quechers_extraction_result is None:
+                    tool.quechers_extraction_result = self._generate_extraction_result(tool)
 
         if state.temperature_c > self.quechers_degradation_threshold_c:
             severity = (state.temperature_c - self.quechers_degradation_threshold_c) / (
@@ -150,6 +158,34 @@ class PhysicalSimulationService:
                 elapsed_seconds,
                 threshold_c=self.pesticide_degradation_threshold_c,
             )
+
+    def _generate_extraction_result(self, tool: WorkbenchTool) -> QuechersExtractionResult:
+        """Generate shared ε_manip factors for a completed QuEChERS extraction.
+
+        One random draw (extraction_manip_factor) is made for the whole tube — it
+        represents the technician's extraction efficiency for this particular run.
+        The pesticide and ISTD share this same factor only when ISTD was added at
+        the right protocol phase, so the ratio naturally corrects for extraction
+        losses.  When ISTD was added too late it gets an independent draw and the
+        ratio remains biased.
+        """
+        manip = random.gauss(self.extraction_manip_mu, self.extraction_manip_sigma)
+        manip = max(self.extraction_manip_min, min(self.extraction_manip_max, manip))
+
+        istd_phase = tool.istd_phase_added
+        if istd_phase in ("pre_solvent", "pre_salts"):
+            istd_manip: float | None = manip
+        elif istd_phase == "post_salts":
+            istd_manip = random.gauss(self.extraction_manip_mu, self.extraction_manip_sigma)
+            istd_manip = max(self.extraction_manip_min, min(self.extraction_manip_max, istd_manip))
+        else:
+            istd_manip = None
+
+        return QuechersExtractionResult(
+            extraction_manip_factor=round(manip, 4),
+            istd_manip_factor=round(istd_manip, 4) if istd_manip is not None else None,
+            istd_phase=istd_phase,
+        )
 
     def advance_grinding_widget(
         self,

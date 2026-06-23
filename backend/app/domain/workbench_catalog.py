@@ -128,7 +128,7 @@ WORKBENCH_LIQUIDS = {
         id="istd_solution",
         name="ISTD solution",
         accent="emerald",
-        transfer_volume_ml=0.1,
+        transfer_volume_ml=0.05,
     ),
 }
 
