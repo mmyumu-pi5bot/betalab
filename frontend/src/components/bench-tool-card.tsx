@@ -315,6 +315,28 @@ export function BenchToolCard({
           </div>
         ) : null}
 
+        {tool.calibrationContext ? (
+          <div className="mt-1 flex items-center justify-between rounded-[0.85rem] border border-rose-200 bg-rose-50 px-3 py-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-rose-500">
+              CAL
+            </span>
+            <span className="text-xs font-semibold text-rose-700">
+              {tool.calibrationContext.levelNgPerMl} ng/mL
+            </span>
+          </div>
+        ) : null}
+
+        {tool.injectionContext && !tool.calibrationContext ? (
+          <div className="mt-1 flex items-center justify-between rounded-[0.85rem] border border-sky-200 bg-sky-50 px-3 py-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-500">
+              Extrait
+            </span>
+            <span className="text-xs font-semibold text-sky-700">
+              {tool.injectionContext.sampleMassG.toFixed(1)} g
+            </span>
+          </div>
+        ) : null}
+
         {onPourExtract &&
         tool.toolType === "centrifuge_tube" &&
         quechers.phase === "cemented" &&

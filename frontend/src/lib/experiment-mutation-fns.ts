@@ -87,6 +87,7 @@ import {
   tareAnalyticalBalance,
   updateAnalyticalBalanceToolSampleLabelText,
   updateWorkbenchToolSampleLabelText,
+  addCalibrationToVial,
   pourExtractToVial,
   runSequence,
 } from "@/lib/api";
@@ -183,6 +184,7 @@ export const mutationFns = {
   tareAnalyticalBalance,
   updateAnalyticalBalanceToolSampleLabelText,
   updateWorkbenchToolSampleLabelText,
+  addCalibrationToVial,
   pourExtractToVial,
   runSequence,
 } satisfies Record<string, MutationFn>;

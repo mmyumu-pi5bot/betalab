@@ -9,6 +9,7 @@ export type DropDraftField = {
   inputStep?: number;
   label: string;
   minValue?: number;
+  presets?: number[];
   stepAmount: number;
   unitLabel: string;
   value: number;
@@ -49,26 +50,46 @@ export function DropDraftCard({
       </div>
       <div className="mt-3 space-y-3">
         {fields.map((field) => (
-          <div className="flex items-center justify-between gap-3" key={field.id}>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
-                {field.label}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {field.visual === "temperature" ? (
-                <TemperatureIndicator temperatureC={field.value} />
-              ) : null}
-              <InlineQuantityInput
-                ariaLabel={field.ariaLabel}
-                inputStep={field.inputStep ?? 0.1}
-                onChange={(nextValue) => {
-                  onChangeField(field.id, Math.max(nextValue, field.minValue ?? 0));
-                }}
-                unitLabel={field.unitLabel}
-                value={field.value}
-                wheelStep={field.wheelStep ?? field.stepAmount}
-              />
+          <div key={field.id} className="space-y-1.5">
+            {field.presets && field.presets.length > 0 ? (
+              <div className="flex flex-wrap justify-end gap-0.5">
+                {field.presets.map((preset) => (
+                  <button
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                      field.value === preset
+                        ? "border-slate-700 bg-slate-700 text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
+                    }`}
+                    key={preset}
+                    onClick={() => onChangeField(field.id, preset)}
+                    type="button"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  {field.label}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {field.visual === "temperature" ? (
+                  <TemperatureIndicator temperatureC={field.value} />
+                ) : null}
+                <InlineQuantityInput
+                  ariaLabel={field.ariaLabel}
+                  inputStep={field.inputStep ?? 0.1}
+                  onChange={(nextValue) => {
+                    onChangeField(field.id, Math.max(nextValue, field.minValue ?? 0));
+                  }}
+                  unitLabel={field.unitLabel}
+                  value={field.value}
+                  wheelStep={field.wheelStep ?? field.stepAmount}
+                />
+              </div>
             </div>
           </div>
         ))}

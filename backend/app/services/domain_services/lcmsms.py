@@ -5,6 +5,7 @@ import random
 from dataclasses import dataclass
 
 from app.domain.models import (
+    CalibrationContext,
     CompoundMeasurement,
     Experiment,
     InjectionContext,
@@ -213,6 +214,18 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             vial = rack_slot.tool
             assert vial is not None  # guaranteed by the filter above
 
+            if vial.calibration_context is not None:
+                injections.append(
+                    InjectionMeasurement(
+                        vial_id=vial.id,
+                        vial_label=vial.label,
+                        rack_slot_id=rack_slot.id,
+                        status="calibration",
+                        compounds=_compute_calibration_compounds(vial.calibration_context),
+                    )
+                )
+                continue
+
             if vial.injection_context is None:
                 injections.append(
                     InjectionMeasurement(
@@ -244,6 +257,77 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             f"LC-MS/MS sequence run {run.id}: {len(injections)} vial(s) injected, "
             f"{n_ok} with extract context."
         )
+
+
+# ---------------------------------------------------------------------------
+# Add calibration standard to vial
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True, slots=True)
+class AddCalibrationToVialRequest:
+    vial_tool_id: str
+    level_ng_per_ml: float
+
+
+class AddCalibrationToVialService(WriteDomainService[AddCalibrationToVialRequest]):
+    def __init__(self, runtime: ExperimentRuntime) -> None:
+        super().__init__(runtime)
+
+    def _run(self, experiment: Experiment, request: AddCalibrationToVialRequest) -> None:
+        from app.domain.pesticide_catalog import APPLE_PESTICIDE_CATALOG
+
+        if request.level_ng_per_ml <= 0:
+            raise ValueError("Calibration level must be positive.")
+
+        from app.domain.dnd_rules import can_tool_receive_liquids
+
+        vial = _find_tool_anywhere(experiment, request.vial_tool_id)
+        if vial is None:
+            raise ValueError("Tool not found.")
+        # A liquid can physically go into any container that holds liquids. If the
+        # container can never enter the autosampler rack (e.g. a centrifuge tube) the
+        # calibrant is simply never injected — useless, but not an error.
+        if not can_tool_receive_liquids(vial.tool_type):
+            raise ValueError(f"{vial.label} cannot receive liquids.")
+        if vial.calibration_context is not None:
+            raise ValueError(f"{vial.label} already contains a calibration standard.")
+        if vial.injection_context is not None:
+            raise ValueError(f"{vial.label} already contains a sample extract.")
+
+        compound_ids = [p.compound_id for p in APPLE_PESTICIDE_CATALOG]
+        vial.calibration_context = CalibrationContext(
+            level_ng_per_ml=round(request.level_ng_per_ml, 4),
+            compound_ids=compound_ids,
+        )
+        experiment.audit_log.append(
+            f"Calibration standard {request.level_ng_per_ml} ng/mL prepared in {vial.label}."
+        )
+
+
+def _compute_calibration_compounds(ctx: CalibrationContext) -> list[CompoundMeasurement]:
+    """Simulate LC-MS/MS measurements for a multi-residue calibration standard.
+
+    Signal is proportional to nominal concentration with small environmental noise only —
+    no extraction variance applies since the standard is a pure solution.
+    """
+    results: list[CompoundMeasurement] = []
+    for compound_id in ctx.compound_ids:
+        env_noise = random.gauss(1.0, ENV_NOISE_SIGMA)
+        signal = ctx.level_ng_per_ml * env_noise
+        results.append(
+            CompoundMeasurement(
+                compound_id=compound_id,
+                true_effective_ug_per_kg=0.0,
+                calculated_conc_ug_per_kg=None,
+                pesticide_signal=round(signal, 6),
+                istd_signal=None,
+                extraction_manip_factor=1.0,
+                istd_correction_applied=False,
+                istd_phase=None,
+                nominal_conc_ng_per_ml=ctx.level_ng_per_ml,
+            )
+        )
+    return results
 
 
 def _compute_compounds(

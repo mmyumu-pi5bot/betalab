@@ -38,7 +38,9 @@ export type LiquidType =
   | "matrix_blank"
   | "apple_extract"
   | "dry_ice_pellets"
-  | "quechers_salts";
+  | "quechers_salts"
+  | "istd_solution"
+  | "calibration_solution";
 
 export type WorkspaceWidgetType =
   | "autosampler_rack"
@@ -396,6 +398,7 @@ export type BenchToolInstance = {
   istdPhaseAdded?: "pre_solvent" | "pre_salts" | "post_salts" | null;
   quechersExtractionResult?: QuechersExtractionResult | null;
   injectionContext?: InjectionContext | null;
+  calibrationContext?: CalibrationContext | null;
 };
 
 export type QuechersState = {
@@ -407,6 +410,11 @@ export type QuechersState = {
   reactionElapsedSeconds: number;
   faults: string[];
   isUsable: boolean;
+};
+
+export type CalibrationContext = {
+  levelNgPerMl: number;
+  compoundIds: string[];
 };
 
 export type QuechersExtractionResult = {
@@ -434,13 +442,14 @@ export type CompoundMeasurement = {
   extractionManipFactor: number;
   istdCorrectionApplied: boolean;
   istdPhase: "pre_solvent" | "pre_salts" | "post_salts" | null;
+  nominalConcNgPerMl: number | null;
 };
 
 export type InjectionMeasurement = {
   vialId: string;
   vialLabel: string;
   rackSlotId: string;
-  status: "ok" | "no_extract_context";
+  status: "ok" | "no_extract_context" | "calibration";
   compounds: CompoundMeasurement[];
 };
 

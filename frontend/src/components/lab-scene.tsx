@@ -60,6 +60,8 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
 
   // Flat adapter — maps grouped API back to the flat shape expected by consumer hooks.
   const flatApi: FlatExperimentApi = {
+    // LC-MS/MS
+    addCalibrationToVial: (p) => void experimentApi.lcmsms.addCalibration(p),
     // Workbench
     addWorkbenchSlot: experimentApi.workbench.addSlot,
     addLiquidToWorkbenchTool: experimentApi.workbench.addLiquid,

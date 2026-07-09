@@ -65,6 +65,10 @@ function InjectionBlock({ injection }: { injection: InjectionMeasurement }) {
     );
   }
 
+  if (injection.status === "calibration") {
+    return <CalibrationBlock injection={injection} />;
+  }
+
   const firstCompound = injection.compounds[0] ?? null;
   const istdPhase = firstCompound?.istdPhase ?? null;
   const istdApplied = firstCompound?.istdCorrectionApplied ?? false;
@@ -123,6 +127,45 @@ function InjectionBlock({ injection }: { injection: InjectionMeasurement }) {
                 </tr>
               );
             })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function CalibrationBlock({ injection }: { injection: InjectionMeasurement }) {
+  const level = injection.compounds[0]?.nominalConcNgPerMl ?? null;
+  return (
+    <div className="overflow-hidden rounded-[0.9rem] border border-rose-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-rose-100 bg-rose-50 px-3 py-1.5">
+        <span className="text-xs font-semibold text-rose-700">{injection.vialLabel}</span>
+        <span className="text-[10px] text-slate-400">slot {injection.rackSlotId}</span>
+        <span className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+          CAL {level !== null ? `${level} ng/mL` : ""}
+        </span>
+      </div>
+      {injection.compounds.length === 0 ? (
+        <p className="px-3 py-2 text-xs text-slate-400">Aucun composé.</p>
+      ) : (
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-100 text-[10px] text-slate-400">
+              <th className="py-1 pl-3 pr-1 text-left font-medium">Composé</th>
+              <th className="py-1 pl-1 pr-3 text-right font-medium">Signal (u.a.)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {injection.compounds.map((c) => (
+              <tr key={c.compoundId} className="border-b border-slate-50 last:border-0">
+                <td className="py-1.5 pl-3 pr-1 font-medium text-slate-700">
+                  {COMPOUND_LABELS[c.compoundId] ?? c.compoundId}
+                </td>
+                <td className="py-1.5 pl-1 pr-3 text-right text-rose-700">
+                  {c.pesticideSignal.toFixed(4)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}

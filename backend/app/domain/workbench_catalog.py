@@ -130,6 +130,12 @@ WORKBENCH_LIQUIDS = {
         accent="emerald",
         transfer_volume_ml=0.05,
     ),
+    "calibration_solution": WorkbenchLiquidDefinition(
+        id="calibration_solution",
+        name="Multi-residue stock solution",
+        accent="rose",
+        transfer_volume_ml=0.0,
+    ),
 }
 
 
@@ -177,6 +183,15 @@ _LIQUID_DETAILS = {
         ),
         "liquid_type": "istd_solution",
         "subtitle": "100 ng/mL · atrazine-d5 / imidaclopride-d4 / deltaméthrine-d6",
+    },
+    "calibration_solution": {
+        "description": (
+            "Multi-residue calibration stock solution containing all monitored pesticides at certified "
+            "concentration in acetonitrile. Drag onto an autosampler vial and choose the calibration "
+            "level in ng/mL to prepare a calibration standard."
+        ),
+        "liquid_type": "calibration_solution",
+        "subtitle": "All pesticides · free level (ng/mL)",
     },
 }
 
@@ -251,11 +266,10 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
         "id": "workflow_liquids",
         "item_ids": (
             "acetonitrile_extraction",
-            "apple_extract",
-            "ultrapure_water_rinse",
             "dry_ice_pellets",
             "quechers_salts",
             "istd_solution",
+            "calibration_solution",
         ),
         "item_source": "liquids",
         "label": "Reagents & materials",

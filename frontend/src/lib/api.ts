@@ -1436,6 +1436,21 @@ export async function pourExtractToVial(
   });
 }
 
+export async function addCalibrationToVial(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lcmsms/add-calibration`,
+    body: {
+      vial_tool_id: requireString(body, "vial_tool_id"),
+      level_ng_per_ml: Number(body["level_ng_per_ml"] ?? 0),
+    },
+  });
+}
+
 export async function runSequence(
   experimentId: string,
   payload?: MutationPayload,
@@ -1751,6 +1766,17 @@ function normalizeBenchTool(
         istdReferenceConcNgPerMl: Number(
           raw.istdReferenceConcNgPerMl ?? raw.istd_reference_conc_ng_per_ml ?? 100,
         ),
+      };
+    })(),
+    calibrationContext: (() => {
+      const raw = (tool.calibrationContext ?? tool.calibration_context) as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (!raw) return null;
+      return {
+        levelNgPerMl: Number(raw.levelNgPerMl ?? raw.level_ng_per_ml ?? 0),
+        compoundIds: (raw.compoundIds ?? raw.compound_ids ?? []) as string[],
       };
     })(),
   };
@@ -2124,7 +2150,7 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
           vialId: String(inj.vialId ?? inj.vial_id ?? ""),
           vialLabel: String(inj.vialLabel ?? inj.vial_label ?? ""),
           rackSlotId: String(inj.rackSlotId ?? inj.rack_slot_id ?? ""),
-          status: String(inj.status ?? "ok") as "ok" | "no_extract_context",
+          status: String(inj.status ?? "ok") as "ok" | "no_extract_context" | "calibration",
           compounds: Array.isArray(inj.compounds)
             ? inj.compounds.map((c: Record<string, unknown>) => ({
                 compoundId: String(c.compoundId ?? c.compound_id ?? ""),
@@ -2155,6 +2181,12 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
                   | "pre_salts"
                   | "post_salts"
                   | null,
+                nominalConcNgPerMl:
+                  c.nominalConcNgPerMl != null
+                    ? Number(c.nominalConcNgPerMl)
+                    : c.nominal_conc_ng_per_ml != null
+                      ? Number(c.nominal_conc_ng_per_ml)
+                      : null,
               }))
             : [],
         }))

@@ -63,6 +63,11 @@ class QuechersExtractionResultSchema(BaseModel):
     istd_phase: str | None = None
 
 
+class CalibrationContextSchema(BaseModel):
+    level_ng_per_ml: float
+    compound_ids: list[str] = Field(default_factory=list)
+
+
 class InjectionContextSchema(BaseModel):
     source_tube_id: str
     sample_mass_g: float
@@ -82,6 +87,7 @@ class CompoundMeasurementSchema(BaseModel):
     extraction_manip_factor: float
     istd_correction_applied: bool
     istd_phase: str | None = None
+    nominal_conc_ng_per_ml: float | None = None
 
 
 class InjectionMeasurementSchema(BaseModel):
@@ -326,6 +332,7 @@ class WorkbenchToolSchema(BaseModel):
     istd_phase_added: str | None = None
     quechers_extraction_result: QuechersExtractionResultSchema | None = None
     injection_context: InjectionContextSchema | None = None
+    calibration_context: CalibrationContextSchema | None = None
 
     @computed_field
     def sample_label_text(self) -> str | None:

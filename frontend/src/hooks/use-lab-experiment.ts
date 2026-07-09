@@ -358,6 +358,8 @@ export function useLabExperiment({
 
     // ── LC-MS/MS ──────────────────────────────────────────────────────────────
     lcmsms: {
+      addCalibration: (p: { vial_tool_id: string; level_ng_per_ml: number }) =>
+        exec(mutationFns.addCalibrationToVial, p),
       pourExtract: (p: { tube_tool_id: string; vial_tool_id: string }) =>
         exec(mutationFns.pourExtractToVial, p),
       runSequence: () => exec(mutationFns.runSequence),

@@ -111,6 +111,33 @@ export function useWorkbenchHandlers({
     }
 
     const liquidDefinition = labLiquidCatalog[payload.itemId];
+    if (payload.itemId === "calibration_solution") {
+      const tool = workbenchSlots.find((slot) => slot.id === slotId)?.tool;
+      if (!tool) return;
+      const CAL_PRESETS = [1, 5, 10, 50, 100, 500];
+      setPendingDropDraft({
+        commandType: "add_calibration_to_vial",
+        fields: [
+          {
+            ariaLabel: "Calibration level in ng/mL",
+            id: "level_ng_per_ml",
+            inputStep: 1,
+            label: "Level",
+            minValue: 0.1,
+            presets: CAL_PRESETS,
+            stepAmount: 10,
+            unitLabel: "ng/mL",
+            value: 10,
+            wheelStep: 5,
+          },
+        ],
+        itemId: tool.id,
+        targetId: slotId,
+        targetKind: "bench_slot",
+        title: "Prepare multi-residue calibrant",
+      });
+      return;
+    }
     if (payload.itemId === "quechers_salts") {
       const tool = workbenchSlots.find((slot) => slot.id === slotId)?.tool;
       if (tool === null || tool === undefined) {
@@ -221,6 +248,7 @@ export function useWorkbenchHandlers({
       activeDragItem.entityKind === "sample_label" ||
       activeDragItem.entityKind === "lims_label_ticket"
     ) {
+
       if (
         !activeDropTargets.some((targetType) =>
           (slot.dropTargetTypes ?? []).includes(targetType),

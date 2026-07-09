@@ -2,6 +2,8 @@ from pydantic import BaseModel
 
 from app.schemas.experiment import ExperimentSchema
 from app.services.domain_services.lcmsms import (
+    AddCalibrationToVialRequest,
+    AddCalibrationToVialService,
     PourExtractToVialRequest,
     PourExtractToVialService,
     RunSequenceRequest,
@@ -24,6 +26,24 @@ def pour_extract_to_vial(experiment_id: str, body: PourExtractBody) -> Experimen
             PourExtractToVialRequest(
                 tube_tool_id=body.tube_tool_id,
                 vial_tool_id=body.vial_tool_id,
+            ),
+        )
+    )
+
+
+class AddCalibrationBody(BaseModel):
+    vial_tool_id: str
+    level_ng_per_ml: float
+
+
+@router.post("/{experiment_id}/lcmsms/add-calibration", response_model=ExperimentSchema)
+def add_calibration_to_vial(experiment_id: str, body: AddCalibrationBody) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: AddCalibrationToVialService(experiment_service).run(
+            experiment_id,
+            AddCalibrationToVialRequest(
+                vial_tool_id=body.vial_tool_id,
+                level_ng_per_ml=body.level_ng_per_ml,
             ),
         )
     )

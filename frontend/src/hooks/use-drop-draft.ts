@@ -11,8 +11,11 @@ import type {
   CreateDebugToolPresetPayload,
 } from "@/types/api-payloads";
 
+type AddCalibrationToVialPayload = { vial_tool_id: string; level_ng_per_ml: number };
+
 export type DropDraft = {
   commandType:
+    | "add_calibration_to_vial"
     | "add_liquid_to_analytical_balance_tool"
     | "add_liquid_to_workbench_tool"
     | "add_liquid_to_workspace_widget"
@@ -30,6 +33,7 @@ export type DropDraft = {
 };
 
 export type DropDraftExperimentApi = {
+  addCalibrationToVial: (payload: AddCalibrationToVialPayload) => void;
   addLiquidToAnalyticalBalanceTool: (payload: AddLiquidToAnalyticalBalanceToolPayload) => void;
   addLiquidToWorkbenchTool: (payload: AddLiquidToWorkbenchToolPayload) => void;
   addLiquidToWorkspaceWidget: (payload: AddLiquidToWorkspaceWidgetPayload) => void;
@@ -72,6 +76,15 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
     // when a field is absent so the payload shape stays explicit.
     const getNumericFieldValue = (fieldId: string) =>
       pendingDropDraft.fields.find((field) => field.id === fieldId)?.value ?? 0;
+
+    if (pendingDropDraft.commandType === "add_calibration_to_vial") {
+      void experimentApi.addCalibrationToVial({
+        vial_tool_id: pendingDropDraft.itemId ?? pendingDropDraft.targetId,
+        level_ng_per_ml: getNumericFieldValue("level_ng_per_ml"),
+      });
+      setPendingDropDraft(null);
+      return;
+    }
 
     if (pendingDropDraft.commandType === "add_liquid_to_analytical_balance_tool") {
       void experimentApi.addLiquidToAnalyticalBalanceTool({

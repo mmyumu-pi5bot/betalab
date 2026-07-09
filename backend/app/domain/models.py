@@ -121,6 +121,13 @@ class InjectionContext:
 
 
 @dataclass
+class CalibrationContext:
+    """Marks a vial as a multi-residue calibration standard at a known concentration."""
+    level_ng_per_ml: float
+    compound_ids: list[str]
+
+
+@dataclass
 class CompoundMeasurement:
     """Single-compound result from an LC-MS/MS injection."""
     compound_id: str
@@ -131,6 +138,8 @@ class CompoundMeasurement:
     extraction_manip_factor: float
     istd_correction_applied: bool
     istd_phase: str | None
+    # Set for calibration standard injections only (None for sample injections).
+    nominal_conc_ng_per_ml: float | None = None
 
 
 @dataclass
@@ -234,6 +243,8 @@ class WorkbenchTool:
     quechers_extraction_result: QuechersExtractionResult | None = None
     # Set when extract is poured from this tube into a vial (on the vial, not the tube).
     injection_context: InjectionContext | None = None
+    # Set when the vial is prepared as a calibration standard.
+    calibration_context: CalibrationContext | None = None
 
 
 @dataclass
