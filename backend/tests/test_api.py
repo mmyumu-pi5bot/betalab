@@ -19,7 +19,7 @@ from app.api.experiment_routes import workbench_produce as experiment_routes_wor
 from app.api.experiment_routes import workbench_spatula as experiment_routes_workbench_spatula
 from app.api.experiment_routes import workspace as experiment_routes_workspace
 from app.core.config import Settings, settings
-from app.domain.models import ProduceFraction, ProduceMaterialState
+from app.domain.models import CalibrationContext, InjectionContext, ProduceFraction, ProduceMaterialState
 from app.main import app
 from app.services.experiment_repository import SqliteExperimentRepository
 from app.services.experiment_service import ExperimentRuntimeService
@@ -133,6 +133,45 @@ def test_create_and_fetch_experiment_over_http() -> None:
     assert any(widget["id"] == "workbench" for widget in fetched.json()["workspace"]["widgets"])
     assert fetched.json()["basket_tools"][0]["tool_type"] == "sample_bag"
     assert fetched.json()["lims_reception"]["status"] == "awaiting_reception"
+
+
+def test_experiment_response_hides_physical_truth_fields(isolated_api_experiment_service) -> None:
+    client = TestClient(app)
+    experiment_id = _create_experiment(client)
+    placed = client.post(
+        f"/experiments/{experiment_id}/workbench/slots/station_1/place-tool",
+        json={"tool_id": "sample_vial_lcms"},
+    )
+    tool_id = placed.json()["workbench"]["slots"][0]["tool"]["id"]
+    added = client.post(
+        f"/experiments/{experiment_id}/tools/{tool_id}/liquids",
+        json={"liquid_id": "istd_solution", "volume_ml": 0.05},
+    )
+    assert added.status_code == 200
+
+    experiment = isolated_api_experiment_service._require_experiment(experiment_id)
+    tool = experiment.workbench.slots[0].tool
+    assert tool is not None
+    tool.calibration_context = CalibrationContext(
+        level_ng_per_ml=10.0,
+        compound_ids=["chlorpyrifos"],
+        true_level_ng_per_ml=9.8,
+    )
+    tool.injection_context = InjectionContext(
+        source_tube_id="tube_1",
+        sample_mass_g=10.0,
+        extract_volume_ml=10.0,
+        effective_residues_ug_per_kg={},
+        extract_true_volume_ml=9.9,
+        istd_true_volume_ml=0.049,
+    )
+
+    payload = client.get(f"/experiments/{experiment_id}").json()
+    public_tool = payload["workbench"]["slots"][0]["tool"]
+    assert "true_volume_ml" not in public_tool["liquids"][0]
+    assert "true_level_ng_per_ml" not in public_tool["calibration_context"]
+    assert "extract_true_volume_ml" not in public_tool["injection_context"]
+    assert "istd_true_volume_ml" not in public_tool["injection_context"]
 
 
 def test_reception_routes_register_and_label_received_bag_over_http() -> None:

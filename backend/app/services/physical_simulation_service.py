@@ -31,6 +31,14 @@ class PhysicalSimulationService:
     extraction_manip_min = 0.60
     extraction_manip_max = 1.05
 
+    dispense_relative_sigma = 0.012   # ~1.2% relative dispensing/pipetting precision
+    dispense_factor_min = 0.90
+    dispense_factor_max = 1.10
+
+    calibration_prep_relative_sigma = 0.02   # ~2% relative concentration-prep precision for standards
+    calibration_prep_factor_min = 0.94
+    calibration_prep_factor_max = 1.06
+
     grinder_cycle_duration_seconds = 30.0
     grinder_optimal_temperature_c = -40.0
     grinder_start_threshold_c = -20.0
@@ -186,6 +194,32 @@ class PhysicalSimulationService:
             istd_manip_factor=round(istd_manip, 4) if istd_manip is not None else None,
             istd_phase=istd_phase,
         )
+
+    @classmethod
+    def draw_dispensed_volume(cls, nominal_ml: float) -> float:
+        """Return the actual (hidden) delivered volume for a requested nominal volume.
+
+        A chemist never delivers exactly the requested volume; the true volume is
+        drawn from nominal * Gauss(1, sigma), clamped to a realistic band.
+        """
+        if nominal_ml <= 0:
+            return 0.0
+        factor = random.gauss(1.0, cls.dispense_relative_sigma)
+        factor = max(cls.dispense_factor_min, min(cls.dispense_factor_max, factor))
+        return nominal_ml * factor
+
+    @classmethod
+    def draw_prepared_level(cls, nominal_ng_per_ml: float) -> float:
+        """Return the actual (hidden) prepared concentration for a requested nominal level.
+
+        A standard is never diluted to exactly the target concentration; the true level
+        is drawn from nominal * Gauss(1, sigma), clamped to a realistic band.
+        """
+        if nominal_ng_per_ml <= 0:
+            return 0.0
+        factor = random.gauss(1.0, cls.calibration_prep_relative_sigma)
+        factor = max(cls.calibration_prep_factor_min, min(cls.calibration_prep_factor_max, factor))
+        return nominal_ng_per_ml * factor
 
     def advance_grinding_widget(
         self,

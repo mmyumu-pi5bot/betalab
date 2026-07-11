@@ -5,10 +5,12 @@ from app.domain.rules import can_tool_accept_liquids, can_tool_receive_contents
 from app.domain.workbench_catalog import get_workbench_liquid_definition
 from app.services.helpers.lookups import format_volume, round_volume
 from app.services.helpers.produce_canonical import get_tool_remaining_fill_capacity_ml
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 QUECHERS_SALTS_ID = "quechers_salts"
 ISTD_SOLUTION_ID = "istd_solution"
 ACETONITRILE_ID = "acetonitrile_extraction"
+CALIBRATION_SOLUTION_ID = "calibration_solution"
 
 
 def _tool_has_wet_contents(tool: WorkbenchTool) -> bool:
@@ -18,6 +20,12 @@ def _tool_has_wet_contents(tool: WorkbenchTool) -> bool:
 def raise_if_quechers_unusable(tool: WorkbenchTool) -> None:
     if not tool.quechers_state.is_usable:
         raise ValueError(f"{tool.label} is contaminated and cannot be used for further preparation.")
+
+
+def remove_liquid_from_tool(tool: WorkbenchTool, liquid: WorkbenchLiquid) -> None:
+    tool.liquids = [entry for entry in tool.liquids if entry.id != liquid.id]
+    if liquid.liquid_id == CALIBRATION_SOLUTION_ID:
+        tool.calibration_context = None
 
 
 def add_liquid_to_tool(
@@ -63,6 +71,8 @@ def add_liquid_to_tool(
         None,
     )
 
+    true_volume_to_add = PhysicalSimulationService.draw_dispensed_volume(volume_to_add)
+
     if existing_liquid is None:
         tool.liquids.append(
             WorkbenchLiquid(
@@ -70,6 +80,7 @@ def add_liquid_to_tool(
                 liquid_id=liquid_definition.id,
                 name=liquid_definition.name,
                 volume_ml=round_volume(volume_to_add),
+                true_volume_ml=round(true_volume_to_add, 6),
                 accent=liquid_definition.accent,
             )
         )
@@ -77,6 +88,11 @@ def add_liquid_to_tool(
         existing_liquid_was_present = False
     else:
         existing_liquid.volume_ml = round_volume(existing_liquid.volume_ml + volume_to_add)
+        existing_liquid.true_volume_ml = round(
+            (existing_liquid.true_volume_ml if existing_liquid.true_volume_ml is not None else existing_liquid.volume_ml)
+            + true_volume_to_add,
+            6,
+        )
         updated_volume = existing_liquid.volume_ml
         existing_liquid_was_present = True
 

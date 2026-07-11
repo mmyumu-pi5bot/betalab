@@ -4952,7 +4952,7 @@ describe("LabScene", () => {
     );
     vi.mocked(sendExperimentCommand).mockResolvedValue(
       makeWorkbenchExperiment({
-        auditLog: ["Ultrapure water added to Autosampler vial."],
+        auditLog: ["ISTD solution added to Autosampler vial."],
         slots: makeSlots([
           {
             tool: makeTool({
@@ -4966,10 +4966,10 @@ describe("LabScene", () => {
                 },
                 {
                   id: "bench_liquid_2",
-                  liquidId: "ultrapure_water",
-                  name: "Ultrapure water",
-                  volume_ml: 1,
-                  accent: "sky",
+                  liquidId: "istd_solution",
+                  name: "ISTD solution",
+                  volume_ml: 0.05,
+                  accent: "emerald",
                 },
               ],
             }),
@@ -4985,7 +4985,7 @@ describe("LabScene", () => {
     });
 
     const liquidTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId("toolbar-item-ultrapure_water_rinse"), {
+    fireEvent.dragStart(screen.getByTestId("toolbar-item-istd_solution"), {
       dataTransfer: liquidTransfer,
     });
 
@@ -4999,14 +4999,17 @@ describe("LabScene", () => {
     fireEvent.click(screen.getByText("Add"));
 
     await waitFor(() => {
-      expect(screen.getByText("Ultrapure water added to Autosampler vial.")).toBeInTheDocument();
+      expect(screen.getByText("ISTD solution added to Autosampler vial.")).toBeInTheDocument();
     });
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
       "add_liquid_to_workbench_tool",
-      { slot_id: "station_1", liquid_id: "ultrapure_water_rinse", volume_ml: 5 },
+      { slot_id: "station_1", liquid_id: "istd_solution", volume_ml: 0.05 },
     );
+    expect(
+      within(screen.getByTestId("bench-slot-station_1")).getByText("ISTD solution"),
+    ).toBeInTheDocument();
   });
 
   it("marks the rack and instrument as ready when a vial is staged in the rack", async () => {

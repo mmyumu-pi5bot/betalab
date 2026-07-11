@@ -34,6 +34,40 @@ function makeTool(): BenchToolInstance {
 }
 
 describe("BenchToolCard QuEChERS state", () => {
+  it("renders a calibration solution through the generic liquid row", () => {
+    const tool = makeTool();
+    tool.toolId = "sample_vial_lcms";
+    tool.toolType = "sample_vial";
+    tool.capacity_ml = 2;
+    tool.liquids = [
+      {
+        id: "calibrant_1",
+        liquidId: "calibration_solution",
+        name: "Multi-residue stock solution",
+        volume_ml: 1,
+        accent: "rose",
+      },
+      {
+        id: "istd_1",
+        liquidId: "istd_solution",
+        name: "ISTD solution",
+        volume_ml: 0.05,
+        accent: "emerald",
+      },
+    ];
+    tool.calibrationContext = {
+      levelNgPerMl: 10,
+      compoundIds: ["chlorpyrifos"],
+    };
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    expect(screen.getByText("Multi-residue stock solution")).toBeInTheDocument();
+    expect(screen.getByText("ISTD solution")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Multi-residue stock solution" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove ISTD solution" })).toBeInTheDocument();
+  });
+
   it("shows only the temperature indicator", () => {
     render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={makeTool()} />);
 

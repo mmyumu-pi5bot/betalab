@@ -19,11 +19,14 @@ from app.domain.models import (
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import find_workspace_widget
 from app.services.helpers.produce_material_states import find_material_state
+from app.services.helpers.tool_liquids import add_liquid_to_tool
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 ISTD_SOLUTION_ID = "istd_solution"
 ACETONITRILE_ID = "acetonitrile_extraction"
 APPLE_EXTRACT_ID = "apple_extract"
 ISTD_REFERENCE_CONC_NG_PER_ML = 100.0
+CALIBRATION_STANDARD_VOLUME_ML = 1.0
 ENV_NOISE_SIGMA = 0.005  # 0.5% environmental noise per measurement
 
 
@@ -154,11 +157,15 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
             (liq for liq in tube.liquids if liq.liquid_id == ACETONITRILE_ID), None
         )
         extract_volume_ml = acetonitrile.volume_ml if acetonitrile is not None else 10.0
+        extract_true_volume_ml = (
+            acetonitrile.true_volume_ml if acetonitrile is not None else extract_volume_ml
+        )
 
         istd_liquid = next(
             (liq for liq in tube.liquids if liq.liquid_id == ISTD_SOLUTION_ID), None
         )
         istd_volume_ml = istd_liquid.volume_ml if istd_liquid is not None else None
+        istd_true_volume_ml = istd_liquid.true_volume_ml if istd_liquid is not None else None
 
         effective = _effective_residues(
             tube.produce_fractions, all_lots, experiment.produce_material_states
@@ -172,6 +179,8 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
             extraction_result=tube.quechers_extraction_result,
             istd_volume_ml=round(istd_volume_ml, 4) if istd_volume_ml is not None else None,
             istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
+            extract_true_volume_ml=round(extract_true_volume_ml, 6) if extract_true_volume_ml is not None else None,
+            istd_true_volume_ml=round(istd_true_volume_ml, 6) if istd_true_volume_ml is not None else None,
         )
 
         experiment.audit_log.append(
@@ -295,9 +304,17 @@ class AddCalibrationToVialService(WriteDomainService[AddCalibrationToVialRequest
             raise ValueError(f"{vial.label} already contains a sample extract.")
 
         compound_ids = [p.compound_id for p in APPLE_PESTICIDE_CATALOG]
+        true_level = round(PhysicalSimulationService.draw_prepared_level(request.level_ng_per_ml), 6)
         vial.calibration_context = CalibrationContext(
             level_ng_per_ml=round(request.level_ng_per_ml, 4),
             compound_ids=compound_ids,
+            true_level_ng_per_ml=true_level,
+        )
+        add_liquid_to_tool(
+            experiment,
+            vial,
+            liquid_id="calibration_solution",
+            volume_ml=CALIBRATION_STANDARD_VOLUME_ML,
         )
         experiment.audit_log.append(
             f"Calibration standard {request.level_ng_per_ml} ng/mL prepared in {vial.label}."
@@ -310,10 +327,11 @@ def _compute_calibration_compounds(ctx: CalibrationContext) -> list[CompoundMeas
     Signal is proportional to nominal concentration with small environmental noise only —
     no extraction variance applies since the standard is a pure solution.
     """
+    true_level = ctx.true_level_ng_per_ml if ctx.true_level_ng_per_ml is not None else ctx.level_ng_per_ml
     results: list[CompoundMeasurement] = []
     for compound_id in ctx.compound_ids:
         env_noise = random.gauss(1.0, ENV_NOISE_SIGMA)
-        signal = ctx.level_ng_per_ml * env_noise
+        signal = true_level * env_noise
         results.append(
             CompoundMeasurement(
                 compound_id=compound_id,
@@ -342,36 +360,40 @@ def _compute_compounds(
     istd_manip = extraction_result.istd_manip_factor if extraction_result else None
     istd_phase = extraction_result.istd_phase if extraction_result else None
 
-    # ISTD parameters
-    istd_amount_ng = (
-        ctx.istd_volume_ml * ctx.istd_reference_conc_ng_per_ml
-        if ctx.istd_volume_ml is not None
-        else None
-    )
+    # Resolve true vs nominal volumes with fallbacks
+    extract_true_v = ctx.extract_true_volume_ml if ctx.extract_true_volume_ml is not None else ctx.extract_volume_ml
+    if not extract_true_v:
+        extract_true_v = ctx.extract_volume_ml or 1.0
+    istd_true_v = ctx.istd_true_volume_ml if ctx.istd_true_volume_ml is not None else ctx.istd_volume_ml
 
     for compound_id, true_effective_ug_per_kg in ctx.effective_residues_ug_per_kg.items():
-        # Pesticide amount in the extract (ng)
+        # Pesticide amount in the extract (ng) — same unit convention as before
         pesticide_amount_ng = true_effective_ug_per_kg * ctx.sample_mass_g * 1e-3
 
-        # Apply shared extraction manip factor + small env noise
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
-        pesticide_signal = pesticide_amount_ng * extraction_manip * env_pest
+        # Concentration in the extract using the TRUE delivered solvent volume
+        pesticide_conc = (pesticide_amount_ng * extraction_manip) / extract_true_v
+        pesticide_signal = pesticide_conc * env_pest
 
         istd_signal: float | None = None
         calculated: float | None = None
         correction_applied = False
 
-        if istd_amount_ng is not None and istd_manip is not None:
+        if istd_true_v is not None and istd_manip is not None:
             # ISTD was present in the tube during extraction at some phase
+            istd_amount_ng_true = istd_true_v * ctx.istd_reference_conc_ng_per_ml
             env_istd = random.gauss(1.0, ENV_NOISE_SIGMA)
-            istd_signal = istd_amount_ng * istd_manip * env_istd
+            istd_conc = (istd_amount_ng_true * istd_manip) / extract_true_v
+            istd_signal = istd_conc * env_istd
             ratio = pesticide_signal / istd_signal
-            # Back-calculate: true = ratio × istd_amount / (sample_mass × 1e-3)
-            calculated = ratio * istd_amount_ng / (ctx.sample_mass_g * 1e-3)
+            # Back-calc uses the chemist's ASSUMED (nominal) ISTD amount ->
+            # the pipetting error (true vs nominal) surfaces here as an uncorrectable bias.
+            istd_amount_ng_nominal = (ctx.istd_volume_ml if ctx.istd_volume_ml is not None else istd_true_v) * ctx.istd_reference_conc_ng_per_ml
+            calculated = ratio * istd_amount_ng_nominal / (ctx.sample_mass_g * 1e-3)
             correction_applied = True
         else:
-            # No ISTD correction — external calibration, biased by extraction manip
-            calculated = true_effective_ug_per_kg * extraction_manip * env_pest
+            # External calibration: read concentration back to ug/kg via the NOMINAL dilution.
+            calculated = pesticide_signal * ctx.extract_volume_ml / (ctx.sample_mass_g * 1e-3)
 
         results.append(
             CompoundMeasurement(

@@ -67,18 +67,6 @@
       "is_draggable": true,
       "is_storable": false
     },
-    "apple_extract": {
-      "allowed_drop_targets": [
-        "workbench_slot",
-        "analytical_balance_widget"
-      ],
-      "can_receive_liquids": false,
-      "can_receive_produce": false,
-      "can_seal": false,
-      "is_discardable": false,
-      "is_draggable": true,
-      "is_storable": false
-    },
     "calibration_solution": {
       "allowed_drop_targets": [
         "workbench_slot",
@@ -119,18 +107,6 @@
         "workbench_slot",
         "analytical_balance_widget",
         "vortex_widget"
-      ],
-      "can_receive_liquids": false,
-      "can_receive_produce": false,
-      "can_seal": false,
-      "is_discardable": false,
-      "is_draggable": true,
-      "is_storable": false
-    },
-    "ultrapure_water": {
-      "allowed_drop_targets": [
-        "workbench_slot",
-        "analytical_balance_widget"
       ],
       "can_receive_liquids": false,
       "can_receive_produce": false,

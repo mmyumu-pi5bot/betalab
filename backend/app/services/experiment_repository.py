@@ -9,11 +9,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from pydantic_core import to_jsonable_python
+
 from app.domain.models import (
+    CalibrationContext,
     ContainerLabel,
     EntityOrigin,
     Experiment,
     ExperimentStatus,
+    InjectionContext,
     LimsLabel,
     LimsReception,
     ManualLabel,
@@ -21,6 +25,7 @@ from app.domain.models import (
     ProduceFraction,
     ProduceLot,
     ProduceMaterialState,
+    QuechersExtractionResult,
     QuechersState,
     Rack,
     RackSlot,
@@ -36,7 +41,10 @@ from app.domain.models import (
     WorkspaceWidget,
 )
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
-from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
+from app.services.helpers.produce_canonical import (
+    sync_canonical_produce_model,
+    sync_pesticide_material_states,
+)
 
 
 class ExperimentRepository(Protocol):
@@ -201,24 +209,7 @@ class SqliteExperimentRepository:
 
 
 def _serialize_experiment(experiment: Experiment) -> dict:
-    return ExperimentSchema.model_validate(
-        {
-            "id": experiment.id,
-            "status": experiment.status.value,
-            "last_simulation_at": experiment.last_simulation_at,
-            "snapshot_version": experiment.snapshot_version,
-            "workbench": asdict(experiment.workbench),
-            "rack": asdict(experiment.rack),
-            "trash": asdict(experiment.trash),
-            "workspace": asdict(experiment.workspace),
-            "lims_reception": asdict(experiment.lims_reception),
-            "lims_entries": [asdict(entry) for entry in experiment.lims_entries],
-            "basket_tools": [asdict(t) for t in experiment.basket_tools],
-            "produce_material_states": [asdict(state) for state in experiment.produce_material_states],
-            "spatula": asdict(experiment.spatula),
-            "audit_log": experiment.audit_log,
-        }
-    ).model_dump(mode="json")
+    return to_jsonable_python(asdict(experiment))
 
 
 def _deserialize_experiment(payload: dict) -> Experiment:
@@ -320,7 +311,7 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                 vortex_run_remaining_ms=widget.vortex_run_remaining_ms,
                 tool=_deserialize_workbench_tool(widget.tool),
                 produce_lots=[_deserialize_produce_lot(lot) for lot in widget.produce_lots],
-                liquids=[WorkbenchLiquid(**liquid.model_dump()) for liquid in widget.liquids],
+                liquids=[_deserialize_workbench_liquid(liquid) for liquid in widget.liquids],
                 produce_fractions=[_deserialize_produce_fraction(fraction) for fraction in widget.produce_fractions],
             )
             for widget in schema.workspace.widgets
@@ -387,9 +378,57 @@ def _deserialize_workbench_tool(tool_schema) -> WorkbenchTool | None:
         field_label_text=tool_schema.field_label_text,
         labels=[_deserialize_container_label(label) for label in tool_schema.labels],
         produce_lots=[_deserialize_produce_lot(lot) for lot in tool_schema.produce_lots],
-        liquids=[WorkbenchLiquid(**liquid.model_dump()) for liquid in tool_schema.liquids],
+        liquids=[_deserialize_workbench_liquid(liquid) for liquid in tool_schema.liquids],
         produce_fractions=[_deserialize_produce_fraction(fraction) for fraction in tool_schema.produce_fractions],
         quechers_state=QuechersState(**tool_schema.quechers_state.model_dump(exclude={"is_usable"})),
+        istd_phase_added=tool_schema.istd_phase_added,
+        quechers_extraction_result=(
+            QuechersExtractionResult(**tool_schema.quechers_extraction_result.model_dump())
+            if tool_schema.quechers_extraction_result is not None
+            else None
+        ),
+        injection_context=_deserialize_injection_context(tool_schema.injection_context),
+        calibration_context=(
+            CalibrationContext(
+                level_ng_per_ml=tool_schema.calibration_context.level_ng_per_ml,
+                compound_ids=list(tool_schema.calibration_context.compound_ids),
+                true_level_ng_per_ml=tool_schema.calibration_context.true_level_ng_per_ml,
+            )
+            if tool_schema.calibration_context is not None
+            else None
+        ),
+    )
+
+
+def _deserialize_workbench_liquid(liquid_schema) -> WorkbenchLiquid:
+    return WorkbenchLiquid(
+        id=liquid_schema.id,
+        liquid_id=liquid_schema.liquid_id,
+        name=liquid_schema.name,
+        volume_ml=liquid_schema.volume_ml,
+        accent=liquid_schema.accent,
+        true_volume_ml=liquid_schema.true_volume_ml,
+    )
+
+
+def _deserialize_injection_context(context_schema) -> InjectionContext | None:
+    if context_schema is None:
+        return None
+    extraction_result = (
+        QuechersExtractionResult(**context_schema.extraction_result.model_dump())
+        if context_schema.extraction_result is not None
+        else None
+    )
+    return InjectionContext(
+        source_tube_id=context_schema.source_tube_id,
+        sample_mass_g=context_schema.sample_mass_g,
+        extract_volume_ml=context_schema.extract_volume_ml,
+        effective_residues_ug_per_kg=dict(context_schema.effective_residues_ug_per_kg),
+        extraction_result=extraction_result,
+        istd_volume_ml=context_schema.istd_volume_ml,
+        istd_reference_conc_ng_per_ml=context_schema.istd_reference_conc_ng_per_ml,
+        extract_true_volume_ml=context_schema.extract_true_volume_ml,
+        istd_true_volume_ml=context_schema.istd_true_volume_ml,
     )
 
 

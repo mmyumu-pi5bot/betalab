@@ -1,13 +1,24 @@
 """Tests for LC-MS/MS domain services: calibration preparation and sequence execution."""
 from __future__ import annotations
 
+import random
+
 import pytest
 
+from app.domain.models import (
+    CalibrationContext,
+    InjectionContext,
+    QuechersExtractionResult,
+    WorkbenchTool,
+    new_id,
+)
 from app.services.domain_services.lcmsms import (
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
     RunSequenceRequest,
     RunSequenceService,
+    _compute_calibration_compounds,
+    _compute_compounds,
 )
 from app.services.domain_services.rack import (
     PlaceToolInRackSlotRequest,
@@ -16,8 +27,12 @@ from app.services.domain_services.rack import (
 from app.services.domain_services.workbench import (
     PlaceToolOnWorkbenchRequest,
     PlaceToolOnWorkbenchService,
+    RemoveLiquidFromWorkbenchToolService,
+    WorkbenchLiquidRequest,
 )
+from app.services.experiment_repository import SqliteExperimentRepository
 from app.services.experiment_service import ExperimentRuntimeService
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 
 def _create(service: ExperimentRuntimeService) -> str:
@@ -71,6 +86,33 @@ class TestAddCalibrationToVial:
         assert vial.calibration_context is not None
         assert vial.calibration_context.level_ng_per_ml == 10.0
         assert len(vial.calibration_context.compound_ids) > 0
+        assert [(liquid.liquid_id, liquid.volume_ml) for liquid in vial.liquids] == [
+            ("calibration_solution", 1.0)
+        ]
+
+    def test_roundtrip_preserves_calibration_liquid_and_hidden_level(self, tmp_path) -> None:
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        vial_id = _place_vial_on_bench(service, exp_id)
+
+        AddCalibrationToVialService(service).run(
+            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
+        )
+        original_vial = service._require_experiment(exp_id).workbench.slots[0].tool
+        assert original_vial is not None
+        assert original_vial.calibration_context is not None
+        original_true_level = original_vial.calibration_context.true_level_ng_per_ml
+        original_true_volume = original_vial.liquids[0].true_volume_ml
+
+        reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        vial = reloaded.workbench.slots[0].tool
+        assert vial is not None
+        assert vial.calibration_context is not None
+        assert vial.calibration_context.true_level_ng_per_ml == original_true_level
+        assert len(vial.liquids) == 1
+        assert vial.liquids[0].liquid_id == "calibration_solution"
+        assert vial.liquids[0].true_volume_ml == original_true_volume
 
     def test_negative_level_raises(self) -> None:
         service = ExperimentRuntimeService()
@@ -94,6 +136,27 @@ class TestAddCalibrationToVial:
             AddCalibrationToVialService(service).run(
                 exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
             )
+
+    def test_removing_calibration_liquid_clears_calibration_context(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        vial_id = _place_vial_on_bench(service, exp_id)
+        AddCalibrationToVialService(service).run(
+            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
+        )
+        vial = service._require_experiment(exp_id).workbench.slots[0].tool
+        assert vial is not None
+
+        RemoveLiquidFromWorkbenchToolService(service).run(
+            exp_id,
+            WorkbenchLiquidRequest(
+                slot_id="station_1",
+                liquid_entry_id=vial.liquids[0].id,
+            ),
+        )
+
+        assert vial.liquids == []
+        assert vial.calibration_context is None
 
     def test_tool_not_found_raises(self) -> None:
         service = ExperimentRuntimeService()
@@ -123,6 +186,117 @@ class TestAddCalibrationToVial:
 
         assert tube.calibration_context is not None
         assert tube.calibration_context.level_ng_per_ml == 10.0
+
+    def test_true_level_within_clamp_band_of_nominal(self) -> None:
+        nominal = 25.0
+        factor_min = PhysicalSimulationService.calibration_prep_factor_min
+        factor_max = PhysicalSimulationService.calibration_prep_factor_max
+        random.seed(42)
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        vial_id = _place_vial_on_bench(service, exp_id)
+
+        AddCalibrationToVialService(service).run(
+            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=nominal)
+        )
+
+        exp = service._require_experiment(exp_id)
+        vial = exp.workbench.slots[0].tool
+        assert vial is not None
+        ctx = vial.calibration_context
+        assert ctx is not None
+        assert ctx.level_ng_per_ml == nominal
+        assert ctx.true_level_ng_per_ml is not None
+        assert factor_min * nominal <= ctx.true_level_ng_per_ml <= factor_max * nominal
+
+    def test_true_level_differs_from_nominal_for_some_seed(self) -> None:
+        """With at least one seed, true_level_ng_per_ml != level_ng_per_ml."""
+        any_differs = False
+        for seed in range(50):
+            random.seed(seed)
+            service = ExperimentRuntimeService()
+            exp_id = _create(service)
+            vial_id = _place_vial_on_bench(service, exp_id)
+
+            AddCalibrationToVialService(service).run(
+                exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=25.0)
+            )
+
+            exp = service._require_experiment(exp_id)
+            vial = exp.workbench.slots[0].tool
+            assert vial is not None
+            ctx = vial.calibration_context
+            assert ctx is not None
+            assert ctx.level_ng_per_ml == 25.0
+            if ctx.true_level_ng_per_ml != ctx.level_ng_per_ml:
+                any_differs = True
+                break
+        assert any_differs, "true_level_ng_per_ml never differed from level_ng_per_ml across 50 seeds"
+
+
+# ---------------------------------------------------------------------------
+# draw_prepared_level unit tests
+# ---------------------------------------------------------------------------
+
+class TestDrawPreparedLevel:
+    def test_zero_nominal_returns_zero(self) -> None:
+        assert PhysicalSimulationService.draw_prepared_level(0.0) == 0.0
+
+    def test_negative_nominal_returns_zero(self) -> None:
+        assert PhysicalSimulationService.draw_prepared_level(-5.0) == 0.0
+
+    def test_draws_stay_within_clamp_band(self) -> None:
+        nominal = 50.0
+        min_v = PhysicalSimulationService.calibration_prep_factor_min * nominal
+        max_v = PhysicalSimulationService.calibration_prep_factor_max * nominal
+        random.seed(42)
+        for _ in range(500):
+            result = PhysicalSimulationService.draw_prepared_level(nominal)
+            assert min_v <= result <= max_v, f"Out of clamp band: {result}"
+
+    def test_draws_are_not_always_equal_to_nominal(self) -> None:
+        nominal = 50.0
+        random.seed(1234)
+        results = [PhysicalSimulationService.draw_prepared_level(nominal) for _ in range(200)]
+        assert any(r != nominal for r in results), "All draws equal nominal — variance not applied"
+
+
+# ---------------------------------------------------------------------------
+# _compute_calibration_compounds — true-level-driven signal scatter
+# ---------------------------------------------------------------------------
+
+class TestComputeCalibrationCompounds:
+    def test_signal_scales_with_true_level_while_nominal_is_fixed(self) -> None:
+        nominal = 50.0
+        true_level_a = 49.0
+        true_level_b = 52.0
+        ctx_a = CalibrationContext(
+            level_ng_per_ml=nominal,
+            compound_ids=["chlorpyrifos"],
+            true_level_ng_per_ml=true_level_a,
+        )
+        ctx_b = CalibrationContext(
+            level_ng_per_ml=nominal,
+            compound_ids=["chlorpyrifos"],
+            true_level_ng_per_ml=true_level_b,
+        )
+
+        random.seed(SEED)
+        results_a = _compute_calibration_compounds(ctx_a)
+        random.seed(SEED)
+        results_b = _compute_calibration_compounds(ctx_b)
+
+        assert len(results_a) == 1
+        assert len(results_b) == 1
+        m_a, m_b = results_a[0], results_b[0]
+
+        # Same seed → same env_noise draw → signals differ exactly by the true-level ratio.
+        assert m_b.pesticide_signal == pytest.approx(
+            m_a.pesticide_signal * (true_level_b / true_level_a), rel=1e-6
+        )
+        # Nominal concentration (what the calibration curve assumes) is unaffected.
+        assert m_a.nominal_conc_ng_per_ml == nominal
+        assert m_b.nominal_conc_ng_per_ml == nominal
 
 
 # ---------------------------------------------------------------------------
@@ -183,3 +357,180 @@ class TestRunSequenceWithCalibration:
 
         with pytest.raises(ValueError, match="instrument"):
             RunSequenceService(service).run(exp_id, RunSequenceRequest())
+
+
+# ---------------------------------------------------------------------------
+# _compute_compounds unit tests — four invariants
+# ---------------------------------------------------------------------------
+
+def _make_vial() -> WorkbenchTool:
+    """Return a minimal valid WorkbenchTool to pass as the vial arg."""
+    return WorkbenchTool(
+        id=new_id("vial"),
+        tool_id="sample_vial_lcms",
+        label="Test Vial",
+        subtitle="",
+        accent="blue",
+        tool_type="sample_vial",
+        capacity_ml=2.0,
+    )
+
+
+def _make_ctx(
+    *,
+    true_effective_ug_per_kg: float = 100.0,
+    sample_mass_g: float = 10.0,
+    extract_nominal: float = 10.0,
+    extract_true: float | None = None,
+    istd_nominal: float | None = 0.05,
+    istd_true: float | None = None,
+    extraction_manip: float = 1.0,
+    istd_manip: float | None = 1.0,
+    istd_phase: str | None = "pre_solvent",
+    ref_conc: float = 100.0,
+) -> InjectionContext:
+    extraction_result: QuechersExtractionResult | None = None
+    if extraction_manip != 1.0 or istd_manip is not None:
+        extraction_result = QuechersExtractionResult(
+            extraction_manip_factor=extraction_manip,
+            istd_manip_factor=istd_manip,
+            istd_phase=istd_phase,
+        )
+    elif istd_manip is None and istd_nominal is None:
+        # external calibration path: no ISTD
+        extraction_result = QuechersExtractionResult(
+            extraction_manip_factor=extraction_manip,
+            istd_manip_factor=None,
+            istd_phase=None,
+        )
+    else:
+        extraction_result = QuechersExtractionResult(
+            extraction_manip_factor=extraction_manip,
+            istd_manip_factor=istd_manip,
+            istd_phase=istd_phase,
+        )
+
+    return InjectionContext(
+        source_tube_id="tube_test",
+        sample_mass_g=sample_mass_g,
+        extract_volume_ml=extract_nominal,
+        effective_residues_ug_per_kg={"chlorpyrifos": true_effective_ug_per_kg},
+        extraction_result=extraction_result,
+        istd_volume_ml=istd_nominal,
+        istd_reference_conc_ng_per_ml=ref_conc,
+        extract_true_volume_ml=extract_true,
+        istd_true_volume_ml=istd_true,
+    )
+
+
+SEED = 1234
+
+
+class TestComputeCompoundsInvariants:
+    def test_recovers_truth_with_all_factors_one(self) -> None:
+        """INV0: all factors = 1, true == nominal → calculated == true_effective exactly."""
+        ctx = _make_ctx(
+            true_effective_ug_per_kg=100.0,
+            sample_mass_g=10.0,
+            extract_nominal=10.0,
+            extract_true=10.0,
+            istd_nominal=0.05,
+            istd_true=0.05,
+            extraction_manip=1.0,
+            istd_manip=1.0,
+            istd_phase="pre_solvent",
+            ref_conc=100.0,
+        )
+        random.seed(SEED)
+        results = _compute_compounds(_make_vial(), ctx)
+        assert len(results) == 1
+        m = results[0]
+        assert m.istd_correction_applied is True
+        # With same seed, env noise cancels in ratio: calculated ≈ true_effective
+        assert m.calculated_conc_ug_per_kg == pytest.approx(100.0, rel=0.02)
+
+    def test_solvent_error_self_corrects_inv1(self) -> None:
+        """INV1: extract_true differs from extract_nominal but ISTD present → calculated unchanged."""
+        ctx_nominal = _make_ctx(
+            extract_nominal=10.0,
+            extract_true=10.0,
+            istd_nominal=0.05,
+            istd_true=0.05,
+        )
+        ctx_biased = _make_ctx(
+            extract_nominal=10.0,
+            extract_true=8.0,   # wrong delivered volume
+            istd_nominal=0.05,
+            istd_true=0.05,
+        )
+
+        random.seed(SEED)
+        results_nominal = _compute_compounds(_make_vial(), ctx_nominal)
+        random.seed(SEED)
+        results_biased = _compute_compounds(_make_vial(), ctx_biased)
+
+        calc_nominal = results_nominal[0].calculated_conc_ug_per_kg
+        calc_biased = results_biased[0].calculated_conc_ug_per_kg
+
+        assert calc_nominal is not None
+        assert calc_biased is not None
+        # Extract volume cancels in ratio — ISTD auto-corrects the shared solvent error
+        assert calc_biased == pytest.approx(calc_nominal, rel=1e-6)
+
+    def test_istd_pipetting_error_biases_inv2(self) -> None:
+        """INV2: istd_true != istd_nominal → calculated biased by istd_nominal / istd_true."""
+        istd_nominal = 0.05
+        istd_true = 0.04   # chemist delivered less than expected
+
+        ctx_baseline = _make_ctx(
+            istd_nominal=istd_nominal,
+            istd_true=istd_nominal,  # true == nominal (no pipetting error)
+        )
+        ctx_biased = _make_ctx(
+            istd_nominal=istd_nominal,
+            istd_true=istd_true,  # true != nominal (ISTD pipetting error)
+        )
+
+        random.seed(SEED)
+        results_baseline = _compute_compounds(_make_vial(), ctx_baseline)
+        random.seed(SEED)
+        results_biased = _compute_compounds(_make_vial(), ctx_biased)
+
+        calc_baseline = results_baseline[0].calculated_conc_ug_per_kg
+        calc_biased = results_biased[0].calculated_conc_ug_per_kg
+
+        assert calc_baseline is not None
+        assert calc_biased is not None
+        expected_ratio = istd_nominal / istd_true  # = 0.05 / 0.04 = 1.25
+        actual_ratio = calc_biased / calc_baseline
+        assert actual_ratio == pytest.approx(expected_ratio, rel=1e-6)
+
+    def test_external_calibration_biased_inv4(self) -> None:
+        """INV4: no ISTD, extraction_manip != 1 and extract_true != extract_nominal → calculated biased."""
+        true_effective = 100.0
+        extraction_manip = 0.9
+        extract_true = 8.0
+        extract_nominal = 10.0
+
+        ctx = _make_ctx(
+            true_effective_ug_per_kg=true_effective,
+            sample_mass_g=10.0,
+            extract_nominal=extract_nominal,
+            extract_true=extract_true,
+            istd_nominal=None,
+            istd_true=None,
+            extraction_manip=extraction_manip,
+            istd_manip=None,
+            istd_phase=None,
+        )
+
+        random.seed(SEED)
+        results = _compute_compounds(_make_vial(), ctx)
+        m = results[0]
+        assert m.istd_correction_applied is False
+        # expected: pesticide_conc = (true_effective * sample_mass * 1e-3 * extraction_manip) / extract_true
+        # calculated = pesticide_signal * extract_nominal / (sample_mass * 1e-3)
+        # = pesticide_conc * env * extract_nominal / (sample_mass * 1e-3)
+        # ignoring env noise:  = true_effective * extraction_manip * extract_nominal / extract_true
+        expected_no_noise = true_effective * extraction_manip * (extract_nominal / extract_true)
+        assert m.calculated_conc_ug_per_kg == pytest.approx(expected_no_noise, rel=0.02)

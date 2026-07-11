@@ -408,6 +408,82 @@ describe("WorkbenchPanel", () => {
     ).toHaveAttribute("data-fill-segments", "2");
   });
 
+  it("renders a container card without crashing when it holds acetonitrile", () => {
+    render(
+      <PesticideWorkbenchPanel
+        onLiquidVolumeChange={vi.fn()}
+        onRemoveLiquid={vi.fn()}
+        onToolbarItemDrop={vi.fn()}
+        slots={[
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              id: "bench_tool_tube",
+              toolId: "centrifuge_tube_50ml",
+              label: "50 mL centrifuge tube",
+              subtitle: "Extraction ready",
+              accent: "sky",
+              toolType: "centrifuge_tube",
+              capacity_ml: 50,
+              liquids: [
+                {
+                  id: "bench_liquid_1",
+                  liquidId: "acetonitrile_extraction",
+                  name: "Acetonitrile",
+                  volume_ml: 10,
+                  accent: "amber",
+                },
+              ],
+            },
+          },
+        ]}
+        statusMessage="Bench ready."
+      />,
+    );
+
+    expect(screen.getByTestId("bench-tool-card-bench_tool_tube")).toBeInTheDocument();
+    expect(screen.getByText("Acetonitrile")).toBeInTheDocument();
+  });
+
+  it("renders a container card without crashing when it holds ISTD solution", () => {
+    render(
+      <PesticideWorkbenchPanel
+        onLiquidVolumeChange={vi.fn()}
+        onRemoveLiquid={vi.fn()}
+        onToolbarItemDrop={vi.fn()}
+        slots={[
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              id: "bench_tool_vial",
+              toolId: "sample_vial_lcms",
+              label: "Autosampler vial",
+              subtitle: "Injection ready",
+              accent: "sky",
+              toolType: "sample_vial",
+              capacity_ml: 2,
+              liquids: [
+                {
+                  id: "bench_liquid_1",
+                  liquidId: "istd_solution",
+                  name: "ISTD solution",
+                  volume_ml: 0.05,
+                  accent: "emerald",
+                },
+              ],
+            },
+          },
+        ]}
+        statusMessage="Bench ready."
+      />,
+    );
+
+    expect(screen.getByTestId("bench-tool-card-bench_tool_vial")).toBeInTheDocument();
+    expect(screen.getByText("ISTD solution")).toBeInTheDocument();
+  });
+
   it("renders powder layers inside powder-loaded tubes", () => {
     render(
       <PesticideWorkbenchPanel

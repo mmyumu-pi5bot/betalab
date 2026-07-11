@@ -72,6 +72,11 @@ class WorkbenchLiquid:
     name: str
     volume_ml: float
     accent: str
+    true_volume_ml: float | None = None   # hidden actual delivered volume; None -> defaults to volume_ml
+
+    def __post_init__(self) -> None:
+        if self.true_volume_ml is None:
+            self.true_volume_ml = self.volume_ml
 
 
 @dataclass
@@ -118,6 +123,8 @@ class InjectionContext:
     extraction_result: QuechersExtractionResult | None = None
     istd_volume_ml: float | None = None           # mL of ISTD solution added to the tube
     istd_reference_conc_ng_per_ml: float = 100.0  # ng/mL in the ISTD stock (catalog value)
+    extract_true_volume_ml: float | None = None   # hidden true acetonitrile volume; None -> falls back to extract_volume_ml
+    istd_true_volume_ml: float | None = None       # hidden true ISTD volume; None -> falls back to istd_volume_ml
 
 
 @dataclass
@@ -125,6 +132,11 @@ class CalibrationContext:
     """Marks a vial as a multi-residue calibration standard at a known concentration."""
     level_ng_per_ml: float
     compound_ids: list[str]
+    true_level_ng_per_ml: float | None = None   # hidden actual prepared concentration; None -> defaults to level_ng_per_ml
+
+    def __post_init__(self) -> None:
+        if self.true_level_ng_per_ml is None:
+            self.true_level_ng_per_ml = self.level_ng_per_ml
 
 
 @dataclass

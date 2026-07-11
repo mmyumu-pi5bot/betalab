@@ -41,6 +41,7 @@ class WorkbenchLiquidSchema(BaseModel):
     name: str
     volume_ml: float
     accent: str
+    true_volume_ml: float | None = Field(default=None, exclude=True)
 
 
 class QuechersStateSchema(BaseModel):
@@ -66,6 +67,7 @@ class QuechersExtractionResultSchema(BaseModel):
 class CalibrationContextSchema(BaseModel):
     level_ng_per_ml: float
     compound_ids: list[str] = Field(default_factory=list)
+    true_level_ng_per_ml: float | None = Field(default=None, exclude=True)
 
 
 class InjectionContextSchema(BaseModel):
@@ -76,6 +78,8 @@ class InjectionContextSchema(BaseModel):
     extraction_result: QuechersExtractionResultSchema | None = None
     istd_volume_ml: float | None = None
     istd_reference_conc_ng_per_ml: float = 100.0
+    extract_true_volume_ml: float | None = Field(default=None, exclude=True)
+    istd_true_volume_ml: float | None = Field(default=None, exclude=True)
 
 
 class CompoundMeasurementSchema(BaseModel):

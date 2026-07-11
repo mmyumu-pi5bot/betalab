@@ -36,7 +36,11 @@ from app.services.helpers.produce_material_states import (
     get_material_state_name,
     set_material_state_name,
 )
-from app.services.helpers.tool_liquids import add_liquid_to_tool, raise_if_quechers_unusable
+from app.services.helpers.tool_liquids import (
+    add_liquid_to_tool,
+    raise_if_quechers_unusable,
+    remove_liquid_from_tool,
+)
 from app.services.helpers.workbench import (
     build_workbench_tool,
     find_produce_lot_in_slot,
@@ -330,7 +334,7 @@ class RemoveLiquidFromWorkbenchToolService(WriteDomainService[WorkbenchLiquidReq
             action="removed",
         )
         liquid_entry = find_tool_liquid(tool, request.liquid_entry_id)
-        tool.liquids = [liquid for liquid in tool.liquids if liquid.id != request.liquid_entry_id]
+        remove_liquid_from_tool(tool, liquid_entry)
         experiment.audit_log.append(f"{liquid_entry.name} removed from {tool.label}.")
 
 
@@ -348,6 +352,8 @@ class UpdateWorkbenchLiquidVolumeService(WriteDomainService[UpdateWorkbenchLiqui
             action="edited",
         )
         liquid_entry = find_tool_liquid(tool, request.liquid_entry_id)
+        previous_nominal_volume = liquid_entry.volume_ml
+        previous_true_volume = liquid_entry.true_volume_ml or previous_nominal_volume
 
         requested_volume = round_volume(max(float(request.volume_ml), 0.0))
         max_allowed_volume = round_volume(
@@ -359,9 +365,16 @@ class UpdateWorkbenchLiquidVolumeService(WriteDomainService[UpdateWorkbenchLiqui
         )
         liquid_entry.volume_ml = round_volume(min(requested_volume, max_allowed_volume))
         if liquid_entry.volume_ml <= 0:
-            tool.liquids = [liquid for liquid in tool.liquids if liquid.id != request.liquid_entry_id]
+            remove_liquid_from_tool(tool, liquid_entry)
             experiment.audit_log.append(f"{liquid_entry.name} removed from {tool.label}.")
             return
+
+        error_factor = (
+            previous_true_volume / previous_nominal_volume
+            if previous_nominal_volume > 0
+            else 1.0
+        )
+        liquid_entry.true_volume_ml = round(liquid_entry.volume_ml * error_factor, 6)
 
         experiment.audit_log.append(f"{liquid_entry.name} adjusted to {format_volume(liquid_entry.volume_ml)} mL in {tool.label}.")
 
