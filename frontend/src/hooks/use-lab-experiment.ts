@@ -339,6 +339,11 @@ export function useLabExperiment({
       pour: (p: PourSpatulaIntoWorkbenchToolPayload) => exec(mutationFns.pourSpatulaIntoWorkbenchTool, p),
     },
 
+    pipette: {
+      aspirate: (p: { tool_id: string; delta_volume_ml: number }) => exec(mutationFns.aspiratePipette, p),
+      dispense: (p: { tool_id: string; delta_volume_ml: number }) => exec(mutationFns.dispensePipette, p),
+    },
+
     // ── DnD (generic move) ───────────────────────────────────────────────────
     dnd: {
       addLiquidToTool: (p: AddLiquidToToolPayload) => exec(mutationFns.addLiquidToTool, p),

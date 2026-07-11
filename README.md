@@ -107,9 +107,9 @@ pnpm dev
 Notes de dev frontend:
 
 - `pnpm dev` est le serveur de reference pour le frontend local et pour les tests E2E.
-- Eviter de lancer plusieurs serveurs `next dev` differents en parallele dans `frontend/`, car ils partagent `frontend/.next`.
-- Les tests E2E doivent reutiliser le serveur existant quand il tourne deja.
-- Si le frontend tombe dans un etat incoherent avec des erreurs `ENOENT` dans `.next`, supprimer `frontend/.next` puis relancer `pnpm dev`.
+- Le serveur local utilise `.next-dev`, les tests E2E `.next-e2e`, et le build de production `.next`. Cette isolation evite qu'un build ou un test E2E corrompe le cache du live reload.
+- Les tests E2E reutilisent toujours un serveur deja disponible sur leur port local.
+- Pour reinitialiser exceptionnellement tous les caches Next.js: `pnpm clean:next`.
 
 ## Prochaines Etapes
 

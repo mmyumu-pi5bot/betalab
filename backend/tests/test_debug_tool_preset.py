@@ -4,6 +4,10 @@ from app.services.domain_services.debug import (
     CreateDebugToolPresetRequest,
     CreateDebugToolPresetService,
 )
+from app.services.domain_services.workbench import (
+    PlaceToolOnWorkbenchRequest,
+    PlaceToolOnWorkbenchService,
+)
 from app.services.experiment_service import ExperimentRuntimeService
 
 
@@ -31,11 +35,7 @@ def test_debug_apple_slurry_tube_defaults_to_ten_grams_on_workbench() -> None:
     assert tool.produce_fractions[0].location_id == "station_1"
     assert tool.liquids[0].liquid_id == "apple_extract"
     assert tool.liquids[0].volume_ml == pytest.approx(10.0)
-    material_state = next(
-        state
-        for state in updated.produce_material_states
-        if state.id == tool.produce_fractions[0].produce_material_state_id
-    )
+    material_state = next(state for state in updated.produce_material_states if state.id == tool.produce_fractions[0].produce_material_state_id)
     assert material_state.material_state == "slurry"
     assert material_state.temperature_c == pytest.approx(20.0)
 
@@ -62,6 +62,34 @@ def test_debug_apple_slurry_tube_can_spawn_on_analytical_balance_with_overrides(
     assert balance.tool.liquids[0].volume_ml == pytest.approx(8.0)
     assert balance.tool.produce_fractions[0].location_kind == "workspace_widget_tool"
     assert balance.tool.produce_fractions[0].location_id == "analytical_balance"
+
+
+@pytest.mark.parametrize("tool_id", ["centrifuge_tube_50ml", "sample_vial_lcms"])
+def test_debug_apple_slurry_can_be_added_to_an_open_workbench_container(tool_id: str) -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id=tool_id),
+    )
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="apple_slurry_centrifuge_tube",
+            destination_kind="workbench_tool",
+            destination_id="station_1",
+        ),
+    )
+
+    tool = updated.workbench.slots[0].tool
+    assert tool is not None
+    assert tool.tool_id == tool_id
+    assert tool.produce_lots[0].label == "Apple slurry"
+    assert tool.produce_fractions[0].location_kind == "workbench_tool"
+    assert tool.produce_fractions[0].location_id == "station_1"
+    assert tool.produce_fractions[0].container_id == tool.id
+    assert tool.liquids[0].liquid_id == "apple_extract"
 
 
 @pytest.mark.parametrize(

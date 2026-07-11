@@ -58,6 +58,7 @@ const makeExperiment = (): Experiment => ({
     produceFractions: [],
     sourceToolId: null,
   },
+  pipette: { capacityMl: 1, volumeMl: 0, sourceToolId: null },
   analyticalBalance: {
     tareMassG: null,
     taredToolId: null,

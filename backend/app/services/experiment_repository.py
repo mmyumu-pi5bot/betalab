@@ -21,6 +21,7 @@ from app.domain.models import (
     LimsLabel,
     LimsReception,
     ManualLabel,
+    PipetteState,
     PrintedLabelTicket,
     ProduceFraction,
     ProduceLot,
@@ -282,6 +283,14 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             is_loaded=schema.spatula.is_loaded,
             produce_fractions=[_deserialize_produce_fraction(f) for f in schema.spatula.produce_fractions],
             source_tool_id=schema.spatula.source_tool_id,
+        ),
+        pipette=PipetteState(
+            capacity_ml=schema.pipette.capacity_ml,
+            volume_ml=schema.pipette.volume_ml,
+            source_tool_id=schema.pipette.source_tool_id,
+            injection_context=InjectionContext(**schema.pipette.injection_context.model_dump())
+            if schema.pipette.injection_context is not None
+            else None,
         ),
         lims_entries=_deserialize_lims_entries(schema),
         snapshot_version=schema.snapshot_version,

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { LabSceneView } from "@/components/lab-scene-view";
 import type { FlatExperimentApi } from "@/types/flat-experiment-api";
 import { DebugInspectorPopup } from "@/components/debug-inspector-popup";
-import { DropDraftCard } from "@/components/drop-draft-card";
+import { DropDraftCard, DropDraftForm } from "@/components/drop-draft-card";
 import { useDebugInspector } from "@/hooks/use-debug-inspector";
 import { useAnalyticalBalanceDnd } from "@/hooks/use-analytical-balance-dnd";
 import { useDragState } from "@/hooks/use-drag-state";
@@ -101,6 +101,8 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     discardSpatula: experimentApi.spatula.discard,
     loadSpatulaFromWorkbenchTool: experimentApi.spatula.load,
     pourSpatulaIntoWorkbenchTool: experimentApi.spatula.pour,
+    aspiratePipette: experimentApi.pipette.aspirate,
+    dispensePipette: experimentApi.pipette.dispense,
     // DnD
     addLiquidToTool: experimentApi.dnd.addLiquidToTool,
     moveObject: experimentApi.dnd.moveObject,
@@ -166,6 +168,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     state.status === "ready"
       ? state.experiment.spatula
       : { isLoaded: false, produceFractions: [], sourceToolId: null };
+  const pipette =
+    state.status === "ready"
+      ? state.experiment.pipette
+      : { capacityMl: 1, volumeMl: 0, sourceToolId: null };
 
   useEffect(() => {
     let isMounted = true;
@@ -193,6 +199,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     dndDisabledByAction,
     isKnifeMode,
     isSpatulaMode,
+    isPipetteMode,
     workspaceCursor,
     handleSpatulaAnalyticalBalancePointerDown,
     handleSpatulaToolCardClick,
@@ -202,8 +209,11 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     handleSpatulaTrashClick,
     spatulaCursorPosition,
     spatulaHintMessage,
+    pipetteCursorPosition,
+    pipetteHintMessage,
+    stopPipetteHold,
     stopSpatulaPour,
-  } = useActionMode({ clearDropTargets, experimentApi: dndApi, spatula });
+  } = useActionMode({ clearDropTargets, experimentApi: dndApi, pipette, spatula });
 
   const liveWidgetIds: WidgetId[] =
     state.status === "ready"
@@ -453,6 +463,23 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     if (!pendingBenchDraft) {
       return null;
     }
+    if (
+      pendingBenchDraft.commandType === "create_debug_tool_preset" &&
+      pendingBenchDraft.destinationKind === "workbench_tool"
+    ) {
+      return (
+        <div className="space-y-2" data-testid="debug-slurry-inline-controls">
+          <DropDraftForm
+            confirmLabel={pendingBenchDraft.confirmLabel}
+            fields={pendingBenchDraft.fields}
+            onCancel={() => setPendingDropDraft(null)}
+            onChangeField={handleUpdateDropDraftField}
+            onConfirm={handleConfirmDropDraft}
+            showCancel
+          />
+        </div>
+      );
+    }
     return (
       <DropDraftCard
         confirmLabel={pendingBenchDraft.confirmLabel}
@@ -545,10 +572,15 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         handleSpatulaToolPointerUp,
         handleSpatulaTrashClick,
         isSpatulaMode,
+        isPipetteMode,
         setActiveActionId,
         spatula,
         spatulaCursorPosition,
         spatulaHintMessage,
+        pipette,
+        pipetteCursorPosition,
+        pipetteHintMessage,
+        stopPipetteHold,
         stopSpatulaPour,
       }}
       ui={{
@@ -567,18 +599,6 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         handleApplyLimsLabelTicket: workbenchHandlers.handleApplyLimsLabelTicket,
         handleApplySampleLabel: workbenchHandlers.handleApplySampleLabel,
         handleMoveObject: workbenchHandlers.handleMoveObject,
-        handlePourExtract: (tubeToolId: string) => {
-          const allSlots = [
-            ...state.experiment.workbench.slots,
-            ...state.experiment.rack.slots,
-          ];
-          const vial = allSlots
-            .flatMap((s) => (s.tool ? [s.tool] : []))
-            .find((t) => t.toolType === "sample_vial" && !t.injectionContext);
-          if (vial) {
-            void experimentApi.lcmsms.pourExtract({ tube_tool_id: tubeToolId, vial_tool_id: vial.id });
-          }
-        },
         handleRemoveLiquid: workbenchHandlers.handleRemoveLiquid,
         handleRemoveWorkbenchSlot: workbenchHandlers.handleRemoveWorkbenchSlot,
         handleStoreWorkbenchTool: workbenchHandlers.handleStoreWorkbenchTool,
@@ -624,7 +644,8 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       {debugInspection ? (
         <DebugInspectorPopup inspection={debugInspection} onClose={clearDebugInspection} />
       ) : null}
-      {pendingDropDraft?.commandType === "create_debug_tool_preset" ? (
+      {pendingDropDraft?.commandType === "create_debug_tool_preset" &&
+      pendingDropDraft.destinationKind !== "workbench_tool" ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-md rounded-[1.5rem] bg-white p-3 shadow-2xl">
             <DropDraftCard

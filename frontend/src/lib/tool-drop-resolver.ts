@@ -26,6 +26,16 @@ function canDescriptorResolveOnTool(
   }
 
   if (
+    descriptor.entityKind === "tool" &&
+    descriptor.sourceKind === "palette" &&
+    descriptor.sourceId === "apple_slurry_centrifuge_tube" &&
+    (tool.toolType === "centrifuge_tube" || tool.toolType === "sample_vial") &&
+    !tool.isSealed
+  ) {
+    return true;
+  }
+
+  if (
     descriptor.entityKind !== "liquid" &&
     !parentDropTargetTypes.some((targetType) => descriptor.allowedDropTargets.includes(targetType))
   ) {

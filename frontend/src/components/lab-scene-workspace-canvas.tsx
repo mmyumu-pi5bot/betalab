@@ -117,7 +117,6 @@ type LabSceneWorkspaceCanvasProps = {
     handleApplyLimsLabelTicket: (payload: { basketBag?: true; grossBalanceBag?: true; slotId?: string }) => void;
     handleApplySampleLabel: (slotId: string) => void;
     handleMoveObject: (payload: MoveObjectPayload) => void;
-    handlePourExtract: (tubeToolId: string) => void;
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
     handleStoreWorkbenchTool: (slotId: string) => void;
@@ -627,7 +626,6 @@ export function LabSceneWorkspaceCanvas({
               onBenchToolPointerDown: spatula.handleSpatulaToolPointerDown,
               onBenchToolPointerUp: spatula.handleSpatulaToolPointerUp,
               onMoveObject: workbench.handleMoveObject,
-              onPourExtract: workbench.handlePourExtract,
               onProduceDrop: dnd.workbench.handleProduceDrop,
               onProduceLotClick: dnd.workbench.handleWorkbenchProduceLotClick,
               onProduceLotDragStart: dnd.workbench.handleWorkbenchProduceLotDragStart,

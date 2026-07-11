@@ -473,6 +473,12 @@ export type SpatulaState = {
   sourceToolId: string | null;
 };
 
+export type PipetteState = {
+  capacityMl: number;
+  volumeMl: number;
+  sourceToolId: string | null;
+};
+
 export type ProduceMaterialState = {
   id: string;
   produceLotId: string;

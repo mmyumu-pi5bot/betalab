@@ -1436,6 +1436,36 @@ export async function pourExtractToVial(
   });
 }
 
+export async function aspiratePipette(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/pipette/aspirate`,
+    body: {
+      tool_id: requireString(body, "tool_id"),
+      delta_volume_ml: Number(body.delta_volume_ml),
+    },
+  });
+}
+
+export async function dispensePipette(
+  experimentId: string,
+  payload: MutationPayload,
+): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/pipette/dispense`,
+    body: {
+      tool_id: requireString(body, "tool_id"),
+      delta_volume_ml: Number(body.delta_volume_ml),
+    },
+  });
+}
+
 export async function addCalibrationToVial(
   experimentId: string,
   payload: MutationPayload,
@@ -1560,6 +1590,9 @@ function normalizeExperiment(experiment: Experiment): Experiment {
       ((experiment as Experiment & Record<string, unknown>).spatula ?? {}) as
         SpatulaState &
         Record<string, unknown>,
+    ),
+    pipette: normalizePipetteState(
+      ((experiment as Experiment & Record<string, unknown>).pipette ?? {}) as Record<string, unknown>,
     ),
     analyticalBalance: normalizeAnalyticalBalanceState(
       (
@@ -1902,6 +1935,17 @@ function normalizeSpatulaState(
     normalized.holdThresholdMs = Number(spatula.holdThresholdMs ?? spatula.hold_threshold_ms);
   }
   return normalized;
+}
+
+function normalizePipetteState(pipette: Record<string, unknown>) {
+  return {
+    capacityMl: Number(pipette.capacityMl ?? pipette.capacity_ml ?? 1.0),
+    volumeMl: Number(pipette.volumeMl ?? pipette.volume_ml ?? 0.0),
+    sourceToolId:
+      pipette.sourceToolId !== undefined
+        ? (pipette.sourceToolId as string | null)
+        : (pipette.source_tool_id as string | null | undefined) ?? null,
+  };
 }
 
 function getGroundProduceMassG(

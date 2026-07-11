@@ -48,7 +48,6 @@ export type WorkbenchPanelHandlers = {
   onProduceDrop?: (targetSlotId: string, payload: ProduceDragPayload) => void;
   onProduceLotClick?: (slotId: string, produceLot: ExperimentProduceLot) => void;
   onProduceLotDragStart?: (slotId: string, produceLot: ExperimentProduceLot, dataTransfer: DataTransfer) => void;
-  onPourExtract?: (tubeToolId: string) => void;
   onRemoveLiquid?: (slotId: string, liquidId: string) => void;
   onRemoveWorkbenchSlot?: (slotId: string) => void;
   onSampleLabelDragEnd?: () => void;
@@ -92,7 +91,6 @@ export function WorkbenchPanel({
     onBenchToolPointerDown,
     onBenchToolPointerUp,
     onMoveObject,
-    onPourExtract,
     onProduceDrop,
     onProduceLotClick,
     onProduceLotDragStart,
@@ -340,7 +338,6 @@ export function WorkbenchPanel({
                       onToolIllustrationClick={(event) => {
                         onBenchToolIllustrationClick?.(slot.id, tool, event);
                       }}
-                      onPourExtract={onPourExtract ? () => onPourExtract(tool.id) : undefined}
                       onRemoveLiquid={(liquidId) => {
                         onRemoveLiquid?.(slot.id, liquidId);
                       }}

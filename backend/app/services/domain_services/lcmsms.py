@@ -101,6 +101,47 @@ def _effective_residues(
     return merged
 
 
+def build_extract_injection_context(
+    experiment: Experiment,
+    tube: WorkbenchTool,
+    extract_volume_ml: float,
+) -> InjectionContext:
+    all_lots: list[ProduceLot] = list(tube.produce_lots)
+    referenced_lot_ids = {fraction.produce_lot_id for fraction in tube.produce_fractions}
+    for lot_id in referenced_lot_ids:
+        if not any(lot.id == lot_id for lot in all_lots):
+            for slot in experiment.workbench.slots:
+                for lot in slot.surface_produce_lots or []:
+                    if lot.id == lot_id:
+                        all_lots.append(lot)
+
+    total_sample_mass_g = sum(fraction.mass_g for fraction in tube.produce_fractions)
+    if total_sample_mass_g <= 0:
+        raise ValueError(f"{tube.label} contains no sample mass to pipette.")
+    acetonitrile = next((liquid for liquid in tube.liquids if liquid.liquid_id == ACETONITRILE_ID), None)
+    total_extract_volume_ml = acetonitrile.volume_ml if acetonitrile is not None else 10.0
+    if total_extract_volume_ml <= 0:
+        raise ValueError(f"{tube.label} contains no extract volume to pipette.")
+    volume_ratio = extract_volume_ml / total_extract_volume_ml
+    istd_liquid = next((liquid for liquid in tube.liquids if liquid.liquid_id == ISTD_SOLUTION_ID), None)
+    effective = _effective_residues(tube.produce_fractions, all_lots, experiment.produce_material_states)
+    return InjectionContext(
+        source_tube_id=tube.id,
+        sample_mass_g=round(total_sample_mass_g * volume_ratio, 4),
+        extract_volume_ml=round(extract_volume_ml, 3),
+        effective_residues_ug_per_kg={key: round(value, 4) for key, value in effective.items()},
+        extraction_result=tube.quechers_extraction_result,
+        istd_volume_ml=round(istd_liquid.volume_ml * volume_ratio, 4) if istd_liquid is not None else None,
+        istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
+        extract_true_volume_ml=round(extract_volume_ml, 6),
+        istd_true_volume_ml=(
+            round((istd_liquid.true_volume_ml or istd_liquid.volume_ml) * volume_ratio, 6)
+            if istd_liquid is not None
+            else None
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pour extract
 # ---------------------------------------------------------------------------
@@ -139,55 +180,18 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
         if vial.injection_context is not None:
             raise ValueError(f"{vial.label} already contains an extract.")
 
-        # Collect all ProduceLots referenced by the tube's fractions
-        all_lots: list[ProduceLot] = list(tube.produce_lots)
-        referenced_lot_ids = {f.produce_lot_id for f in tube.produce_fractions}
-        for lot_id in referenced_lot_ids:
-            if not any(lot.id == lot_id for lot in all_lots):
-                for slot in experiment.workbench.slots:
-                    for lot in (slot.surface_produce_lots or []):
-                        if lot.id == lot_id:
-                            all_lots.append(lot)
-
-        sample_mass_g = sum(f.mass_g for f in tube.produce_fractions)
-        if sample_mass_g <= 0:
-            raise ValueError(f"{tube.label} contains no sample mass to pour.")
-
         acetonitrile = next(
             (liq for liq in tube.liquids if liq.liquid_id == ACETONITRILE_ID), None
         )
         extract_volume_ml = acetonitrile.volume_ml if acetonitrile is not None else 10.0
-        extract_true_volume_ml = (
-            acetonitrile.true_volume_ml if acetonitrile is not None else extract_volume_ml
-        )
-
-        istd_liquid = next(
-            (liq for liq in tube.liquids if liq.liquid_id == ISTD_SOLUTION_ID), None
-        )
-        istd_volume_ml = istd_liquid.volume_ml if istd_liquid is not None else None
-        istd_true_volume_ml = istd_liquid.true_volume_ml if istd_liquid is not None else None
-
-        effective = _effective_residues(
-            tube.produce_fractions, all_lots, experiment.produce_material_states
-        )
-
-        vial.injection_context = InjectionContext(
-            source_tube_id=tube.id,
-            sample_mass_g=round(sample_mass_g, 4),
-            extract_volume_ml=round(extract_volume_ml, 3),
-            effective_residues_ug_per_kg={k: round(v, 4) for k, v in effective.items()},
-            extraction_result=tube.quechers_extraction_result,
-            istd_volume_ml=round(istd_volume_ml, 4) if istd_volume_ml is not None else None,
-            istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
-            extract_true_volume_ml=round(extract_true_volume_ml, 6) if extract_true_volume_ml is not None else None,
-            istd_true_volume_ml=round(istd_true_volume_ml, 6) if istd_true_volume_ml is not None else None,
-        )
+        vial.injection_context = build_extract_injection_context(experiment, tube, extract_volume_ml)
+        context = vial.injection_context
 
         experiment.audit_log.append(
             f"Extract poured from {tube.label} into {vial.label} "
-            f"({sample_mass_g:.2f} g sample, "
-            f"{len(effective)} compound(s)"
-            + (f", ISTD {istd_volume_ml:.3f} mL" if istd_volume_ml else ", no ISTD")
+            f"({context.sample_mass_g:.2f} g sample, "
+            f"{len(context.effective_residues_ug_per_kg)} compound(s)"
+            + (f", ISTD {context.istd_volume_ml:.3f} mL" if context.istd_volume_ml else ", no ISTD")
             + ")."
         )
 

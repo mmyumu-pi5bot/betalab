@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
+import { buildDebugSlurryTubeDraftFields } from "@/lib/lab-scene-config";
 import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { canResolveActiveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
@@ -99,6 +100,24 @@ export function useWorkbenchHandlers({
     clearDropTargets();
 
     if (payload.itemType === "tool") {
+      const targetTool = workbenchSlots.find((slot) => slot.id === slotId)?.tool;
+      if (
+        payload.itemId === "apple_slurry_centrifuge_tube" &&
+        targetTool &&
+        (targetTool.toolType === "centrifuge_tube" || targetTool.toolType === "sample_vial")
+      ) {
+        setPendingDropDraft({
+          commandType: "create_debug_tool_preset",
+          confirmLabel: "Add",
+          destinationKind: "workbench_tool",
+          fields: buildDebugSlurryTubeDraftFields(),
+          presetId: payload.itemId,
+          targetId: slotId,
+          targetKind: "bench_slot",
+          title: "Configure Apple slurry",
+        });
+        return;
+      }
       executeToolDropCommand(
         resolveToolDropCommand(payload, { kind: "workbench_slot", slotId }),
         { moveObject: experimentApi.moveObject },

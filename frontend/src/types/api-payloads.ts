@@ -257,7 +257,8 @@ export type CreateDebugToolPresetPayload = {
     | "gross_balance"
     | "trash_bin"
     | "vortex"
-    | "workbench_slot";
+    | "workbench_slot"
+    | "workbench_tool";
   destination_id: string;
   produce_mass_g?: number;
   liquid_volume_ml?: number;

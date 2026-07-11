@@ -7,6 +7,7 @@ from app.domain.models import (
     Experiment,
     ExperimentStatus,
     LimsReception,
+    PipetteState,
     Rack,
     RackSlot,
     SpatulaState,
@@ -145,6 +146,7 @@ def build_experiment() -> Experiment:
         lims_entries=[],
         basket_tools=[build_received_sampling_bag()],
         spatula=SpatulaState(),
+        pipette=PipetteState(),
         analytical_balance=AnalyticalBalanceState(),
         last_simulation_at=datetime.now(UTC),
         audit_log=[

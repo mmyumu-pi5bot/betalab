@@ -8,6 +8,7 @@ import { ActionBarPanel } from "@/components/action-bar-panel";
 import { LabSceneInventoryPanel } from "@/components/lab-scene-inventory-panel";
 import { LabSceneWorkspaceCanvas } from "@/components/lab-scene-workspace-canvas";
 import { SpatulaOverlay } from "@/components/lab-scene-spatula-overlay";
+import { PipetteOverlay } from "@/components/lab-scene-pipette-overlay";
 import type { DebugProducePreset } from "@/components/debug-produce-palette";
 import type { AnalyticalBalanceDndApi } from "@/hooks/use-analytical-balance-dnd";
 import type { DropDraft } from "@/hooks/use-drop-draft";
@@ -27,6 +28,7 @@ import type {
   ExperimentProduceLot,
   ExperimentWorkspaceWidget,
   RackSlot,
+  PipetteState,
   SpatulaState,
   ToolbarCategory,
   ToolbarItem,
@@ -101,10 +103,15 @@ type LabSceneViewProps = {
     handleSpatulaToolPointerUp: () => void;
     handleSpatulaTrashClick: () => void;
     isSpatulaMode: boolean;
+    isPipetteMode: boolean;
     setActiveActionId: Dispatch<SetStateAction<string | null>>;
     spatula: SpatulaState;
     spatulaCursorPosition: { x: number; y: number } | null;
     spatulaHintMessage: string | null;
+    pipette: PipetteState;
+    pipetteCursorPosition: { x: number; y: number } | null;
+    pipetteHintMessage: string | null;
+    stopPipetteHold: () => void;
     stopSpatulaPour: () => void;
   };
   ui: {
@@ -123,7 +130,6 @@ type LabSceneViewProps = {
     handleApplyLimsLabelTicket: (payload: { basketBag?: true; grossBalanceBag?: true; slotId?: string }) => void;
     handleApplySampleLabel: (slotId: string) => void;
     handleMoveObject: (payload: MoveObjectPayload) => void;
-    handlePourExtract: (tubeToolId: string) => void;
     handleRemoveLiquid: (slotId: string, liquidId: string) => void;
     handleRemoveWorkbenchSlot: (slotId: string) => void;
     handleStoreWorkbenchTool: (slotId: string) => void;
@@ -240,9 +246,11 @@ export function LabSceneView({
           <div className="xl:sticky xl:top-6 xl:self-start" data-testid="widget-actions">
             <ActionBarPanel
               activeActionId={spatula.activeActionId}
+              pipette={spatula.pipette}
               onToggleAction={(actionId) => {
                 dnd.clearDropTargets();
                 spatula.stopSpatulaPour();
+                spatula.stopPipetteHold();
                 spatula.setActiveActionId((current) => (current === actionId ? null : actionId));
               }}
             />
@@ -254,6 +262,12 @@ export function LabSceneView({
         cursorPosition={spatula.spatulaCursorPosition}
         isSpatulaMode={spatula.isSpatulaMode}
         spatula={spatula.spatula}
+      />
+      <PipetteOverlay
+        cursorPosition={spatula.pipetteCursorPosition}
+        hint={spatula.pipetteHintMessage}
+        isPipetteMode={spatula.isPipetteMode}
+        pipette={spatula.pipette}
       />
     </main>
   );

@@ -486,6 +486,7 @@ function makeWorkbenchExperiment({
         produceFractions: [],
         sourceToolId: null,
       },
+    pipette: { capacityMl: 1, volumeMl: 0, sourceToolId: null },
     analyticalBalance,
     limsReception,
     limsEntries,
@@ -865,7 +866,6 @@ describe("LabScene", () => {
     expect(await screen.findByLabelText("Debug slurry apple mass")).toHaveValue(10);
     expect(screen.getByLabelText("Debug slurry liquid volume")).toHaveValue(10);
     expect(screen.getByLabelText("Debug slurry temperature")).toHaveValue(20);
-
     fireEvent.change(screen.getByLabelText("Debug slurry apple mass"), {
       target: { value: "12.5" },
     });
@@ -883,6 +883,54 @@ describe("LabScene", () => {
         temperature_c: 20,
       },
     );
+  });
+
+  it.each([
+    ["centrifuge tube", "centrifuge_tube_50ml", "centrifuge_tube"],
+    ["autosampler vial", "sample_vial_lcms", "sample_vial"],
+  ] as const)("adds debug apple slurry to an existing %s", async (_label, toolId, toolType) => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    const targetTool = makeTool({ toolId, toolType });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({ slots: makeSlots([{ tool: targetTool }]) }),
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId(
+      "debug-palette-preset-apple_slurry_centrifuge_tube",
+    );
+    const station = screen.getByTestId("bench-slot-station_1");
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    const dragOverEvent = createEvent.dragOver(station, { dataTransfer: transfer });
+    fireEvent(station, dragOverEvent);
+    fireEvent.drop(station, { dataTransfer: transfer });
+
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    const inlineControls = await within(station).findByTestId("debug-slurry-inline-controls");
+    expect(screen.queryByText("Configure Apple slurry")).not.toBeInTheDocument();
+    expect(document.querySelector(".fixed.inset-0.z-50")).not.toBeInTheDocument();
+    expect(within(inlineControls).getByLabelText("Debug slurry apple mass")).toHaveValue(10);
+    expect(within(inlineControls).getByLabelText("Debug slurry liquid volume")).toHaveValue(10);
+    expect(within(inlineControls).getByLabelText("Debug slurry temperature")).toHaveValue(20);
+    fireEvent.change(within(inlineControls).getByLabelText("Debug slurry liquid volume"), {
+      target: { value: "1.5" },
+    });
+    fireEvent.click(within(inlineControls).getByText("Add"));
+    await waitFor(() => expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      expect.objectContaining({
+        destination_id: "station_1",
+        destination_kind: "workbench_tool",
+        liquid_volume_ml: 1.5,
+        preset_id: "apple_slurry_centrifuge_tube",
+        produce_mass_g: 10,
+        temperature_c: 20,
+      }),
+    ));
   });
 
   it("adds QuEChERS salts to a debug apple slurry tube on the workbench", async () => {

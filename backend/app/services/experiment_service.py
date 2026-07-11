@@ -96,6 +96,7 @@ class ExperimentRuntimeService:
                 "basket_tools": [asdict(t) for t in experiment.basket_tools],
                 "produce_material_states": produce_material_states,
                 "spatula": asdict(experiment.spatula),
+                "pipette": asdict(experiment.pipette),
                 "analytical_balance": asdict(experiment.analytical_balance),
                 "audit_log": experiment.audit_log,
             }

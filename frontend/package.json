@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:turbopack": "next dev --turbopack",
+    "dev": "NEXT_DIST_DIR=.next-dev next dev",
+    "dev:turbopack": "NEXT_DIST_DIR=.next-dev next dev --turbopack",
     "build": "next build",
+    "clean:next": "rm -rf .next .next-dev .next-e2e",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",

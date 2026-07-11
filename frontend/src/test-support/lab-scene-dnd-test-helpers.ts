@@ -567,6 +567,7 @@ function makeExperiment({
       produceFractions: [],
       sourceToolId: null,
     },
+    pipette: { capacityMl: 1, volumeMl: 0, sourceToolId: null },
     analyticalBalance: {
       tareMassG: null,
       taredToolId: null,
@@ -912,7 +913,7 @@ function createDebugSlurryTubePresetSourceCase(): DndSourceCase {
         slots: makeSlots([{ tool: makeTool(sampleVialItem) }]),
       }),
     targetExpectations: {
-      "bench-slot-station_1": { compatible: false, command: null },
+      "bench-slot-station_1": { compatible: true, command: null },
       "bench-slot-station_2": { compatible: true, command: null },
       "grinder-dropzone": { compatible: false, command: null },
       "gross-balance-dropzone": { compatible: true, command: null },

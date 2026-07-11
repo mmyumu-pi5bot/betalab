@@ -1,4 +1,6 @@
 .next
+.next-dev
+.next-e2e
 node_modules
 __pycache__
 *.egg-info/

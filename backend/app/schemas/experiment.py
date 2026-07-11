@@ -196,6 +196,15 @@ class SpatulaStateSchema(BaseModel):
     def can_discard(self) -> bool:
         return self.is_loaded
 
+
+class PipetteStateSchema(BaseModel):
+    capacity_ml: float = 1.0
+    volume_ml: float = 0.0
+    source_tool_id: str | None = None
+    injection_context: InjectionContextSchema | None = None
+
+
+
     @computed_field
     def click_increment_mu_g(self) -> float:
         return SPATULA_CLICK_INCREMENT_MU_G
@@ -678,6 +687,7 @@ class ExperimentSchema(BaseModel):
     produce_material_states: list[ProduceMaterialStateSchema] = Field(default_factory=list)
 
     spatula: SpatulaStateSchema = Field(default_factory=SpatulaStateSchema)
+    pipette: PipetteStateSchema = Field(default_factory=PipetteStateSchema)
     analytical_balance: AnalyticalBalanceStateSchema = Field(default_factory=AnalyticalBalanceStateSchema)
     audit_log: list[str]
 
@@ -847,6 +857,7 @@ class DebugToolPresetSpawnSchema(BaseModel):
         "trash_bin",
         "vortex",
         "workbench_slot",
+        "workbench_tool",
     ]
     destination_id: str
     produce_mass_g: float | None = None

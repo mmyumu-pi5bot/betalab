@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchLiquid, new_id
+from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchLiquid, WorkbenchTool, new_id
 from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.gross_balance import GrossBalanceProduceLotTarget
+from app.services.helpers.lookups import find_workbench_slot
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
 from app.services.helpers.workbench import build_workbench_tool
 from app.services.transfer import GrinderProduceLotTarget, WorkbenchProduceLotTarget
@@ -108,44 +109,37 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
         if liquid_volume_ml < 0:
             raise ValueError("Liquid volume cannot be negative.")
 
-        tool = build_workbench_tool("centrifuge_tube_50ml")
-        produce_lot = ProduceLot(
-            id=new_id("produce"),
-            label="Apple slurry",
-            produce_type="apple",
-            total_mass_g=produce_mass_g,
-            unit_count=None,
-            pesticide_residues=generate_pesticide_residues("apple"),
-        )
-        tool.produce_lots.append(produce_lot)
-        set_material_state_name(experiment.produce_material_states, produce_lot.id, "slurry")
-        state = next(state for state in experiment.produce_material_states if state.produce_lot_id == produce_lot.id)
-        state.temperature_c = temperature_c
-        state.grind_quality_label = "slurry"
-        state.homogeneity_score = 1.0
-        tool.produce_fractions.append(
-            ProduceFraction(
-                id=new_id("produce_fraction"),
-                produce_lot_id=produce_lot.id,
-                produce_material_state_id=state.id,
-                mass_g=produce_mass_g,
-                is_mixed=True,
+        if request.destination_kind == "workbench_tool":
+            slot = find_workbench_slot(experiment.workbench, request.destination_id)
+            if slot.tool is None or slot.tool.tool_type not in {"centrifuge_tube", "sample_vial"}:
+                raise ValueError("Apple slurry requires a centrifuge tube or autosampler vial.")
+            if slot.tool.is_sealed:
+                raise ValueError(f"Open {slot.tool.label} before adding apple slurry.")
+            if slot.tool.produce_lots or slot.tool.produce_fractions:
+                raise ValueError(f"{slot.tool.label} already contains produce.")
+            tool = slot.tool
+            _fill_tool_with_debug_slurry(
+                experiment,
+                tool,
+                produce_mass_g=produce_mass_g,
+                liquid_volume_ml=liquid_volume_ml,
+                temperature_c=temperature_c,
                 location_kind="workbench_tool",
-                location_id=tool.id,
-                container_id=tool.id,
-                container_label=tool.label,
+                location_id=slot.id,
             )
+            experiment.audit_log.append(f"Debug Apple slurry added to {tool.label} on {slot.label}.")
+            return
+
+        tool = build_workbench_tool("centrifuge_tube_50ml")
+        _fill_tool_with_debug_slurry(
+            experiment,
+            tool,
+            produce_mass_g=produce_mass_g,
+            liquid_volume_ml=liquid_volume_ml,
+            temperature_c=temperature_c,
+            location_kind="workbench_tool",
+            location_id=tool.id,
         )
-        if liquid_volume_ml > 0:
-            tool.liquids.append(
-                WorkbenchLiquid(
-                    id=new_id("liquid"),
-                    liquid_id="apple_extract",
-                    name="Apple extract",
-                    volume_ml=liquid_volume_ml,
-                    accent="rose",
-                )
-            )
 
         place_new_tool(
             self._runtime,
@@ -161,14 +155,59 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             "vortex": "workspace_widget_tool",
             "workbench_slot": "workbench_tool",
         }[request.destination_kind]
-        location_id = (
-            tool.id
-            if request.destination_kind == "trash_bin"
-            else request.destination_id
-        )
+        location_id = tool.id if request.destination_kind == "trash_bin" else request.destination_id
         for fraction in tool.produce_fractions:
             fraction.location_kind = location_kind
             fraction.location_id = location_id
+
+
+def _fill_tool_with_debug_slurry(
+    experiment: Experiment,
+    tool: WorkbenchTool,
+    *,
+    produce_mass_g: float,
+    liquid_volume_ml: float,
+    temperature_c: float,
+    location_kind: str,
+    location_id: str,
+) -> None:
+    produce_lot = ProduceLot(
+        id=new_id("produce"),
+        label="Apple slurry",
+        produce_type="apple",
+        total_mass_g=produce_mass_g,
+        unit_count=None,
+        pesticide_residues=generate_pesticide_residues("apple"),
+    )
+    tool.produce_lots.append(produce_lot)
+    set_material_state_name(experiment.produce_material_states, produce_lot.id, "slurry")
+    state = next(state for state in experiment.produce_material_states if state.produce_lot_id == produce_lot.id)
+    state.temperature_c = temperature_c
+    state.grind_quality_label = "slurry"
+    state.homogeneity_score = 1.0
+    tool.produce_fractions.append(
+        ProduceFraction(
+            id=new_id("produce_fraction"),
+            produce_lot_id=produce_lot.id,
+            produce_material_state_id=state.id,
+            mass_g=produce_mass_g,
+            is_mixed=True,
+            location_kind=location_kind,
+            location_id=location_id,
+            container_id=tool.id,
+            container_label=tool.label,
+        )
+    )
+    if liquid_volume_ml > 0:
+        tool.liquids.append(
+            WorkbenchLiquid(
+                id=new_id("liquid"),
+                liquid_id="apple_extract",
+                name="Apple extract",
+                volume_ml=liquid_volume_ml,
+                accent="rose",
+            )
+        )
 
 
 def _build_debug_produce_lot(

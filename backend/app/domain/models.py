@@ -271,6 +271,22 @@ class SpatulaState:
 
 
 @dataclass
+class PipetteState:
+    capacity_ml: float = 1.0
+    volume_ml: float = 0.0
+    source_tool_id: str | None = None
+    injection_context: InjectionContext | None = None
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.volume_ml <= self.capacity_ml:
+            raise ValueError("pipette volume must be between zero and capacity")
+        if (self.volume_ml > 0) != (self.source_tool_id is not None):
+            raise ValueError("source_tool_id must be set iff the pipette contains liquid")
+        if (self.volume_ml > 0) != (self.injection_context is not None):
+            raise ValueError("injection_context must be set iff the pipette contains liquid")
+
+
+@dataclass
 class AnalyticalBalanceState:
     # Invariant: tare_mass_g and tared_tool_id are both set or both None.
     tare_mass_g: float | None = None
@@ -402,6 +418,7 @@ class Experiment:
     basket_tools: list[WorkbenchTool] = field(default_factory=list)
     produce_material_states: list[ProduceMaterialState] = field(default_factory=list)
     spatula: SpatulaState = field(default_factory=SpatulaState)
+    pipette: PipetteState = field(default_factory=PipetteState)
     analytical_balance: AnalyticalBalanceState = field(default_factory=AnalyticalBalanceState)
     lims_entries: list[LimsReception] = field(default_factory=list)
     snapshot_version: int = 0

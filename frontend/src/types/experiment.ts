@@ -8,6 +8,7 @@ import type {
   LimsReception,
   ProduceMaterialState,
   SpatulaState,
+  PipetteState,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
 } from "@/types/workbench";
@@ -46,6 +47,7 @@ export type Experiment = {
   basketTools: BenchToolInstance[];
   produceMaterialStates?: ProduceMaterialState[];
   spatula: SpatulaState;
+  pipette: PipetteState;
   analyticalBalance: AnalyticalBalanceState;
   audit_log: string[];
 };

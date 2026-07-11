@@ -26,6 +26,80 @@ type DropDraftCardProps = {
   title: string;
 };
 
+type DropDraftFormProps = Omit<DropDraftCardProps, "title"> & {
+  showCancel?: boolean;
+};
+
+export function DropDraftForm({
+  confirmLabel = "Add",
+  fields,
+  onCancel,
+  onChangeField,
+  onConfirm,
+  showCancel = false,
+}: DropDraftFormProps) {
+  return (
+    <div className="space-y-3">
+      {fields.map((field) => (
+        <div key={field.id} className="space-y-1.5">
+          {field.presets && field.presets.length > 0 ? (
+            <div className="flex flex-wrap justify-end gap-0.5">
+              {field.presets.map((preset) => (
+                <button
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                    field.value === preset
+                      ? "border-slate-700 bg-slate-700 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
+                  }`}
+                  key={preset}
+                  onClick={() => onChangeField(field.id, preset)}
+                  type="button"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
+              {field.label}
+            </p>
+            <div className="flex items-center gap-2">
+              {field.visual === "temperature" ? (
+                <TemperatureIndicator temperatureC={field.value} />
+              ) : null}
+              <InlineQuantityInput
+                ariaLabel={field.ariaLabel}
+                inputStep={field.inputStep ?? 0.1}
+                onChange={(nextValue) => {
+                  onChangeField(field.id, Math.max(nextValue, field.minValue ?? 0));
+                }}
+                unitLabel={field.unitLabel}
+                value={field.value}
+                wheelStep={field.wheelStep ?? field.stepAmount}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="flex justify-end gap-2">
+        {showCancel ? (
+          <button className="text-[11px] font-semibold text-slate-500" onClick={onCancel} type="button">
+            Cancel
+          </button>
+        ) : null}
+        <button
+          className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+          onClick={onConfirm}
+          type="button"
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DropDraftCard({
   confirmLabel = "Add",
   fields,
@@ -48,60 +122,14 @@ export function DropDraftCard({
           Cancel
         </button>
       </div>
-      <div className="mt-3 space-y-3">
-        {fields.map((field) => (
-          <div key={field.id} className="space-y-1.5">
-            {field.presets && field.presets.length > 0 ? (
-              <div className="flex flex-wrap justify-end gap-0.5">
-                {field.presets.map((preset) => (
-                  <button
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
-                      field.value === preset
-                        ? "border-slate-700 bg-slate-700 text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
-                    }`}
-                    key={preset}
-                    onClick={() => onChangeField(field.id, preset)}
-                    type="button"
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
-                  {field.label}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {field.visual === "temperature" ? (
-                  <TemperatureIndicator temperatureC={field.value} />
-                ) : null}
-                <InlineQuantityInput
-                  ariaLabel={field.ariaLabel}
-                  inputStep={field.inputStep ?? 0.1}
-                  onChange={(nextValue) => {
-                    onChangeField(field.id, Math.max(nextValue, field.minValue ?? 0));
-                  }}
-                  unitLabel={field.unitLabel}
-                  value={field.value}
-                  wheelStep={field.wheelStep ?? field.stepAmount}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-        <div className="flex justify-end">
-          <button
-            className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
-            onClick={onConfirm}
-            type="button"
-          >
-            {confirmLabel}
-          </button>
-        </div>
+      <div className="mt-3">
+        <DropDraftForm
+          confirmLabel={confirmLabel}
+          fields={fields}
+          onCancel={onCancel}
+          onChangeField={onChangeField}
+          onConfirm={onConfirm}
+        />
       </div>
     </div>
   );

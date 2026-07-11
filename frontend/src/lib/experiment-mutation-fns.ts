@@ -89,6 +89,8 @@ import {
   updateWorkbenchToolSampleLabelText,
   addCalibrationToVial,
   pourExtractToVial,
+  aspiratePipette,
+  dispensePipette,
   runSequence,
 } from "@/lib/api";
 import type { Experiment } from "@/types/experiment";
@@ -186,5 +188,7 @@ export const mutationFns = {
   updateWorkbenchToolSampleLabelText,
   addCalibrationToVial,
   pourExtractToVial,
+  aspiratePipette,
+  dispensePipette,
   runSequence,
 } satisfies Record<string, MutationFn>;
