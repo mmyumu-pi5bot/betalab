@@ -355,8 +355,8 @@ describe("workbench dnd helpers", () => {
       sourceId: "station_2",
       sourceKind: "workbench",
       sourceSlotId: "station_2",
-      toolId: "beaker_rinse",
-      toolType: "beaker",
+      toolId: "hdpe_storage_jar_2l",
+      toolType: "storage_jar",
     });
     syncTypes(dataTransfer);
 
@@ -370,8 +370,8 @@ describe("workbench dnd helpers", () => {
       sourceId: "station_2",
       sourceKind: "workbench",
       sourceSlotId: "station_2",
-      toolId: "beaker_rinse",
-      toolType: "beaker",
+      toolId: "hdpe_storage_jar_2l",
+      toolType: "storage_jar",
     });
   });
 

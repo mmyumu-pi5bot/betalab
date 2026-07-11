@@ -433,24 +433,6 @@ describe("WorkbenchPanel", () => {
               ],
             },
           },
-          {
-            id: "station_2",
-            label: "Station 2",
-            tool: {
-              id: "bench_tool_cleanup",
-              toolId: "cleanup_tube_dspe",
-              label: "d-SPE cleanup tube",
-              subtitle: "Cleanup ready",
-              accent: "sky",
-              toolType: "cleanup_tube",
-              capacity_ml: 15,
-              powderMassG: 0.8,
-              liquids: [],
-              produceFractions: [
-                { id: "powder_2", produceLotId: "lot_2", produceMaterialStateId: "state_ground_2", massG: 0.8 },
-              ],
-            },
-          },
         ]}
         statusMessage="Bench ready."
       />,
@@ -460,11 +442,6 @@ describe("WorkbenchPanel", () => {
       screen
         .getByTestId("bench-tool-card-bench_tool_tube")
         .querySelector("[data-kind='centrifuge_tube'] [data-powder-layer='true']"),
-    ).toBeTruthy();
-    expect(
-      screen
-        .getByTestId("bench-tool-card-bench_tool_cleanup")
-        .querySelector("[data-kind='cleanup_tube'] [data-powder-layer='true']"),
     ).toBeTruthy();
   });
 
@@ -1466,8 +1443,8 @@ describe("WorkbenchPanel", () => {
       sourceId: "station_1",
       sourceKind: "workbench",
       sourceSlotId: "station_1",
-      toolId: "beaker_rinse",
-      toolType: "beaker",
+      toolId: "hdpe_storage_jar_2l",
+      toolType: "storage_jar",
     });
     syncTypes(dataTransfer);
 
@@ -1495,8 +1472,8 @@ describe("WorkbenchPanel", () => {
       sourceId: "station_1",
       sourceKind: "workbench",
       sourceSlotId: "station_1",
-      toolId: "beaker_rinse",
-      toolType: "beaker",
+      toolId: "hdpe_storage_jar_2l",
+      toolType: "storage_jar",
     });
   });
 

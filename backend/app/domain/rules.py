@@ -14,7 +14,6 @@ def can_tool_be_sealed(tool_type: str) -> bool:
         "sample_bag",
         "storage_jar",
         "centrifuge_tube",
-        "cleanup_tube",
         "sample_vial",
     }
 

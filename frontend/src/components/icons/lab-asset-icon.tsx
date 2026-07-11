@@ -190,72 +190,6 @@ function CentrifugeTubeIcon({
   );
 }
 
-function CleanupTubeIcon({
-  closureFault,
-  containsSlurry = false,
-  fillRatio,
-  glow,
-  isSealed = false,
-  label,
-  liquidDefs,
-  liquidFill,
-  powderMassG = 0,
-  stroke,
-}: {
-  closureFault?: string | null;
-  containsSlurry?: boolean;
-  fillRatio: number;
-  glow: string;
-  isSealed?: boolean;
-  label: string;
-  liquidDefs?: ReactNode;
-  liquidFill: string;
-  powderMassG?: number;
-  stroke: string;
-}) {
-  const liquidTop = 84 - fillRatio * 34;
-  const powderHeight = Math.min(Math.max(powderMassG * 0.9, 0), 14);
-  const sealVisualState: SealVisualState =
-    closureFault === "pressure_pop" ? "popped" : isSealed ? "sealed" : "open";
-
-  return (
-    <VesselFrame defs={liquidDefs} glow={glow} label={label} stroke={stroke}>
-      {sealVisualState === "open" ? (
-        <rect fill="#fff" height="11" rx="4" stroke={stroke} transform="rotate(-16 44 23.5)" width="30" x="29" y="18" />
-      ) : sealVisualState === "popped" ? (
-        <>
-          <rect fill="#fff" height="11" rx="4" stroke="#e11d48" transform="rotate(12 47 22)" width="30" x="32" y="16" />
-          <path d="M57 21L64 17" stroke="#e11d48" />
-        </>
-      ) : (
-        <rect fill="#fff" height="11" rx="4" stroke={stroke} width="30" x="29" y="18" />
-      )}
-      <path d="M31 29H57V84C57 93 51 100 44 104C37 100 31 93 31 84V29Z" />
-      <path
-        d={`M35 ${liquidTop}H53V82C53 87 50 92 44 96C38 92 35 87 35 82V${liquidTop}Z`}
-        fill={liquidFill}
-        stroke="none"
-      />
-      <path d={`M35 ${liquidTop}C40 ${liquidTop - 1} 48 ${liquidTop + 2} 53 ${liquidTop}`} opacity="0.65" />
-      {!containsSlurry && powderHeight > 0 ? (
-        fillRatio > 0 ? (
-          <PowderLayer
-            bodyPath={`M36 ${liquidTop - powderHeight}C40 ${liquidTop - powderHeight - 3} 48 ${liquidTop - powderHeight - 3} 52 ${liquidTop - powderHeight}L52 ${liquidTop + 2}L36 ${liquidTop + 2}Z`}
-            fill="#d6c6a8"
-            ridgePath={`M36 ${liquidTop - powderHeight}C40 ${liquidTop - powderHeight - 1} 48 ${liquidTop - powderHeight - 1} 52 ${liquidTop - powderHeight}`}
-          />
-        ) : (
-          <PowderLayer
-            bodyPath={`M36 ${95 - powderHeight}C40 ${91 - powderHeight} 48 ${92 - powderHeight} 52 ${95 - powderHeight}V82C52 86 49 90 44 94C39 90 36 86 36 82V${95 - powderHeight}Z`}
-            fill="#d6c6a8"
-            ridgePath={`M36 ${95 - powderHeight}C40 ${92 - powderHeight} 48 ${93 - powderHeight} 52 ${95 - powderHeight}`}
-          />
-        )
-      ) : null}
-    </VesselFrame>
-  );
-}
-
 function SampleVialIcon({
   closureFault,
   containsSlurry = false,
@@ -822,17 +756,6 @@ export function LabAssetIcon({
     case "centrifuge_tube":
       icon = (
         <CentrifugeTubeIcon
-          {...sharedProps}
-          closureFault={closureFault}
-          containsSlurry={containsSlurry}
-          isSealed={isSealed}
-          powderMassG={powderMassG}
-        />
-      );
-      break;
-    case "cleanup_tube":
-      icon = (
-        <CleanupTubeIcon
           {...sharedProps}
           closureFault={closureFault}
           containsSlurry={containsSlurry}

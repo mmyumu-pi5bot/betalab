@@ -3775,7 +3775,7 @@ def test_move_gross_balance_tool_to_rack_rejects_non_vials() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()
 
-    place_tool_on_gross_balance(service, experiment.id, "beaker_rinse")
+    place_tool_on_gross_balance(service, experiment.id, "centrifuge_tube_50ml")
 
     with pytest.raises(ValueError, match=r"does not fit in the rack"):
         move_gross_balance_tool_to_rack(service, experiment.id, "rack_slot_1")
@@ -3997,9 +3997,9 @@ def test_open_gross_balance_tool_rejects_non_sealable_tool() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()
 
-    place_tool_on_gross_balance(service, experiment.id, "beaker_rinse")
+    place_tool_on_gross_balance(service, experiment.id, "cutting_board_hdpe")
 
-    with pytest.raises(ValueError, match=r"Bench beaker does not support sealing"):
+    with pytest.raises(ValueError, match=r"Cutting board does not support sealing"):
         open_gross_balance_tool(service, experiment.id)
 
 
@@ -5564,7 +5564,7 @@ def test_rack_commands_require_vials_present_and_compatible() -> None:
         "place_tool_on_workbench",
         {
             "slot_id": "station_1",
-            "tool_id": "beaker_rinse",
+            "tool_id": "centrifuge_tube_50ml",
         },
     )
     with pytest.raises(ValueError, match=r"Only autosampler vials can be placed in the rack."):
@@ -5647,7 +5647,7 @@ def test_rack_commands_require_vials_present_and_compatible() -> None:
         "place_tool_on_workbench",
         {
             "slot_id": "station_2",
-            "tool_id": "beaker_rinse",
+            "tool_id": "centrifuge_tube_50ml",
         },
     )
 

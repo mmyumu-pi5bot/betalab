@@ -699,12 +699,10 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
       },
       "vortex-dropzone": {
         compatible:
-          (item.itemType === "tool" &&
-            (item.toolType === "centrifuge_tube" || item.toolType === "cleanup_tube")) ||
+          (item.itemType === "tool" && item.toolType === "centrifuge_tube") ||
           (item.itemType === "liquid" && item.id === "quechers_salts"),
         command:
-          item.itemType === "tool" &&
-          (item.toolType === "centrifuge_tube" || item.toolType === "cleanup_tube")
+          item.itemType === "tool" && item.toolType === "centrifuge_tube"
             ? expectedToolMoveCommand({
                 entityId: item.id,
                 sourceKind: "palette",
@@ -2366,7 +2364,7 @@ function getAnalyticalBalanceTargetExpectation(sourceCase: DndSourceCase) {
   return { compatible: false, command: null };
 }
 
-const vortexCompatibleToolTypes = new Set(["centrifuge_tube", "cleanup_tube"]);
+const vortexCompatibleToolTypes = new Set(["centrifuge_tube"]);
 
 function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: boolean; command: null | { type: string; payload: unknown } } {
   if (sourceCase.id.startsWith("palette-")) {

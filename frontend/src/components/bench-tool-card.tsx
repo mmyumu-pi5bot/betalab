@@ -83,8 +83,7 @@ export function BenchToolCard({
   const isPowderTool =
     tool.toolType === "storage_jar" ||
     tool.toolType === "sample_vial" ||
-    tool.toolType === "centrifuge_tube" ||
-    tool.toolType === "cleanup_tube";
+    tool.toolType === "centrifuge_tube";
   const isProduceSurface = tool.canReceiveProduce;
   const isSealable = tool.canSeal;
   const isSealed = tool.isSealed ?? false;

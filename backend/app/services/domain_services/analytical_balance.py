@@ -39,7 +39,6 @@ _TARE_BY_TOOL_TYPE_G: dict[str, float] = {
     "sample_vial": 1.5,
     "beaker": 68.0,
     "centrifuge_tube": 12.0,
-    "cleanup_tube": 7.0,
     "cutting_board": 320.0,
     "sample_bag": 36.0,
     "storage_jar": 180.0,

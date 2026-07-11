@@ -67,9 +67,9 @@ describe("BenchToolCard QuEChERS state", () => {
 
   it("shows an ambient temperature indicator on any container", () => {
     const tool = makeTool();
-    tool.toolId = "beaker_rinse";
-    tool.toolType = "beaker";
-    tool.label = "Bench beaker";
+    tool.toolId = "hdpe_storage_jar_2l";
+    tool.toolType = "storage_jar";
+    tool.label = "Wide-neck HDPE jar";
     tool.quechersState = undefined;
 
     render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);

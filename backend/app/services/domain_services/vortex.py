@@ -91,8 +91,8 @@ class VortexServiceBase(WriteDomainService[object]):
         return widget.tool
 
     def _validate_compatible_tool(self, tool: WorkbenchTool) -> None:
-        if tool.tool_type not in {"centrifuge_tube", "cleanup_tube"}:
-            raise ValueError(f"{tool.label} cannot be vortexed (only centrifuge or cleanup tubes).")
+        if tool.tool_type != "centrifuge_tube":
+            raise ValueError(f"{tool.label} cannot be vortexed (only centrifuge tubes).")
 
     def place_tool_on_vortex(
         self,

@@ -192,7 +192,7 @@ TOOL_DND_CASES: tuple[ToolDndCase, ...] = (
     ToolDndCase("rack_vial", "analytical_balance", True),
     ToolDndCase("trash_vial", "analytical_balance", True),
     ToolDndCase("trash_storage_jar", "analytical_balance", True),
-    # vortex target — existing sources (all False: only centrifuge/cleanup tubes allowed)
+    # vortex target — existing sources (all False: only centrifuge tubes are allowed)
     ToolDndCase("palette_vial", "vortex", False),
     ToolDndCase("palette_storage_jar", "vortex", False),
     ToolDndCase("palette_cutting_board", "vortex", False),

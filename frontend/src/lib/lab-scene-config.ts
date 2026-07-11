@@ -113,7 +113,6 @@ const toolTareMassByType: Record<ToolType, number> = {
   sample_vial: 1.5,
   beaker: 68,
   centrifuge_tube: 12,
-  cleanup_tube: 7,
   cutting_board: 320,
   sample_bag: 36,
   storage_jar: 180,

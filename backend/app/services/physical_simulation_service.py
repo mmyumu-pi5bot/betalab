@@ -710,8 +710,6 @@ class PhysicalSimulationService:
             return 1.4
         if tool_type == "sample_vial":
             return 3.5
-        if tool_type == "cleanup_tube":
-            return 2.4
         if tool_type == "centrifuge_tube":
             return 2.8
         return 5.0

@@ -279,10 +279,14 @@ def test_toolbar_catalog_exposes_backend_dnd_targets_over_http() -> None:
 
     assert response.status_code == 200
     categories = response.json()
+    catalog_ids = {item["id"] for category in categories for item in category["items"]}
     sample_vial = next(item for category in categories for item in category["items"] if item["id"] == "sample_vial_lcms")
     cutting_board = next(item for category in categories for item in category["items"] if item["id"] == "cutting_board_hdpe")
     dry_ice = next(item for category in categories for item in category["items"] if item["id"] == "dry_ice_pellets")
     label = next(item for category in categories for item in category["items"] if item["id"] == "sampling_bag_label")
+
+    assert "cleanup_tube_dspe" not in catalog_ids
+    assert "beaker_rinse" not in catalog_ids
 
     assert sample_vial["item_type"] == "tool"
     assert sample_vial["can_seal"] is True

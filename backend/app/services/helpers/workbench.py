@@ -9,7 +9,6 @@ from app.services.helpers.lookups import find_tool_label
 
 _CONTACT_IMPURITY_MG_PER_G_BY_TOOL_TYPE: dict[str, tuple[float, float]] = {
     "centrifuge_tube": (0.004, 0.012),
-    "cleanup_tube": (0.006, 0.018),
     "sample_vial": (0.003, 0.010),
     "beaker": (0.010, 0.028),
     "cutting_board": (0.020, 0.060),

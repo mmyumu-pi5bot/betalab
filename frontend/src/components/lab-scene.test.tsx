@@ -1467,12 +1467,12 @@ describe("LabScene", () => {
   it("discards a bench tool when dropped into the trash", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
-        slots: makeSlots([{ tool: makeTool({ toolType: "beaker", toolId: "beaker_rinse", label: "Bench beaker" }) }]),
+        slots: makeSlots([{ tool: makeTool({ toolType: "sample_vial", toolId: "sample_vial_lcms", label: "Autosampler vial" }) }]),
       }),
     );
     vi.mocked(sendExperimentCommand).mockResolvedValue(
       makeWorkbenchExperiment({
-        auditLog: ["Bench beaker discarded from Station 1."],
+        auditLog: ["Autosampler vial discarded from Station 1."],
         slots: makeSlots(),
       }),
     );
@@ -4349,11 +4349,11 @@ describe("LabScene", () => {
         slots: makeSlots([
           {
             tool: makeTool({
-              toolId: "beaker_rinse",
-              label: "Bench beaker",
-              subtitle: "Temporary holding",
-              toolType: "beaker",
-              capacity_ml: 100,
+              toolId: "centrifuge_tube_50ml",
+              label: "50 mL centrifuge tube",
+              subtitle: "QuEChERS extraction",
+              toolType: "centrifuge_tube",
+              capacity_ml: 50,
             }),
           },
         ]),
@@ -4361,16 +4361,16 @@ describe("LabScene", () => {
     );
     vi.mocked(sendExperimentCommand).mockResolvedValue(
       makeWorkbenchExperiment({
-        auditLog: ["Bench beaker moved from Station 1 to Station 2."],
+        auditLog: ["50 mL centrifuge tube moved from Station 1 to Station 2."],
         slots: makeSlots([
           { tool: null },
           {
             tool: makeTool({
-              toolId: "beaker_rinse",
-              label: "Bench beaker",
-              subtitle: "Temporary holding",
-              toolType: "beaker",
-              capacity_ml: 100,
+              toolId: "centrifuge_tube_50ml",
+              label: "50 mL centrifuge tube",
+              subtitle: "QuEChERS extraction",
+              toolType: "centrifuge_tube",
+              capacity_ml: 50,
             }),
           },
         ]),
@@ -4381,7 +4381,7 @@ describe("LabScene", () => {
 
     await waitFor(() => {
       expect(
-        within(screen.getByTestId("bench-slot-station_1")).getByText("Bench beaker"),
+        within(screen.getByTestId("bench-slot-station_1")).getByText("50 mL centrifuge tube"),
       ).toBeInTheDocument();
     });
 
@@ -4394,7 +4394,7 @@ describe("LabScene", () => {
 
     await waitFor(() => {
       expect(
-        within(screen.getByTestId("bench-slot-station_2")).getByText("Bench beaker"),
+        within(screen.getByTestId("bench-slot-station_2")).getByText("50 mL centrifuge tube"),
       ).toBeInTheDocument();
     });
 
@@ -4772,7 +4772,7 @@ describe("LabScene", () => {
     });
 
     const secondTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId("toolbar-item-beaker_rinse"), {
+    fireEvent.dragStart(screen.getByTestId("toolbar-item-centrifuge_tube_50ml"), {
       dataTransfer: secondTransfer,
     });
     fireEvent.drop(screen.getByTestId("bench-slot-station_2"), { dataTransfer: secondTransfer });

@@ -25,7 +25,6 @@ export type ToolType =
   | "sample_vial"
   | "beaker"
   | "centrifuge_tube"
-  | "cleanup_tube"
   | "cutting_board"
   | "sample_bag"
   | "storage_jar";

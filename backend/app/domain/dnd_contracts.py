@@ -56,20 +56,6 @@ _TOOL_CONTRACTS: dict[str, DndEntityContract] = {
         can_receive_liquids=True,
         can_seal=True,
     ),
-    "cleanup_tube": DndEntityContract(
-        entity_kind="tool",
-        allowed_drop_targets=(
-            "workbench_slot",
-            "trash_bin",
-            "gross_balance_widget",
-            "analytical_balance_widget",
-            "vortex_widget",
-        ),
-        is_discardable=True,
-        supports_object_move=True,
-        can_receive_liquids=True,
-        can_seal=True,
-    ),
     "cutting_board": DndEntityContract(
         entity_kind="tool",
         allowed_drop_targets=("workbench_slot", "gross_balance_widget"),

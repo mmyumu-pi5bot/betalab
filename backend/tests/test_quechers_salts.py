@@ -94,7 +94,7 @@ def test_salts_added_to_wet_tube_start_exothermic_reaction_and_cementation() -> 
 
 @pytest.mark.parametrize(
     "tool_id",
-    ("centrifuge_tube_50ml", "cleanup_tube_dspe", "sample_vial_lcms", "beaker_rinse"),
+    ("centrifuge_tube_50ml", "sample_vial_lcms"),
 )
 def test_salts_can_be_added_to_every_open_liquid_container(tool_id: str) -> None:
     service = ExperimentRuntimeService()

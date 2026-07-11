@@ -42,14 +42,6 @@ WORKBENCH_TOOLS = {
         tool_type="centrifuge_tube",
         capacity_ml=50.0,
     ),
-    "cleanup_tube_dspe": WorkbenchToolDefinition(
-        id="cleanup_tube_dspe",
-        name="d-SPE cleanup tube",
-        subtitle="Matrix cleanup",
-        accent="emerald",
-        tool_type="cleanup_tube",
-        capacity_ml=15.0,
-    ),
     "sample_vial_lcms": WorkbenchToolDefinition(
         id="sample_vial_lcms",
         name="Autosampler vial",
@@ -57,14 +49,6 @@ WORKBENCH_TOOLS = {
         accent="sky",
         tool_type="sample_vial",
         capacity_ml=2.0,
-    ),
-    "beaker_rinse": WorkbenchToolDefinition(
-        id="beaker_rinse",
-        name="Bench beaker",
-        subtitle="Temporary holding",
-        accent="rose",
-        tool_type="beaker",
-        capacity_ml=100.0,
     ),
     "cutting_board_hdpe": WorkbenchToolDefinition(
         id="cutting_board_hdpe",
@@ -141,9 +125,7 @@ WORKBENCH_LIQUIDS = {
 
 _TOOL_DESCRIPTIONS = {
     "centrifuge_tube_50ml": "Receives apple sample and extraction solvent before salts and centrifugation.",
-    "cleanup_tube_dspe": "Collects the supernatant for dispersive SPE cleanup before final vialing.",
     "sample_vial_lcms": "Standard autosampler vial used to load the final extract into the chromatograph.",
-    "beaker_rinse": "Open vessel for rinse, discard, or intermediate handling on the bench.",
     "hdpe_storage_jar_2l": "Wide-mouth 2 L HDPE storage jar with a thick screw cap for cold, sealed bulk homogenate handling.",
     "sealed_sampling_bag": "Tamper-evident sample collection bag for sealed produce or field intake.",
     "cutting_board_hdpe": "Clean prep board used to stage apples before cutting.",
@@ -219,7 +201,7 @@ _WORKSPACE_WIDGET_ITEMS = {
     },
     "vortex_mixer_widget": {
         "accent": "violet",
-        "description": "Benchtop vortex used to mix centrifuge and cleanup tubes.",
+        "description": "Benchtop vortex used to mix centrifuge tubes.",
         "name": "Vortex mixer",
         "subtitle": "Tube agitation",
         "widget_type": "vortex_mixer",
@@ -253,9 +235,7 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
         "id": "prep_tools",
         "item_ids": (
             "centrifuge_tube_50ml",
-            "cleanup_tube_dspe",
             "sample_vial_lcms",
-            "beaker_rinse",
             "hdpe_storage_jar_2l",
         ),
         "item_source": "tools",
