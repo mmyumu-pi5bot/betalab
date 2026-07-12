@@ -110,18 +110,7 @@ export function DropDraftCard({
 }: DropDraftCardProps) {
   return (
     <div className="rounded-[1rem] border border-sky-200 bg-sky-50/80 px-4 py-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-        </div>
-        <button
-          className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-          onClick={onCancel}
-          type="button"
-        >
-          Cancel
-        </button>
-      </div>
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
       <div className="mt-3">
         <DropDraftForm
           confirmLabel={confirmLabel}
@@ -129,6 +118,7 @@ export function DropDraftCard({
           onCancel={onCancel}
           onChangeField={onChangeField}
           onConfirm={onConfirm}
+          showCancel
         />
       </div>
     </div>

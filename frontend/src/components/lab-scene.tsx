@@ -468,7 +468,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       pendingBenchDraft.destinationKind === "workbench_tool"
     ) {
       return (
-        <div className="space-y-2" data-testid="debug-slurry-inline-controls">
+        <div
+          className="space-y-2 rounded-[1rem] border border-sky-200 bg-sky-50/80 px-4 py-4"
+          data-testid="debug-slurry-inline-controls"
+        >
           <DropDraftForm
             confirmLabel={pendingBenchDraft.confirmLabel}
             fields={pendingBenchDraft.fields}

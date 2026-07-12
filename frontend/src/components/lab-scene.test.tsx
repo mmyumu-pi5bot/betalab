@@ -909,6 +909,7 @@ describe("LabScene", () => {
 
     expect(dragOverEvent.defaultPrevented).toBe(true);
     const inlineControls = await within(station).findByTestId("debug-slurry-inline-controls");
+    expect(inlineControls).toHaveClass("border-sky-200", "bg-sky-50/80");
     expect(screen.queryByText("Configure Apple slurry")).not.toBeInTheDocument();
     expect(document.querySelector(".fixed.inset-0.z-50")).not.toBeInTheDocument();
     expect(within(inlineControls).getByLabelText("Debug slurry apple mass")).toHaveValue(10);
