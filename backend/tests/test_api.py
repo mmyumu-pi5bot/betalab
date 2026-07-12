@@ -1045,7 +1045,6 @@ def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
                 "destination_kind": "workbench_slot",
                 "destination_id": "station_1",
                 "produce_mass_g": 10.0,
-                "liquid_volume_ml": 8.0,
                 "temperature_c": 4.0,
             },
         )
@@ -1055,7 +1054,7 @@ def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
     assert tool["tool_id"] == "centrifuge_tube_50ml"
     assert tool["produce_fractions"][0]["mass_g"] == 10.0
     assert tool["produce_fractions"][0]["is_mixed"] is True
-    assert tool["liquids"][0]["volume_ml"] == 8.0
+    assert tool["liquids"] == []
     lot_state = _find_material_state(spawned.json(), tool["produce_lots"][0]["id"])
     assert lot_state["material_state"] == "slurry"
     assert lot_state["temperature_c"] == 4.0

@@ -864,7 +864,7 @@ describe("LabScene", () => {
     fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
 
     expect(await screen.findByLabelText("Debug slurry apple mass")).toHaveValue(10);
-    expect(screen.getByLabelText("Debug slurry liquid volume")).toHaveValue(10);
+    expect(screen.queryByLabelText("Debug slurry liquid volume")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Debug slurry temperature")).toHaveValue(20);
     fireEvent.change(screen.getByLabelText("Debug slurry apple mass"), {
       target: { value: "12.5" },
@@ -877,7 +877,6 @@ describe("LabScene", () => {
       {
         destination_id: "station_1",
         destination_kind: "workbench_slot",
-        liquid_volume_ml: 10,
         preset_id: "apple_slurry_centrifuge_tube",
         produce_mass_g: 12.5,
         temperature_c: 20,
@@ -913,11 +912,8 @@ describe("LabScene", () => {
     expect(screen.queryByText("Configure Apple slurry")).not.toBeInTheDocument();
     expect(document.querySelector(".fixed.inset-0.z-50")).not.toBeInTheDocument();
     expect(within(inlineControls).getByLabelText("Debug slurry apple mass")).toHaveValue(10);
-    expect(within(inlineControls).getByLabelText("Debug slurry liquid volume")).toHaveValue(10);
+    expect(within(inlineControls).queryByLabelText("Debug slurry liquid volume")).not.toBeInTheDocument();
     expect(within(inlineControls).getByLabelText("Debug slurry temperature")).toHaveValue(20);
-    fireEvent.change(within(inlineControls).getByLabelText("Debug slurry liquid volume"), {
-      target: { value: "1.5" },
-    });
     fireEvent.click(within(inlineControls).getByText("Add"));
     await waitFor(() => expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
@@ -925,7 +921,6 @@ describe("LabScene", () => {
       expect.objectContaining({
         destination_id: "station_1",
         destination_kind: "workbench_tool",
-        liquid_volume_ml: 1.5,
         preset_id: "apple_slurry_centrifuge_tube",
         produce_mass_g: 10,
         temperature_c: 20,
@@ -951,15 +946,7 @@ describe("LabScene", () => {
           unitCount: null,
         }),
       ],
-      liquids: [
-        {
-          id: "debug_extract_1",
-          liquidId: "apple_extract",
-          name: "Apple extract",
-          volume_ml: 10,
-          accent: "rose",
-        },
-      ],
+      liquids: [],
     });
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({ slots: makeSlots([{ tool: debugTube }]) }),
@@ -4105,7 +4092,7 @@ describe("LabScene", () => {
     expect(sendExperimentCommand).not.toHaveBeenCalled();
   });
 
-  it("shows locked contents feedback and disables liquid removal in a closed container", async () => {
+  it("shows declared contents without liquid removal in a closed container", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
         slots: makeSlots([
@@ -4129,10 +4116,10 @@ describe("LabScene", () => {
 
     render(<PesticideWorkbench />);
 
-    const removeButton = await screen.findByRole("button", { name: "Remove Acetonitrile" });
-    expect(removeButton).toBeDisabled();
-
-    fireEvent.click(removeButton);
+    const declaredContents = await screen.findByRole("region", { name: "Declared contents" });
+    expect(within(declaredContents).getByText("Acetonitrile")).toBeInTheDocument();
+    expect(within(declaredContents).getByText("2.00 mL")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove Acetonitrile" })).not.toBeInTheDocument();
     expect(sendExperimentCommand).not.toHaveBeenCalled();
   });
 
@@ -4904,7 +4891,7 @@ describe("LabScene", () => {
     expect(within(screen.getByTestId("bench-slot-station_1")).getByText("Acetonitrile")).toBeInTheDocument();
   });
 
-  it("lets the user remove a liquid from a tool through a backend command", async () => {
+  it("does not offer individual liquid removal from a tool", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
         slots: makeSlots([
@@ -4924,34 +4911,13 @@ describe("LabScene", () => {
         ]),
       }),
     );
-    vi.mocked(sendExperimentCommand).mockResolvedValue(
-      makeWorkbenchExperiment({
-        auditLog: ["Acetonitrile removed from Autosampler vial."],
-        slots: makeSlots([{ tool: makeTool({ liquids: [] }) }]),
-      }),
-    );
-
     render(<PesticideWorkbench />);
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Remove Acetonitrile" })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove Acetonitrile" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Acetonitrile removed from Autosampler vial.")).toBeInTheDocument();
-    });
-
-    expect(sendExperimentCommand).toHaveBeenCalledWith(
-      "experiment_pesticides",
-      "remove_liquid_from_workbench_tool",
-      {
-        slot_id: "station_1",
-        liquid_entry_id: "bench_liquid_1",
-      },
-    );
-    expect(screen.queryByText("2 mL")).not.toBeInTheDocument();
+    const declaredContents = await screen.findByRole("region", { name: "Declared contents" });
+    expect(within(declaredContents).getByText("Acetonitrile")).toBeInTheDocument();
+    expect(within(declaredContents).getByText("2.00 mL")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove Acetonitrile" })).not.toBeInTheDocument();
+    expect(sendExperimentCommand).not.toHaveBeenCalled();
   });
 
   it("surfaces backend command failures in the status panel without mutating the bench", async () => {
@@ -5466,15 +5432,7 @@ describe("LabScene", () => {
       toolType: "centrifuge_tube",
       capacity_ml: 50,
       containsSlurry: true,
-      liquids: [
-        {
-          id: "debug_extract_1",
-          liquidId: "apple_extract",
-          name: "Apple extract",
-          volume_ml: 10,
-          accent: "rose",
-        },
-      ],
+      liquids: [],
     });
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({

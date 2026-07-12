@@ -125,7 +125,6 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
         destination_kind: pendingDropDraft.destinationKind,
         destination_id: pendingDropDraft.targetId,
         produce_mass_g: getNumericFieldValue("produce_mass_g"),
-        liquid_volume_ml: getNumericFieldValue("liquid_volume_ml"),
         temperature_c: getNumericFieldValue("temperature_c"),
       });
       setPendingDropDraft(null);

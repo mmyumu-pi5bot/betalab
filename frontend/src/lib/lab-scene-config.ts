@@ -200,17 +200,6 @@ export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
       wheelStep: 1,
     },
     {
-      ariaLabel: "Debug slurry liquid volume",
-      id: "liquid_volume_ml",
-      inputStep: 0.1,
-      label: "Liquid volume",
-      minValue: 0,
-      stepAmount: 1,
-      unitLabel: "mL",
-      value: 10,
-      wheelStep: 1,
-    },
-    {
       ariaLabel: "Debug slurry temperature",
       id: "temperature_c",
       inputStep: 1,

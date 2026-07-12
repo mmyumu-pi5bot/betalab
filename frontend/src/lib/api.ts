@@ -1067,7 +1067,6 @@ export async function createDebugToolPreset(
       destination_kind: requireString(body, "destination_kind"),
       destination_id: requireString(body, "destination_id"),
       ...optionalNumberBody(body, "produce_mass_g"),
-      ...optionalNumberBody(body, "liquid_volume_ml"),
       ...optionalNumberBody(body, "temperature_c"),
     },
   });

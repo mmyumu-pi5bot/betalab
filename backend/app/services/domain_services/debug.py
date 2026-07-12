@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchLiquid, WorkbenchTool, new_id
+from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchTool, new_id
 from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
@@ -37,7 +37,6 @@ class CreateDebugToolPresetRequest:
     destination_kind: str
     destination_id: str
     produce_mass_g: float | None = None
-    liquid_volume_ml: float | None = None
     temperature_c: float | None = None
 
 
@@ -102,13 +101,9 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             raise ValueError("Unknown debug tool preset")
 
         produce_mass_g = request.produce_mass_g if request.produce_mass_g is not None else 10.0
-        liquid_volume_ml = request.liquid_volume_ml if request.liquid_volume_ml is not None else 10.0
         temperature_c = request.temperature_c if request.temperature_c is not None else 20.0
         if produce_mass_g <= 0:
             raise ValueError("Produce mass must be greater than zero.")
-        if liquid_volume_ml < 0:
-            raise ValueError("Liquid volume cannot be negative.")
-
         if request.destination_kind == "workbench_tool":
             slot = find_workbench_slot(experiment.workbench, request.destination_id)
             if slot.tool is None or slot.tool.tool_type not in {"centrifuge_tube", "sample_vial"}:
@@ -122,7 +117,6 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
                 experiment,
                 tool,
                 produce_mass_g=produce_mass_g,
-                liquid_volume_ml=liquid_volume_ml,
                 temperature_c=temperature_c,
                 location_kind="workbench_tool",
                 location_id=slot.id,
@@ -135,7 +129,6 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             experiment,
             tool,
             produce_mass_g=produce_mass_g,
-            liquid_volume_ml=liquid_volume_ml,
             temperature_c=temperature_c,
             location_kind="workbench_tool",
             location_id=tool.id,
@@ -166,14 +159,13 @@ def _fill_tool_with_debug_slurry(
     tool: WorkbenchTool,
     *,
     produce_mass_g: float,
-    liquid_volume_ml: float,
     temperature_c: float,
     location_kind: str,
     location_id: str,
 ) -> None:
     produce_lot = ProduceLot(
         id=new_id("produce"),
-        label="Apple slurry",
+        label="Apple",
         produce_type="apple",
         total_mass_g=produce_mass_g,
         unit_count=None,
@@ -198,18 +190,6 @@ def _fill_tool_with_debug_slurry(
             container_label=tool.label,
         )
     )
-    if liquid_volume_ml > 0:
-        tool.liquids.append(
-            WorkbenchLiquid(
-                id=new_id("liquid"),
-                liquid_id="apple_extract",
-                name="Apple extract",
-                volume_ml=liquid_volume_ml,
-                accent="rose",
-            )
-        )
-
-
 def _build_debug_produce_lot(
     preset_id: str,
     *,

@@ -62,10 +62,33 @@ describe("BenchToolCard QuEChERS state", () => {
 
     render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
 
+    expect(screen.getByText("Declared contents")).toBeInTheDocument();
     expect(screen.getByText("Multi-residue stock solution")).toBeInTheDocument();
+    expect(screen.getByText("1.00 mL")).toBeInTheDocument();
     expect(screen.getByText("ISTD solution")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove Multi-residue stock solution" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove ISTD solution" })).toBeInTheDocument();
+    expect(screen.getByText("0.05 mL")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps nominal liquid contents visible after slurry forms", () => {
+    const tool = makeTool();
+    tool.containsSlurry = true;
+    tool.liquids = [
+      {
+        id: "acetonitrile_1",
+        liquidId: "acetonitrile_extraction",
+        name: "Acetonitrile",
+        volume_ml: 10,
+        accent: "amber",
+      },
+    ];
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    expect(screen.getByText("Declared contents")).toBeInTheDocument();
+    expect(screen.getByText("Acetonitrile")).toBeInTheDocument();
+    expect(screen.getByText("10.00 mL")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove Acetonitrile" })).not.toBeInTheDocument();
   });
 
   it("shows only the temperature indicator", () => {

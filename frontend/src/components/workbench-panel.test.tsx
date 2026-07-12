@@ -521,7 +521,7 @@ describe("WorkbenchPanel", () => {
     ).toBeTruthy();
   });
 
-  it("hides removable liquid cards when the tool contains slurry", () => {
+  it("keeps declared liquid contents visible when the tool contains slurry", () => {
     render(
       <PesticideWorkbenchPanel
         onLiquidVolumeChange={vi.fn()}
@@ -549,7 +549,15 @@ describe("WorkbenchPanel", () => {
                   accent: "amber",
                 },
               ],
-              produceLots: [makeProduceLot({ id: "lot_1", materialState: "slurry" })],
+              produceLots: [
+                makeProduceLot({
+                  id: "lot_1",
+                  label: "Apple",
+                  materialState: "slurry",
+                  totalMassG: 10,
+                  unitCount: null,
+                }),
+              ],
             },
           },
         ]}
@@ -559,7 +567,11 @@ describe("WorkbenchPanel", () => {
 
     const toolCard = screen.getByTestId("bench-tool-card-bench_tool_tube");
     expect(toolCard).toHaveTextContent("Slurry present");
-    expect(screen.queryByText("Acetonitrile")).not.toBeInTheDocument();
+    expect(screen.getByText("Declared contents")).toBeInTheDocument();
+    expect(screen.getByText("Apple")).toBeInTheDocument();
+    expect(screen.getByText("10 g • Slurry")).toBeInTheDocument();
+    expect(screen.getByText("Acetonitrile")).toBeInTheDocument();
+    expect(screen.getByText("10.00 mL")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove Acetonitrile" })).not.toBeInTheDocument();
   });
 

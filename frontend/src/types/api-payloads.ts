@@ -261,7 +261,6 @@ export type CreateDebugToolPresetPayload = {
     | "workbench_tool";
   destination_id: string;
   produce_mass_g?: number;
-  liquid_volume_ml?: number;
   temperature_c?: number;
 };
 

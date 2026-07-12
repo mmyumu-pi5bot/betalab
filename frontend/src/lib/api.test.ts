@@ -819,7 +819,6 @@ describe("api client", () => {
       destination_kind: "workbench_slot",
       destination_id: "station_1",
       produce_mass_g: 10,
-      liquid_volume_ml: 8,
       temperature_c: 4,
     });
 
@@ -832,7 +831,6 @@ describe("api client", () => {
           destination_kind: "workbench_slot",
           destination_id: "station_1",
           produce_mass_g: 10,
-          liquid_volume_ml: 8,
           temperature_c: 4,
         }),
       },

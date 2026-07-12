@@ -861,7 +861,6 @@ class DebugToolPresetSpawnSchema(BaseModel):
     ]
     destination_id: str
     produce_mass_g: float | None = None
-    liquid_volume_ml: float | None = None
     temperature_c: float | None = None
 
 
