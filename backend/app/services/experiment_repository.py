@@ -291,6 +291,12 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             injection_context=InjectionContext(**schema.pipette.injection_context.model_dump())
             if schema.pipette.injection_context is not None
             else None,
+            liquids=[WorkbenchLiquid(**liquid.model_dump()) for liquid in schema.pipette.liquids],
+            produce_lots=[_deserialize_produce_lot(lot) for lot in schema.pipette.produce_lots],
+            produce_fractions=[
+                _deserialize_produce_fraction(fraction)
+                for fraction in schema.pipette.produce_fractions
+            ],
         ),
         lims_entries=_deserialize_lims_entries(schema),
         snapshot_version=schema.snapshot_version,
@@ -380,6 +386,7 @@ def _deserialize_workbench_tool(tool_schema) -> WorkbenchTool | None:
         tool_type=tool_schema.tool_type,
         capacity_ml=tool_schema.capacity_ml,
         contact_impurity_mg_per_g=tool_schema.contact_impurity_mg_per_g,
+        contents_homogeneity=tool_schema.contents_homogeneity,
         is_sealed=tool_schema.is_sealed,
         closure_fault=tool_schema.closure_fault,
         internal_pressure_bar=tool_schema.internal_pressure_bar,

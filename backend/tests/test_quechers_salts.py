@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pytest
@@ -151,6 +152,18 @@ def test_unmixed_salted_tube_cements_after_fifteen_seconds() -> None:
     assert state.is_usable is False
 
 
+def test_full_cementation_generates_extraction_result() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _add(service, experiment.id, "quechers_salts")
+
+    _advance(service, experiment.id, 15000)
+
+    assert _tube(service, experiment.id).quechers_extraction_result is not None
+
+
 def test_starting_vortex_in_time_stops_cementation_and_cycle_marks_mixed() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()
@@ -172,6 +185,38 @@ def test_starting_vortex_in_time_stops_cementation_and_cycle_marks_mixed() -> No
     assert state.phase == "mixed"
     assert state.cementation_progress == pytest.approx(progress_at_start)
     assert state.is_usable is True
+    assert _vortex_tool(service, experiment.id).quechers_extraction_result is not None
+
+
+def test_vortex_builds_hidden_container_homogeneity_progressively() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _add(service, experiment.id, "quechers_salts")
+    CloseWorkbenchToolService(service).run(
+        experiment.id,
+        WorkbenchSlotRequest(slot_id="station_1"),
+    )
+    MoveWorkbenchToolToVortexService(service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+
+    StartVortexCycleService(service).run(experiment.id, EmptyRequest())
+    _advance(service, experiment.id, 1000)
+
+    expected_after_one_second = 1.0 - math.exp(-1.0 / 1.25)
+    assert _vortex_tool(service, experiment.id).contents_homogeneity == pytest.approx(
+        expected_after_one_second,
+        abs=0.001,
+    )
+
+    _advance(service, experiment.id, 2000)
+    assert _vortex_tool(service, experiment.id).contents_homogeneity == pytest.approx(
+        1.0 - math.exp(-3.0 / 1.25),
+        abs=0.001,
+    )
 
 
 def test_vortexing_open_tube_with_wet_contents_contaminates_tool() -> None:
@@ -288,3 +333,27 @@ def test_quechers_state_round_trips_through_sqlite(tmp_path: Path) -> None:
     assert state.phase == "reacting"
     assert state.temperature_c > 20
     assert state.cementation_progress > 0
+
+
+def test_hidden_container_homogeneity_round_trips_through_sqlite(tmp_path: Path) -> None:
+    repository = SqliteExperimentRepository(str(tmp_path / "homogeneity.sqlite3"))
+    first_service = ExperimentRuntimeService(repository=repository)
+    experiment = first_service.create_experiment()
+    _place_tube(first_service, experiment.id)
+    _add(first_service, experiment.id, "acetonitrile_extraction", 10)
+    _add(first_service, experiment.id, "quechers_salts")
+    CloseWorkbenchToolService(first_service).run(
+        experiment.id,
+        WorkbenchSlotRequest(slot_id="station_1"),
+    )
+    MoveWorkbenchToolToVortexService(first_service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+    StartVortexCycleService(first_service).run(experiment.id, EmptyRequest())
+    _advance(first_service, experiment.id, 1000)
+    expected = _vortex_tool(first_service, experiment.id).contents_homogeneity
+
+    second_service = ExperimentRuntimeService(repository=repository)
+
+    assert _vortex_tool(second_service, experiment.id).contents_homogeneity == expected

@@ -113,7 +113,7 @@ class ProduceMaterialStateSchema(BaseModel):
     material_state: str = "whole"
     temperature_c: float = 20.0
     grind_quality_label: str | None = None
-    homogeneity_score: float | None = None
+    homogeneity_score: float | None = Field(default=None, exclude=True)
     residual_co2_mass_g: float = 0.0
     grinding_elapsed_seconds: float = 0.0
     grinding_temperature_integral: float = 0.0
@@ -126,7 +126,7 @@ class ProduceFractionSchema(BaseModel):
     produce_material_state_id: str
     mass_g: float
     unit_count: int | None = None
-    is_mixed: bool = False
+    is_mixed: bool = Field(default=False, exclude=True)
     is_contaminated: bool = False
     impurity_mass_mg: float = 0.0
     exposure_container_ids: list[str] = Field(default_factory=list)
@@ -202,6 +202,9 @@ class PipetteStateSchema(BaseModel):
     volume_ml: float = 0.0
     source_tool_id: str | None = None
     injection_context: InjectionContextSchema | None = None
+    liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
+    produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
+    produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
 
 
 
@@ -332,6 +335,7 @@ class WorkbenchToolSchema(BaseModel):
     tool_type: str
     capacity_ml: float
     contact_impurity_mg_per_g: float = 0.0
+    contents_homogeneity: float = Field(default=0.0, exclude=True)
     is_sealed: bool = False
     closure_fault: str | None = None
     internal_pressure_bar: float = 1.0
@@ -383,6 +387,10 @@ class WorkbenchToolSchema(BaseModel):
     @computed_field
     def can_receive_produce(self) -> bool:
         return can_tool_receive_produce(self.tool_type)
+
+    @computed_field
+    def can_receive_liquids(self) -> bool:
+        return can_tool_receive_liquids(self.tool_type)
 
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:

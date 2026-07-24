@@ -58,7 +58,14 @@ const makeExperiment = (): Experiment => ({
     produceFractions: [],
     sourceToolId: null,
   },
-  pipette: { capacityMl: 1, volumeMl: 0, sourceToolId: null },
+  pipette: {
+    capacityMl: 1,
+    liquids: [],
+    produceFractions: [],
+    produceLots: [],
+    volumeMl: 0,
+    sourceToolId: null,
+  },
   analyticalBalance: {
     tareMassG: null,
     taredToolId: null,
@@ -665,7 +672,10 @@ describe("api client", () => {
 
     const normalized = await getExperiment("experiment_123");
     expect("isMixed" in ((normalized.produceMaterialStates?.[0] ?? {}) as Record<string, unknown>)).toBe(false);
-    expect(normalized.workbench.slots[0].tool?.produceFractions?.[0]?.isMixed).toBe(true);
+    expect(
+      "isMixed" in
+        ((normalized.workbench.slots[0].tool?.produceFractions?.[0] ?? {}) as Record<string, unknown>)
+    ).toBe(false);
     expect("isMixed" in ((normalized.workbench.slots[0].tool ?? {}) as Record<string, unknown>)).toBe(false);
   });
 
@@ -995,7 +1005,10 @@ describe("api client", () => {
     expect(experiment.workspace.produceBasketLots[0]?.unitCount).toBe(12);
     expect(experiment.workspace.produceBasketLots[0]?.totalMassG).toBe(2450);
     expect(experiment.workspace.produceBasketLots[0]?.grindQualityLabel).toBe("powder_fine");
-    expect(experiment.workspace.produceBasketLots[0]?.homogeneityScore).toBe(0.94);
+    expect(
+      "homogeneityScore" in
+        ((experiment.workspace.produceBasketLots[0] ?? {}) as Record<string, unknown>)
+    ).toBe(false);
   });
 
   it("throws when experiment creation fails", async () => {

@@ -14,8 +14,8 @@ export type ActionModeExperimentApi = {
   loadSpatulaFromAnalyticalBalanceTool: () => void;
   pourSpatulaIntoWorkbenchTool: (payload: { delta_mass_g: number; slot_id: string }) => void;
   pourSpatulaIntoAnalyticalBalanceTool: (payload: { delta_mass_g: number }) => void;
-  aspiratePipette: (payload: { tool_id: string; delta_volume_ml: number }) => void;
-  dispensePipette: (payload: { tool_id: string; delta_volume_ml: number }) => void;
+  aspiratePipette: (payload: { tool_id: string; delta_volume_ml: number }) => void | Promise<void>;
+  dispensePipette: (payload: { tool_id: string; delta_volume_ml: number }) => void | Promise<void>;
 };
 
 type UseActionModeOptions = {
@@ -55,10 +55,10 @@ export function useActionMode({ clearDropTargets, experimentApi, pipette, spatul
     void experimentApiRef.current.pourSpatulaIntoAnalyticalBalanceTool(payload);
   }, []);
   const onAspiratePipette = useCallback((payload: { tool_id: string; delta_volume_ml: number }) => {
-    void experimentApiRef.current.aspiratePipette(payload);
+    return experimentApiRef.current.aspiratePipette(payload);
   }, []);
   const onDispensePipette = useCallback((payload: { tool_id: string; delta_volume_ml: number }) => {
-    void experimentApiRef.current.dispensePipette(payload);
+    return experimentApiRef.current.dispensePipette(payload);
   }, []);
 
   useEffect(() => {

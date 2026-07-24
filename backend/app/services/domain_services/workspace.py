@@ -391,6 +391,11 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
 
         if widget.vortex_run_remaining_ms > 0:
             vortex_elapsed_ms = min(elapsed_ms, widget.vortex_run_remaining_ms)
+            if widget.tool is not None and widget.tool.quechers_state.phase != "contaminated":
+                physical_simulation_service.advance_vortex_mixing(
+                    widget.tool,
+                    vortex_elapsed_ms / 1000.0,
+                )
             widget.vortex_run_remaining_ms = round_volume(max(widget.vortex_run_remaining_ms - vortex_elapsed_ms, 0.0))
             if widget.vortex_run_remaining_ms <= 0:
                 _complete_vortex_cycle(experiment, widget)
@@ -499,8 +504,10 @@ def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> N
         return
     if widget.tool.quechers_state.phase == "mixing":
         widget.tool.quechers_state.phase = "mixed"
+        physical_simulation_service.complete_quechers_extraction(widget.tool)
+    is_mixed = widget.tool.contents_homogeneity >= 0.9
     for fraction in widget.tool.produce_fractions:
-        fraction.is_mixed = True
+        fraction.is_mixed = is_mixed
     experiment.audit_log.append(f"{widget.tool.label} successfully vortexed on {widget.label}.")
 
 

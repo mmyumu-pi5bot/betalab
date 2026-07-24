@@ -1,6 +1,7 @@
 "use client";
 
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
+import { PipetteIcon } from "@/components/pipette-icon";
 import type { PipetteState } from "@/types/workbench";
 
 type ActionDefinition = {
@@ -97,30 +98,6 @@ function SpatulaIcon({ active }: { active: boolean }) {
         <ellipse cx="6.5" cy="12" rx="5.5" ry="4" stroke="currentColor" strokeWidth="1.15" />
         {/* Bowl rim glint */}
         <ellipse cx="5" cy="10.2" fill="none" opacity="0.5" rx="2.5" ry="1.2" stroke="currentColor" strokeWidth="0.6" />
-      </g>
-    </svg>
-  );
-}
-
-function PipetteIcon({ active, fillRatio }: { active: boolean; fillRatio: number }) {
-  const liquidHeight = 7.4 * fillRatio;
-  const liquidTop = 12.1 - liquidHeight;
-  return (
-    <svg aria-hidden="true" className={active ? "text-sky-700" : "text-slate-700"} fill="none" viewBox="0 0 24 24">
-      <g transform="rotate(38 12 12)">
-        <rect x="9" y="2" width="6" height="4" rx="1.2" fill="currentColor" opacity="0.25" />
-        <rect x="8" y="5" width="8" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
-        <rect
-          x="9"
-          y={Math.max(5.4, liquidTop)}
-          width="6"
-          height={Math.max(0.6, liquidHeight)}
-          rx="1.2"
-          fill={fillRatio > 0 ? (active ? "#38bdf8" : "#7dd3fc") : "#e2e8f0"}
-          opacity={fillRatio > 0 ? 0.92 : 0.2}
-        />
-        <rect x="9.7" y="7" width="4.6" height="5.5" rx="1" fill={active ? "#bae6fd" : "#f8fafc"} />
-        <path d="M10.5 15h3L12.8 21h-1.6l-.7-6Z" fill="currentColor" opacity="0.8" />
       </g>
     </svg>
   );

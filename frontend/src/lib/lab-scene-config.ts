@@ -73,7 +73,6 @@ export const debugProducePresets: DebugProducePreset[] = [
       residualCo2MassG: 18,
       temperatureC: -62,
       grindQualityLabel: "powder_fine",
-      homogeneityScore: 0.96,
       isDraggable: true,
       allowedDropTargets: debugProduceAllowedDropTargets,
     },

@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Experiment, ProduceFraction, ProduceLot, WorkbenchTool, new_id
+from app.domain.models import (
+    Experiment,
+    ProduceFraction,
+    ProduceFractionLocationKind,
+    ProduceLot,
+    WorkbenchTool,
+    new_id,
+)
 from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
@@ -141,13 +148,12 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             DndObjectRef(kind=request.destination_kind, id=request.destination_id),
             source_label="Debug palette",
         )
-        location_kind = {
-            "analytical_balance": "workspace_widget_tool",
-            "gross_balance": "workspace_widget_tool",
-            "trash_bin": "trash",
-            "vortex": "workspace_widget_tool",
-            "workbench_slot": "workbench_tool",
-        }[request.destination_kind]
+        if request.destination_kind == "trash_bin":
+            location_kind: ProduceFractionLocationKind = "trash"
+        elif request.destination_kind == "workbench_slot":
+            location_kind = "workbench_tool"
+        else:
+            location_kind = "workspace_widget_tool"
         location_id = tool.id if request.destination_kind == "trash_bin" else request.destination_id
         for fraction in tool.produce_fractions:
             fraction.location_kind = location_kind
@@ -160,7 +166,7 @@ def _fill_tool_with_debug_slurry(
     *,
     produce_mass_g: float,
     temperature_c: float,
-    location_kind: str,
+    location_kind: ProduceFractionLocationKind,
     location_id: str,
 ) -> None:
     produce_lot = ProduceLot(
@@ -177,6 +183,7 @@ def _fill_tool_with_debug_slurry(
     state.temperature_c = temperature_c
     state.grind_quality_label = "slurry"
     state.homogeneity_score = 1.0
+    tool.contents_homogeneity = 1.0
     tool.produce_fractions.append(
         ProduceFraction(
             id=new_id("produce_fraction"),

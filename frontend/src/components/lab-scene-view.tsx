@@ -109,7 +109,6 @@ type LabSceneViewProps = {
     spatulaCursorPosition: { x: number; y: number } | null;
     spatulaHintMessage: string | null;
     pipette: PipetteState;
-    pipetteCursorPosition: { x: number; y: number } | null;
     pipetteHintMessage: string | null;
     stopPipetteHold: () => void;
     stopSpatulaPour: () => void;
@@ -264,7 +263,6 @@ export function LabSceneView({
         spatula={spatula.spatula}
       />
       <PipetteOverlay
-        cursorPosition={spatula.pipetteCursorPosition}
         hint={spatula.pipetteHintMessage}
         isPipetteMode={spatula.isPipetteMode}
         pipette={spatula.pipette}

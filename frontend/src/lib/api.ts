@@ -1592,6 +1592,7 @@ function normalizeExperiment(experiment: Experiment): Experiment {
     ),
     pipette: normalizePipetteState(
       ((experiment as Experiment & Record<string, unknown>).pipette ?? {}) as Record<string, unknown>,
+      materialStates,
     ),
     analyticalBalance: normalizeAnalyticalBalanceState(
       (
@@ -1668,6 +1669,7 @@ function normalizeBenchTool(
     accent: tool.accent,
     toolType: String(tool.toolType ?? tool.tool_type) as BenchToolInstance["toolType"],
     capacity_ml: Number(tool.capacity_ml),
+    canReceiveLiquids: Boolean(tool.canReceiveLiquids ?? tool.can_receive_liquids),
     canReceiveProduce: Boolean(tool.canReceiveProduce ?? tool.can_receive_produce),
     canSeal: Boolean(tool.canSeal ?? tool.can_seal),
     contactImpurityMgPerG: Number(tool.contactImpurityMgPerG ?? tool.contact_impurity_mg_per_g ?? 0),
@@ -1828,12 +1830,6 @@ function normalizeProduceMaterialState(
         : state.grind_quality_label !== undefined
           ? (state.grind_quality_label as string | null)
           : null,
-    homogeneityScore:
-      state.homogeneityScore !== undefined && state.homogeneityScore !== null
-        ? Number(state.homogeneityScore)
-        : state.homogeneity_score !== undefined && state.homogeneity_score !== null
-          ? Number(state.homogeneity_score)
-          : null,
     residualCo2MassG: Number(state.residualCo2MassG ?? state.residual_co2_mass_g ?? 0),
     pesticideDegradationFactors: (state.pesticideDegradationFactors ??
       state.pesticide_degradation_factors ??
@@ -1851,7 +1847,6 @@ function normalizeProduceFractions(raw: unknown): ProduceFraction[] {
       produceMaterialStateId: String(
         fraction.produceMaterialStateId ?? fraction.produce_material_state_id ?? "",
       ),
-      isMixed: Boolean(fraction.isMixed ?? fraction.is_mixed ?? false),
       massG: Number(fraction.massG ?? fraction.mass_g ?? 0),
       unitCount:
         fraction.unitCount !== undefined && fraction.unitCount !== null
@@ -1936,9 +1931,28 @@ function normalizeSpatulaState(
   return normalized;
 }
 
-function normalizePipetteState(pipette: Record<string, unknown>) {
+function normalizePipetteState(
+  pipette: Record<string, unknown>,
+  materialStates: ProduceMaterialState[] = [],
+) {
+  const statesById = new Map(materialStates.map((state) => [state.id, state]));
+  const produceFractions = normalizeProduceFractions(
+    pipette.produceFractions ?? pipette.produce_fractions,
+  ).map((fraction) => ({
+    ...fraction,
+    materialState: statesById.get(fraction.produceMaterialStateId)?.materialState,
+  }));
+  const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
   return {
     capacityMl: Number(pipette.capacityMl ?? pipette.capacity_ml ?? 1.0),
+    liquids: Array.isArray(pipette.liquids) ? pipette.liquids.map(normalizeBenchLiquid) : [],
+    produceFractions,
+    produceLots: (
+      (pipette.produceLots ?? pipette.produce_lots ?? []) as unknown[]
+    ).map((lot) => normalizeProduceLot(
+      lot as ExperimentProduceLot & Record<string, unknown>,
+      buildProduceLotNormalizationContext(statesByLotId, statesById, produceFractions),
+    )),
     volumeMl: Number(pipette.volumeMl ?? pipette.volume_ml ?? 0.0),
     sourceToolId:
       pipette.sourceToolId !== undefined
@@ -2277,13 +2291,6 @@ function normalizeProduceLot(
         ? String(lot.grindQualityLabel)
         : lot.grind_quality_label !== undefined && lot.grind_quality_label !== null
           ? String(lot.grind_quality_label)
-          : null),
-    homogeneityScore:
-      stateRecord?.homogeneityScore ??
-      (lot.homogeneityScore !== undefined
-        ? Number(lot.homogeneityScore)
-        : lot.homogeneity_score !== undefined && lot.homogeneity_score !== null
-          ? Number(lot.homogeneity_score)
           : null),
     id: lotId,
     isContaminated: fractionRecord?.isContaminated ?? Boolean(lot.isContaminated ?? lot.is_contaminated),

@@ -22,6 +22,58 @@ def raise_if_quechers_unusable(tool: WorkbenchTool) -> None:
         raise ValueError(f"{tool.label} is contaminated and cannot be used for further preparation.")
 
 
+def merge_liquid_portion(
+    liquids: list[WorkbenchLiquid],
+    source: WorkbenchLiquid,
+    volume_ml: float,
+    true_volume_ml: float,
+    *,
+    id_prefix: str,
+) -> None:
+    existing = next((liquid for liquid in liquids if liquid.liquid_id == source.liquid_id), None)
+    if existing is None:
+        liquids.append(
+            WorkbenchLiquid(
+                id=new_id(id_prefix),
+                liquid_id=source.liquid_id,
+                name=source.name,
+                volume_ml=round(volume_ml, 6),
+                true_volume_ml=round(true_volume_ml, 6),
+                accent=source.accent,
+            )
+        )
+    else:
+        existing.volume_ml = round(existing.volume_ml + volume_ml, 6)
+        existing.true_volume_ml = round((existing.true_volume_ml or 0.0) + true_volume_ml, 6)
+
+
+def transfer_liquid_portion(
+    source_liquids: list[WorkbenchLiquid],
+    target_liquids: list[WorkbenchLiquid],
+    entry: WorkbenchLiquid,
+    volume_ml: float,
+    *,
+    target_id_prefix: str,
+) -> float:
+    """Move up to volume_ml of one liquid entry between containers, keeping the
+    hidden true volume proportional on both sides. Returns the volume actually moved.
+    Empty entries are pruned from the source so no zero-volume liquid survives a transfer."""
+    if entry.volume_ml <= 0:
+        source_liquids.remove(entry)
+        return 0.0
+    moved_ml = round(min(volume_ml, entry.volume_ml), 6)
+    if moved_ml <= 0:
+        return 0.0
+    true_ratio = (entry.true_volume_ml if entry.true_volume_ml is not None else entry.volume_ml) / entry.volume_ml
+    moved_true_ml = round(moved_ml * true_ratio, 6)
+    merge_liquid_portion(target_liquids, entry, moved_ml, moved_true_ml, id_prefix=target_id_prefix)
+    entry.volume_ml = round(entry.volume_ml - moved_ml, 6)
+    entry.true_volume_ml = round(max((entry.true_volume_ml or 0.0) - moved_true_ml, 0.0), 6)
+    if entry.volume_ml <= 0:
+        source_liquids.remove(entry)
+    return moved_ml
+
+
 def remove_liquid_from_tool(tool: WorkbenchTool, liquid: WorkbenchLiquid) -> None:
     tool.liquids = [entry for entry in tool.liquids if entry.id != liquid.id]
     if liquid.liquid_id == CALIBRATION_SOLUTION_ID:
@@ -42,11 +94,13 @@ def add_liquid_to_tool(
         raise ValueError(f"Open {tool.label} before adding liquids.")
 
     liquid_definition = get_workbench_liquid_definition(liquid_id)
+    had_contents = bool(tool.liquids or tool.produce_fractions)
     if liquid_id == QUECHERS_SALTS_ID:
         if tool.quechers_state.salts_added:
             raise ValueError(f"{tool.label} already contains a QuEChERS salts packet.")
         tool.quechers_state.salts_added = True
         tool.quechers_state.phase = "reacting" if _tool_has_wet_contents(tool) else "armed"
+        tool.contents_homogeneity = 0.0 if had_contents else 1.0
         experiment.audit_log.append(f"{liquid_definition.name} added to {tool.label}.")
         return
 
@@ -95,6 +149,16 @@ def add_liquid_to_tool(
         )
         updated_volume = existing_liquid.volume_ml
         existing_liquid_was_present = True
+
+    has_other_components = bool(
+        tool.produce_fractions
+        or any(liquid.liquid_id != liquid_definition.id for liquid in tool.liquids)
+    )
+    if volume_to_add > 0:
+        if not had_contents:
+            tool.contents_homogeneity = 1.0
+        elif has_other_components:
+            tool.contents_homogeneity = 0.0
 
     if salts_were_armed and volume_to_add > 0:
         tool.quechers_state.phase = "cemented"

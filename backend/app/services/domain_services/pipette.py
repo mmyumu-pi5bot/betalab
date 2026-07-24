@@ -1,10 +1,30 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
+from typing import cast
 
-from app.domain.models import Experiment, InjectionContext
+from app.domain.models import (
+    Experiment,
+    InjectionContext,
+    PipetteState,
+    ProduceFraction,
+    ProduceFractionLocationKind,
+    ProduceLot,
+    WorkbenchLiquid,
+    WorkbenchTool,
+)
+from app.domain.rules import can_tool_accept_liquids
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.lcmsms import _find_tool_anywhere, build_extract_injection_context
+from app.services.helpers.lookups import round_volume
+from app.services.helpers.produce_canonical import (
+    _pour_produce_fractions_proportional,
+    _split_produce_fraction,
+    get_tool_remaining_fill_capacity_ml,
+)
+from app.services.helpers.tool_liquids import raise_if_quechers_unusable, transfer_liquid_portion
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +44,106 @@ def _validate_positive_volume(volume_ml: float) -> None:
         raise ValueError("Pipette volume must be positive.")
 
 
+def _scaled_injection_context(context: InjectionContext, ratio: float, extract_volume_ml: float) -> InjectionContext:
+    return InjectionContext(
+        source_tube_id=context.source_tube_id,
+        sample_mass_g=round(context.sample_mass_g * ratio, 4),
+        extract_volume_ml=round(extract_volume_ml, 3),
+        effective_residues_ug_per_kg=dict(context.effective_residues_ug_per_kg),
+        extraction_result=context.extraction_result,
+        istd_volume_ml=round(context.istd_volume_ml * ratio, 4) if context.istd_volume_ml else None,
+        istd_reference_conc_ng_per_ml=context.istd_reference_conc_ng_per_ml,
+        extract_true_volume_ml=round(extract_volume_ml, 6),
+        istd_true_volume_ml=(
+            round(context.istd_true_volume_ml * ratio, 6)
+            if context.istd_true_volume_ml
+            else None
+        ),
+    )
+
+
+def _merge_injection_context(base: InjectionContext, addition: InjectionContext) -> None:
+    base.sample_mass_g = round(base.sample_mass_g + addition.sample_mass_g, 4)
+    base.extract_volume_ml = round(base.extract_volume_ml + addition.extract_volume_ml, 3)
+    if addition.istd_volume_ml:
+        base.istd_volume_ml = round((base.istd_volume_ml or 0) + addition.istd_volume_ml, 4)
+
+
+def _shrink_injection_context(context: InjectionContext, remaining_ratio: float, extract_volume_ml: float) -> None:
+    context.sample_mass_g = round(context.sample_mass_g * remaining_ratio, 4)
+    context.extract_volume_ml = round(extract_volume_ml, 3)
+    if context.istd_volume_ml:
+        context.istd_volume_ml = round(context.istd_volume_ml * remaining_ratio, 4)
+
+
+def _pipettable_volume_ml(tool: WorkbenchTool) -> float:
+    # Product suspensions use the deliberate simulation simplification 1 g = 1 mL.
+    canonical_lot_ids = {lot.id for lot in tool.produce_lots}
+    return round(
+        sum(max(liquid.volume_ml, 0.0) for liquid in tool.liquids)
+        + sum(
+            max(fraction.mass_g, 0.0)
+            for fraction in tool.produce_fractions
+            if fraction.produce_lot_id in canonical_lot_ids
+        ),
+        6,
+    )
+
+
+def _pipette_content_volume_ml(pipette: PipetteState) -> float:
+    return round(
+        sum(max(liquid.volume_ml, 0.0) for liquid in pipette.liquids)
+        + sum(max(fraction.mass_g, 0.0) for fraction in pipette.produce_fractions),
+        6,
+    )
+
+
+def _sync_produce_lot_masses(
+    produce_lots: list[ProduceLot],
+    produce_fractions: list[ProduceFraction],
+) -> None:
+    masses_by_lot_id: dict[str, float] = {}
+    for fraction in produce_fractions:
+        masses_by_lot_id[fraction.produce_lot_id] = (
+            masses_by_lot_id.get(fraction.produce_lot_id, 0.0) + max(fraction.mass_g, 0.0)
+        )
+    for lot in produce_lots:
+        lot.total_mass_g = round(masses_by_lot_id.get(lot.id, 0.0), 3)
+    produce_lots[:] = [lot for lot in produce_lots if lot.total_mass_g > 0]
+
+
+def _copy_missing_produce_lots(
+    source_lots: list[ProduceLot],
+    target_lots: list[ProduceLot],
+    fractions: list[ProduceFraction],
+) -> None:
+    target_ids = {lot.id for lot in target_lots}
+    required_ids = {fraction.produce_lot_id for fraction in fractions}
+    for lot in source_lots:
+        if lot.id in required_ids and lot.id not in target_ids:
+            target_lots.append(deepcopy(lot))
+            target_ids.add(lot.id)
+
+
+def _find_tool_produce_location(
+    experiment: Experiment,
+    tool_id: str,
+) -> tuple[ProduceFractionLocationKind, str]:
+    for tool in experiment.basket_tools:
+        if tool.id == tool_id:
+            return "basket_tool", tool.id
+    for slot in experiment.workbench.slots:
+        if slot.tool is not None and slot.tool.id == tool_id:
+            return "workbench_tool", slot.id
+    for slot in experiment.rack.slots:
+        if slot.tool is not None and slot.tool.id == tool_id:
+            return "rack_tool", slot.id
+    for widget in experiment.workspace.widgets:
+        if widget.tool is not None and widget.tool.id == tool_id:
+            return "workspace_widget_tool", widget.id
+    raise ValueError("Pipette target location not found.")
+
+
 class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
@@ -33,24 +153,110 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
         source = _find_tool_anywhere(experiment, request.source_tool_id)
         if source is None:
             raise ValueError("Pipette source not found.")
-        if source.tool_type != "centrifuge_tube":
-            raise ValueError("The pipette can currently aspirate prepared extract from a centrifuge tube only.")
         if source.is_sealed:
             raise ValueError(f"Open {source.label} before aspirating.")
-        if source.quechers_state.phase != "cemented" or "dry_salts_wetted" in source.quechers_state.faults:
-            raise ValueError("Complete the QuEChERS extraction before aspirating it.")
-        if source.quechers_extraction_result is None:
-            raise ValueError("Run the simulation clock before aspirating the extract.")
+        total_source_ml = _pipettable_volume_ml(source)
+        if total_source_ml <= 0:
+            raise ValueError(f"{source.label} contains no liquid or material to aspirate.")
         pipette = experiment.pipette
         if pipette.source_tool_id not in (None, source.id):
             raise ValueError("The pipette contains another liquid; dispense it first.")
-        aspirated_ml = min(request.delta_volume_ml, pipette.capacity_ml - pipette.volume_ml)
-        if aspirated_ml <= 0:
+        requested_ml = min(request.delta_volume_ml, pipette.capacity_ml - pipette.volume_ml, total_source_ml)
+        if requested_ml <= 0:
             return
-        pipette.volume_ml = round(pipette.volume_ml + aspirated_ml, 3)
+
+        # An unvortexed suspension does not aspirate at the container's average
+        # composition; the per-liquid bias is drawn by the simulation facade.
+        canonical_lot_ids = {lot.id for lot in source.produce_lots}
+        pipettable_fractions = [
+            fraction
+            for fraction in source.produce_fractions
+            if fraction.produce_lot_id in canonical_lot_ids
+        ]
+        components = [
+            ("liquid", liquid, liquid.volume_ml)
+            for liquid in source.liquids
+            if liquid.volume_ml > 0
+        ] + [
+            ("produce", fraction, fraction.mass_g)
+            for fraction in pipettable_fractions
+            if fraction.mass_g > 0
+        ]
+        weights = PhysicalSimulationService.draw_aspiration_weights(
+            [component_volume_ml for _, _, component_volume_ml in components],
+            source.contents_homogeneity,
+        )
+        weight_total = sum(weights)
+        planned = [
+            (kind, component, min(round(requested_ml * weight / weight_total, 6), component_volume_ml))
+            for (kind, component, component_volume_ml), weight in zip(components, weights, strict=True)
+        ]
+        actual_ml = round(sum(component_ml for _, _, component_ml in planned), 6)
+        if actual_ml <= 0:
+            return
+
+        aspirated_context = self._build_aspirated_context(experiment, source, pipette, actual_ml, total_source_ml)
+        source_lots_before = list(source.produce_lots)
+        for kind, component, component_ml in planned:
+            if kind == "liquid":
+                liquid = cast(WorkbenchLiquid, component)
+                transfer_liquid_portion(
+                    source.liquids,
+                    pipette.liquids,
+                    liquid,
+                    component_ml,
+                    target_id_prefix="pipette_liquid",
+                )
+                continue
+            fraction = cast(ProduceFraction, component)
+            transferred = _split_produce_fraction(
+                fraction,
+                component_ml / fraction.mass_g,
+                location_kind="pipette",
+                location_id="pipette",
+                container_id="pipette",
+                container_label="Pipette",
+            )
+            if transferred is not None:
+                pipette.produce_fractions.append(transferred)
+        source.liquids = [liquid for liquid in source.liquids if liquid.volume_ml > 0]
+        source.produce_fractions = [fraction for fraction in source.produce_fractions if fraction.mass_g > 0]
+        _copy_missing_produce_lots(source_lots_before, pipette.produce_lots, pipette.produce_fractions)
+        _sync_produce_lot_masses(source.produce_lots, source.produce_fractions)
+        _sync_produce_lot_masses(pipette.produce_lots, pipette.produce_fractions)
+        pipette.volume_ml = min(_pipette_content_volume_ml(pipette), pipette.capacity_ml)
         pipette.source_tool_id = source.id
-        pipette.injection_context = build_extract_injection_context(experiment, source, pipette.volume_ml)
-        experiment.audit_log.append(f"Pipette aspirated {aspirated_ml:.3f} mL from {source.label}.")
+        pipette.injection_context = aspirated_context
+        if not source.liquids and not source.produce_fractions:
+            source.injection_context = None
+        experiment.audit_log.append(f"Pipette aspirated {actual_ml:.3f} mL from {source.label}.")
+
+    @staticmethod
+    def _build_aspirated_context(
+        experiment: Experiment,
+        source,
+        pipette,
+        actual_ml: float,
+        total_source_ml: float,
+    ) -> InjectionContext | None:
+        if source.quechers_extraction_result is not None and source.produce_fractions:
+            return build_extract_injection_context(experiment, source, pipette.volume_ml + actual_ml)
+        if source.injection_context is None:
+            return pipette.injection_context
+        # The source carries extract that was dispensed into it earlier: the
+        # aspirated share takes a proportional part of that provenance along.
+        share_ratio = min(actual_ml / total_source_ml, 1.0)
+        share = _scaled_injection_context(source.injection_context, share_ratio, actual_ml)
+        remaining_ratio = 1.0 - share_ratio
+        if remaining_ratio <= 0:
+            source.injection_context = None
+        else:
+            _shrink_injection_context(
+                source.injection_context, remaining_ratio, max(total_source_ml - actual_ml, 0.0)
+            )
+        if pipette.injection_context is not None:
+            _merge_injection_context(share, pipette.injection_context)
+        return share
 
 
 class DispensePipetteService(WriteDomainService[DispensePipetteRequest]):
@@ -62,49 +268,80 @@ class DispensePipetteService(WriteDomainService[DispensePipetteRequest]):
         target = _find_tool_anywhere(experiment, request.target_tool_id)
         if target is None:
             raise ValueError("Pipette target not found.")
-        if target.tool_type != "sample_vial":
-            raise ValueError("Extract can currently be dispensed into an autosampler vial only.")
+        raise_if_quechers_unusable(target)
+        if not can_tool_accept_liquids(target.tool_type):
+            raise ValueError(f"{target.label} does not accept liquids.")
         if target.is_sealed:
             raise ValueError(f"Open {target.label} before dispensing.")
         pipette = experiment.pipette
-        if pipette.injection_context is None or pipette.volume_ml <= 0:
-            raise ValueError("The pipette is empty; aspirate extract first.")
-        if target.injection_context is not None and target.injection_context.source_tube_id != pipette.source_tool_id:
+        if not (pipette.liquids or pipette.produce_fractions) or pipette.volume_ml <= 0:
+            raise ValueError("The pipette is empty; aspirate some contents first.")
+        pipette_context = pipette.injection_context
+        if (
+            pipette_context is not None
+            and target.injection_context is not None
+            and target.injection_context.source_tube_id != pipette_context.source_tube_id
+        ):
             raise ValueError("This vial already contains extract from another tube.")
-        dispensed_ml = min(request.delta_volume_ml, pipette.volume_ml)
-        source_context = pipette.injection_context
-        ratio = dispensed_ml / pipette.volume_ml
-        addition = InjectionContext(
-            source_tube_id=source_context.source_tube_id,
-            sample_mass_g=round(source_context.sample_mass_g * ratio, 4),
-            extract_volume_ml=round(dispensed_ml, 3),
-            effective_residues_ug_per_kg=dict(source_context.effective_residues_ug_per_kg),
-            extraction_result=source_context.extraction_result,
-            istd_volume_ml=round(source_context.istd_volume_ml * ratio, 4) if source_context.istd_volume_ml else None,
-            istd_reference_conc_ng_per_ml=source_context.istd_reference_conc_ng_per_ml,
-            extract_true_volume_ml=round(dispensed_ml, 6),
-            istd_true_volume_ml=(
-                round(source_context.istd_true_volume_ml * ratio, 6)
-                if source_context.istd_true_volume_ml
-                else None
-            ),
+        target_remaining_ml = round_volume(
+            get_tool_remaining_fill_capacity_ml(target, material_states=experiment.produce_material_states)
         )
-        if target.injection_context is None:
-            target.injection_context = addition
-        else:
-            target.injection_context.sample_mass_g = round(target.injection_context.sample_mass_g + addition.sample_mass_g, 4)
-            target.injection_context.extract_volume_ml = round(target.injection_context.extract_volume_ml + addition.extract_volume_ml, 3)
-            if addition.istd_volume_ml:
-                target.injection_context.istd_volume_ml = round((target.injection_context.istd_volume_ml or 0) + addition.istd_volume_ml, 4)
-        remaining_ratio = (pipette.volume_ml - dispensed_ml) / pipette.volume_ml
-        pipette.volume_ml = round(pipette.volume_ml - dispensed_ml, 3)
-        if pipette.volume_ml <= 0:
+        requested_ml = min(request.delta_volume_ml, pipette.volume_ml, target_remaining_ml)
+        if requested_ml <= 0:
+            raise ValueError(f"{target.label} is already full.")
+
+        target_had_contents = bool(target.liquids or target.produce_fractions)
+        volume_before_ml = pipette.volume_ml
+        ratio = requested_ml / volume_before_ml
+        dispensed_ml = 0.0
+        for liquid in list(pipette.liquids):
+            dispensed_ml += transfer_liquid_portion(
+                pipette.liquids, target.liquids, liquid, round(liquid.volume_ml * ratio, 6), target_id_prefix="bench_liquid"
+            )
+        produce_mass_before_g = sum(fraction.mass_g for fraction in pipette.produce_fractions)
+        if pipette.produce_fractions:
+            target_location_kind, target_location_id = _find_tool_produce_location(experiment, target.id)
+            _copy_missing_produce_lots(
+                pipette.produce_lots,
+                target.produce_lots,
+                pipette.produce_fractions,
+            )
+            _pour_produce_fractions_proportional(
+                pipette.produce_fractions,
+                target.produce_fractions,
+                ratio,
+                target,
+                location_kind=target_location_kind,
+                location_id=target_location_id,
+            )
+            pipette.produce_fractions = [
+                fraction for fraction in pipette.produce_fractions if fraction.mass_g > 0
+            ]
+            produce_mass_after_g = sum(fraction.mass_g for fraction in pipette.produce_fractions)
+            dispensed_ml += produce_mass_before_g - produce_mass_after_g
+            _sync_produce_lot_masses(target.produce_lots, target.produce_fractions)
+            _sync_produce_lot_masses(pipette.produce_lots, pipette.produce_fractions)
+        dispensed_ml = round(dispensed_ml, 6)
+        if dispensed_ml <= 0:
+            return
+
+        if pipette_context is not None:
+            addition = _scaled_injection_context(pipette_context, ratio, dispensed_ml)
+            if target.injection_context is None:
+                target.injection_context = addition
+            else:
+                _merge_injection_context(target.injection_context, addition)
+
+        remaining_ratio = max(volume_before_ml - dispensed_ml, 0.0) / volume_before_ml
+        pipette.volume_ml = _pipette_content_volume_ml(pipette)
+        if pipette.volume_ml <= 0 or not (pipette.liquids or pipette.produce_fractions):
             pipette.volume_ml = 0.0
+            pipette.liquids = []
+            pipette.produce_lots = []
+            pipette.produce_fractions = []
             pipette.source_tool_id = None
             pipette.injection_context = None
-        else:
-            source_context.sample_mass_g = round(source_context.sample_mass_g * remaining_ratio, 4)
-            source_context.extract_volume_ml = pipette.volume_ml
-            if source_context.istd_volume_ml:
-                source_context.istd_volume_ml = round(source_context.istd_volume_ml * remaining_ratio, 4)
+        elif pipette_context is not None:
+            _shrink_injection_context(pipette_context, remaining_ratio, pipette.volume_ml)
+        target.contents_homogeneity = 0.0 if target_had_contents else 1.0
         experiment.audit_log.append(f"Pipette dispensed {dispensed_ml:.3f} mL into {target.label}.")

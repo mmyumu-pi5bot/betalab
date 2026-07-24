@@ -373,6 +373,7 @@ export type BenchToolInstance = {
   accent: ToolbarAccent;
   toolType: ToolType;
   capacity_ml: number;
+  canReceiveLiquids: boolean;
   canReceiveProduce: boolean;
   canSeal: boolean;
   contactImpurityMgPerG?: number;
@@ -475,6 +476,9 @@ export type SpatulaState = {
 
 export type PipetteState = {
   capacityMl: number;
+  liquids?: BenchLiquidPortion[];
+  produceFractions?: ProduceFraction[];
+  produceLots?: ExperimentProduceLot[];
   volumeMl: number;
   sourceToolId: string | null;
 };
@@ -485,7 +489,6 @@ export type ProduceMaterialState = {
   materialState?: ProduceMaterialKind;
   temperatureC?: number;
   grindQualityLabel?: string | null;
-  homogeneityScore?: number | null;
   residualCo2MassG?: number;
   pesticideDegradationFactors?: Record<string, number>;
 };
@@ -495,7 +498,6 @@ export type ProduceFraction = {
   produceLotId: string;
   produceMaterialStateId: string;
   materialState?: ProduceMaterialKind;
-  isMixed?: boolean;
   massG: number;
   unitCount?: number | null;
   isContaminated?: boolean;
@@ -505,6 +507,7 @@ export type ProduceFraction = {
     | "basket_tool"
     | "produce_basket"
     | "rack_tool"
+    | "pipette"
     | "spatula"
     | "trash"
     | "workbench_surface"
@@ -609,7 +612,6 @@ export type ExperimentWorkspaceWidget = {
 export type ExperimentProduceLot = {
   materialState?: ProduceMaterialKind;
   grindQualityLabel?: string | null;
-  homogeneityScore?: number | null;
   id: string;
   isContaminated?: boolean;
   isDraggable: boolean;

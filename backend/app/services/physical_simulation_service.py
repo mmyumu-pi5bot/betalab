@@ -129,8 +129,7 @@ class PhysicalSimulationService:
             if state.cementation_progress >= 1.0:
                 state.phase = "cemented"
                 state.faults = ["cemented"]
-                if tool.quechers_extraction_result is None:
-                    tool.quechers_extraction_result = self._generate_extraction_result(tool)
+                self.complete_quechers_extraction(tool)
 
         if state.temperature_c > self.quechers_degradation_threshold_c:
             severity = (state.temperature_c - self.quechers_degradation_threshold_c) / (
@@ -194,6 +193,58 @@ class PhysicalSimulationService:
             istd_manip_factor=round(istd_manip, 4) if istd_manip is not None else None,
             istd_phase=istd_phase,
         )
+
+    def complete_quechers_extraction(self, tool: WorkbenchTool) -> None:
+        if tool.quechers_extraction_result is None:
+            tool.quechers_extraction_result = self._generate_extraction_result(tool)
+
+    vortex_mixing_time_constant_seconds = 1.25
+    aspiration_heterogeneity_relative_sigma = 0.20
+    aspiration_heterogeneity_factor_min = 0.5
+    aspiration_heterogeneity_factor_max = 1.5
+
+    @classmethod
+    def advance_vortex_mixing(cls, tool: WorkbenchTool, elapsed_seconds: float) -> None:
+        """Move the container's hidden homogeneity toward one while vortexing."""
+        if elapsed_seconds <= 0:
+            return
+        current = max(0.0, min(1.0, tool.contents_homogeneity))
+        mixed_fraction = 1.0 - math.exp(
+            -elapsed_seconds / cls.vortex_mixing_time_constant_seconds
+        )
+        tool.contents_homogeneity = round(
+            min(current + (1.0 - current) * mixed_fraction, 1.0),
+            6,
+        )
+
+    @classmethod
+    def draw_aspiration_weights(
+        cls,
+        volumes_ml: list[float],
+        homogeneity: float,
+    ) -> list[float]:
+        """Return sampling weights for aspirating from a container's liquids.
+
+        Sampling bias decreases continuously as the hidden homogeneity approaches
+        one. A fully homogeneous container is drawn exactly proportionally.
+        """
+        normalized_homogeneity = max(0.0, min(1.0, homogeneity))
+        relative_sigma = cls.aspiration_heterogeneity_relative_sigma * (
+            1.0 - normalized_homogeneity
+        )
+        if relative_sigma <= 0:
+            return list(volumes_ml)
+        return [
+            volume
+            * max(
+                cls.aspiration_heterogeneity_factor_min,
+                min(
+                    cls.aspiration_heterogeneity_factor_max,
+                    random.gauss(1.0, relative_sigma),
+                ),
+            )
+            for volume in volumes_ml
+        ]
 
     @classmethod
     def draw_dispensed_volume(cls, nominal_ml: float) -> float:

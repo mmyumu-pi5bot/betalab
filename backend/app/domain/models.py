@@ -189,6 +189,7 @@ class ProduceMaterialState:
 
 ProduceFractionLocationKind = Literal[
     "basket_tool",
+    "pipette",
     "produce_basket",
     "rack_tool",
     "spatula",
@@ -234,10 +235,13 @@ class WorkbenchTool:
     tool_type: str
     capacity_ml: float
     contact_impurity_mg_per_g: float = 0.0
+    contents_homogeneity: float = 0.0
     is_sealed: bool = False
     closure_fault: str | None = None
 
     def __post_init__(self) -> None:
+        if not 0.0 <= self.contents_homogeneity <= 1.0:
+            raise ValueError("contents_homogeneity must be between zero and one")
         if self.closure_fault is not None and self.closure_fault != "pressure_pop" and not self.is_sealed:
             raise ValueError("closure_fault must be None when is_sealed=False unless the tool popped open")
 
@@ -276,14 +280,17 @@ class PipetteState:
     volume_ml: float = 0.0
     source_tool_id: str | None = None
     injection_context: InjectionContext | None = None
+    liquids: list[WorkbenchLiquid] = field(default_factory=list)
+    produce_lots: list[ProduceLot] = field(default_factory=list)
+    produce_fractions: list[ProduceFraction] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not 0 <= self.volume_ml <= self.capacity_ml:
             raise ValueError("pipette volume must be between zero and capacity")
         if (self.volume_ml > 0) != (self.source_tool_id is not None):
             raise ValueError("source_tool_id must be set iff the pipette contains liquid")
-        if (self.volume_ml > 0) != (self.injection_context is not None):
-            raise ValueError("injection_context must be set iff the pipette contains liquid")
+        if (self.volume_ml > 0) != bool(self.liquids or self.produce_fractions):
+            raise ValueError("pipette contents must be set iff the pipette has volume")
 
 
 @dataclass

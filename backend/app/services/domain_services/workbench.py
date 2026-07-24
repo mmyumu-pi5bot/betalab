@@ -436,6 +436,7 @@ def _convert_ground_produce_to_slurry(experiment: Experiment, tool: WorkbenchToo
         converted_any = True
     if not converted_any:
         return
+    tool.contents_homogeneity = 0.0
     sync_canonical_produce_model(experiment)
 
 

@@ -29,6 +29,7 @@ import type {
 vi.mock("@/lib/api", async () => await import("@/test-support/api-mock"));
 
 import {
+  aspiratePipette,
   createExperiment,
   emitExperimentSnapshot,
   resetApiMocks,
@@ -621,6 +622,32 @@ afterEach(() => {
 });
 
 describe("LabScene", () => {
+  it("routes a real pipette click on a filled tube to the aspiration API", async () => {
+    const tube = makeTool({
+      id: "tube_1",
+      label: "Filled tube",
+      toolId: "centrifuge_tube_50ml",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      liquids: [{ id: "liquid_1", liquidId: "acetonitrile_extraction", name: "Acetonitrile", volume_ml: 10, accent: "amber" }],
+    });
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment({ slots: makeSlots([{ tool: tube }]) }));
+
+    render(<PesticideWorkbench />);
+    await screen.findByText("Filled tube");
+    const pipetteButton = screen.getByRole("button", { name: "Micropipette" });
+    fireEvent.click(pipetteButton);
+    await waitFor(() => expect(pipetteButton).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.pointerDown(screen.getByTestId("bench-tool-card-tube_1"), { button: 0 });
+    expect(screen.getByLabelText(/Aspiration/)).toBeInTheDocument();
+    fireEvent.pointerUp(window);
+
+    await waitFor(() => expect(aspiratePipette).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      { tool_id: "tube_1", delta_volume_ml: 0.05 },
+    ));
+  });
+
   it("starts with an empty bench loaded from the backend", async () => {
     vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
 

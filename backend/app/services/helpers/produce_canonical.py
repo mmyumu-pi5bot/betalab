@@ -16,14 +16,13 @@ from app.domain.models import (
 )
 from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.domain.spatula_rules import SPATULA_LOAD_SOURCE_TOOL_TYPES, SPATULA_POUR_TARGET_TOOL_TYPES
-
-_SPATULA_INVOLVED_TOOL_TYPES = frozenset(SPATULA_LOAD_SOURCE_TOOL_TYPES) | frozenset(SPATULA_POUR_TARGET_TOOL_TYPES)
 from app.services.helpers.produce_material_states import (
     PARTICULATE_MATERIAL_STATES,
     find_material_state,
     get_material_state_name,
 )
 
+_SPATULA_INVOLVED_TOOL_TYPES = frozenset(SPATULA_LOAD_SOURCE_TOOL_TYPES) | frozenset(SPATULA_POUR_TARGET_TOOL_TYPES)
 GROUND_POWDER_APPARENT_DENSITY_G_PER_ML = 0.5
 
 
@@ -124,6 +123,8 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         container_id="spatula",
         container_label="Spatula",
     )
+    for fraction in experiment.pipette.produce_fractions:
+        register_material_state(fraction.produce_material_state_id)
 
     for slot in experiment.workbench.slots:
         slot.surface_produce_fractions = _build_surface_produce_fractions(
@@ -306,6 +307,7 @@ def _collect_produce_lots(experiment: Experiment) -> dict[str, ProduceLot]:
 
     for basket_tool in experiment.basket_tools:
         add(basket_tool.produce_lots)
+    add(experiment.pipette.produce_lots)
     add(experiment.workspace.produce_basket_lots)
     for slot in experiment.workbench.slots:
         add(slot.surface_produce_lots)
