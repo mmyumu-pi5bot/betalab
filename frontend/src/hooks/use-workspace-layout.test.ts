@@ -3,7 +3,9 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  areWidgetLayoutsEqual,
   inferAnchoredLayout,
+  resolveAnchoredPosition,
   useWorkspaceLayout,
   type WidgetLayout,
 } from "@/hooks/use-workspace-layout";
@@ -35,6 +37,51 @@ describe("inferAnchoredLayout", () => {
       offsetX: 60,
       offsetY: 920,
     });
+  });
+
+  it("never infers a non-finite offset from a non-finite position", () => {
+    const result = inferAnchoredLayout(
+      { x: Number.NaN, y: 120 },
+      { width: 320, height: 220 },
+      { width: 1600, height: 1200 },
+    );
+
+    expect(Number.isFinite(result.offsetX)).toBe(true);
+    expect(Number.isFinite(result.offsetY)).toBe(true);
+  });
+});
+
+describe("areWidgetLayoutsEqual", () => {
+  it("treats matching non-finite coordinates as equal so the layout guard converges", () => {
+    const layout: WidgetLayout = {
+      anchor: "top-right",
+      fallbackHeight: 200,
+      offsetX: 24,
+      offsetY: 16,
+      width: Number.NaN,
+      x: Number.NaN,
+      y: 40,
+    };
+
+    // NaN === NaN is false, which would make the anchoring effect re-run forever
+    // ("Maximum update depth exceeded"). The guard must converge instead.
+    expect(areWidgetLayoutsEqual(layout, { ...layout })).toBe(true);
+  });
+});
+
+describe("resolveAnchoredPosition", () => {
+  it("falls back to a finite coordinate when the widget width is not yet measured", () => {
+    const result = resolveAnchoredPosition(
+      { anchor: "top-right", offsetX: 24, offsetY: 16 },
+      { width: Number.NaN, height: 200 },
+      { width: 1600, height: 1200 },
+      { x: 120, y: 48 },
+    );
+
+    // A non-finite x would surface as `NaN is an invalid value for the left css
+    // style property` and feed the infinite render loop.
+    expect(Number.isFinite(result.x)).toBe(true);
+    expect(Number.isFinite(result.y)).toBe(true);
   });
 });
 

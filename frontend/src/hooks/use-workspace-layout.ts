@@ -50,15 +50,30 @@ type WorkspaceSize = {
   width: number;
 };
 
+// A widget whose width has not been measured yet resolves to a NaN coordinate.
+// Falling back to the first finite candidate keeps positions out of the DOM as
+// `left: NaN` and, combined with the Object.is guard below, lets the anchoring
+// effect converge instead of re-rendering forever.
+function firstFinite(...values: Array<number | undefined>) {
+  for (const value of values) {
+    if (value !== undefined && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return 0;
+}
+
 function areWidgetLayoutsEqual(left: WidgetLayout, right: WidgetLayout) {
+  // Object.is (not ===) so two matching NaN coordinates compare equal; with ===
+  // the guard would never converge and the effect would loop indefinitely.
   return (
     left.anchor === right.anchor &&
-    left.fallbackHeight === right.fallbackHeight &&
-    left.offsetX === right.offsetX &&
-    left.offsetY === right.offsetY &&
-    left.width === right.width &&
-    left.x === right.x &&
-    left.y === right.y
+    Object.is(left.fallbackHeight, right.fallbackHeight) &&
+    Object.is(left.offsetX, right.offsetX) &&
+    Object.is(left.offsetY, right.offsetY) &&
+    Object.is(left.width, right.width) &&
+    Object.is(left.x, right.x) &&
+    Object.is(left.y, right.y)
   );
 }
 
@@ -73,26 +88,29 @@ function resolveAnchoredPosition(
   }
 
   if (layout.anchor === "top-left") {
-    return { x: layout.offsetX, y: layout.offsetY };
+    return {
+      x: firstFinite(layout.offsetX, fallbackPosition.x),
+      y: firstFinite(layout.offsetY, fallbackPosition.y),
+    };
   }
 
   if (layout.anchor === "top-right") {
     return {
-      x: Math.max(workspaceSize.width - widgetSize.width - layout.offsetX, 0),
-      y: layout.offsetY,
+      x: firstFinite(Math.max(workspaceSize.width - widgetSize.width - layout.offsetX, 0), fallbackPosition.x),
+      y: firstFinite(layout.offsetY, fallbackPosition.y),
     };
   }
 
   if (layout.anchor === "bottom-left") {
     return {
-      x: layout.offsetX,
-      y: Math.max(workspaceSize.height - widgetSize.height - layout.offsetY, 0),
+      x: firstFinite(layout.offsetX, fallbackPosition.x),
+      y: firstFinite(Math.max(workspaceSize.height - widgetSize.height - layout.offsetY, 0), fallbackPosition.y),
     };
   }
 
   return {
-    x: Math.max(workspaceSize.width - widgetSize.width - layout.offsetX, 0),
-    y: Math.max(workspaceSize.height - widgetSize.height - layout.offsetY, 0),
+    x: firstFinite(Math.max(workspaceSize.width - widgetSize.width - layout.offsetX, 0), fallbackPosition.x),
+    y: firstFinite(Math.max(workspaceSize.height - widgetSize.height - layout.offsetY, 0), fallbackPosition.y),
   };
 }
 
@@ -101,11 +119,14 @@ function inferAnchoredLayout(
   widgetSize: { height: number; width: number },
   workspaceSize: WorkspaceSize | null,
 ): AnchoredWidgetLayout {
+  // Guard every offset: a non-finite position (e.g. a widget dropped before its
+  // width was measured) must never be persisted as `offset_x: NaN`, which would
+  // round-trip through the backend and re-trigger the render loop on reload.
   if (!workspaceSize || workspaceSize.width <= 0 || workspaceSize.height <= 0) {
     return {
       anchor: "top-left",
-      offsetX: Math.round(position.x),
-      offsetY: Math.round(position.y),
+      offsetX: Math.round(firstFinite(position.x)),
+      offsetY: Math.round(firstFinite(position.y)),
     };
   }
 
@@ -120,23 +141,23 @@ function inferAnchoredLayout(
   if (anchor === "top-left") {
     return {
       anchor,
-      offsetX: Math.round(leftDistance),
-      offsetY: Math.round(topDistance),
+      offsetX: Math.round(firstFinite(leftDistance)),
+      offsetY: Math.round(firstFinite(topDistance)),
     };
   }
 
   if (anchor === "top-right") {
     return {
       anchor,
-      offsetX: Math.round(Math.max(rightDistance, 0)),
-      offsetY: Math.round(topDistance),
+      offsetX: Math.round(firstFinite(Math.max(rightDistance, 0))),
+      offsetY: Math.round(firstFinite(topDistance)),
     };
   }
 
   return {
     anchor,
-    offsetX: Math.round(Math.max(rightDistance, 0)),
-    offsetY: Math.round(topDistance),
+    offsetX: Math.round(firstFinite(Math.max(rightDistance, 0))),
+    offsetY: Math.round(firstFinite(topDistance)),
   };
 }
 
@@ -726,4 +747,4 @@ export function useWorkspaceLayout<WidgetId extends string>({
 }
 
 export type { WidgetLayout };
-export { inferAnchoredLayout };
+export { areWidgetLayoutsEqual, inferAnchoredLayout, resolveAnchoredPosition };
