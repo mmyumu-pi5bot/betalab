@@ -287,11 +287,15 @@ def _deserialize_experiment(payload: dict) -> Experiment:
         pipette=PipetteState(
             capacity_ml=schema.pipette.capacity_ml,
             volume_ml=schema.pipette.volume_ml,
+            true_volume_ml=schema.pipette.true_volume_ml,
             source_tool_id=schema.pipette.source_tool_id,
-            injection_context=InjectionContext(**schema.pipette.injection_context.model_dump())
-            if schema.pipette.injection_context is not None
-            else None,
-            liquids=[WorkbenchLiquid(**liquid.model_dump()) for liquid in schema.pipette.liquids],
+            injection_context=_deserialize_injection_context(
+                schema.pipette.injection_context
+            ),
+            liquids=[
+                _deserialize_workbench_liquid(liquid)
+                for liquid in schema.pipette.liquids
+            ],
             produce_lots=[_deserialize_produce_lot(lot) for lot in schema.pipette.produce_lots],
             produce_fractions=[
                 _deserialize_produce_fraction(fraction)
@@ -438,6 +442,7 @@ def _deserialize_injection_context(context_schema) -> InjectionContext | None:
     return InjectionContext(
         source_tube_id=context_schema.source_tube_id,
         sample_mass_g=context_schema.sample_mass_g,
+        sample_true_mass_g=context_schema.sample_true_mass_g,
         extract_volume_ml=context_schema.extract_volume_ml,
         effective_residues_ug_per_kg=dict(context_schema.effective_residues_ug_per_kg),
         extraction_result=extraction_result,
@@ -491,4 +496,7 @@ def _deserialize_produce_lot(lot_schema) -> ProduceLot:
 
 
 def _deserialize_produce_fraction(fraction_schema) -> ProduceFraction:
-    return ProduceFraction(**fraction_schema.model_dump())
+    payload = fraction_schema.model_dump()
+    payload["is_mixed"] = fraction_schema.is_mixed
+    payload["true_mass_g"] = fraction_schema.true_mass_g
+    return ProduceFraction(**payload)

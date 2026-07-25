@@ -158,7 +158,8 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     setActiveDropTargets,
     showDropTargets,
   } = useDragState();
-  const { inspection: debugInspection, clear: clearDebugInspection } = useDebugInspector();
+  const { inspection: debugInspection, clear: clearDebugInspection } =
+    useDebugInspector(experimentId);
   const [isBasketOpen, setIsBasketOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [toolbarCategories, setToolbarCategories] = useState<ToolbarCategory[]>([]);

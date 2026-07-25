@@ -11,6 +11,9 @@ def _parse_csv_env(name: str, default: str) -> list[str]:
 class Settings:
     app_name: str = "Betalab Simulation API"
     app_version: str = "0.1.0"
+    environment: str = field(
+        default_factory=lambda: os.getenv("BETALAB_ENV", "development").strip().lower()
+    )
     experiments_db_path: str = field(
         default_factory=lambda: os.getenv(
             "BETALAB_EXPERIMENTS_DB_PATH",
@@ -23,6 +26,10 @@ class Settings:
             "http://localhost:3000,http://127.0.0.1:3000",
         )
     )
+
+    @property
+    def debug_inspector_enabled(self) -> bool:
+        return self.environment == "development"
 
 
 settings = Settings()

@@ -8,6 +8,7 @@ import {
   createDebugToolPreset,
   createExperiment,
   deleteExperiment,
+  getDebugInspection,
   getExperiment,
   getToolbarCatalog,
   listExperiments,
@@ -79,6 +80,22 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("loads private state from the dedicated debug endpoint", async () => {
+    const debugState = { volume_ml: 0.5, true_volume_ml: 0.49 };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => debugState,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getDebugInspection("experiment_123", "pipette", "pipette"),
+    ).resolves.toEqual(debugState);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/experiment_123/debug/inspect/pipette/pipette",
+    );
+  });
+
   it("adds liquid to a container by tool identity", async () => {
     const experiment = makeExperiment();
     const fetchMock = vi.fn().mockResolvedValue({
@@ -613,6 +630,73 @@ describe("api client", () => {
         exposureContainerIds: ["spatula"],
       },
     ]);
+  });
+
+  it("does not expose actual quantities through the normal experiment model", async () => {
+    const experiment = {
+      ...makeExperiment(),
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: {
+              id: "bench_tool_1",
+              tool_id: "centrifuge_tube_50ml",
+              label: "50 mL centrifuge tube",
+              subtitle: "Extraction ready",
+              accent: "sky",
+              tool_type: "centrifuge_tube",
+              capacity_ml: 50,
+              produce_lots: [],
+              produce_fractions: [
+                {
+                  id: "fraction_1",
+                  produce_lot_id: "lot_1",
+                  produce_material_state_id: "state_slurry",
+                  mass_g: 1.2,
+                  true_mass_g: 1.08,
+                },
+              ],
+              liquids: [
+                {
+                  id: "liquid_1",
+                  liquid_id: "acetonitrile_extraction",
+                  name: "Acetonitrile",
+                  volume_ml: 10,
+                  true_volume_ml: 9.87,
+                  accent: "amber",
+                },
+              ],
+              labels: [],
+            },
+          },
+        ],
+      },
+      pipette: {
+        capacity_ml: 1,
+        volume_ml: 0.5,
+        true_volume_ml: 0.49,
+        source_tool_id: "bench_tool_1",
+        liquids: [],
+        produce_lots: [],
+        produce_fractions: [],
+      },
+    } as unknown as Experiment;
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    }));
+
+    const normalized = await getExperiment("experiment_123");
+    const tool = normalized.workbench.slots[0].tool;
+    expect(tool?.liquids[0]).toMatchObject({ volume_ml: 10 });
+    expect(tool?.produceFractions?.[0]).toMatchObject({ massG: 1.2 });
+    expect(normalized.pipette).toMatchObject({ volumeMl: 0.5 });
+    expect("trueVolumeMl" in (tool?.liquids[0] ?? {})).toBe(false);
+    expect("trueMassG" in (tool?.produceFractions?.[0] ?? {})).toBe(false);
+    expect("trueVolumeMl" in normalized.pipette).toBe(false);
   });
 
   it("normalizes mixed state on the produce fraction only", async () => {

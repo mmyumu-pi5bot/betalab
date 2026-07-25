@@ -1054,14 +1054,13 @@ def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
     assert tool["tool_id"] == "centrifuge_tube_50ml"
     assert tool["produce_fractions"][0]["mass_g"] == 10.0
     assert "is_mixed" not in tool["produce_fractions"][0]
+    assert "true_mass_g" not in tool["produce_fractions"][0]
     assert "contents_homogeneity" not in tool
     assert tool["liquids"] == []
     lot_state = _find_material_state(spawned.json(), tool["produce_lots"][0]["id"])
     assert lot_state["material_state"] == "slurry"
     assert lot_state["temperature_c"] == 4.0
     assert "homogeneity_score" not in lot_state
-
-
 def test_open_workbench_tool_route_unseals_a_jar() -> None:
     with TestClient(app) as client:
         experiment_id = _create_experiment(client)

@@ -58,14 +58,10 @@ def _effective_residues(
 ) -> dict[str, float]:
     """Return weighted-average effective residues (µg/kg) across all fractions in a tube.
 
-    Effective = initial_residue × degradation_factor.  Fractions from the same lot
+    Effective = initial_residue x degradation_factor. Fractions from the same lot
     are combined proportionally by mass.
     """
     lot_map = {lot.id: lot for lot in produce_lots}
-    # Also include lots whose fractions live in the tube
-    for fraction in produce_fractions:
-        # lot itself may be on the experiment, not on the tool
-        pass
 
     total_mass_g: dict[str, float] = {}
     weighted_residues: dict[str, dict[str, float]] = {}
@@ -78,7 +74,11 @@ def _effective_residues(
         state = find_material_state(material_states, lot_id)
         deg_factors = state.pesticide_degradation_factors if state else {}
 
-        mass = fraction.mass_g
+        mass = (
+            fraction.true_mass_g
+            if fraction.true_mass_g is not None
+            else fraction.mass_g
+        )
         total_mass_g[lot_id] = total_mass_g.get(lot_id, 0.0) + mass
         if lot_id not in weighted_residues:
             weighted_residues[lot_id] = {}
@@ -105,6 +105,12 @@ def build_extract_injection_context(
     experiment: Experiment,
     tube: WorkbenchTool,
     extract_volume_ml: float,
+    *,
+    sample_mass_g: float | None = None,
+    sample_true_mass_g: float | None = None,
+    extract_true_volume_ml: float | None = None,
+    istd_volume_ml: float | None = None,
+    istd_true_volume_ml: float | None = None,
 ) -> InjectionContext:
     all_lots: list[ProduceLot] = list(tube.produce_lots)
     referenced_lot_ids = {fraction.produce_lot_id for fraction in tube.produce_fractions}
@@ -116,26 +122,66 @@ def build_extract_injection_context(
                         all_lots.append(lot)
 
     total_sample_mass_g = sum(fraction.mass_g for fraction in tube.produce_fractions)
+    total_sample_true_mass_g = sum(
+        fraction.true_mass_g
+        if fraction.true_mass_g is not None
+        else fraction.mass_g
+        for fraction in tube.produce_fractions
+    )
     if total_sample_mass_g <= 0:
         raise ValueError(f"{tube.label} contains no sample mass to pipette.")
     acetonitrile = next((liquid for liquid in tube.liquids if liquid.liquid_id == ACETONITRILE_ID), None)
     total_extract_volume_ml = acetonitrile.volume_ml if acetonitrile is not None else 10.0
+    total_extract_true_volume_ml = (
+        acetonitrile.true_volume_ml
+        if acetonitrile is not None and acetonitrile.true_volume_ml is not None
+        else total_extract_volume_ml
+    )
     if total_extract_volume_ml <= 0:
         raise ValueError(f"{tube.label} contains no extract volume to pipette.")
     volume_ratio = extract_volume_ml / total_extract_volume_ml
+    true_volume_ratio = (
+        extract_true_volume_ml / total_extract_true_volume_ml
+        if extract_true_volume_ml is not None and total_extract_true_volume_ml > 0
+        else volume_ratio
+    )
     istd_liquid = next((liquid for liquid in tube.liquids if liquid.liquid_id == ISTD_SOLUTION_ID), None)
     effective = _effective_residues(tube.produce_fractions, all_lots, experiment.produce_material_states)
     return InjectionContext(
         source_tube_id=tube.id,
-        sample_mass_g=round(total_sample_mass_g * volume_ratio, 4),
+        sample_mass_g=round(
+            sample_mass_g
+            if sample_mass_g is not None
+            else total_sample_mass_g * volume_ratio,
+            4,
+        ),
+        sample_true_mass_g=round(
+            sample_true_mass_g
+            if sample_true_mass_g is not None
+            else total_sample_true_mass_g * true_volume_ratio,
+            6,
+        ),
         extract_volume_ml=round(extract_volume_ml, 3),
         effective_residues_ug_per_kg={key: round(value, 4) for key, value in effective.items()},
         extraction_result=tube.quechers_extraction_result,
-        istd_volume_ml=round(istd_liquid.volume_ml * volume_ratio, 4) if istd_liquid is not None else None,
+        istd_volume_ml=(
+            round(istd_volume_ml, 4)
+            if istd_volume_ml is not None
+            else round(istd_liquid.volume_ml * volume_ratio, 4)
+            if istd_liquid is not None
+            else None
+        ),
         istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
-        extract_true_volume_ml=round(extract_volume_ml, 6),
+        extract_true_volume_ml=round(
+            extract_true_volume_ml
+            if extract_true_volume_ml is not None
+            else extract_volume_ml,
+            6,
+        ),
         istd_true_volume_ml=(
-            round((istd_liquid.true_volume_ml or istd_liquid.volume_ml) * volume_ratio, 6)
+            round(istd_true_volume_ml, 6)
+            if istd_true_volume_ml is not None
+            else round((istd_liquid.true_volume_ml or istd_liquid.volume_ml) * volume_ratio, 6)
             if istd_liquid is not None
             else None
         ),
@@ -369,10 +415,15 @@ def _compute_compounds(
     if not extract_true_v:
         extract_true_v = ctx.extract_volume_ml or 1.0
     istd_true_v = ctx.istd_true_volume_ml if ctx.istd_true_volume_ml is not None else ctx.istd_volume_ml
+    sample_true_mass_g = (
+        ctx.sample_true_mass_g
+        if ctx.sample_true_mass_g is not None
+        else ctx.sample_mass_g
+    )
 
     for compound_id, true_effective_ug_per_kg in ctx.effective_residues_ug_per_kg.items():
         # Pesticide amount in the extract (ng) — same unit convention as before
-        pesticide_amount_ng = true_effective_ug_per_kg * ctx.sample_mass_g * 1e-3
+        pesticide_amount_ng = true_effective_ug_per_kg * sample_true_mass_g * 1e-3
 
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
         # Concentration in the extract using the TRUE delivered solvent volume

@@ -75,6 +75,7 @@ class InjectionContextSchema(BaseModel):
     sample_mass_g: float
     extract_volume_ml: float
     effective_residues_ug_per_kg: dict[str, float] = Field(default_factory=dict)
+    sample_true_mass_g: float | None = Field(default=None, exclude=True)
     extraction_result: QuechersExtractionResultSchema | None = None
     istd_volume_ml: float | None = None
     istd_reference_conc_ng_per_ml: float = 100.0
@@ -125,6 +126,7 @@ class ProduceFractionSchema(BaseModel):
     produce_lot_id: str
     produce_material_state_id: str
     mass_g: float
+    true_mass_g: float | None = Field(default=None, exclude=True)
     unit_count: int | None = None
     is_mixed: bool = Field(default=False, exclude=True)
     is_contaminated: bool = False
@@ -200,6 +202,7 @@ class SpatulaStateSchema(BaseModel):
 class PipetteStateSchema(BaseModel):
     capacity_ml: float = 1.0
     volume_ml: float = 0.0
+    true_volume_ml: float | None = Field(default=None, exclude=True)
     source_tool_id: str | None = None
     injection_context: InjectionContextSchema | None = None
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)

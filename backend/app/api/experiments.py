@@ -1,6 +1,7 @@
 from app.api.experiment_routes import (
     analytical_balance,
     core,
+    debug_inspection,
     dnd,
     gross_balance,
     lcmsms,
@@ -22,6 +23,7 @@ from app.services.experiment_service import ExperimentRuntimeService
 _route_modules = (
     analytical_balance,
     core,
+    debug_inspection,
     dnd,
     gross_balance,
     lcmsms,

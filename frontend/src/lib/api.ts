@@ -43,6 +43,7 @@ type StreamHandlers = {
   onError?: (error: Error) => void;
   onMessage: (experiment: Experiment) => void;
 };
+export type DebugInspectionKind = "pipette" | "tool";
 
 function normalizeAllowedDropTargets(raw: unknown): DropTargetType[] {
   if (!Array.isArray(raw)) {
@@ -153,6 +154,20 @@ async function buildApiError(response: Response, fallbackMessage: string): Promi
   }
 
   return new Error(fallbackMessage);
+}
+
+export async function getDebugInspection(
+  experimentId: string,
+  entityKind: DebugInspectionKind,
+  entityId: string,
+): Promise<unknown> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/${encodeURIComponent(experimentId)}/debug/inspect/${entityKind}/${encodeURIComponent(entityId)}`,
+  );
+  if (!response.ok) {
+    throw await buildApiError(response, "Unable to inspect debug state");
+  }
+  return response.json() as Promise<unknown>;
 }
 
 async function sendMutationRequest(

@@ -34,6 +34,15 @@ function makeTool(): BenchToolInstance {
 }
 
 describe("BenchToolCard QuEChERS state", () => {
+  it("references remote debug state without embedding the tool model", () => {
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={makeTool()} />);
+
+    const card = screen.getByTestId("bench-tool-card-tube_1").closest("article");
+    expect(card).toHaveAttribute("data-debug-kind", "tool");
+    expect(card).toHaveAttribute("data-debug-id", "tube_1");
+    expect(card).not.toHaveAttribute("data-debug-model");
+  });
+
   it("renders a calibration solution through the generic liquid row", () => {
     const tool = makeTool();
     tool.toolId = "sample_vial_lcms";

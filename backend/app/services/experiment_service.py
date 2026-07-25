@@ -9,6 +9,7 @@ from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
 from app.services.domain_services.workspace import advance_workspace_cryogenics_state
 from app.services.experiment_factory import build_experiment
 from app.services.experiment_repository import ExperimentRepository, InMemoryExperimentRepository
+from app.services.helpers.lookups import find_experiment_tool
 from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
 
 
@@ -43,6 +44,20 @@ class ExperimentRuntimeService:
         if did_advance:
             return self._persist_mutation_and_to_schema(experiment)
         return self._to_schema(experiment)
+
+    def get_debug_inspection(
+        self,
+        experiment_id: str,
+        entity_kind: str,
+        entity_id: str,
+    ) -> dict[str, object]:
+        """Return raw private state without advancing or persisting the simulation."""
+        experiment = self._require_experiment(experiment_id)
+        if entity_kind == "tool":
+            return asdict(find_experiment_tool(experiment, entity_id))
+        if entity_kind == "pipette":
+            return asdict(experiment.pipette)
+        raise ValueError("Unknown debug inspection kind")
 
     def _require_experiment(self, experiment_id: str) -> Experiment:
         experiment = self._experiments.get(experiment_id)

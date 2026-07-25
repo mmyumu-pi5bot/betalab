@@ -54,6 +54,7 @@ def transfer_liquid_portion(
     volume_ml: float,
     *,
     target_id_prefix: str,
+    true_volume_ml: float | None = None,
 ) -> float:
     """Move up to volume_ml of one liquid entry between containers, keeping the
     hidden true volume proportional on both sides. Returns the volume actually moved.
@@ -64,12 +65,16 @@ def transfer_liquid_portion(
     moved_ml = round(min(volume_ml, entry.volume_ml), 6)
     if moved_ml <= 0:
         return 0.0
-    true_ratio = (entry.true_volume_ml if entry.true_volume_ml is not None else entry.volume_ml) / entry.volume_ml
-    moved_true_ml = round(moved_ml * true_ratio, 6)
+    source_true_ml = entry.true_volume_ml if entry.true_volume_ml is not None else entry.volume_ml
+    if true_volume_ml is None:
+        true_ratio = source_true_ml / entry.volume_ml
+        moved_true_ml = round(moved_ml * true_ratio, 6)
+    else:
+        moved_true_ml = round(min(max(true_volume_ml, 0.0), source_true_ml), 6)
     merge_liquid_portion(target_liquids, entry, moved_ml, moved_true_ml, id_prefix=target_id_prefix)
     entry.volume_ml = round(entry.volume_ml - moved_ml, 6)
-    entry.true_volume_ml = round(max((entry.true_volume_ml or 0.0) - moved_true_ml, 0.0), 6)
-    if entry.volume_ml <= 0:
+    entry.true_volume_ml = round(max(source_true_ml - moved_true_ml, 0.0), 6)
+    if entry.volume_ml <= 0 and entry.true_volume_ml <= 0:
         source_liquids.remove(entry)
     return moved_ml
 

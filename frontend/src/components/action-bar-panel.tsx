@@ -130,6 +130,9 @@ export function ActionBarPanel({
                   ? "border-sky-300 bg-sky-50 ring-2 ring-sky-200/70"
                   : "border-slate-200 bg-slate-50/80 hover:border-slate-300 hover:bg-white"
               }`}
+              data-debug-id={action.id === "pipette" ? "pipette" : undefined}
+              data-debug-kind={action.id === "pipette" ? "pipette" : undefined}
+              data-debug-label={action.id === "pipette" ? "Micropipette" : undefined}
               key={action.id}
               onClick={() => onToggleAction(action.id)}
               title={

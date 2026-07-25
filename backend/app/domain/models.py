@@ -120,6 +120,7 @@ class InjectionContext:
     extract_volume_ml: float   # mL of acetonitrile used (sets the dilution)
     # True residues after thermal degradation at extraction time, per compound (µg/kg)
     effective_residues_ug_per_kg: dict[str, float]
+    sample_true_mass_g: float | None = None  # hidden sampled mass; None -> sample_mass_g
     extraction_result: QuechersExtractionResult | None = None
     istd_volume_ml: float | None = None           # mL of ISTD solution added to the tube
     istd_reference_conc_ng_per_ml: float = 100.0  # ng/mL in the ISTD stock (catalog value)
@@ -207,6 +208,7 @@ class ProduceFraction:
     produce_lot_id: str
     produce_material_state_id: str
     mass_g: float
+    true_mass_g: float | None = None
     unit_count: int | None = None
     is_mixed: bool = False
     is_contaminated: bool = False
@@ -221,6 +223,10 @@ class ProduceFraction:
     container_label: str | None = None
 
     def __post_init__(self) -> None:
+        if self.true_mass_g is None:
+            self.true_mass_g = self.mass_g
+        if self.true_mass_g < 0:
+            raise ValueError("true_mass_g must be non-negative")
         if (self.location_kind is None) != (self.location_id is None):
             raise ValueError("location_kind and location_id must both be set or both be None")
 
@@ -278,6 +284,7 @@ class SpatulaState:
 class PipetteState:
     capacity_ml: float = 1.0
     volume_ml: float = 0.0
+    true_volume_ml: float | None = None
     source_tool_id: str | None = None
     injection_context: InjectionContext | None = None
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
@@ -285,6 +292,10 @@ class PipetteState:
     produce_fractions: list[ProduceFraction] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        if self.true_volume_ml is None:
+            self.true_volume_ml = self.volume_ml
+        if self.true_volume_ml < 0:
+            raise ValueError("pipette true volume must be non-negative")
         if not 0 <= self.volume_ml <= self.capacity_ml:
             raise ValueError("pipette volume must be between zero and capacity")
         if (self.volume_ml > 0) != (self.source_tool_id is not None):

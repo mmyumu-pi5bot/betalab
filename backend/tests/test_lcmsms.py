@@ -380,6 +380,7 @@ def _make_ctx(
     *,
     true_effective_ug_per_kg: float = 100.0,
     sample_mass_g: float = 10.0,
+    sample_true_mass_g: float | None = None,
     extract_nominal: float = 10.0,
     extract_true: float | None = None,
     istd_nominal: float | None = 0.05,
@@ -413,6 +414,7 @@ def _make_ctx(
     return InjectionContext(
         source_tube_id="tube_test",
         sample_mass_g=sample_mass_g,
+        sample_true_mass_g=sample_true_mass_g,
         extract_volume_ml=extract_nominal,
         effective_residues_ug_per_kg={"chlorpyrifos": true_effective_ug_per_kg},
         extraction_result=extraction_result,
@@ -476,6 +478,22 @@ class TestComputeCompoundsInvariants:
         assert calc_biased is not None
         # Extract volume cancels in ratio — ISTD auto-corrects the shared solvent error
         assert calc_biased == pytest.approx(calc_nominal, rel=1e-6)
+
+    def test_hidden_sample_mass_bias_survives_istd_correction(self) -> None:
+        baseline = _make_ctx(sample_mass_g=10.0, sample_true_mass_g=10.0)
+        undersampled = _make_ctx(sample_mass_g=10.0, sample_true_mass_g=8.0)
+
+        random.seed(SEED)
+        baseline_result = _compute_compounds(_make_vial(), baseline)[0]
+        random.seed(SEED)
+        undersampled_result = _compute_compounds(_make_vial(), undersampled)[0]
+
+        assert baseline_result.calculated_conc_ug_per_kg is not None
+        assert undersampled_result.calculated_conc_ug_per_kg is not None
+        assert (
+            undersampled_result.calculated_conc_ug_per_kg
+            / baseline_result.calculated_conc_ug_per_kg
+        ) == pytest.approx(0.8)
 
     def test_istd_pipetting_error_biases_inv2(self) -> None:
         """INV2: istd_true != istd_nominal → calculated biased by istd_nominal / istd_true."""
