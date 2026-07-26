@@ -3,6 +3,7 @@ import type {
   AnalyticalBalanceToolDragPayload,
   BasketToolDragPayload,
   BenchToolDragPayload,
+  CentrifugeToolDragPayload,
   GrossBalanceToolDragPayload,
   RackToolDragPayload,
   ToolbarDragPayload,
@@ -16,6 +17,7 @@ type SupportedToolDropPayload =
   | AnalyticalBalanceToolDragPayload
   | BasketToolDragPayload
   | BenchToolDragPayload
+  | CentrifugeToolDragPayload
   | GrossBalanceToolDragPayload
   | RackToolDragPayload
   | ToolbarToolDragPayload
@@ -24,6 +26,7 @@ type SupportedToolDropPayload =
 
 type ToolDropTarget =
   | { kind: "analytical_balance" }
+  | { kind: "centrifuge" }
   | { kind: "gross_balance" }
   | { kind: "rack_slot"; rackSlotId: string }
   | { kind: "trash_bin" }
@@ -73,6 +76,7 @@ export function resolveToolDropCommand(
       (target.kind === "rack_slot" && "rackSlotId" in payload && payload.rackSlotId === target.rackSlotId) ||
       (target.kind === "gross_balance" && payload.sourceKind === "gross_balance") ||
       (target.kind === "analytical_balance" && payload.sourceKind === "analytical_balance") ||
+      (target.kind === "centrifuge" && payload.sourceKind === "centrifuge") ||
       (target.kind === "vortex" && payload.sourceKind === "vortex") ||
       (target.kind === "trash_bin" && payload.sourceKind === "trash"))
   ) {

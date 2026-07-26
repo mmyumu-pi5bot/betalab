@@ -51,6 +51,7 @@ class QuechersStateSchema(BaseModel):
     cementation_progress: float = 0.0
     thermal_degradation_progress: float = 0.0
     reaction_elapsed_seconds: float = 0.0
+    separation_progress: float = 0.0
     faults: list[str] = Field(default_factory=list)
 
     @computed_field
@@ -550,6 +551,9 @@ class WorkspaceWidgetSchema(BaseModel):
     grinder_fault: str | None = None
     vortex_run_duration_ms: float = 0.0
     vortex_run_remaining_ms: float = 0.0
+    centrifuge_run_duration_ms: float = 0.0
+    centrifuge_run_remaining_ms: float = 0.0
+    centrifuge_speed_rpm: int = 0
     tool: WorkbenchToolSchema | None = None
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
@@ -568,6 +572,8 @@ class WorkspaceWidgetSchema(BaseModel):
             targets.append("analytical_balance_widget")
         if self.widget_type == "vortex_mixer":
             targets.append("vortex_widget")
+        if self.widget_type == "centrifuge":
+            targets.append("centrifuge_widget")
         return targets
 
     @computed_field
@@ -614,7 +620,7 @@ class WorkspaceWidgetSchema(BaseModel):
                 can_receive=remaining_capacity > 0,
                 blocked_reason=None if remaining_capacity > 0 else "occupied",
             )
-        if self.widget_type in {"gross_balance", "analytical_balance", "vortex_mixer"}:
+        if self.widget_type in {"gross_balance", "analytical_balance", "vortex_mixer", "centrifuge"}:
             remaining_capacity = max(1 - (1 if self.tool is not None else 0), 0)
             return ContainmentSchema(
                 children=children,

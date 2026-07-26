@@ -206,6 +206,13 @@ _WORKSPACE_WIDGET_ITEMS = {
         "subtitle": "Tube agitation",
         "widget_type": "vortex_mixer",
     },
+    "centrifuge_widget": {
+        "accent": "sky",
+        "description": "Benchtop centrifuge used to separate the QuEChERS extract into visible phases.",
+        "name": "Centrifuge",
+        "subtitle": "Phase separation",
+        "widget_type": "centrifuge",
+    },
     "lims_terminal_widget": {
         "accent": "emerald",
         "description": "Terminal used to register the sample and print the lab label.",
@@ -262,6 +269,7 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
             "lc_msms_instrument_widget",
             "cryogenic_grinder_widget",
             "vortex_mixer_widget",
+            "centrifuge_widget",
             "lims_terminal_widget",
             "gross_balance_widget",
             "analytical_balance_widget",

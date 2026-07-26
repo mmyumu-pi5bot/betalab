@@ -6,6 +6,7 @@ from typing import Literal
 DndEntityKind = Literal["tool", "produce_lot", "liquid", "sample_label", "lims_label_ticket", "workspace_widget"]
 DndDropTargetType = Literal[
     "analytical_balance_widget",
+    "centrifuge_widget",
     "grinder_widget",
     "gross_balance_widget",
     "rack_slot",
@@ -50,6 +51,7 @@ _TOOL_CONTRACTS: dict[str, DndEntityContract] = {
             "gross_balance_widget",
             "analytical_balance_widget",
             "vortex_widget",
+            "centrifuge_widget",
         ),
         is_discardable=True,
         supports_object_move=True,
@@ -154,6 +156,7 @@ def get_tool_dnd_contract(tool_type: str) -> DndEntityContract:
 # Maps a move-source kind to the equivalent DndDropTargetType used in same-location checks.
 _SOURCE_KIND_TO_DROP_TARGET_TYPE: dict[str, str] = {
     "analytical_balance": "analytical_balance_widget",
+    "centrifuge": "centrifuge_widget",
     "gross_balance": "gross_balance_widget",
     "rack": "rack_slot",
     "trash": "trash_bin",

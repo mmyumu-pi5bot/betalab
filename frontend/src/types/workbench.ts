@@ -8,7 +8,8 @@ export type DropTargetType =
   | "grinder_widget"
   | "gross_balance_widget"
   | "analytical_balance_widget"
-  | "vortex_widget";
+  | "vortex_widget"
+  | "centrifuge_widget";
 
 type ToolbarBaseItem = {
   allowedDropTargets: DropTargetType[];
@@ -49,7 +50,8 @@ export type WorkspaceWidgetType =
   | "lims_terminal"
   | "gross_balance"
   | "analytical_balance"
-  | "vortex_mixer";
+  | "vortex_mixer"
+  | "centrifuge";
 export type ExperimentWorkspaceWidgetId =
   | "workbench"
   | "trash"
@@ -60,7 +62,8 @@ export type ExperimentWorkspaceWidgetId =
   | "lims"
   | "gross_balance"
   | "analytical_balance"
-  | "vortex";
+  | "vortex"
+  | "centrifuge";
 export type ExperimentWorkspaceWidgetType = "workbench" | "trash" | WorkspaceWidgetType;
 export type WidgetAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type ProduceLotType = string;
@@ -83,6 +86,7 @@ type DragSourceKind =
   | "gross_balance"
   | "analytical_balance"
   | "vortex"
+  | "centrifuge"
   | "lims";
 
 export type DebugProducePresetId = "apple_powder_residual_co2";
@@ -274,6 +278,15 @@ export type VortexToolDragPayload = BaseDragPayload & {
   toolType: ToolType;
 };
 
+export type CentrifugeToolDragPayload = BaseDragPayload & {
+  entityId: string;
+  entityKind: "tool";
+  sourceId: string;
+  sourceKind: "centrifuge";
+  toolId: string;
+  toolType: ToolType;
+};
+
 export type TrashToolDragPayload = BaseDragPayload & {
   entityId: string;
   entityKind: "tool";
@@ -403,11 +416,21 @@ export type BenchToolInstance = {
 
 export type QuechersState = {
   saltsAdded: boolean;
-  phase: "idle" | "armed" | "reacting" | "mixing" | "mixed" | "cemented" | "contaminated";
+  phase:
+    | "idle"
+    | "armed"
+    | "reacting"
+    | "mixing"
+    | "mixed"
+    | "separating"
+    | "separated"
+    | "cemented"
+    | "contaminated";
   temperatureC: number;
   cementationProgress: number;
   thermalDegradationProgress: number;
   reactionElapsedSeconds: number;
+  separationProgress: number;
   faults: string[];
   isUsable: boolean;
 };
@@ -601,6 +624,9 @@ export type ExperimentWorkspaceWidget = {
   grinderDisplayMode?: string | null;
   vortexRunDurationMs?: number;
   vortexRunRemainingMs?: number;
+  centrifugeRunDurationMs?: number;
+  centrifugeRunRemainingMs?: number;
+  centrifugeSpeedRpm?: number;
   isPresent: boolean;
   isTrashed: boolean;
   tool?: BenchToolInstance | null;

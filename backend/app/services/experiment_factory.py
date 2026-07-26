@@ -116,6 +116,16 @@ def build_experiment() -> Experiment:
                     is_trashed=False,
                 ),
                 WorkspaceWidget(
+                    id="centrifuge",
+                    widget_type="centrifuge",
+                    label="Centrifuge",
+                    anchor="top-left",
+                    offset_x=1668,
+                    offset_y=886,
+                    is_present=False,
+                    is_trashed=False,
+                ),
+                WorkspaceWidget(
                     id="grinder",
                     widget_type="cryogenic_grinder",
                     label="Cryogenic grinder",

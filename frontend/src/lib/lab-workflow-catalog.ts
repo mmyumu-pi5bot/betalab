@@ -149,6 +149,16 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         widgetType: "vortex_mixer",
       },
       {
+        id: "centrifuge_widget",
+        allowedDropTargets: ["workspace_canvas"],
+        itemType: "workspace_widget",
+        name: "Centrifuge",
+        subtitle: "Phase separation",
+        description: "Benchtop centrifuge used to separate the QuEChERS extract into visible phases.",
+        accent: "sky",
+        widgetType: "centrifuge",
+      },
+      {
         id: "lims_terminal_widget",
         allowedDropTargets: ["workspace_canvas"],
         itemType: "workspace_widget",

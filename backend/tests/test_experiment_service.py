@@ -749,6 +749,7 @@ def test_create_experiment_starts_with_received_bag_and_empty_workbench() -> Non
         "rack",
         "instrument",
         "basket",
+        "centrifuge",
         "grinder",
         "vortex",
     ]
@@ -762,6 +763,7 @@ def test_create_experiment_starts_with_received_bag_and_empty_workbench() -> Non
     assert widgets_by_id["instrument"].is_present is False
     assert widgets_by_id["basket"].is_present is True
     assert widgets_by_id["grinder"].is_present is False
+    assert widgets_by_id["centrifuge"].is_present is False
     assert widgets_by_id["trash"].anchor == "top-left"
     assert widgets_by_id["trash"].offset_x == 1276
     assert widgets_by_id["trash"].offset_y == 24

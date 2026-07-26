@@ -4,6 +4,7 @@ import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import type {
   BasketToolDragPayload,
   BenchToolDragPayload,
+  CentrifugeToolDragPayload,
   RackToolDragPayload,
   ToolbarDragPayload,
   TrashToolDragPayload,
@@ -93,6 +94,21 @@ function createVortexToolPayload(overrides: Partial<VortexToolDragPayload> = {})
   };
 }
 
+function createCentrifugeToolPayload(
+  overrides: Partial<CentrifugeToolDragPayload> = {},
+): CentrifugeToolDragPayload {
+  return {
+    allowedDropTargets: ["workbench_slot", "trash_bin", "gross_balance_widget", "analytical_balance_widget", "vortex_widget", "centrifuge_widget"],
+    entityId: "centrifuge_tool_1",
+    entityKind: "tool",
+    sourceId: "centrifuge",
+    sourceKind: "centrifuge",
+    toolId: "centrifuge_tube_50ml",
+    toolType: "centrifuge_tube",
+    ...overrides,
+  };
+}
+
 describe("resolveToolDropCommand", () => {
   it("maps all tool drops to the generic move-object command", () => {
     expect(resolveToolDropCommand(createWorkbenchToolPayload(), { kind: "gross_balance" })).toEqual({
@@ -148,6 +164,26 @@ describe("resolveToolDropCommand", () => {
     });
 
     expect(resolveToolDropCommand(createVortexToolPayload(), { kind: "vortex" })).toBeNull();
+    expect(resolveToolDropCommand(createCentrifugeToolPayload(), { kind: "centrifuge" })).toBeNull();
+  });
+
+  it("routes centrifuge drops and preserves centrifuge provenance", () => {
+    expect(resolveToolDropCommand(createWorkbenchToolPayload(), { kind: "centrifuge" })).toEqual({
+      kind: "move_object",
+      payload: {
+        entity: { kind: "tool", id: "bench_tool_1" },
+        source: { kind: "workbench", id: "station_1" },
+        destination: { kind: "centrifuge", id: "centrifuge" },
+      },
+    });
+    expect(resolveToolDropCommand(createCentrifugeToolPayload(), { kind: "workbench_slot", slotId: "station_2" })).toEqual({
+      kind: "move_object",
+      payload: {
+        entity: { kind: "tool", id: "centrifuge_tool_1" },
+        source: { kind: "centrifuge", id: "centrifuge" },
+        destination: { kind: "workbench_slot", id: "station_2" },
+      },
+    });
   });
 
   it("keeps basket provenance in the generic move-object command", () => {

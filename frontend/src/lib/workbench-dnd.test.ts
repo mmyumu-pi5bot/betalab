@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   hasCompatibleDropTarget,
   readBenchToolDragPayload,
+  readEquipmentToolDragPayload,
   readProduceDragPayload,
   readRackToolDragPayload,
   readSampleLabelDragPayload,
   readToolbarDragPayload,
   readWorkspaceLiquidDragPayload,
   writeBenchToolDragPayload,
+  writeEquipmentToolDragPayload,
   writeProduceDragPayload,
   writeRackToolDragPayload,
   writeSampleLabelDragPayload,
@@ -403,5 +405,24 @@ describe("workbench dnd helpers", () => {
       toolId: "sample_vial_lcms",
       toolType: "sample_vial",
     });
+  });
+
+  it("round-trips a tube dragged out of the centrifuge", () => {
+    const dataTransfer = createDataTransfer();
+    const payload = {
+      allowedDropTargets: ["workbench_slot", "vortex_widget", "centrifuge_widget", "trash_bin"] as const,
+      entityId: "tube_1",
+      entityKind: "tool" as const,
+      sourceId: "centrifuge",
+      sourceKind: "centrifuge" as const,
+      toolId: "centrifuge_tube_50ml",
+      toolType: "centrifuge_tube" as const,
+    };
+
+    writeEquipmentToolDragPayload(dataTransfer, payload);
+    syncTypes(dataTransfer);
+
+    expect(hasCompatibleDropTarget(dataTransfer, "workbench_slot")).toBe(true);
+    expect(readEquipmentToolDragPayload(dataTransfer)).toEqual(payload);
   });
 });

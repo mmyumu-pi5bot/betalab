@@ -4,6 +4,7 @@ import type { Dispatch, MouseEvent as ReactMouseEvent, PointerEvent as ReactPoin
 import type { DragEvent } from "react";
 
 import { AnalyticalBalanceWidget } from "@/components/analytical-balance-widget";
+import { CentrifugeWidget } from "@/components/centrifuge-widget";
 import { BenchToolCard } from "@/components/bench-tool-card";
 import { DropDraftCard } from "@/components/drop-draft-card";
 import { FloatingWidget } from "@/components/floating-widget";
@@ -21,6 +22,7 @@ import { VortexWidget } from "@/components/vortex-widget";
 import { WorkbenchPanel } from "@/components/workbench-panel";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 import type { AnalyticalBalanceDndApi } from "@/hooks/use-analytical-balance-dnd";
+import type { CentrifugeDndApi } from "@/hooks/use-centrifuge-dnd";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { GrinderDndApi } from "@/hooks/use-grinder-dnd";
 import type { GrossBalanceDndApi } from "@/hooks/use-gross-balance-dnd";
@@ -64,6 +66,7 @@ type LabSceneWorkspaceCanvasProps = {
   };
   dnd: {
     analyticalBalance: AnalyticalBalanceDndApi;
+    centrifuge: CentrifugeDndApi;
     clearDropTargets: () => void;
     dndDisabledByAction: boolean;
     grinder: GrinderDndApi;
@@ -151,6 +154,7 @@ type LabSceneWorkspaceCanvasProps = {
       orchard_name: string;
     }) => void;
     onStartVortex: () => void;
+    onStartCentrifuge: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onToggleVortexToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
@@ -199,6 +203,15 @@ export function LabSceneWorkspaceCanvas({
     vortexRunDurationMs > 0
       ? Math.round((1 - vortexRunRemainingMs / vortexRunDurationMs) * 100)
       : 0;
+  const centrifugeWidget = experiment.workspace.widgets.find((w) => w.id === "centrifuge") ?? null;
+  const centrifugeTool = centrifugeWidget?.tool ?? null;
+  const centrifugeRunRemainingMs = centrifugeWidget?.centrifugeRunRemainingMs ?? 0;
+  const centrifugeRunDurationMs = centrifugeWidget?.centrifugeRunDurationMs ?? 0;
+  const isCentrifugeRunning = centrifugeRunRemainingMs > 0;
+  const centrifugeProgressPercent =
+    centrifugeRunDurationMs > 0
+      ? Math.round((1 - centrifugeRunRemainingMs / centrifugeRunDurationMs) * 100)
+      : Math.round((centrifugeTool?.quechersState?.separationProgress ?? 0) * 100);
   const renderStoreWidgetAction = (widget: ExperimentWorkspaceWidget) => {
     if (!widget.isStorable || !widget.isPresent) {
       return undefined;
@@ -333,6 +346,23 @@ export function LabSceneWorkspaceCanvas({
       />
     </div>
   ) : undefined;
+  const centrifugeStagedContent = centrifugeTool ? (
+    <div
+      data-testid="centrifuge-staged-item"
+      onDragOver={dnd.centrifuge.handleDragOver}
+      onDrop={dnd.centrifuge.handleDrop}
+    >
+      <BenchToolCard
+        draggable={!isCentrifugeRunning}
+        onDragEnd={dnd.clearDropTargets}
+        onDragStart={(event) => dnd.centrifuge.handleItemDragStart(event.dataTransfer)}
+        onDragOver={dnd.centrifuge.handleDragOver}
+        onDrop={dnd.centrifuge.handleDrop}
+        onRemoveLiquid={() => {}}
+        tool={{ ...centrifugeTool, id: `centrifuge-${centrifugeTool.id}` }}
+      />
+    </div>
+  ) : undefined;
 
   return (
     <section className="overflow-hidden rounded-[2.25rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.75),rgba(255,255,255,0.55))] p-4 shadow-[0_28px_60px_rgba(15,23,42,0.08)] backdrop-blur xl:p-6">
@@ -424,6 +454,7 @@ export function LabSceneWorkspaceCanvas({
             );
             const grinderTargetType = widgetDropTargets.find((target) => target === "grinder_widget");
             const vortexTargetType = widgetDropTargets.find((target) => target === "vortex_widget");
+            const centrifugeTargetType = widgetDropTargets.find((target) => target === "centrifuge_widget");
 
             return (
             <FloatingWidget
@@ -443,6 +474,8 @@ export function LabSceneWorkspaceCanvas({
                           ? "Gross Balance Widget"
                           : widgetId === "vortex"
                             ? "Vortex Widget"
+                            : widgetId === "centrifuge"
+                              ? "Centrifuge Widget"
                             : "Produce Basket Widget"
               }
               onDragStart={(id, event) => {
@@ -570,6 +603,23 @@ export function LabSceneWorkspaceCanvas({
                   onStart={workspaceActions.onStartVortex}
                   progressPercent={vortexProgressPercent}
                   stagedContent={vortexStagedContent}
+                />
+              ) : widgetId === "centrifuge" ? (
+                <CentrifugeWidget
+                  headerAction={renderStoreWidgetAction(widget)}
+                  isCommandPending={ui.isCommandPending}
+                  isDropHighlighted={
+                    centrifugeTargetType
+                      ? dnd.isDropTargetHighlighted(centrifugeTargetType)
+                      : false
+                  }
+                  isRunning={isCentrifugeRunning}
+                  onDragOver={dnd.centrifuge.handleDragOver}
+                  onDrop={dnd.centrifuge.handleDrop}
+                  onStart={workspaceActions.onStartCentrifuge}
+                  progressPercent={centrifugeProgressPercent}
+                  separationProgress={centrifugeTool?.quechersState?.separationProgress ?? 0}
+                  stagedContent={centrifugeStagedContent}
                 />
               ) : (
                 <WorkspaceEquipmentWidget

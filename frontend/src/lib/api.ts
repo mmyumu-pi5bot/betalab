@@ -1435,6 +1435,17 @@ export async function startVortexCycle(
   });
 }
 
+export async function startCentrifugeCycle(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/centrifuge/start`,
+  });
+}
+
 export async function pourExtractToVial(
   experimentId: string,
   payload: MutationPayload,
@@ -1738,6 +1749,9 @@ function normalizeBenchTool(
       ),
       reactionElapsedSeconds: Number(
         rawQuechersState.reactionElapsedSeconds ?? rawQuechersState.reaction_elapsed_seconds ?? 0,
+      ),
+      separationProgress: Number(
+        rawQuechersState.separationProgress ?? rawQuechersState.separation_progress ?? 0,
       ),
       faults: Array.isArray(rawQuechersState.faults)
         ? (rawQuechersState.faults as unknown[]).map(String)
@@ -2192,6 +2206,13 @@ function normalizeWorkspaceWidget(
           : null,
     vortexRunDurationMs: Number(widget.vortexRunDurationMs ?? widget.vortex_run_duration_ms ?? 0),
     vortexRunRemainingMs: Number(widget.vortexRunRemainingMs ?? widget.vortex_run_remaining_ms ?? 0),
+    centrifugeRunDurationMs: Number(
+      widget.centrifugeRunDurationMs ?? widget.centrifuge_run_duration_ms ?? 0,
+    ),
+    centrifugeRunRemainingMs: Number(
+      widget.centrifugeRunRemainingMs ?? widget.centrifuge_run_remaining_ms ?? 0,
+    ),
+    centrifugeSpeedRpm: Number(widget.centrifugeSpeedRpm ?? widget.centrifuge_speed_rpm ?? 0),
     offsetX: Number(widget.offsetX ?? widget.offset_x),
     offsetY: Number(widget.offsetY ?? widget.offset_y),
     isPresent: Boolean(widget.isPresent ?? widget.is_present),

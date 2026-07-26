@@ -49,6 +49,7 @@ export type MoveObjectPayload = {
     kind:
       | "analytical_balance"
       | "basket"
+      | "centrifuge"
       | "grinder"
       | "gross_balance"
       | "palette"
@@ -61,6 +62,7 @@ export type MoveObjectPayload = {
   destination: {
     kind:
       | "analytical_balance"
+      | "centrifuge"
       | "gross_balance"
       | "rack_slot"
       | "trash_bin"

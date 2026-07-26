@@ -400,6 +400,22 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
             if widget.vortex_run_remaining_ms <= 0:
                 _complete_vortex_cycle(experiment, widget)
 
+        if widget.centrifuge_run_remaining_ms > 0:
+            centrifuge_elapsed_ms = min(elapsed_ms, widget.centrifuge_run_remaining_ms)
+            widget.centrifuge_run_remaining_ms = round_volume(
+                max(widget.centrifuge_run_remaining_ms - centrifuge_elapsed_ms, 0.0)
+            )
+            if widget.tool is not None:
+                duration_ms = max(widget.centrifuge_run_duration_ms, 1.0)
+                widget.tool.quechers_state.separation_progress = round_volume(
+                    min(
+                        1.0 - (widget.centrifuge_run_remaining_ms / duration_ms),
+                        1.0,
+                    )
+                )
+            if widget.centrifuge_run_remaining_ms <= 0:
+                _complete_centrifuge_cycle(experiment, widget)
+
         if remaining_seconds > 0:
             physical_simulation_service.advance_widget(
                 widget,
@@ -509,6 +525,16 @@ def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> N
     for fraction in widget.tool.produce_fractions:
         fraction.is_mixed = is_mixed
     experiment.audit_log.append(f"{widget.tool.label} successfully vortexed on {widget.label}.")
+
+
+def _complete_centrifuge_cycle(experiment: Experiment, widget: WorkspaceWidget) -> None:
+    widget.centrifuge_run_remaining_ms = 0.0
+    widget.centrifuge_speed_rpm = 0
+    if widget.tool is None:
+        return
+    widget.tool.quechers_state.phase = "separated"
+    widget.tool.quechers_state.separation_progress = 1.0
+    experiment.audit_log.append(f"{widget.tool.label} separated in {widget.label}.")
 
 
 def _remove_widget_produce_lot(widget: WorkspaceWidget, produce_lot_id: str) -> ProduceLot:

@@ -326,6 +326,10 @@ export function useLabExperiment({
       restoreToolFromTrash: (p: RestoreTrashedToolToVortexPayload) => exec(mutationFns.restoreTrashedToolToVortex, p),
     },
 
+    centrifuge: {
+      start: () => exec(mutationFns.startCentrifugeCycle),
+    },
+
     // ── Grinder ───────────────────────────────────────────────────────────────
     grinder: {
       start: (p: StartGrinderCyclePayload) => exec(mutationFns.startGrinderCycle, p),

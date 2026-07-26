@@ -366,6 +366,14 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
             raise ValueError("Pipette source not found.")
         if source.is_sealed:
             raise ValueError(f"Open {source.label} before aspirating.")
+        if (
+            source.tool_type == "centrifuge_tube"
+            and source.quechers_extraction_result is not None
+            and source.quechers_state.phase != "separated"
+        ):
+            raise ValueError(
+                f"{source.label} must be centrifuged before aspirating the extract."
+            )
         total_source_ml = _pipettable_volume_ml(source)
         if total_source_ml <= 0:
             raise ValueError(f"{source.label} contains no liquid or material to aspirate.")

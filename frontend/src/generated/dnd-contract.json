@@ -123,7 +123,8 @@
         "trash_bin",
         "gross_balance_widget",
         "analytical_balance_widget",
-        "vortex_widget"
+        "vortex_widget",
+        "centrifuge_widget"
       ],
       "can_receive_liquids": true,
       "can_receive_produce": false,

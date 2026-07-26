@@ -87,6 +87,7 @@ class QuechersState:
     cementation_progress: float = 0.0
     thermal_degradation_progress: float = 0.0
     reaction_elapsed_seconds: float = 0.0
+    separation_progress: float = 0.0
     faults: list[str] = field(default_factory=list)
 
     @property
@@ -389,6 +390,9 @@ class WorkspaceWidget:
     grinder_fault: str | None = None
     vortex_run_duration_ms: float = 0.0
     vortex_run_remaining_ms: float = 0.0
+    centrifuge_run_duration_ms: float = 0.0
+    centrifuge_run_remaining_ms: float = 0.0
+    centrifuge_speed_rpm: int = 0
     tool: WorkbenchTool | None = None
     produce_lots: list[ProduceLot] = field(default_factory=list)
     liquids: list[WorkbenchLiquid] = field(default_factory=list)

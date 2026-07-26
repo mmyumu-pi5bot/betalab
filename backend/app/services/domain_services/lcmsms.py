@@ -210,10 +210,10 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
             raise ValueError(f"{tube.label} is not a centrifuge tube.")
 
         qs = tube.quechers_state
-        if qs.phase != "cemented" or "dry_salts_wetted" in qs.faults:
+        if qs.phase != "separated" or "dry_salts_wetted" in qs.faults:
             raise ValueError(
-                f"{tube.label} does not contain a completed extraction. "
-                "Complete the QuEChERS process first."
+                f"{tube.label} does not contain a separated extract. "
+                "Complete vortexing and centrifugation first."
             )
         if tube.quechers_extraction_result is None:
             raise ValueError(f"{tube.label} has no extraction result — run the simulation clock first.")

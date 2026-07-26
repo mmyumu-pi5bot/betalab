@@ -95,6 +95,7 @@ ToolSource = Literal[
     "gross_balance_vial",
     "analytical_balance_vial",
     "vortex_centrifuge",
+    "centrifuge_centrifuge",
 ]
 ToolTarget = Literal[
     "empty_workbench",
@@ -104,6 +105,7 @@ ToolTarget = Literal[
     "gross_balance",
     "analytical_balance",
     "vortex",
+    "centrifuge",
     "trash",
 ]
 
@@ -221,6 +223,30 @@ TOOL_DND_CASES: tuple[ToolDndCase, ...] = (
     ToolDndCase("vortex_centrifuge", "analytical_balance", True),
     ToolDndCase("vortex_centrifuge", "vortex", False),
     ToolDndCase("vortex_centrifuge", "trash", True),
+    # centrifuge target — every existing concrete source is explicit
+    ToolDndCase("palette_vial", "centrifuge", False),
+    ToolDndCase("palette_storage_jar", "centrifuge", False),
+    ToolDndCase("palette_cutting_board", "centrifuge", False),
+    ToolDndCase("basket_bag", "centrifuge", False),
+    ToolDndCase("workbench_vial", "centrifuge", False),
+    ToolDndCase("workbench_storage_jar", "centrifuge", False),
+    ToolDndCase("workbench_cutting_board", "centrifuge", False),
+    ToolDndCase("rack_vial", "centrifuge", False),
+    ToolDndCase("trash_vial", "centrifuge", False),
+    ToolDndCase("trash_storage_jar", "centrifuge", False),
+    ToolDndCase("gross_balance_vial", "centrifuge", False),
+    ToolDndCase("analytical_balance_vial", "centrifuge", False),
+    ToolDndCase("vortex_centrifuge", "centrifuge", True),
+    # centrifuge origin — same tube compatibility from every location
+    ToolDndCase("centrifuge_centrifuge", "empty_workbench", True),
+    ToolDndCase("centrifuge_centrifuge", "occupied_workbench", False),
+    ToolDndCase("centrifuge_centrifuge", "empty_rack", False),
+    ToolDndCase("centrifuge_centrifuge", "occupied_rack", False),
+    ToolDndCase("centrifuge_centrifuge", "gross_balance", True),
+    ToolDndCase("centrifuge_centrifuge", "analytical_balance", True),
+    ToolDndCase("centrifuge_centrifuge", "vortex", True),
+    ToolDndCase("centrifuge_centrifuge", "centrifuge", False),
+    ToolDndCase("centrifuge_centrifuge", "trash", True),
 )
 
 
@@ -233,7 +259,7 @@ def _tool_id_for_source(source: ToolSource) -> str:
         return "cutting_board_hdpe"
     if source == "basket_bag":
         return "sealed_sampling_bag"
-    if source == "vortex_centrifuge":
+    if source in {"vortex_centrifuge", "centrifuge_centrifuge"}:
         return "centrifuge_tube_50ml"
     raise AssertionError(f"Unhandled source: {source}")
 
@@ -271,6 +297,16 @@ def _prepare_source(service: ExperimentRuntimeService, experiment_id: str, sourc
     if source == "vortex_centrifuge":
         PlaceToolOnVortexService(service).run(experiment_id, PlaceToolOnVortexRequest(tool_id=tool_id))
         return None
+    if source == "centrifuge_centrifuge":
+        DndMoveObjectService(service).run(
+            experiment_id,
+            DndMoveObjectRequest(
+                entity=DndObjectRef(kind="tool", id=tool_id),
+                source=DndObjectRef(kind="palette", id=tool_id),
+                destination=DndObjectRef(kind="centrifuge", id="centrifuge"),
+            ),
+        )
+        return None
     raise AssertionError(f"Unhandled source: {source}")
 
 
@@ -285,6 +321,8 @@ def _dnd_dest_ref(target: ToolTarget) -> DndObjectRef:
         return DndObjectRef(kind="analytical_balance", id="analytical_balance")
     if target == "vortex":
         return DndObjectRef(kind="vortex", id="vortex")
+    if target == "centrifuge":
+        return DndObjectRef(kind="centrifuge", id="centrifuge")
     if target == "trash":
         return DndObjectRef(kind="trash_bin", id="trash")
     raise AssertionError(f"Unhandled target: {target}")
@@ -297,6 +335,13 @@ def _execute_drop(
     target: ToolTarget,
     trash_tool_id: str | None,
 ):
+    if target == "centrifuge":
+        return _execute_generic_drop_to_centrifuge(
+            service,
+            experiment_id,
+            source,
+            trash_tool_id,
+        )
     tool_id = _tool_id_for_source(source)
     if target in {"empty_workbench", "occupied_workbench"}:
         if source.startswith("palette_"):
@@ -326,7 +371,7 @@ def _execute_drop(
             return MoveGrossBalanceToolToWorkbenchService(service).run(
                 experiment_id, MoveGrossBalanceToolToWorkbenchRequest(target_slot_id="station_2")
             )
-        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+        if source in {"analytical_balance_vial", "vortex_centrifuge", "centrifuge_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target in {"empty_rack", "occupied_rack"}:
         if source.startswith("palette_"):
@@ -349,7 +394,7 @@ def _execute_drop(
             )
         if source == "gross_balance_vial":
             return MoveGrossBalanceToolToRackService(service).run(experiment_id, MoveGrossBalanceToolToRackRequest(rack_slot_id="rack_slot_2"))
-        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+        if source in {"analytical_balance_vial", "vortex_centrifuge", "centrifuge_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "gross_balance":
         if source.startswith("palette_"):
@@ -368,7 +413,7 @@ def _execute_drop(
             return RestoreTrashedToolToGrossBalanceService(service).run(
                 experiment_id, RestoreTrashedToolToGrossBalanceRequest(trash_tool_id=trash_tool_id)
             )
-        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+        if source in {"analytical_balance_vial", "vortex_centrifuge", "centrifuge_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "analytical_balance":
         if source.startswith("palette_"):
@@ -398,7 +443,7 @@ def _execute_drop(
             )
         if source == "gross_balance_vial":
             return MoveGrossBalanceToolToAnalyticalBalanceService(service).run(experiment_id, MoveGrossBalanceToolToAnalyticalBalanceRequest())
-        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+        if source in {"analytical_balance_vial", "vortex_centrifuge", "centrifuge_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "vortex":
         if source.startswith("palette_"):
@@ -422,7 +467,7 @@ def _execute_drop(
             return RestoreTrashedToolToVortexService(service).run(experiment_id, RestoreTrashedToolToVortexRequest(trash_tool_id=trash_tool_id))
         if source == "gross_balance_vial":
             return MoveGrossBalanceToolToVortexService(service).run(experiment_id, MoveGrossBalanceToolToVortexRequest())
-        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+        if source in {"analytical_balance_vial", "vortex_centrifuge", "centrifuge_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     if target == "trash":
         if source.startswith("palette_"):
@@ -436,9 +481,69 @@ def _execute_drop(
             return DiscardRackToolService(service).run(experiment_id, DiscardRackToolRequest(rack_slot_id="rack_slot_1"))
         if source == "gross_balance_vial":
             return DiscardGrossBalanceToolService(service).run(experiment_id, EmptyRequest())
-        if source in {"analytical_balance_vial", "vortex_centrifuge"}:
+        if source in {"analytical_balance_vial", "vortex_centrifuge", "centrifuge_centrifuge"}:
             return _execute_dnd_drop(service, experiment_id, source, target)
     raise ValueError(f"Unsupported tool drop: {source} -> {target}")
+
+
+def _execute_generic_drop_to_centrifuge(
+    service: ExperimentRuntimeService,
+    experiment_id: str,
+    source: ToolSource,
+    trash_tool_id: str | None,
+):
+    state = service.get_experiment(experiment_id)
+    tool_id = _tool_id_for_source(source)
+    if source.startswith("palette_"):
+        entity_id = tool_id
+        source_ref = DndObjectRef(kind="palette", id=tool_id)
+    elif source == "basket_bag":
+        entity_id = state.basket_tools[0].id
+        source_ref = DndObjectRef(kind="basket", id="produce_basket")
+    elif source.startswith("workbench_"):
+        tool = state.workbench.slots[0].tool
+        assert tool is not None
+        entity_id = tool.id
+        source_ref = DndObjectRef(kind="workbench", id="station_1")
+    elif source == "rack_vial":
+        tool = state.rack.slots[0].tool
+        assert tool is not None
+        entity_id = tool.id
+        source_ref = DndObjectRef(kind="rack", id="rack_slot_1")
+    elif source.startswith("trash_"):
+        assert trash_tool_id is not None
+        entity_id = trash_tool_id
+        source_ref = DndObjectRef(kind="trash", id=trash_tool_id)
+    elif source == "gross_balance_vial":
+        tool = next(w for w in state.workspace.widgets if w.id == "gross_balance").tool
+        assert tool is not None
+        entity_id = tool.id
+        source_ref = DndObjectRef(kind="gross_balance", id="gross_balance")
+    elif source == "analytical_balance_vial":
+        tool = next(w for w in state.workspace.widgets if w.id == "analytical_balance").tool
+        assert tool is not None
+        entity_id = tool.id
+        source_ref = DndObjectRef(kind="analytical_balance", id="analytical_balance")
+    elif source == "vortex_centrifuge":
+        tool = next(w for w in state.workspace.widgets if w.id == "vortex").tool
+        assert tool is not None
+        entity_id = tool.id
+        source_ref = DndObjectRef(kind="vortex", id="vortex")
+    elif source == "centrifuge_centrifuge":
+        tool = next(w for w in state.workspace.widgets if w.id == "centrifuge").tool
+        assert tool is not None
+        entity_id = tool.id
+        source_ref = DndObjectRef(kind="centrifuge", id="centrifuge")
+    else:
+        raise AssertionError(f"Unhandled centrifuge source: {source}")
+    return DndMoveObjectService(service).run(
+        experiment_id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="tool", id=entity_id),
+            source=source_ref,
+            destination=DndObjectRef(kind="centrifuge", id="centrifuge"),
+        ),
+    )
 
 
 def _execute_dnd_drop(
@@ -458,6 +563,11 @@ def _execute_dnd_drop(
         assert vortex_w.tool is not None
         entity_id = vortex_w.tool.id
         source_ref = DndObjectRef(kind="vortex", id="vortex")
+    elif source == "centrifuge_centrifuge":
+        centrifuge_w = next(w for w in experiment_state.workspace.widgets if w.id == "centrifuge")
+        assert centrifuge_w.tool is not None
+        entity_id = centrifuge_w.tool.id
+        source_ref = DndObjectRef(kind="centrifuge", id="centrifuge")
     else:
         raise AssertionError(f"_execute_dnd_drop called for unexpected source: {source}")
     return DndMoveObjectService(service).run(
@@ -506,6 +616,10 @@ def test_tool_dnd_matrix(source: ToolSource, target: ToolTarget, allowed: bool) 
     if target == "vortex":
         vortex = next(widget for widget in updated.workspace.widgets if widget.id == "vortex")
         assert vortex.tool is not None
+        return
+    if target == "centrifuge":
+        centrifuge = next(widget for widget in updated.workspace.widgets if widget.id == "centrifuge")
+        assert centrifuge.tool is not None
         return
     if target == "trash":
         assert updated.trash.children

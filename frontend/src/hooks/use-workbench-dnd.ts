@@ -17,6 +17,7 @@ import {
 } from "@/lib/workbench-dnd";
 import type {
   AnalyticalBalanceToolDragPayload,
+  CentrifugeToolDragPayload,
   BasketToolDragPayload,
   BenchLabel,
   BenchToolDragPayload,
@@ -67,6 +68,7 @@ export type WorkbenchDndApi = {
       | RackToolDragPayload
       | GrossBalanceToolDragPayload
       | AnalyticalBalanceToolDragPayload
+      | CentrifugeToolDragPayload
       | VortexToolDragPayload
       | TrashToolDragPayload,
   ) => void;
@@ -151,6 +153,7 @@ export function useWorkbenchDnd({
       | RackToolDragPayload
       | GrossBalanceToolDragPayload
       | AnalyticalBalanceToolDragPayload
+      | CentrifugeToolDragPayload
       | VortexToolDragPayload
       | TrashToolDragPayload,
   ) => {

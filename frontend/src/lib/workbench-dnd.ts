@@ -3,6 +3,7 @@ import type {
   BenchLabel,
   BasketToolDragPayload,
   BenchToolDragPayload,
+  CentrifugeToolDragPayload,
   DragDescriptor,
   DropTargetType,
   GrossBalanceToolDragPayload,
@@ -25,6 +26,7 @@ export type EquipmentToolDragPayload =
   | RackToolDragPayload
   | GrossBalanceToolDragPayload
   | AnalyticalBalanceToolDragPayload
+  | CentrifugeToolDragPayload
   | VortexToolDragPayload
   | TrashToolDragPayload;
 
@@ -51,7 +53,8 @@ function isDropTargetType(targetType: unknown): targetType is DropTargetType {
     targetType === "grinder_widget" ||
     targetType === "gross_balance_widget" ||
     targetType === "analytical_balance_widget" ||
-    targetType === "vortex_widget"
+    targetType === "vortex_widget" ||
+    targetType === "centrifuge_widget"
   );
 }
 
@@ -358,6 +361,8 @@ export function readEquipmentToolDragPayload(
         return { ...base, sourceKind: "analytical_balance" };
       case "vortex":
         return { ...base, sourceKind: "vortex" };
+      case "centrifuge":
+        return { ...base, sourceKind: "centrifuge" };
       case "trash":
         if (typeof parsed.trashToolId !== "string") return null;
         return { ...base, sourceKind: "trash", trashToolId: parsed.trashToolId };

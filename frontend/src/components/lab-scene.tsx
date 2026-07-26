@@ -15,6 +15,7 @@ import { useDropDraft } from "@/hooks/use-drop-draft";
 import { useLabExperiment } from "@/hooks/use-lab-experiment";
 import { useRackDnd } from "@/hooks/use-rack-dnd";
 import { useActionMode } from "@/hooks/use-action-mode";
+import { useCentrifugeDnd } from "@/hooks/use-centrifuge-dnd";
 import { useTrashDnd } from "@/hooks/use-trash-dnd";
 import { useVortexDnd } from "@/hooks/use-vortex-dnd";
 import { useWorkbenchDnd } from "@/hooks/use-workbench-dnd";
@@ -304,6 +305,12 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     state.status === "ready"
       ? (state.experiment.workspace.widgets.find((w) => w.id === "vortex")?.tool ?? null)
       : null;
+  const centrifugeWidget =
+    state.status === "ready"
+      ? (state.experiment.workspace.widgets.find((w) => w.id === "centrifuge") ?? null)
+      : null;
+  const centrifugeTool = centrifugeWidget?.tool ?? null;
+  const isCentrifugeRunning = (centrifugeWidget?.centrifugeRunRemainingMs ?? 0) > 0;
 
   const rackDnd = useRackDnd({
     dndDisabledByAction,
@@ -363,6 +370,13 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     dndDisabledByAction,
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
     experimentApi: dndApi,
+  });
+  const centrifugeDnd = useCentrifugeDnd({
+    centrifugeTool,
+    dndDisabledByAction,
+    dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
+    experimentApi: dndApi,
+    isRunning: isCentrifugeRunning,
   });
 
   const { handleWorkspaceDragOver, handleWorkspaceDrop } = useWorkspaceDrop({
@@ -538,6 +552,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       }}
       dnd={{
         analyticalBalance: analyticalBalanceDnd,
+        centrifuge: centrifugeDnd,
         clearDropTargets,
         dndDisabledByAction,
         grinder: grinderDnd,
@@ -627,6 +642,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       workspaceActions={{
         ...workspaceActions,
         onRunSequence: () => { void experimentApi.lcmsms.runSequence(); },
+        onStartCentrifuge: () => { void experimentApi.centrifuge.start(); },
         onStartVortex: () => { void experimentApi.vortex.start(); },
         onStoreWorkspaceWidget: (widgetId) => {
           clearDropTargets();

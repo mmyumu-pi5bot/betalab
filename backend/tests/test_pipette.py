@@ -49,7 +49,8 @@ def _prepared_experiment(
     tube = experiment.workbench.slots[0].tool
     vial = experiment.workbench.slots[1].tool
     assert tube is not None and vial is not None
-    tube.quechers_state.phase = "mixed"
+    tube.quechers_state.phase = "separated"
+    tube.quechers_state.separation_progress = 1.0
     tube.quechers_extraction_result = QuechersExtractionResult(
         extraction_manip_factor=1.0,
         istd_manip_factor=None,
@@ -68,6 +69,20 @@ def _prepared_experiment(
     ]
     tube.liquids = [WorkbenchLiquid(id="liquid_1", liquid_id="acetonitrile_extraction", name="Acetonitrile", volume_ml=10.0, accent="amber")]
     return service, experiment_id, tube.id, vial.id
+
+
+def test_pipette_rejects_completed_extract_before_centrifugation() -> None:
+    service, experiment_id, tube_id, _ = _prepared_experiment()
+    tube = service._require_experiment(experiment_id).workbench.slots[0].tool
+    assert tube is not None
+    tube.quechers_state.phase = "mixed"
+    tube.quechers_state.separation_progress = 0.0
+
+    with pytest.raises(ValueError, match="centrifuged"):
+        AspiratePipetteService(service).run(
+            experiment_id,
+            AspiratePipetteRequest(source_tool_id=tube_id, delta_volume_ml=0.1),
+        )
 
 
 def test_pipette_aspirates_requested_volume_and_caps_at_capacity() -> None:
