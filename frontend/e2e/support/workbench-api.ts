@@ -5,10 +5,10 @@ import type { Experiment, ExperimentListEntry } from "../../src/types/experiment
 import type {
   BenchSlot,
   BenchToolInstance,
+  DropTargetType,
   ExperimentProduceLot,
   ExperimentWorkspaceWidget,
   RackSlot,
-  TrashToolEntry,
   ToolType,
 } from "../../src/types/workbench";
 
@@ -54,10 +54,23 @@ function makeSlots(count = 2): BenchSlot[] {
   }));
 }
 
+function makeRackSlotContainment() {
+  return {
+    accepts: [{ entityKind: "tool" as const, toolType: "sample_vial" as ToolType }],
+    blockedReason: null,
+    canReceive: true,
+    capacity: 1,
+    children: [],
+    remainingCapacity: 1,
+  };
+}
+
 function makeRackSlots(): RackSlot[] {
   return Array.from({ length: 12 }, (_, index) => ({
     id: `rack_slot_${index + 1}`,
     label: `Position ${index + 1}`,
+    containment: makeRackSlotContainment(),
+    dropTargetTypes: ["rack_slot"] as DropTargetType[],
     tool: null,
   }));
 }
@@ -209,7 +222,7 @@ function makeExperiment(): Experiment {
     snapshot_version: 1,
     spatula: { isLoaded: false, produceFractions: [], sourceToolId: null },
     status: "preparing",
-    trash: { produceLots: [], sampleLabels: [], tools: [] },
+    trash: { children: [], discardedFrom: {}, produceLots: [], sampleLabels: [] },
     workbench: { slots: makeSlots() },
     workspace: { produceBasketLots: [], widgets: makeWorkspaceWidgets() },
   };
@@ -255,7 +268,7 @@ function requireRackSlot(experiment: Experiment, rackSlotId: string) {
 }
 
 function requireTrashTool(experiment: Experiment, trashToolId: string) {
-  const tool = experiment.trash.tools.find((candidate) => candidate.id === trashToolId);
+  const tool = experiment.trash.children.find((candidate) => candidate.id === trashToolId);
   if (!tool) {
     throw new Error(`Unknown trash tool: ${trashToolId}`);
   }
@@ -263,7 +276,7 @@ function requireTrashTool(experiment: Experiment, trashToolId: string) {
 }
 
 function nextTrashToolId(experiment: Experiment) {
-  return `trash_tool_${experiment.trash.tools.length + 1}`;
+  return `trash_tool_${experiment.trash.children.length + 1}`;
 }
 
 function requireWorkbenchSlotByToolId(experiment: Experiment, toolId: string) {
@@ -325,22 +338,54 @@ function applyCommand(
       if (!slot.tool) {
         throw new Error(`No tool to discard in ${slot.id}`);
       }
-      const trashTool: TrashToolEntry = {
-        id: nextTrashToolId(next),
-        originLabel: slot.label,
-        tool: slot.tool,
-      };
-      next.trash.tools.push(trashTool);
+      const trashToolId = nextTrashToolId(next);
+      const originLabel = slot.label;
+      const trashedTool = { ...slot.tool, id: trashToolId };
+      next.trash.children.push(trashedTool);
+      next.trash.discardedFrom[trashToolId] = originLabel;
       slot.tool = null;
-      return appendAudit(next, `${trashTool.tool.label} discarded from ${trashTool.originLabel}.`);
+      return appendAudit(next, `${trashedTool.label} discarded from ${originLabel}.`);
     }
     case "restore_trashed_tool_to_workbench_slot": {
       const slot = requireSlot(next, String(payload.target_slot_id));
       const trashToolId = String(payload.trash_tool_id);
-      const trashTool = requireTrashTool(next, trashToolId);
-      slot.tool = trashTool.tool;
-      next.trash.tools = next.trash.tools.filter((entry) => entry.id !== trashToolId);
-      return appendAudit(next, `${slot.tool.label} restored to ${slot.label}.`);
+      const trashedTool = requireTrashTool(next, trashToolId);
+      slot.tool = trashedTool;
+      next.trash.children = next.trash.children.filter((tool) => tool.id !== trashToolId);
+      delete next.trash.discardedFrom[trashToolId];
+      return appendAudit(next, `${trashedTool.label} restored to ${slot.label}.`);
+    }
+    case "move_object": {
+      const entity = payload.entity as { id: string; kind: string };
+      const source = payload.source as { id: string; kind: string };
+      const destination = payload.destination as { id: string; kind: string };
+
+      if (source.kind === "palette" && destination.kind === "workbench_slot") {
+        return applyCommand(experiment, "place_tool_on_workbench", {
+          slot_id: destination.id,
+          tool_id: entity.id,
+        });
+      }
+      if (source.kind === "workbench" && destination.kind === "rack_slot") {
+        return applyCommand(experiment, "place_workbench_tool_in_rack_slot", {
+          rack_slot_id: destination.id,
+          source_slot_id: source.id,
+        });
+      }
+      if (source.kind === "workbench" && destination.kind === "trash_bin") {
+        return applyCommand(experiment, "discard_workbench_tool", {
+          slot_id: source.id,
+        });
+      }
+      if (source.kind === "trash" && destination.kind === "workbench_slot") {
+        return applyCommand(experiment, "restore_trashed_tool_to_workbench_slot", {
+          target_slot_id: destination.id,
+          trash_tool_id: source.id,
+        });
+      }
+      throw new Error(
+        `Unsupported mock move_object: ${source.kind} -> ${destination.kind}`,
+      );
     }
     case "create_produce_lot": {
       const produceLot: ExperimentProduceLot = {
@@ -430,7 +475,9 @@ export async function mockWorkbenchApi(
 
     let command: CommandRecord | null = null;
 
-    if (method === "POST" && path === `/experiments/${experiment.id}/workbench/slots`) {
+    if (method === "POST" && path === `/experiments/${experiment.id}/dnd/move`) {
+      command = { payload: parseJsonBody(route), type: "move_object" };
+    } else if (method === "POST" && path === `/experiments/${experiment.id}/workbench/slots`) {
       command = { payload: {}, type: "add_workbench_slot" };
     } else if (method === "DELETE" && path.match(new RegExp(`/experiments/${experiment.id}/workbench/slots/[^/]+$`))) {
       command = {

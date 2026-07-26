@@ -96,9 +96,10 @@ test.describe("Analytical balance sample labels", () => {
     await page.getByRole("button", { name: "Create LIMS record" }).click();
     await page.getByRole("button", { name: "Print label" }).click();
 
-    await page
-      .getByTestId("lims-printed-ticket")
-      .dragTo(stagedCard.locator('[data-testid^="bench-tool-illustration-"]').first());
+    await dragAndDrop(
+      page.getByTestId("lims-printed-ticket"),
+      stagedCard.locator('[data-testid^="bench-tool-illustration-"]').first(),
+    );
 
     await expect(
       page

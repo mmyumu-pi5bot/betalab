@@ -5,6 +5,8 @@ export default defineConfig({
   fullyParallel: false,
   reporter: "list",
   retries: process.env.CI ? 2 : 0,
+  timeout: Number(process.env.PW_TEST_TIMEOUT) || 30_000,
+  expect: { timeout: Number(process.env.PW_EXPECT_TIMEOUT) || 5_000 },
   use: {
     baseURL: "http://127.0.0.1:3001",
     headless: true,
@@ -14,7 +16,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "UV_CACHE_DIR=/tmp/uv-cache BETALAB_EXPERIMENTS_DB_PATH=/tmp/betalab-playwright.sqlite3 BETALAB_CORS_ALLOWED_ORIGINS=http://127.0.0.1:3001,http://localhost:3001,http://127.0.0.1:3000,http://localhost:3000 uv run uvicorn app.main:app --host 127.0.0.1 --port 8010",
+        "UV_CACHE_DIR=/tmp/uv-cache BETALAB_EXPERIMENTS_DB_PATH=/tmp/betalab-playwright.sqlite3 BETALAB_CORS_ALLOWED_ORIGINS=http://127.0.0.1:3001,http://localhost:3001,http://127.0.0.1:3000,http://localhost:3000 uv run uvicorn app.main:app --host 127.0.0.1 --port 8010 --log-level warning",
       cwd: "../backend",
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,

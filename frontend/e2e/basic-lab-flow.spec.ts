@@ -69,7 +69,7 @@ test.describe("Basic lab flow", () => {
     await expect(page.getByTestId("bench-slot-station_1")).toBeVisible();
 
     await expandToolbarCategory(page, "Workspace equipment");
-    await expandToolbarCategory(page, "Liquids");
+    await expandToolbarCategory(page, "Reagents & materials");
     await expandToolbarCategory(page, "MISC");
 
     await dragAndDrop(
@@ -142,7 +142,7 @@ test.describe("Basic lab flow", () => {
     await dragAndDrop(firstBenchProduceLot(page, "station_2"), page.getByTestId("grinder-dropzone"));
     await expect(page.locator('[data-testid^="grinder-produce-"]').first()).toBeVisible();
 
-    await expandToolbarCategory(page, "Liquids");
+    await expandToolbarCategory(page, "Reagents & materials");
     await dragAndDrop(
       page.getByTestId("toolbar-item-dry_ice_pellets"),
       page.getByTestId("grinder-dropzone"),

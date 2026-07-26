@@ -147,12 +147,20 @@ test.describe("Pesticide workbench", () => {
         type: "add_workspace_widget",
       },
       {
-        payload: { slot_id: "station_1", tool_id: "sample_vial_lcms" },
-        type: "place_tool_on_workbench",
+        payload: {
+          destination: { id: "station_1", kind: "workbench_slot" },
+          entity: { id: "sample_vial_lcms", kind: "tool" },
+          source: { id: "sample_vial_lcms", kind: "palette" },
+        },
+        type: "move_object",
       },
       {
-        payload: { rack_slot_id: "rack_slot_1", source_slot_id: "station_1" },
-        type: "place_workbench_tool_in_rack_slot",
+        payload: {
+          destination: { id: "rack_slot_1", kind: "rack_slot" },
+          entity: { id: "bench_tool_sample_vial_lcms", kind: "tool" },
+          source: { id: "station_1", kind: "workbench" },
+        },
+        type: "move_object",
       },
     ]);
   });
@@ -184,16 +192,28 @@ test.describe("Pesticide workbench", () => {
     await expect(page.getByTestId("trash-tool-trash_tool_1")).toHaveCount(0);
     expect(api.commands).toEqual([
       {
-        payload: { slot_id: "station_1", tool_id: "sealed_sampling_bag" },
-        type: "place_tool_on_workbench",
+        payload: {
+          destination: { id: "station_1", kind: "workbench_slot" },
+          entity: { id: "sealed_sampling_bag", kind: "tool" },
+          source: { id: "sealed_sampling_bag", kind: "palette" },
+        },
+        type: "move_object",
       },
       {
-        payload: { slot_id: "station_1" },
-        type: "discard_workbench_tool",
+        payload: {
+          destination: { id: "trash_bin", kind: "trash_bin" },
+          entity: { id: "bench_tool_sealed_sampling_bag", kind: "tool" },
+          source: { id: "station_1", kind: "workbench" },
+        },
+        type: "move_object",
       },
       {
-        payload: { target_slot_id: "station_1", trash_tool_id: "trash_tool_1" },
-        type: "restore_trashed_tool_to_workbench_slot",
+        payload: {
+          destination: { id: "station_1", kind: "workbench_slot" },
+          entity: { id: "trash_tool_1", kind: "tool" },
+          source: { id: "trash_tool_1", kind: "trash" },
+        },
+        type: "move_object",
       },
     ]);
   });

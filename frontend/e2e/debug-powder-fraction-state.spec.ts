@@ -52,7 +52,7 @@ test.describe("Debug powder fraction state", () => {
     await expect(page.getByTestId("widget-debug-inventory")).toBeVisible();
 
     await expandToolbarCategory(page, "Containers");
-    await expandToolbarCategory(page, "Liquids");
+    await expandToolbarCategory(page, "Reagents & materials");
 
     await dragAndDrop(page.getByTestId("toolbar-item-hdpe_storage_jar_2l"), station1);
     await dragAndDrop(page.getByTestId("toolbar-item-centrifuge_tube_50ml"), station2);
