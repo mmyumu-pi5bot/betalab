@@ -30,6 +30,7 @@ class PhysicalSimulationService:
     extraction_manip_sigma = 0.04   # std dev (technician variability)
     extraction_manip_min = 0.60
     extraction_manip_max = 1.05
+    spilled_extraction_manip_factor = 0.05  # ~95% of the extract sprays out of an open tube
 
     dispense_relative_sigma = 0.012   # ~1.2% relative dispensing/pipetting precision
     dispense_factor_min = 0.90
@@ -191,6 +192,23 @@ class PhysicalSimulationService:
         return QuechersExtractionResult(
             extraction_manip_factor=round(manip, 4),
             istd_manip_factor=round(istd_manip, 4) if istd_manip is not None else None,
+            istd_phase=istd_phase,
+        )
+
+    def generate_spilled_extraction_result(self, tool: WorkbenchTool) -> QuechersExtractionResult:
+        """Catastrophic ε_manip for a tube centrifuged without its cap.
+
+        Most of the extract sprays out of the open tube, so analyte recovery
+        collapses.  The ISTD cannot rescue the ratio because the spill is
+        uncontrolled relative to it, so — when ISTD is present — its factor is a
+        normal, independent efficiency, leaving the pesticide/ISTD ratio badly
+        biased instead of self-correcting.
+        """
+        istd_phase = tool.istd_phase_added
+        istd_manip = round(self.extraction_manip_mu, 4) if istd_phase is not None else None
+        return QuechersExtractionResult(
+            extraction_manip_factor=self.spilled_extraction_manip_factor,
+            istd_manip_factor=istd_manip,
             istd_phase=istd_phase,
         )
 

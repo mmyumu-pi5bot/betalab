@@ -168,6 +168,7 @@ type LabSceneViewProps = {
     onStartCentrifuge: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onToggleVortexToolSeal: () => void;
+    onToggleCentrifugeToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onRunSequence: () => void;

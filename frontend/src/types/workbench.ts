@@ -627,6 +627,8 @@ export type ExperimentWorkspaceWidget = {
   centrifugeRunDurationMs?: number;
   centrifugeRunRemainingMs?: number;
   centrifugeSpeedRpm?: number;
+  centrifugeCanStart?: boolean;
+  centrifugeStartBlockReason?: string | null;
   isPresent: boolean;
   isTrashed: boolean;
   tool?: BenchToolInstance | null;

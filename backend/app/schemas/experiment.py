@@ -5,6 +5,7 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, Field, computed_field
 
+from app.domain.centrifuge_rules import get_centrifuge_start_block_reason
 from app.domain.dnd_rules import (
     can_tool_be_discarded,
     can_tool_be_stored,
@@ -637,6 +638,18 @@ class WorkspaceWidgetSchema(BaseModel):
         if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
             return False
         return self.grinder_start_block_reason is None
+
+    @computed_field
+    def centrifuge_can_start(self) -> bool:
+        return self.centrifuge_start_block_reason is None
+
+    @computed_field
+    def centrifuge_start_block_reason(self) -> str | None:
+        return get_centrifuge_start_block_reason(
+            widget_type=self.widget_type,
+            has_tool=self.tool is not None,
+            run_remaining_ms=self.centrifuge_run_remaining_ms,
+        )
 
     @computed_field
     def grinder_start_block_reason(self) -> str | None:

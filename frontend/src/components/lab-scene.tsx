@@ -643,6 +643,16 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         ...workspaceActions,
         onRunSequence: () => { void experimentApi.lcmsms.runSequence(); },
         onStartCentrifuge: () => { void experimentApi.centrifuge.start(); },
+        onToggleCentrifugeToolSeal: () => {
+          if (!centrifugeTool) {
+            return;
+          }
+          if (centrifugeTool.isSealed) {
+            void experimentApi.centrifuge.openTool();
+            return;
+          }
+          void experimentApi.centrifuge.closeTool();
+        },
         onStartVortex: () => { void experimentApi.vortex.start(); },
         onStoreWorkspaceWidget: (widgetId) => {
           clearDropTargets();

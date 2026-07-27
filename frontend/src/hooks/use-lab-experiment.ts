@@ -328,6 +328,8 @@ export function useLabExperiment({
 
     centrifuge: {
       start: () => exec(mutationFns.startCentrifugeCycle),
+      closeTool: () => exec(mutationFns.closeCentrifugeTool),
+      openTool: () => exec(mutationFns.openCentrifugeTool),
     },
 
     // ── Grinder ───────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { CentrifugeIllustration } from "@/components/illustrations/centrifuge-il
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 
 type CentrifugeWidgetProps = {
+  canStart: boolean;
   headerAction?: ReactNode;
   isCommandPending: boolean;
   isDropHighlighted: boolean;
@@ -16,6 +17,7 @@ type CentrifugeWidgetProps = {
   progressPercent: number;
   separationProgress: number;
   stagedContent?: ReactNode;
+  startBlockReason?: string | null;
 };
 
 export function CentrifugeWidget(props: CentrifugeWidgetProps) {
@@ -34,7 +36,11 @@ export function CentrifugeWidget(props: CentrifugeWidgetProps) {
         className="h-[190px] w-full"
         hasTube={hasTube}
         isRunning={props.isRunning}
+        onStartClick={props.onStart}
         separationProgress={props.separationProgress}
+        startDisabled={!props.canStart || props.isRunning || props.isCommandPending}
+        startLabel={props.isRunning ? "Centrifuging…" : "Start the centrifuge"}
+        startTestId="centrifuge-start-button"
       />
       <div className="rounded-xl border border-slate-300 bg-slate-900 px-3 py-2 text-sky-100">
         <div className="flex items-center justify-between font-mono text-xs">
@@ -48,16 +54,10 @@ export function CentrifugeWidget(props: CentrifugeWidgetProps) {
             style={{ width: `${props.progressPercent}%` }}
           />
         </div>
+        {!props.isRunning && props.startBlockReason ? (
+          <p className="mt-2 text-[11px] leading-4 text-amber-200">{props.startBlockReason}</p>
+        ) : null}
       </div>
-      <button
-        className="mt-2 w-full rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
-        data-testid="centrifuge-start-button"
-        disabled={!hasTube || props.isRunning || props.isCommandPending}
-        onClick={props.onStart}
-        type="button"
-      >
-        {props.isRunning ? "Centrifugation en cours" : "Démarrer · 4000 rpm · 10 s"}
-      </button>
       {hasTube ? <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50 p-2">{props.stagedContent}</div> : null}
     </WorkspaceEquipmentWidget>
   );

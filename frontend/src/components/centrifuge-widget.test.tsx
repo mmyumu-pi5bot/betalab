@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CentrifugeWidget } from "@/components/centrifuge-widget";
@@ -8,6 +8,7 @@ describe("CentrifugeWidget", () => {
     const onStart = vi.fn();
     render(
       <CentrifugeWidget
+        canStart
         isCommandPending={false}
         isDropHighlighted
         isRunning={false}
@@ -22,13 +23,16 @@ describe("CentrifugeWidget", () => {
 
     expect(screen.getByTestId("centrifuge-visible-phases")).toBeInTheDocument();
     expect(screen.getByTestId("centrifuge-progress-bar")).toHaveStyle({ width: "65%" });
-    fireEvent.click(screen.getByTestId("centrifuge-start-button"));
+    const illustration = screen.getByTestId("centrifuge-illustration");
+    const powerButton = within(illustration).getByTestId("centrifuge-start-button");
+    fireEvent.click(powerButton);
     expect(onStart).toHaveBeenCalledOnce();
   });
 
-  it("cannot start without a tube", () => {
+  it("shows the backend block reason when the tube is not physically ready", () => {
     render(
       <CentrifugeWidget
+        canStart={false}
         isCommandPending={false}
         isDropHighlighted={false}
         isRunning={false}
@@ -37,10 +41,12 @@ describe("CentrifugeWidget", () => {
         onStart={vi.fn()}
         progressPercent={0}
         separationProgress={0}
+        startBlockReason="Add a tube to centrifuge."
       />,
     );
 
     expect(screen.getByTestId("centrifuge-start-button")).toBeDisabled();
     expect(screen.queryByTestId("centrifuge-visible-phases")).not.toBeInTheDocument();
+    expect(screen.getByText("Add a tube to centrifuge.")).toBeInTheDocument();
   });
 });

@@ -157,6 +157,7 @@ type LabSceneWorkspaceCanvasProps = {
     onStartCentrifuge: () => void;
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onToggleVortexToolSeal: () => void;
+    onToggleCentrifugeToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onRunSequence: () => void;
@@ -359,6 +360,7 @@ export function LabSceneWorkspaceCanvas({
         onDragOver={dnd.centrifuge.handleDragOver}
         onDrop={dnd.centrifuge.handleDrop}
         onRemoveLiquid={() => {}}
+        onToggleSeal={workspaceActions.onToggleCentrifugeToolSeal}
         tool={{ ...centrifugeTool, id: `centrifuge-${centrifugeTool.id}` }}
       />
     </div>
@@ -606,6 +608,7 @@ export function LabSceneWorkspaceCanvas({
                 />
               ) : widgetId === "centrifuge" ? (
                 <CentrifugeWidget
+                  canStart={centrifugeWidget?.centrifugeCanStart ?? false}
                   headerAction={renderStoreWidgetAction(widget)}
                   isCommandPending={ui.isCommandPending}
                   isDropHighlighted={
@@ -620,6 +623,9 @@ export function LabSceneWorkspaceCanvas({
                   progressPercent={centrifugeProgressPercent}
                   separationProgress={centrifugeTool?.quechersState?.separationProgress ?? 0}
                   stagedContent={centrifugeStagedContent}
+                  startBlockReason={formatCentrifugeStartBlockReason(
+                    centrifugeWidget?.centrifugeStartBlockReason,
+                  )}
                 />
               ) : (
                 <WorkspaceEquipmentWidget
@@ -695,4 +701,13 @@ export function LabSceneWorkspaceCanvas({
       </div>
     </section>
   );
+}
+
+function formatCentrifugeStartBlockReason(reason?: string | null): string | null {
+  switch (reason) {
+    case "missing_tube":
+      return "Add a tube to centrifuge.";
+    default:
+      return null;
+  }
 }

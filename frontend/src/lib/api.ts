@@ -1446,6 +1446,28 @@ export async function startCentrifugeCycle(
   });
 }
 
+export async function closeCentrifugeTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/centrifuge/tool/close`,
+  });
+}
+
+export async function openCentrifugeTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/centrifuge/tool/open`,
+  });
+}
+
 export async function pourExtractToVial(
   experimentId: string,
   payload: MutationPayload,
@@ -2213,6 +2235,17 @@ function normalizeWorkspaceWidget(
       widget.centrifugeRunRemainingMs ?? widget.centrifuge_run_remaining_ms ?? 0,
     ),
     centrifugeSpeedRpm: Number(widget.centrifugeSpeedRpm ?? widget.centrifuge_speed_rpm ?? 0),
+    centrifugeCanStart: Boolean(
+      widget.centrifugeCanStart ?? widget.centrifuge_can_start ?? false,
+    ),
+    centrifugeStartBlockReason:
+      widget.centrifugeStartBlockReason !== undefined &&
+      widget.centrifugeStartBlockReason !== null
+        ? String(widget.centrifugeStartBlockReason)
+        : widget.centrifuge_start_block_reason !== undefined &&
+            widget.centrifuge_start_block_reason !== null
+          ? String(widget.centrifuge_start_block_reason)
+          : null,
     offsetX: Number(widget.offsetX ?? widget.offset_x),
     offsetY: Number(widget.offsetY ?? widget.offset_y),
     isPresent: Boolean(widget.isPresent ?? widget.is_present),

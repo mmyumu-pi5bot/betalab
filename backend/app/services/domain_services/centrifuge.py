@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.centrifuge_rules import get_centrifuge_start_block_reason
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
+from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
-from app.services.helpers.lookups import find_workspace_widget
+from app.services.helpers.lookups import find_workspace_widget, format_volume
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 CENTRIFUGE_CYCLE_DURATION_MS = 10_000.0
 CENTRIFUGE_SPEED_RPM = 4_000
+
+physical_simulation_service = PhysicalSimulationService()
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,21 +64,88 @@ class CentrifugeServiceBase(WriteDomainService[object]):
 class StartCentrifugeCycleService(CentrifugeServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         widget = self.find_widget(experiment)
-        if widget.tool is None:
+        tool = widget.tool
+        block_reason = get_centrifuge_start_block_reason(
+            widget_type=widget.widget_type,
+            has_tool=tool is not None,
+            run_remaining_ms=widget.centrifuge_run_remaining_ms,
+        )
+        if block_reason == "missing_tube":
             raise ValueError(f"Place a tube in {widget.label} before starting it.")
-        if widget.centrifuge_run_remaining_ms > 0:
+        if block_reason == "already_running":
             raise ValueError(f"{widget.label} is already running.")
-        if not widget.tool.is_sealed:
-            raise ValueError(f"{widget.tool.label} must be sealed before centrifugation.")
-        state = widget.tool.quechers_state
-        if state.phase not in {"mixed", "separated"}:
-            raise ValueError(f"{widget.tool.label} must be mixed before centrifugation.")
+        if tool is None:
+            raise ValueError(f"Place a tube in {widget.label} before starting it.")
+        if block_reason is not None:
+            raise ValueError(f"{tool.label} cannot be centrifuged.")
 
+        state = tool.quechers_state
+        if state.phase not in {"mixed", "separated"}:
+            if "centrifuged_without_valid_extraction" not in state.faults:
+                state.faults.append("centrifuged_without_valid_extraction")
+            tool.quechers_extraction_result = None
+        elif not tool.is_sealed and tool.liquids:
+            # Spinning an open tube sprays most of the extract out — the run still
+            # completes, but analyte recovery is catastrophic (see get_start_block_reason:
+            # an unsealed tube no longer blocks the cycle, it just ruins the result).
+            if "centrifuged_open" not in state.faults:
+                state.faults.append("centrifuged_open")
+            tool.quechers_extraction_result = (
+                physical_simulation_service.generate_spilled_extraction_result(tool)
+            )
+            experiment.audit_log.append(
+                f"{tool.label} was centrifuged without being sealed; most of the extract "
+                f"sprayed out and the result will be badly compromised."
+            )
         state.phase = "separating"
         state.separation_progress = 0.0
         widget.centrifuge_run_duration_ms = CENTRIFUGE_CYCLE_DURATION_MS
         widget.centrifuge_run_remaining_ms = CENTRIFUGE_CYCLE_DURATION_MS
         widget.centrifuge_speed_rpm = CENTRIFUGE_SPEED_RPM
         experiment.audit_log.append(
-            f"{widget.label} started with {widget.tool.label} at {CENTRIFUGE_SPEED_RPM} rpm."
+            f"{widget.label} started with {tool.label} at {CENTRIFUGE_SPEED_RPM} rpm."
         )
+
+
+class CloseCentrifugeToolService(CentrifugeServiceBase):
+    def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
+        widget = self.find_widget(experiment)
+        if widget.centrifuge_run_remaining_ms > 0:
+            raise ValueError(f"{widget.label} is running.")
+        tool = widget.tool
+        if tool is None:
+            raise ValueError(f"{widget.label} does not contain a tube.")
+        if not can_tool_be_sealed(tool.tool_type):
+            raise ValueError(f"{tool.label} cannot be sealed.")
+
+        tool.is_sealed = True
+        tool.closure_fault = None
+        tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
+        experiment.audit_log.append(f"{tool.label} sealed in {widget.label}.")
+
+
+class OpenCentrifugeToolService(CentrifugeServiceBase):
+    def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
+        widget = self.find_widget(experiment)
+        if widget.centrifuge_run_remaining_ms > 0:
+            raise ValueError(f"{widget.label} is running.")
+        tool = widget.tool
+        if tool is None:
+            raise ValueError(f"{widget.label} does not contain a tube.")
+        if not can_tool_be_sealed(tool.tool_type):
+            raise ValueError(f"{tool.label} cannot be opened.")
+
+        vent_event = physical_simulation_service.vent_opened_tool(
+            tool,
+            material_states=experiment.produce_material_states,
+        )
+        tool.is_sealed = False
+        tool.closure_fault = None
+        if vent_event is not None and vent_event.lost_mass_g > 0:
+            experiment.audit_log.append(
+                f"{tool.label} vented at {format_volume(vent_event.pressure_bar)} bar in {widget.label}; "
+                f"{format_volume(vent_event.lost_mass_g)} g of powder was lost."
+            )
+            return
+
+        experiment.audit_log.append(f"{tool.label} opened in {widget.label}.")
