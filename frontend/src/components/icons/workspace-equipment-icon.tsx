@@ -1,7 +1,9 @@
 import { AutosamplerRackIllustration } from "@/components/illustrations/autosampler-rack-illustration";
+import { CentrifugeIllustration } from "@/components/illustrations/centrifuge-illustration";
 import { CryogenicGrinderIllustration } from "@/components/illustrations/cryogenic-grinder-illustration";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
 import { ProduceBasketIllustration } from "@/components/illustrations/produce-basket-illustration";
+import { VortexMixerIllustration } from "@/components/illustrations/vortex-mixer-illustration";
 import type { WorkspaceWidgetType } from "@/types/workbench";
 
 type WorkspaceEquipmentIconProps = {
@@ -33,6 +35,49 @@ export function WorkspaceEquipmentIcon({
     return (
       <div className={className} data-widget-type={widgetType}>
         <CryogenicGrinderIllustration />
+      </div>
+    );
+  }
+
+  if (widgetType === "vortex_mixer") {
+    return (
+      <div className={className} data-widget-type={widgetType}>
+        <VortexMixerIllustration />
+      </div>
+    );
+  }
+
+  if (widgetType === "centrifuge") {
+    return (
+      <div className={className} data-widget-type={widgetType}>
+        <CentrifugeIllustration hasTube={false} isRunning={false} separationProgress={0} startDisabled />
+      </div>
+    );
+  }
+
+  if (widgetType === "lims_terminal") {
+    return (
+      <div className={className} data-widget-type={widgetType}>
+        <svg aria-label={widgetType} className="h-full w-full" viewBox="0 0 120 120">
+          {/* Monitor */}
+          <rect x="12" y="20" width="96" height="66" rx="8" fill="#e2e8f0" stroke="#64748b" strokeWidth="4" />
+          <rect x="22" y="30" width="76" height="46" rx="4" fill="#0f172a" />
+          {/* Barcode on screen */}
+          <g fill="#e2e8f0">
+            <rect x="30" y="38" width="4" height="30" />
+            <rect x="38" y="38" width="2" height="30" />
+            <rect x="44" y="38" width="5" height="30" />
+            <rect x="53" y="38" width="2" height="30" />
+            <rect x="59" y="38" width="4" height="30" />
+            <rect x="67" y="38" width="3" height="30" />
+            <rect x="74" y="38" width="5" height="30" />
+            <rect x="83" y="38" width="2" height="30" />
+            <rect x="89" y="38" width="4" height="30" />
+          </g>
+          {/* Stand + base */}
+          <rect x="52" y="86" width="16" height="12" fill="#cbd5e1" />
+          <rect x="38" y="98" width="44" height="8" rx="4" fill="#94a3b8" />
+        </svg>
       </div>
     );
   }
