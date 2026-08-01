@@ -182,22 +182,41 @@ def _shrink_injection_context(
         )
 
 
-def _pipettable_volume_ml(tool: WorkbenchTool) -> float:
+def _pipettable_volume_ml(tool: WorkbenchTool, *, include_produce: bool = True) -> float:
     # Product suspensions use the deliberate simulation simplification 1 g = 1 mL.
+    # When aspirating a separated supernatant the settled pellet is excluded.
     canonical_lot_ids = {lot.id for lot in tool.produce_lots}
-    return round(
-        sum(max(liquid.volume_ml, 0.0) for liquid in tool.liquids)
-        + sum(
+    produce_ml = (
+        sum(
             max(fraction.mass_g, 0.0)
             for fraction in tool.produce_fractions
             if fraction.produce_lot_id in canonical_lot_ids
-        ),
+        )
+        if include_produce
+        else 0.0
+    )
+    return round(
+        sum(max(liquid.volume_ml, 0.0) for liquid in tool.liquids) + produce_ml,
         6,
     )
 
 
-def _pipettable_true_volume_ml(tool: WorkbenchTool) -> float:
+def _pipettable_true_volume_ml(tool: WorkbenchTool, *, include_produce: bool = True) -> float:
     canonical_lot_ids = {lot.id for lot in tool.produce_lots}
+    produce_true_ml = (
+        sum(
+            max(
+                fraction.true_mass_g
+                if fraction.true_mass_g is not None
+                else fraction.mass_g,
+                0.0,
+            )
+            for fraction in tool.produce_fractions
+            if fraction.produce_lot_id in canonical_lot_ids
+        )
+        if include_produce
+        else 0.0
+    )
     return round(
         sum(
             max(
@@ -208,16 +227,7 @@ def _pipettable_true_volume_ml(tool: WorkbenchTool) -> float:
             )
             for liquid in tool.liquids
         )
-        + sum(
-            max(
-                fraction.true_mass_g
-                if fraction.true_mass_g is not None
-                else fraction.mass_g,
-                0.0,
-            )
-            for fraction in tool.produce_fractions
-            if fraction.produce_lot_id in canonical_lot_ids
-        ),
+        + produce_true_ml,
         6,
     )
 
@@ -366,15 +376,16 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
             raise ValueError("Pipette source not found.")
         if source.is_sealed:
             raise ValueError(f"Open {source.label} before aspirating.")
-        if (
+        # After centrifugation a QuEChERS extract stratifies: the matrix solids
+        # settle into a pellet and only the acetonitrile supernatant is drawn,
+        # leaving the pellet behind. Before separation the tube is still a turbid
+        # suspension, pipetted "as-is" — the solvent carries matrix solids along.
+        supernatant_only = (
             source.tool_type == "centrifuge_tube"
+            and source.quechers_state.phase == "separated"
             and source.quechers_extraction_result is not None
-            and source.quechers_state.phase != "separated"
-        ):
-            raise ValueError(
-                f"{source.label} must be centrifuged before aspirating the extract."
-            )
-        total_source_ml = _pipettable_volume_ml(source)
+        )
+        total_source_ml = _pipettable_volume_ml(source, include_produce=not supernatant_only)
         if total_source_ml <= 0:
             raise ValueError(f"{source.label} contains no liquid or material to aspirate.")
         pipette = experiment.pipette
@@ -387,11 +398,15 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
         # An unvortexed suspension does not aspirate at the container's average
         # composition; the per-liquid bias is drawn by the simulation facade.
         canonical_lot_ids = {lot.id for lot in source.produce_lots}
-        pipettable_fractions = [
-            fraction
-            for fraction in source.produce_fractions
-            if fraction.produce_lot_id in canonical_lot_ids
-        ]
+        pipettable_fractions = (
+            []
+            if supernatant_only
+            else [
+                fraction
+                for fraction in source.produce_fractions
+                if fraction.produce_lot_id in canonical_lot_ids
+            ]
+        )
         components = [
             (
                 "liquid",
@@ -489,7 +504,7 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
             requested_ml,
             requested_true_ml,
             total_source_ml,
-            _pipettable_true_volume_ml(source),
+            _pipettable_true_volume_ml(source, include_produce=not supernatant_only),
             nominal_sample_mass_g,
             true_sample_mass_g,
             nominal_istd_volume_ml,

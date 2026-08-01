@@ -119,6 +119,19 @@ export function BenchToolCard({
     isUsable: true,
   };
   const isContainer = tool.capacity_ml > 0;
+  const pelletMassG = (tool.produceFractions ?? []).reduce(
+    (total, fraction) => total + fraction.massG,
+    0,
+  );
+  // Mirrors the backend `supernatant_only` gate in AspiratePipetteService: a
+  // separated tube only yields a clean supernatant (pellet left behind) when it
+  // holds a valid QuEChERS extract. Without one (e.g. centrifuged raw slurry with
+  // no solvent), the pipette co-aspirates the pellet, so the panel would lie.
+  const showSeparatedPhases =
+    tool.toolType === "centrifuge_tube" &&
+    quechers.phase === "separated" &&
+    tool.quechersExtractionResult != null &&
+    (totalVolumeMl > 0 || pelletMassG > 0);
 
   return (
     <article
@@ -333,6 +346,10 @@ export function BenchToolCard({
           </div>
         ) : null}
 
+        {showSeparatedPhases ? (
+          <SeparatedPhasesPanel pelletMassG={pelletMassG} supernatantMl={totalVolumeMl} />
+        ) : null}
+
         {pendingContent ? (
           <div className="space-y-0.5">{pendingContent}</div>
         ) : produceLots.length > 0 || tool.liquids.length > 0 ? (
@@ -395,5 +412,47 @@ export function BenchToolCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function SeparatedPhasesPanel({
+  pelletMassG,
+  supernatantMl,
+}: {
+  pelletMassG: number;
+  supernatantMl: number;
+}) {
+  return (
+    <section aria-label="Separated phases" className="space-y-1.5" data-testid="separated-phases">
+      <p className="px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+        Separated phases
+      </p>
+      <div className="overflow-hidden rounded-[0.9rem] border border-slate-200">
+        <div className="flex items-center justify-between gap-2 bg-amber-50 px-2.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400" />
+            <span className="truncate text-xs font-semibold text-amber-900">Supernatant</span>
+            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-700">
+              Pipette draws this
+            </span>
+          </div>
+          <span className="shrink-0 tabular-nums text-[11px] text-amber-700">
+            {supernatantMl.toFixed(2)} mL
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-100 px-2.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400" />
+            <span className="truncate text-xs font-semibold text-slate-700">Pellet</span>
+            <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+              Left behind
+            </span>
+          </div>
+          <span className="shrink-0 tabular-nums text-[11px] text-slate-500">
+            {pelletMassG.toFixed(2)} g
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }

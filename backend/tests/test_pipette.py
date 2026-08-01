@@ -71,18 +71,29 @@ def _prepared_experiment(
     return service, experiment_id, tube.id, vial.id
 
 
-def test_pipette_rejects_completed_extract_before_centrifugation() -> None:
+def test_pipette_aspirates_turbid_extract_before_centrifugation() -> None:
+    # Removing the hard block: an un-centrifuged tube is a turbid suspension that
+    # can still be pipetted "as-is" — you draw up matrix solids along with the
+    # solvent instead of a clean supernatant.
     service, experiment_id, tube_id, _ = _prepared_experiment()
     tube = service._require_experiment(experiment_id).workbench.slots[0].tool
     assert tube is not None
     tube.quechers_state.phase = "mixed"
     tube.quechers_state.separation_progress = 0.0
+    tube.produce_lots = [
+        ProduceLot(id="lot_1", label="Apple", produce_type="apple", total_mass_g=10.0)
+    ]
+    tube.contents_homogeneity = 1.0
 
-    with pytest.raises(ValueError, match="centrifuged"):
-        AspiratePipetteService(service).run(
-            experiment_id,
-            AspiratePipetteRequest(source_tool_id=tube_id, delta_volume_ml=0.1),
-        )
+    updated = AspiratePipetteService(service).run(
+        experiment_id,
+        AspiratePipetteRequest(source_tool_id=tube_id, delta_volume_ml=1.0),
+    )
+
+    assert sum(liquid.volume_ml for liquid in updated.pipette.liquids) == pytest.approx(0.5)
+    assert sum(
+        fraction.mass_g for fraction in updated.pipette.produce_fractions
+    ) == pytest.approx(0.5)
 
 
 def test_pipette_aspirates_requested_volume_and_caps_at_capacity() -> None:
@@ -143,6 +154,7 @@ def test_mixed_slurry_and_liquid_are_aspirated_together() -> None:
     experiment = service._require_experiment(experiment_id)
     tube = experiment.workbench.slots[0].tool
     assert tube is not None
+    tube.quechers_state.phase = "mixed"
     tube.produce_lots = [
         ProduceLot(id="lot_1", label="Apple", produce_type="apple", total_mass_g=10.0)
     ]
@@ -154,6 +166,33 @@ def test_mixed_slurry_and_liquid_are_aspirated_together() -> None:
 
     assert sum(liquid.volume_ml for liquid in updated.pipette.liquids) == pytest.approx(0.5)
     assert sum(fraction.mass_g for fraction in updated.pipette.produce_fractions) == pytest.approx(0.5)
+
+
+def test_separated_extract_aspirates_supernatant_only_leaving_pellet() -> None:
+    # After centrifugation the matrix solids form a pellet at the bottom; a
+    # supernatant aspiration draws only the acetonitrile extract and leaves the
+    # pellet behind. The analyte-equivalent sample mass is still derived from the
+    # pellet-mass / extract-volume ratio, not from carrying solids across.
+    service, experiment_id, tube_id, _ = _prepared_experiment()
+    experiment = service._require_experiment(experiment_id)
+    tube = experiment.workbench.slots[0].tool
+    assert tube is not None
+    tube.produce_lots = [
+        ProduceLot(id="lot_1", label="Apple", produce_type="apple", total_mass_g=10.0)
+    ]
+    tube.contents_homogeneity = 1.0
+
+    updated = AspiratePipetteService(service).run(
+        experiment_id, AspiratePipetteRequest(source_tool_id=tube_id, delta_volume_ml=1.0)
+    )
+
+    assert sum(liquid.volume_ml for liquid in updated.pipette.liquids) == pytest.approx(1.0)
+    assert updated.pipette.produce_fractions == []
+    source = updated.workbench.slots[0].tool
+    assert source is not None
+    assert sum(fraction.mass_g for fraction in source.produce_fractions) == pytest.approx(10.0)
+    assert updated.pipette.injection_context is not None
+    assert updated.pipette.injection_context.sample_mass_g == pytest.approx(1.0)
 
 
 def test_pipette_dispenses_apple_slurry_into_another_tube() -> None:
@@ -393,6 +432,7 @@ def test_dispense_moves_theoretical_and_actual_slurry_ledgers_independently(
     tube.produce_lots = [
         ProduceLot(id="lot_1", label="Apple", produce_type="apple", total_mass_g=10.0)
     ]
+    tube.quechers_state.phase = "mixed"
     tube.produce_fractions[0].true_mass_g = 12.0
     tube.liquids[0].true_volume_ml = 8.0
     tube.contents_homogeneity = 0.0

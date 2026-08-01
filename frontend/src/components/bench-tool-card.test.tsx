@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { BenchToolCard } from "@/components/bench-tool-card";
@@ -129,6 +129,91 @@ describe("BenchToolCard QuEChERS state", () => {
     expect(screen.queryByText("Slurry mixed")).not.toBeInTheDocument();
     expect(screen.getByText("20.0°C")).toBeInTheDocument();
     expect(screen.getByTestId("temperature-indicator-fill")).toBeInTheDocument();
+  });
+
+  it("shows the separated supernatant and pellet phases after centrifugation", () => {
+    const tool = makeTool();
+    tool.quechersState = {
+      ...tool.quechersState!,
+      phase: "separated",
+      separationProgress: 1,
+      faults: [],
+      isUsable: true,
+    };
+    tool.liquids = [
+      {
+        id: "aceto_1",
+        liquidId: "acetonitrile_extraction",
+        name: "Acetonitrile",
+        volume_ml: 8,
+        accent: "amber",
+      },
+    ];
+    tool.produceFractions = [
+      {
+        id: "frac_1",
+        produceLotId: "lot_1",
+        produceMaterialStateId: "state_1",
+        massG: 10,
+      },
+    ];
+    tool.quechersExtractionResult = {
+      extractionManipFactor: 1,
+      istdManipFactor: null,
+      istdPhase: null,
+    };
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    const panel = within(screen.getByTestId("separated-phases"));
+    expect(screen.getByText("Separated phases")).toBeInTheDocument();
+    expect(panel.getByText("Supernatant")).toBeInTheDocument();
+    expect(panel.getByText("Pipette draws this")).toBeInTheDocument();
+    expect(panel.getByText("8.00 mL")).toBeInTheDocument();
+    expect(panel.getByText("Pellet")).toBeInTheDocument();
+    expect(panel.getByText("10.00 g")).toBeInTheDocument();
+  });
+
+  it("does not show separated phases before centrifugation", () => {
+    const tool = makeTool();
+    tool.quechersState = { ...tool.quechersState!, phase: "mixed", faults: [], isUsable: true };
+    tool.liquids = [
+      {
+        id: "aceto_1",
+        liquidId: "acetonitrile_extraction",
+        name: "Acetonitrile",
+        volume_ml: 8,
+        accent: "amber",
+      },
+    ];
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    expect(screen.queryByText("Separated phases")).not.toBeInTheDocument();
+  });
+
+  it("does not show separated phases when the tube separated without a valid extraction", () => {
+    const tool = makeTool();
+    tool.quechersState = {
+      ...tool.quechersState!,
+      phase: "separated",
+      separationProgress: 1,
+      faults: ["centrifuged_without_valid_extraction"],
+      isUsable: true,
+    };
+    tool.quechersExtractionResult = null;
+    tool.produceFractions = [
+      {
+        id: "frac_1",
+        produceLotId: "lot_1",
+        produceMaterialStateId: "state_1",
+        massG: 9,
+      },
+    ];
+
+    render(<BenchToolCard onRemoveLiquid={vi.fn()} tool={tool} />);
+
+    expect(screen.queryByText("Separated phases")).not.toBeInTheDocument();
   });
 
   it("shows an ambient temperature indicator on any container", () => {
