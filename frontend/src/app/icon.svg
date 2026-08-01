@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#334155"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <!-- amber extract inside the conical tube -->
+  <path d="M12.9 14 H19.1 V17 L16 25.6 L12.9 17 Z" fill="url(#liquid)"/>
+  <!-- glass tube outline -->
+  <path d="M12 7.6 V17 L16 27 L20 17 V7.6" fill="none" stroke="#e2e8f0" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- cap -->
+  <rect x="10" y="4" width="12" height="3.6" rx="1.6" fill="#e2e8f0"/>
+</svg>
