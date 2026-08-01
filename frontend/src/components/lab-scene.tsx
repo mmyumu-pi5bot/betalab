@@ -29,7 +29,8 @@ import {
   buildDebugProduceDraftFields,
   buildDebugSlurryTubeDraftFields,
   debugProducePresets,
-  debugSlurryTubePreset,
+  debugToolPresets,
+  debugToolPresetsById,
   formatProduceLotMetadata,
   getApproximateToolMassG,
   getRackIllustrationSlotPosition,
@@ -129,7 +130,9 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const dndApi: FlatExperimentApi = {
     ...flatApi,
     moveObject: (payload) => {
-      if (payload.source.kind !== "palette" || payload.entity.id !== "apple_slurry_centrifuge_tube") {
+      const preset =
+        payload.source.kind === "palette" ? debugToolPresetsById[payload.entity.id] : undefined;
+      if (!preset) {
         flatApi.moveObject(payload);
         return;
       }
@@ -143,10 +146,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
           | "vortex"
           | "workbench_slot",
         fields: buildDebugSlurryTubeDraftFields(),
-        presetId: "apple_slurry_centrifuge_tube",
+        presetId: preset.id,
         targetId: payload.destination.id,
         targetKind: "workspace_widget",
-        title: "Configure Apple slurry tube",
+        title: `Configure ${preset.name}`,
       });
     },
   };
@@ -534,7 +537,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       debug={{
         debugInventoryEnabled,
         debugProducePresets,
-        debugToolPresets: [debugSlurryTubePreset],
+        debugToolPresets,
       }}
       inventory={{
         toolbarCategories,

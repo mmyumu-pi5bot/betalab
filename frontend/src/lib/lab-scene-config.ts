@@ -100,6 +100,34 @@ export const debugSlurryTubePreset: ToolCatalogItem = {
   ],
 };
 
+export const debugVortexedSlurryTubePreset: ToolCatalogItem = {
+  id: "vortexed_slurry_centrifuge_tube",
+  name: "Vortexed slurry tube",
+  subtitle: "50 mL centrifuge tube · ready to spin",
+  description:
+    "Debug tube with apple slurry already salted, sealed and vortexed — drop it straight into the centrifuge.",
+  accent: "rose",
+  itemType: "tool",
+  toolType: "centrifuge_tube",
+  capacity_ml: 50,
+  allowedDropTargets: [
+    "workbench_slot",
+    "trash_bin",
+    "gross_balance_widget",
+    "analytical_balance_widget",
+    "vortex_widget",
+  ],
+};
+
+export const debugToolPresets: ToolCatalogItem[] = [
+  debugSlurryTubePreset,
+  debugVortexedSlurryTubePreset,
+];
+
+export const debugToolPresetsById: Record<string, ToolCatalogItem> = Object.fromEntries(
+  debugToolPresets.map((preset) => [preset.id, preset]),
+);
+
 export const knifeCursor =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none'%3E%3Cg transform='rotate(-142 12 12)'%3E%3Crect x='4.1' y='9.9' width='8.6' height='4.2' rx='1.2' fill='%230f172a'/%3E%3Crect x='4.1' y='9.9' width='8.6' height='4.2' rx='1.2' stroke='%230f172a' stroke-width='1.15'/%3E%3Cpath d='M12.7 9.9H15.9L19.8 12L15.9 14.1H12.7V9.9Z' fill='%23e2e8f0' stroke='%230f172a' stroke-width='1.15' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E\") 22 8, auto";
 export const spatulaCursor = "crosshair";

@@ -7,6 +7,7 @@ from app.domain.models import (
     ProduceFraction,
     ProduceFractionLocationKind,
     ProduceLot,
+    WorkbenchLiquid,
     WorkbenchTool,
     new_id,
 )
@@ -16,8 +17,17 @@ from app.services.domain_services.base import ExperimentRuntime, WriteDomainServ
 from app.services.domain_services.gross_balance import GrossBalanceProduceLotTarget
 from app.services.helpers.lookups import find_workbench_slot
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
+from app.services.helpers.tool_liquids import ACETONITRILE_ID
 from app.services.helpers.workbench import build_workbench_tool
+from app.services.physical_simulation_service import PhysicalSimulationService
 from app.services.transfer import GrinderProduceLotTarget, WorkbenchProduceLotTarget
+
+_physical_simulation_service = PhysicalSimulationService()
+
+# Debug tube presets that prefill a 50 mL centrifuge tube with apple slurry.
+_RAW_SLURRY_TUBE_PRESET = "apple_slurry_centrifuge_tube"
+_VORTEXED_SLURRY_TUBE_PRESET = "vortexed_slurry_centrifuge_tube"
+_SLURRY_TUBE_PRESETS = frozenset({_RAW_SLURRY_TUBE_PRESET, _VORTEXED_SLURRY_TUBE_PRESET})
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,8 +114,9 @@ class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduce
 
 class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetRequest]):
     def _run(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
-        if request.preset_id != "apple_slurry_centrifuge_tube":
+        if request.preset_id not in _SLURRY_TUBE_PRESETS:
             raise ValueError("Unknown debug tool preset")
+        prepared_extract = request.preset_id == _VORTEXED_SLURRY_TUBE_PRESET
 
         produce_mass_g = request.produce_mass_g if request.produce_mass_g is not None else 10.0
         temperature_c = request.temperature_c if request.temperature_c is not None else 20.0
@@ -128,7 +139,10 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
                 location_kind="workbench_tool",
                 location_id=slot.id,
             )
-            experiment.audit_log.append(f"Debug Apple slurry added to {tool.label} on {slot.label}.")
+            if prepared_extract:
+                _prepare_vortexed_extract(tool)
+            label = "vortexed apple slurry" if prepared_extract else "Apple slurry"
+            experiment.audit_log.append(f"Debug {label} added to {tool.label} on {slot.label}.")
             return
 
         tool = build_workbench_tool("centrifuge_tube_50ml")
@@ -140,6 +154,8 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             location_kind="workbench_tool",
             location_id=tool.id,
         )
+        if prepared_extract:
+            _prepare_vortexed_extract(tool)
 
         place_new_tool(
             self._runtime,
@@ -197,6 +213,30 @@ def _fill_tool_with_debug_slurry(
             container_label=tool.label,
         )
     )
+def _prepare_vortexed_extract(tool: WorkbenchTool) -> None:
+    """Bring a debug slurry tube to the post-vortex "mixed" state.
+
+    This mirrors the manual QuEChERS path (add acetonitrile, add salts, seal, then
+    vortex to "mixed") so the tube carries a valid extract and can be centrifuged
+    straight into a pipettable supernatant. The centrifuge only produces a valid
+    separation when phase is in {mixed, separated}; see StartCentrifugeCycleService.
+    """
+    tool.liquids.append(
+        WorkbenchLiquid(
+            id=new_id("liquid"),
+            liquid_id=ACETONITRILE_ID,
+            name="Acetonitrile",
+            volume_ml=10.0,
+            accent="amber",
+        )
+    )
+    tool.quechers_state.salts_added = True
+    tool.quechers_state.phase = "mixed"
+    tool.contents_homogeneity = 1.0
+    _physical_simulation_service.complete_quechers_extraction(tool)
+    tool.is_sealed = True
+
+
 def _build_debug_produce_lot(
     preset_id: str,
     *,

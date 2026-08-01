@@ -926,6 +926,46 @@ function createDebugSlurryTubePresetSourceCase(): DndSourceCase {
   };
 }
 
+function createVortexedSlurryTubePresetSourceCase(): DndSourceCase {
+  // Spawn-only preset: unlike the raw apple slurry tube it cannot fill an existing
+  // tube, so its stations start empty and every compatible target simply spawns a
+  // fresh, ready-to-centrifuge tube through the same configuration draft dialog.
+  return {
+    id: "debug-palette-vortexed_slurry_centrifuge_tube",
+    label: "debug palette vortexed slurry centrifuge tube preset",
+    sourceTestId: "debug-palette-preset-vortexed_slurry_centrifuge_tube",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        slots: makeSlots(),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: true, command: null },
+      "bench-slot-station_2": { compatible: true, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: true, command: null },
+      "analytical-balance-dropzone": { compatible: true, command: null },
+      "rack-illustration-slot-1": { compatible: false, command: null },
+      "vortex-dropzone": { compatible: true, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: true, command: null },
+    },
+  };
+}
+
 function createWorkbenchToolSourceCase(item: ToolCatalogItem): DndSourceCase {
   return {
     id: `workbench-${item.id}`,
@@ -2090,6 +2130,7 @@ const baseDndSourceCases: DndSourceCase[] = [
   createPaletteSampleLabelSourceCase(),
   createDebugProducePresetSourceCase(),
   createDebugSlurryTubePresetSourceCase(),
+  createVortexedSlurryTubePresetSourceCase(),
   ...toolItems.map(createWorkbenchToolSourceCase),
   createBasketReceivedBagSourceCase(),
   createBasketProduceSourceCase(),

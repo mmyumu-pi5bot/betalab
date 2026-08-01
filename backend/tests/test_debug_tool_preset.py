@@ -62,6 +62,51 @@ def test_debug_apple_slurry_tube_can_spawn_on_analytical_balance_with_overrides(
     assert balance.tool.produce_fractions[0].location_id == "analytical_balance"
 
 
+def test_debug_vortexed_slurry_tube_is_ready_to_centrifuge() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="vortexed_slurry_centrifuge_tube",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+        ),
+    )
+
+    tool = updated.workbench.slots[0].tool
+    assert tool is not None
+    assert tool.tool_id == "centrifuge_tube_50ml"
+    # Slurry is present, just like the raw preset.
+    assert tool.produce_fractions[0].mass_g == pytest.approx(10.0)
+    # Extraction solvent is loaded.
+    assert [liq.liquid_id for liq in tool.liquids] == ["acetonitrile_extraction"]
+    assert sum(liq.volume_ml for liq in tool.liquids) == pytest.approx(10.0)
+    # Post-vortex state: sealed, mixed, and carrying a valid extract so the very
+    # next centrifuge run separates into a pipettable supernatant.
+    assert tool.quechers_state.salts_added is True
+    assert tool.quechers_state.phase == "mixed"
+    assert tool.contents_homogeneity == pytest.approx(1.0)
+    assert tool.quechers_extraction_result is not None
+    assert tool.is_sealed is True
+
+
+def test_debug_unknown_tool_preset_is_rejected() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    with pytest.raises(ValueError, match="Unknown debug tool preset"):
+        CreateDebugToolPresetService(service).run(
+            experiment.id,
+            CreateDebugToolPresetRequest(
+                preset_id="not_a_real_preset",
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
+        )
+
+
 @pytest.mark.parametrize("tool_id", ["centrifuge_tube_50ml", "sample_vial_lcms"])
 def test_debug_apple_slurry_can_be_added_to_an_open_workbench_container(tool_id: str) -> None:
     service = ExperimentRuntimeService()

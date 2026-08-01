@@ -911,6 +911,39 @@ describe("LabScene", () => {
     );
   });
 
+  it("configures and spawns the vortexed slurry tube ready to centrifuge", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId(
+      "debug-palette-preset-vortexed_slurry_centrifuge_tube",
+    );
+    expect(preset).toHaveTextContent("Vortexed slurry tube");
+
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(await screen.findByText("Configure Vortexed slurry tube")).toBeInTheDocument();
+    expect(screen.getByLabelText("Debug slurry apple mass")).toHaveValue(10);
+    fireEvent.click(screen.getByText("Spawn"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      {
+        destination_id: "station_1",
+        destination_kind: "workbench_slot",
+        preset_id: "vortexed_slurry_centrifuge_tube",
+        produce_mass_g: 10,
+        temperature_c: 20,
+      },
+    );
+  });
+
   it.each([
     ["centrifuge tube", "centrifuge_tube_50ml", "centrifuge_tube"],
     ["autosampler vial", "sample_vial_lcms", "sample_vial"],
