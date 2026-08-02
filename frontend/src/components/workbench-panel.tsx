@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { DragEvent, MouseEvent, PointerEvent, ReactNode } from "react";
 
 import { BenchToolCard } from "@/components/bench-tool-card";
@@ -77,6 +78,8 @@ export function WorkbenchPanel({
   renderPendingContent,
   slots,
 }: WorkbenchPanelProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const headerPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const {
     canDragBenchTool,
     isBenchSlotHighlighted,
@@ -103,6 +106,25 @@ export function WorkbenchPanel({
     onToggleToolSeal,
     onToolbarItemDrop,
   } = handlers;
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((current) => !current);
+  };
+
+  const handleHeaderClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, input, textarea, select, a, [role='button']")) {
+      return;
+    }
+
+    const start = headerPressStartRef.current;
+    headerPressStartRef.current = null;
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) {
+      return;
+    }
+
+    toggleCollapsed();
+  };
 
   const canAcceptWorkbenchDrop = (event: DragEvent<HTMLElement>, slot: BenchSlot) => {
     if (dndDisabled) {
@@ -191,35 +213,57 @@ export function WorkbenchPanel({
   return (
     <section className="overflow-hidden rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(180deg,#fffdf8_0%,#fff4dc_100%)] shadow-sm">
       <div
-        className={`${dragAffordanceClassName} border-b border-amber-200/80 bg-white/70 px-5 py-5 backdrop-blur xl:px-6 xl:py-6`}
+        aria-expanded={!isCollapsed}
+        className={`${dragAffordanceClassName} bg-white/70 px-5 py-5 backdrop-blur xl:px-6 xl:py-6 ${
+          isCollapsed ? "" : "border-b border-amber-200/80"
+        }`}
         data-widget-drag-handle="true"
+        data-testid="workbench-header"
+        onClick={handleHeaderClick}
+        onMouseDown={(event) => {
+          headerPressStartRef.current = { x: event.clientX, y: event.clientY };
+        }}
+        onPointerDown={(event) => {
+          headerPressStartRef.current = { x: event.clientX, y: event.clientY };
+        }}
       >
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
               Workbench
             </p>
+            <span
+              aria-hidden="true"
+              className={`text-sm text-amber-700 transition-transform ${
+                isCollapsed ? "" : "rotate-180"
+              }`}
+            >
+              ▾
+            </span>
           </div>
 
-          <button
-            aria-label="Add workbench station"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white/85 text-lg font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-white"
-            data-testid="add-workbench-slot-button"
-            onClick={() => {
-              onAddWorkbenchSlot?.();
-            }}
-            type="button"
-          >
-            +
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Add workbench station"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white/85 text-lg font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-white"
+              data-testid="add-workbench-slot-button"
+              onClick={() => {
+                onAddWorkbenchSlot?.();
+              }}
+              type="button"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="relative p-5 xl:p-6">
-        <div className="absolute inset-x-5 bottom-5 top-16 rounded-[2rem] bg-[linear-gradient(180deg,rgba(120,53,15,0)_0%,rgba(146,64,14,0.08)_30%,rgba(120,53,15,0.16)_100%)]" />
-        <div className="absolute inset-x-8 bottom-7 h-4 rounded-full bg-amber-900/10 blur-md" />
+      {isCollapsed ? null : (
+        <div className="relative p-5 xl:p-6">
+          <div className="absolute inset-x-5 bottom-5 top-16 rounded-[2rem] bg-[linear-gradient(180deg,rgba(120,53,15,0)_0%,rgba(146,64,14,0.08)_30%,rgba(120,53,15,0.16)_100%)]" />
+          <div className="absolute inset-x-8 bottom-7 h-4 rounded-full bg-amber-900/10 blur-md" />
 
-        <div className="relative grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="relative grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {slots.map((slot) => {
             const tool = slot.tool;
             const pendingContent = renderPendingContent?.(slot, tool) ?? null;
@@ -414,8 +458,9 @@ export function WorkbenchPanel({
               </article>
             );
           })}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

@@ -220,6 +220,36 @@ function writePayload(
 }
 
 describe("WorkbenchPanel", () => {
+  it("collapses on a header click without consuming header drag gestures", () => {
+    const onAddWorkbenchSlot = vi.fn();
+    render(
+      <PesticideWorkbenchPanel
+        onAddWorkbenchSlot={onAddWorkbenchSlot}
+        slots={slots}
+      />,
+    );
+
+    const header = screen.getByTestId("workbench-header");
+    expect(header).toHaveAttribute("data-widget-drag-handle", "true");
+    expect(header).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByTestId("add-workbench-slot-button"));
+    expect(onAddWorkbenchSlot).toHaveBeenCalledOnce();
+    expect(screen.getByText("Station 1")).toBeInTheDocument();
+
+    fireEvent.click(header, { clientX: 20, clientY: 20 });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Station 1")).not.toBeInTheDocument();
+
+    fireEvent.click(header, { clientX: 20, clientY: 20 });
+    expect(screen.getByText("Station 1")).toBeInTheDocument();
+
+    fireEvent.mouseDown(header, { clientX: 20, clientY: 20 });
+    fireEvent.click(header, { clientX: 40, clientY: 40 });
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Station 1")).toBeInTheDocument();
+  });
+
   it("renders empty stations with add/remove controls", () => {
     render(
       <PesticideWorkbenchPanel
