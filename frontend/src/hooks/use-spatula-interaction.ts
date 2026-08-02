@@ -117,8 +117,8 @@ export function useSpatulaInteraction({
 
     setSpatulaHintMessage(
       spatula.isLoaded
-        ? "Clique pour verser un peu · Maintiens et lève pour verser vite."
-        : "Clique sur un container ouvert avec de la poudre pour charger la spatule.",
+        ? "Click to pour a little · Hold and lift to pour faster."
+        : "Click an open container holding powder to load the spatula.",
     );
   }, [isSpatulaMode, spatula.isLoaded]);
 
@@ -176,7 +176,7 @@ export function useSpatulaInteraction({
       }
 
       if (!spatula.isLoaded) {
-        setSpatulaHintMessage("La spatule est vide. Charge-la d'abord sur un container ouvert.");
+        setSpatulaHintMessage("The spatula is empty. Load it from an open container first.");
         return;
       }
 
@@ -245,7 +245,7 @@ export function useSpatulaInteraction({
   const loadSpatulaFromTool = useCallback(
     (slotId: string) => {
       stopSpatulaPour();
-      setSpatulaHintMessage("Chargement de la spatule...");
+      setSpatulaHintMessage("Loading spatula...");
       onLoadFromTool({ slot_id: slotId });
     },
     [onLoadFromTool, stopSpatulaPour],
@@ -287,9 +287,9 @@ export function useSpatulaInteraction({
           // No justPouredRef guard here: on the balance there is no onClick path
           // that could trigger a spurious reload, so every intentional click should load.
           onLoadFromAnalyticalBalance();
-          setSpatulaHintMessage("Chargement de la spatule...");
+          setSpatulaHintMessage("Loading spatula...");
         } else {
-          setSpatulaHintMessage("La spatule est vide. Charge-la d'abord sur un container ouvert.");
+          setSpatulaHintMessage("The spatula is empty. Load it from an open container first.");
         }
         return;
       }
@@ -356,7 +356,7 @@ export function useSpatulaInteraction({
       justPouredRef.current = false;
 
       if (canPourIntoTool(tool) && !spatula.isLoaded) {
-        setSpatulaHintMessage("La spatule est vide. Charge-la d'abord sur un container ouvert.");
+        setSpatulaHintMessage("The spatula is empty. Load it from an open container first.");
       }
     },
     [canLoadFromTool, canPourIntoTool, isSpatulaMode, loadSpatulaFromTool, spatula.isLoaded],

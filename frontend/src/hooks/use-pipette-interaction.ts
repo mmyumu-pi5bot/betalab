@@ -67,8 +67,8 @@ export function usePipetteInteraction({
     }
     setPipetteHintMessage(
       pipette.volumeMl > 0
-        ? `Pipette chargée ${pipette.volumeMl.toFixed(2)} / ${pipette.capacityMl.toFixed(2)} mL · Maintiens sur un récipient pour distribuer.`
-        : "Pipette vide · Maintiens sur un liquide pour aspirer.",
+        ? `Pipette loaded ${pipette.volumeMl.toFixed(2)} / ${pipette.capacityMl.toFixed(2)} mL · Hold over a container to dispense.`
+        : "Pipette empty · Hold over a liquid to aspirate.",
     );
   }, [isPipetteMode, pipette.capacityMl, pipette.volumeMl, stopPipetteHold]);
 
@@ -102,8 +102,8 @@ export function usePipetteInteraction({
     if (!operation) {
       setPipetteHintMessage(
         pipette.volumeMl > 0
-          ? "La pipette est chargée : choisis un récipient ouvert pouvant contenir du liquide."
-          : "La pipette est vide : choisis un récipient ouvert contenant du contenu.",
+          ? "The pipette is loaded: choose an open container that can receive liquid."
+          : "The pipette is empty: choose an open container containing liquid.",
       );
       return;
     }
@@ -116,7 +116,11 @@ export function usePipetteInteraction({
         ? Math.min(pipette.capacityMl, pipette.volumeMl + STEP_VOLUME_ML)
         : Math.max(0, pipette.volumeMl - STEP_VOLUME_ML),
     );
-    setPipetteHintMessage(operation === "aspirate" ? "Aspiration… relâche au volume voulu." : "Distribution… relâche au volume voulu.");
+    setPipetteHintMessage(
+      operation === "aspirate"
+        ? "Aspirating… release at the desired volume."
+        : "Dispensing… release at the desired volume.",
+    );
     timeoutRef.current = window.setTimeout(() => {
       const state = holdStateRef.current;
       if (!state) return;

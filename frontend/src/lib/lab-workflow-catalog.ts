@@ -84,7 +84,7 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         allowedDropTargets: [],
         itemType: "liquid",
         name: "ISTD solution",
-        subtitle: "100 ng/mL · atrazine-d5 / imidaclopride-d4 / deltaméthrine-d6",
+        subtitle: "100 ng/mL · atrazine-d5 / imidacloprid-d4 / deltamethrin-d6",
         description: "Pre-mixed internal standard solution at 100 ng/mL each in acetonitrile.",
         accent: "emerald",
         liquidType: "istd_solution",

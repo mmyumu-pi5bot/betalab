@@ -24,24 +24,24 @@ class PesticideInfo:
 
 APPLE_PESTICIDE_CATALOG: list[PesticideInfo] = [
     # SDHI fungicides — very thermostable
-    PesticideInfo("boscalid", "Boscalide", "fungicide", 2000.0, 8e-5, 0.70, 20.0, 1200.0),
+    PesticideInfo("boscalid", "Boscalid", "fungicide", 2000.0, 8e-5, 0.70, 20.0, 1200.0),
     PesticideInfo("fluxapyroxad", "Fluxapyroxad", "fungicide", 600.0, 6e-5, 0.35, 10.0, 350.0),
     # Contact/phthalimide fungicides — moderately to highly thermolabile
-    PesticideInfo("captan", "Captane", "fungicide", 3000.0, 2e-3, 0.55, 30.0, 1500.0),
+    PesticideInfo("captan", "Captan", "fungicide", 3000.0, 2e-3, 0.55, 30.0, 1500.0),
     PesticideInfo("dithianon", "Dithianon", "fungicide", 500.0, 1e-3, 0.40, 10.0, 300.0),
     # Neonicotinoid insecticides — thermostable
-    PesticideInfo("acetamiprid", "Acétamipride", "insecticide", 400.0, 9e-5, 0.25, 5.0, 200.0),
-    PesticideInfo("imidacloprid", "Imidaclopride", "insecticide", 500.0, 1e-4, 0.20, 5.0, 200.0),
-    PesticideInfo("thiacloprid", "Thiaclopride", "insecticide", 300.0, 1e-4, 0.20, 5.0, 150.0),
+    PesticideInfo("acetamiprid", "Acetamiprid", "insecticide", 400.0, 9e-5, 0.25, 5.0, 200.0),
+    PesticideInfo("imidacloprid", "Imidacloprid", "insecticide", 500.0, 1e-4, 0.20, 5.0, 200.0),
+    PesticideInfo("thiacloprid", "Thiacloprid", "insecticide", 300.0, 1e-4, 0.20, 5.0, 150.0),
     # Pyrethroid insecticides — moderately stable
-    PesticideInfo("lambda_cyhalothrin", "Lambda-cyhalothrine", "insecticide", 100.0, 2e-4, 0.30, 2.0, 60.0),
-    PesticideInfo("deltamethrin", "Deltaméthrine", "insecticide", 100.0, 1.5e-4, 0.15, 2.0, 50.0),
+    PesticideInfo("lambda_cyhalothrin", "Lambda-cyhalothrin", "insecticide", 100.0, 2e-4, 0.30, 2.0, 60.0),
+    PesticideInfo("deltamethrin", "Deltamethrin", "insecticide", 100.0, 1.5e-4, 0.15, 2.0, 50.0),
     # Organophosphate insecticides — highly thermolabile
-    PesticideInfo("chlorpyrifos_methyl", "Chlorpyrifos-méthyl", "insecticide", 10.0, 3e-3, 0.12, 0.5, 8.0),
+    PesticideInfo("chlorpyrifos_methyl", "Chlorpyrifos-methyl", "insecticide", 10.0, 3e-3, 0.12, 0.5, 8.0),
     # Carbamate insecticides — thermolabile
-    PesticideInfo("pyrimicarb", "Pyrimycarbe", "insecticide", 1000.0, 1.5e-3, 0.20, 10.0, 500.0),
+    PesticideInfo("pyrimicarb", "Pirimicarb", "insecticide", 1000.0, 1.5e-3, 0.20, 10.0, 500.0),
     # Tetronic acid insecticides — thermostable
-    PesticideInfo("spirotetramat", "Spirotétramate", "insecticide", 800.0, 7e-5, 0.20, 10.0, 400.0),
+    PesticideInfo("spirotetramat", "Spirotetramat", "insecticide", 800.0, 7e-5, 0.20, 10.0, 400.0),
 ]
 
 CATALOG_BY_ID: dict[str, PesticideInfo] = {p.compound_id: p for p in APPLE_PESTICIDE_CATALOG}

@@ -451,7 +451,7 @@ def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
     with TestClient(app) as client:
         experiment_id = _create_experiment(client)
 
-        # --- Réception ---
+        # --- Reception ---
         created = client.get(f"/experiments/{experiment_id}")
         basket_tool_id = created.json()["basket_tools"][0]["id"]
         basket_moved_to_balance = client.post(
@@ -471,7 +471,7 @@ def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
         printed = client.post(f"/experiments/{experiment_id}/lims/print-label")
         labeled = client.post(f"/experiments/{experiment_id}/lims/apply-label-to-gross-balance-bag")
 
-        # --- Découpe ---
+        # --- Cutting ---
         moved_bag_to_bench = client.post(
             f"/experiments/{experiment_id}/gross-balance/move-tool-to-workbench",
             json={"target_slot_id": "station_1"},

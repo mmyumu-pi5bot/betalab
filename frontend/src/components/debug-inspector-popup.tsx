@@ -50,7 +50,7 @@ export function DebugInspectorPopup({ inspection, onClose }: Props) {
               className="rounded px-2 py-1 font-mono text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               onClick={handleCopy}
             >
-              {copied ? "✓ copié" : "copier"}
+              {copied ? "✓ copied" : "copy"}
             </button>
             <button
               className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"

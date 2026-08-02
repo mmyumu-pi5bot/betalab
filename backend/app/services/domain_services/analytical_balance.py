@@ -379,15 +379,17 @@ class RecordAnalyticalSampleMassService(AnalyticalBalanceServiceBase):
         tool = self.require_balance_tool(experiment)
         measured_mass_g = self._calculate_tool_mass_g(tool)
         if measured_mass_g > _ANALYTICAL_BALANCE_MAX_G:
-            raise ValueError("ERR_OVER: OVERLOAD : Retirez l'objet immediatement du plateau.")
+            raise ValueError("ERR_OVER: OVERLOAD: Remove the object from the pan immediately.")
 
         tare_mass_g = experiment.analytical_balance.tare_mass_g
         if tare_mass_g is None:
-            raise ValueError("ERR_TARE: Erreur de tare : le contenant semble trop lourd ou non remis a zero.")
+            raise ValueError(
+                "ERR_TARE: Tare error: the container seems too heavy or the balance was not reset to zero."
+            )
 
         net_mass_g = round(measured_mass_g - tare_mass_g, 3)
         if net_mass_g < _ANALYTICAL_BALANCE_TARGET_MIN_G or net_mass_g > _ANALYTICAL_BALANCE_TARGET_MAX_G:
-            raise ValueError("ERR_RANGE: Masse hors specifications. Ajustez la quantite de poudre.")
+            raise ValueError("ERR_RANGE: Mass outside specifications. Adjust the powder quantity.")
 
         experiment.lims_reception.measured_sample_mass_g = net_mass_g
         experiment.audit_log.append(f"Analytical sample mass recorded at {net_mass_g:.3f} g.")

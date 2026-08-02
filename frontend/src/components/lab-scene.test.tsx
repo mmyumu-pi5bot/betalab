@@ -646,7 +646,7 @@ describe("LabScene", () => {
     fireEvent.click(pipetteButton);
     await waitFor(() => expect(pipetteButton).toHaveAttribute("aria-pressed", "true"));
     fireEvent.pointerDown(screen.getByTestId("bench-tool-card-tube_1"), { button: 0 });
-    expect(screen.getByLabelText(/Aspiration/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Aspirating/)).toBeInTheDocument();
     fireEvent.pointerUp(window);
 
     await waitFor(() => expect(aspiratePipette).toHaveBeenCalledWith(

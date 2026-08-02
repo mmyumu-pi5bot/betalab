@@ -40,7 +40,7 @@ export function PipetteOverlay({ hint, isPipetteMode, pipette }: {
   const fillRatio = pipette.capacityMl > 0 ? pipette.volumeMl / pipette.capacityMl : 0;
   return (
     <div
-      aria-label={hint ?? (pipette.volumeMl > 0 ? "Pipette chargée" : "Pipette vide")}
+      aria-label={hint ?? (pipette.volumeMl > 0 ? "Pipette loaded" : "Pipette empty")}
       className="pointer-events-none fixed left-0 top-0 z-[100] w-20 opacity-0 will-change-transform"
       ref={overlayRef}
     >

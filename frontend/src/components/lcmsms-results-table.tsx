@@ -3,24 +3,24 @@
 import type { InjectionMeasurement, SequenceRun } from "@/types/workbench";
 
 const COMPOUND_LABELS: Record<string, string> = {
-  boscalid: "Boscalide",
+  boscalid: "Boscalid",
   fluxapyroxad: "Fluxapyroxad",
-  captan: "Captane",
+  captan: "Captan",
   dithianon: "Dithianon",
-  acetamiprid: "Acétamipride",
-  imidacloprid: "Imidaclopride",
-  thiacloprid: "Thiaclopride",
-  lambda_cyhalothrin: "Lambda-cyhalothrine",
-  deltamethrin: "Deltaméthrine",
-  chlorpyrifos_methyl: "Chlorpyrifos-méthyl",
-  pyrimicarb: "Pyrimycarbe",
-  spirotetramat: "Spirotétramate",
+  acetamiprid: "Acetamiprid",
+  imidacloprid: "Imidacloprid",
+  thiacloprid: "Thiacloprid",
+  lambda_cyhalothrin: "Lambda-cyhalothrin",
+  deltamethrin: "Deltamethrin",
+  chlorpyrifos_methyl: "Chlorpyrifos-methyl",
+  pyrimicarb: "Pirimicarb",
+  spirotetramat: "Spirotetramat",
 };
 
 const ISTD_PHASE_LABELS: Record<string, string> = {
-  pre_solvent: "avant acétonitrile ✓",
-  pre_salts: "avant sels ✓",
-  post_salts: "après sels ✗",
+  pre_solvent: "before acetonitrile ✓",
+  pre_salts: "before salts ✓",
+  post_salts: "after salts ✗",
 };
 
 function relativeError(calculated: number | null, truth: number): number | null {
@@ -36,7 +36,7 @@ export function LcMsMsResultsTable({ runs }: Props) {
   if (runs.length === 0) {
     return (
       <p className="py-3 text-center text-xs text-slate-400">
-        Aucune séquence lancée — placez des vials dans le rack et cliquez sur Run.
+        No sequence has been run yet — load the rack and launch an acquisition.
       </p>
     );
   }
@@ -46,7 +46,7 @@ export function LcMsMsResultsTable({ runs }: Props) {
   return (
     <div className="space-y-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-        Séquence {latestRun.id} · {latestRun.injections.length} injection(s) · {latestRun.methodId}
+        Sequence {latestRun.id} · {latestRun.injections.length} injection(s) · {latestRun.methodId}
       </p>
       {latestRun.injections.map((inj) => (
         <InjectionBlock key={inj.vialId} injection={inj} />
@@ -88,13 +88,13 @@ function InjectionBlock({ injection }: { injection: InjectionMeasurement }) {
 
       {/* Compounds */}
       {injection.compounds.length === 0 ? (
-        <p className="px-3 py-2 text-xs text-slate-400">Aucun composé détecté.</p>
+        <p className="px-3 py-2 text-xs text-slate-400">No compounds detected.</p>
       ) : (
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-[10px] text-slate-400">
-              <th className="py-1 pl-3 pr-1 text-left font-medium">Composé</th>
-              <th className="px-1 py-1 text-right font-medium">Mesuré (µg/kg)</th>
+              <th className="py-1 pl-3 pr-1 text-left font-medium">Compound</th>
+              <th className="px-1 py-1 text-right font-medium">Measured (µg/kg)</th>
               <th className="px-1 py-1 text-right font-medium">Vrai (µg/kg)</th>
               <th className="py-1 pl-1 pr-3 text-right font-medium">Δ%</th>
             </tr>
@@ -155,12 +155,12 @@ function CalibrationBlock({ injection }: { injection: InjectionMeasurement }) {
         {injection.outputFilename} · {injection.injectionVolumeUl} µL · rep {injection.replicateIndex}
       </p>
       {injection.compounds.length === 0 ? (
-        <p className="px-3 py-2 text-xs text-slate-400">Aucun composé.</p>
+        <p className="px-3 py-2 text-xs text-slate-400">No compounds.</p>
       ) : (
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-[10px] text-slate-400">
-              <th className="py-1 pl-3 pr-1 text-left font-medium">Composé</th>
+              <th className="py-1 pl-3 pr-1 text-left font-medium">Compound</th>
               <th className="py-1 pl-1 pr-3 text-right font-medium">Signal (u.a.)</th>
             </tr>
           </thead>
@@ -192,7 +192,7 @@ function IstdBadge({
   if (!applied) {
     return (
       <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-        Sans ISTD
+        No ISTD
       </span>
     );
   }

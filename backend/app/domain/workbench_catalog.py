@@ -159,12 +159,12 @@ _LIQUID_DETAILS = {
     },
     "istd_solution": {
         "description": (
-            "Pre-mixed internal standard solution — atrazine-d5, imidaclopride-d4 and deltaméthrine-d6 "
+            "Pre-mixed internal standard solution — atrazine-d5, imidacloprid-d4 and deltamethrin-d6 "
             "at 100 ng/mL each in acetonitrile. Added to the final extract before LC-MS/MS injection "
             "for matrix effect correction and analyte quantification."
         ),
         "liquid_type": "istd_solution",
-        "subtitle": "100 ng/mL · atrazine-d5 / imidaclopride-d4 / deltaméthrine-d6",
+        "subtitle": "100 ng/mL · atrazine-d5 / imidacloprid-d4 / deltamethrin-d6",
     },
     "calibration_solution": {
         "description": (

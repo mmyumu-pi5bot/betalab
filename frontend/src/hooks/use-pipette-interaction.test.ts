@@ -45,7 +45,7 @@ describe("usePipetteInteraction", () => {
 
     for (let version = 1; version <= 100; version += 1) rerender({ version });
 
-    expect(result.current.pipetteHintMessage).toContain("Pipette vide");
+    expect(result.current.pipetteHintMessage).toContain("Pipette empty");
   });
 
   it("sends one aspiration command when a tube click is released", () => {
@@ -136,7 +136,7 @@ describe("usePipetteInteraction", () => {
     act(() => result.current.handlePipetteToolPointerDown("station_2", tool("sample_bag", { canReceiveLiquids: false }), pointer()));
     act(() => fireEvent.pointerUp(window));
     expect(onDispense).not.toHaveBeenCalled();
-    expect(result.current.pipetteHintMessage).toContain("récipient ouvert");
+    expect(result.current.pipetteHintMessage).toContain("open container");
   });
 
   it("refuses to dispense into a sealed container", () => {
