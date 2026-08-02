@@ -173,6 +173,7 @@ type LabSceneViewProps = {
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
+    onUnloadRackFromInstrument: () => void;
     onTareAnalyticalBalance: () => void;
   };
 };

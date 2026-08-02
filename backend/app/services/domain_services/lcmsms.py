@@ -272,6 +272,31 @@ class LoadRackIntoInstrumentService(WriteDomainService[LoadRackIntoInstrumentReq
         experiment.rack.state = "loaded"
         experiment.audit_log.append("Autosampler rack loaded into the LC-MS/MS.")
 
+
+@dataclass(frozen=True, slots=True)
+class UnloadRackFromInstrumentRequest:
+    pass
+
+
+class UnloadRackFromInstrumentService(WriteDomainService[UnloadRackFromInstrumentRequest]):
+    def _run(self, experiment: Experiment, request: UnloadRackFromInstrumentRequest) -> None:
+        del request
+        instrument = find_workspace_widget(experiment.workspace, "instrument")
+        if not instrument.is_present:
+            raise ValueError("LC-MS/MS instrument is not deployed on the bench.")
+
+        rack_widget = find_workspace_widget(experiment.workspace, "rack")
+        if not rack_widget.is_present:
+            raise ValueError("Autosampler rack is not deployed.")
+        if experiment.rack.state == "locked":
+            raise ValueError("The autosampler rack cannot be unloaded during an acquisition.")
+        if experiment.rack.state not in {"loaded", "completed"}:
+            raise ValueError("The autosampler rack is not loaded into the LC-MS/MS.")
+
+        experiment.rack.state = "available"
+        experiment.audit_log.append("Autosampler rack unloaded from the LC-MS/MS.")
+
+
 @dataclass(frozen=True, slots=True)
 class AcquisitionSequenceLineRequest:
     rack_slot_id: str

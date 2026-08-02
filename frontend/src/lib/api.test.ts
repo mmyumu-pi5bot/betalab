@@ -17,6 +17,7 @@ import {
   openWorkbenchTool,
   runSequence,
   subscribeToExperimentStream,
+  unloadRackFromInstrument,
 } from "@/lib/api";
 import type { Experiment, ExperimentListEntry } from "@/types/experiment";
 
@@ -109,6 +110,24 @@ describe("api client", () => {
     );
     expect(result.rack.state).toBe("loaded");
     expect(result.rack.isDraggable).toBe(false);
+  });
+
+  it("unloads the autosampler rack from the LC-MS/MS", async () => {
+    const experiment = makeExperiment();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await unloadRackFromInstrument("experiment_test");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/experiment_test/lcmsms/unload-rack",
+      { method: "POST" },
+    );
+    expect(result.rack.state).toBe("available");
+    expect(result.rack.isDraggable).toBe(true);
   });
 
   it("sends the configured LC-MS/MS sequence to the acquisition route", async () => {

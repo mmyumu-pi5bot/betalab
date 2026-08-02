@@ -5758,6 +5758,45 @@ describe("LabScene", () => {
     expect(screen.getByText("Rack loaded in LC-MS/MS")).toBeInTheDocument();
   });
 
+  it("unloads the rack so its vials can be moved again", async () => {
+    const loadedExperiment = makeWorkbenchExperiment({
+      rackState: "loaded",
+      rackSlots: makeRackSlots([{ tool: makeTool({ id: "sample_vial" }) }]),
+      workspaceWidgets: makeWorkspaceWithRackAndInstrumentVisible(),
+    });
+    const unloadedExperiment = {
+      ...loadedExperiment,
+      snapshot_version: loadedExperiment.snapshot_version + 1,
+      rack: {
+        ...loadedExperiment.rack,
+        allowedDropTargets: ["lcmsms_instrument" as const],
+        isDraggable: true,
+        state: "available" as const,
+      },
+    };
+    vi.mocked(createExperiment).mockResolvedValue(loadedExperiment);
+    vi.mocked(sendExperimentCommand).mockResolvedValue(unloadedExperiment);
+
+    render(<PesticideWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Unload rack from LC-MS/MS" }),
+    );
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "unload_rack_from_instrument",
+      {},
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Drag rack into LC-MS/MS")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("rack-illustration-slot-1")).toHaveAttribute(
+      "draggable",
+      "true",
+    );
+  });
+
   it("opens the LC-MS/MS console from the instrument and launches its configured sequence", async () => {
     const experiment = makeWorkbenchExperiment({
       rackState: "loaded",

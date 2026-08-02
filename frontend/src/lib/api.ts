@@ -1552,6 +1552,17 @@ export async function loadRackIntoInstrument(
   });
 }
 
+export async function unloadRackFromInstrument(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lcmsms/unload-rack`,
+  });
+}
+
 function normalizeExperiment(experiment: Experiment): Experiment {
   const rawRack = experiment.rack as Experiment["rack"] & Record<string, unknown>;
   const rawTrash = experiment.trash as Experiment["trash"] & Record<string, unknown>;

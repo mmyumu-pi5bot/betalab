@@ -24,6 +24,8 @@ from app.services.domain_services.lcmsms import (
     LoadRackIntoInstrumentService,
     RunSequenceRequest,
     RunSequenceService,
+    UnloadRackFromInstrumentRequest,
+    UnloadRackFromInstrumentService,
     _compute_calibration_compounds,
     _compute_compounds,
 )
@@ -340,6 +342,36 @@ class TestLoadRackIntoInstrument:
             _load_rack_into_instrument(service, exp_id)
 
 
+class TestUnloadRackFromInstrument:
+    def test_unloads_a_loaded_rack_and_persists_the_state(self, tmp_path) -> None:
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id)
+        _load_rack_into_instrument(service, exp_id)
+
+        result = UnloadRackFromInstrumentService(service).run(
+            exp_id,
+            UnloadRackFromInstrumentRequest(),
+        )
+
+        assert result.rack.state == "available"
+        reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        assert reloaded.rack.state == "available"
+
+    def test_rejects_unloading_an_available_rack(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+
+        with pytest.raises(ValueError, match="not loaded"):
+            UnloadRackFromInstrumentService(service).run(
+                exp_id,
+                UnloadRackFromInstrumentRequest(),
+            )
+
+
 class TestRunSequenceWithCalibration:
     def test_console_configuration_drives_injection_order_and_metadata(self) -> None:
         service = ExperimentRuntimeService()
@@ -652,6 +684,19 @@ def test_load_rack_route_marks_the_rack_as_loaded(monkeypatch) -> None:
     response = lcmsms_routes.load_rack_into_instrument(exp_id)
 
     assert response.rack.state == "loaded"
+
+
+def test_unload_rack_route_marks_the_rack_as_available(monkeypatch) -> None:
+    service = ExperimentRuntimeService()
+    monkeypatch.setattr(lcmsms_routes, "experiment_service", service)
+    exp_id = _create(service)
+    _deploy_instrument_and_rack(service, exp_id)
+    _place_vial_in_rack(service, exp_id)
+    _load_rack_into_instrument(service, exp_id)
+
+    response = lcmsms_routes.unload_rack_from_instrument(exp_id)
+
+    assert response.rack.state == "available"
 
 
 # ---------------------------------------------------------------------------

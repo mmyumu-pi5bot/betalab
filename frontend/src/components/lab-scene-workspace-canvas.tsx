@@ -164,6 +164,7 @@ type LabSceneWorkspaceCanvasProps = {
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
+    onUnloadRackFromInstrument: () => void;
     onTareAnalyticalBalance: () => void;
   };
 };
@@ -624,6 +625,20 @@ export function LabSceneWorkspaceCanvas({
                         ? "Close acquisition console"
                         : "Open acquisition console"}
                     </button>
+                    {experiment.rack.state === "loaded" ||
+                    experiment.rack.state === "completed" ? (
+                      <button
+                        className="ml-2 rounded-full border border-slate-300 bg-white px-5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-40"
+                        disabled={ui.isCommandPending}
+                        onClick={() => {
+                          setIsAcquisitionConsoleOpen(false);
+                          workspaceActions.onUnloadRackFromInstrument();
+                        }}
+                        type="button"
+                      >
+                        Unload rack from LC-MS/MS
+                      </button>
+                    ) : null}
                   </div>
                   {isAcquisitionConsoleOpen ? (
                     <LcMsMsAcquisitionConsole

@@ -376,6 +376,7 @@ export function useLabExperiment({
         exec(mutationFns.pourExtractToVial, p),
       loadRack: () => exec(mutationFns.loadRackIntoInstrument),
       runSequence: (p: RunSequencePayload) => exec(mutationFns.runSequence, p),
+      unloadRack: () => exec(mutationFns.unloadRackFromInstrument),
     },
 
     // ── Produce / debug ───────────────────────────────────────────────────────

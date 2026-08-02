@@ -191,7 +191,9 @@ widget LC-MS/MS. La cible est mise en évidence pendant le déplacement.
 Le chargement exige que le rack et l'instrument soient déployés et que le rack
 contienne au moins un vial. Le rack passe alors de `available` à `loaded`, ses
 positions ne sont plus modifiables et la console d'acquisition devient
-accessible. Le retrait du rack après acquisition reste à implémenter.
+accessible. Une action `Unload rack from LC-MS/MS` remet ensuite le rack à
+`available`, avant ou après la séquence, afin de rendre ses vials de nouveau
+déplaçables. Le déchargement reste interdit pendant l'état `locked`.
 
 ## 7. Étape C — Ouvrir la console constructeur
 
@@ -583,7 +585,7 @@ de retry sont hors périmètre du premier parcours.
 | Ordre déterminé par les positions | Implémenté | Conserver |
 | Préparation d'un calibrant | Implémentée | Conserver |
 | Préparation d'un sample | Implémentée | Conserver |
-| Chargement physique du rack dans l'instrument | Implémenté par glisser-déposer | Ajouter le retrait après acquisition |
+| Chargement et retrait physique du rack | Implémentés | Conserver |
 | Console constructeur | Absente | À implémenter |
 | Déclaration calibration/sample | Déduite implicitement du vial | À rendre visible et confirmable |
 | Méthode d'acquisition | Absente | Méthode fixe à ajouter |
@@ -645,7 +647,7 @@ Chaque incrément doit être utilisable ou vérifiable indépendamment.
 
 - afficher la progression et les statuts ;
 - proposer le téléchargement ou la transmission ;
-- permettre le retrait du rack après la séquence ;
+- conserver le retrait du rack après la séquence ;
 - couvrir le parcours complet par un test d'intégration.
 
 ## 19. Scénario d'acceptation du Step 1

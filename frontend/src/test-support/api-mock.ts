@@ -169,6 +169,7 @@ export const dispensePipette = wrapCommand("dispense_pipette");
 export const addCalibrationToVial = wrapCommand("add_calibration_to_vial");
 export const loadRackIntoInstrument = wrapCommand("load_rack_into_instrument");
 export const runSequence = wrapCommand("run_sequence");
+export const unloadRackFromInstrument = wrapCommand("unload_rack_from_instrument");
 export const subscribeToExperimentStream = vi.fn((experimentId: string, handlers: {
   onError?: (error: Error) => void;
   onMessage: (experiment: Experiment) => void;

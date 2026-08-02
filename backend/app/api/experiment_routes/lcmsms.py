@@ -13,6 +13,8 @@ from app.services.domain_services.lcmsms import (
     PourExtractToVialService,
     RunSequenceRequest,
     RunSequenceService,
+    UnloadRackFromInstrumentRequest,
+    UnloadRackFromInstrumentService,
 )
 
 from .common import experiment_service, handle_service_errors, router
@@ -62,6 +64,16 @@ def load_rack_into_instrument(experiment_id: str) -> ExperimentSchema:
         lambda: LoadRackIntoInstrumentService(experiment_service).run(
             experiment_id,
             LoadRackIntoInstrumentRequest(),
+        )
+    )
+
+
+@router.post("/{experiment_id}/lcmsms/unload-rack", response_model=ExperimentSchema)
+def unload_rack_from_instrument(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: UnloadRackFromInstrumentService(experiment_service).run(
+            experiment_id,
+            UnloadRackFromInstrumentRequest(),
         )
     )
 

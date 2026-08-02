@@ -652,6 +652,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         ...workspaceActions,
         onLoadRackIntoInstrument: () => { void experimentApi.lcmsms.loadRack(); },
         onRunSequence: (payload) => { void experimentApi.lcmsms.runSequence(payload); },
+        onUnloadRackFromInstrument: () => { void experimentApi.lcmsms.unloadRack(); },
         onStartCentrifuge: () => { void experimentApi.centrifuge.start(); },
         onToggleCentrifugeToolSeal: () => {
           if (!centrifugeTool) {
