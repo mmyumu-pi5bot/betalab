@@ -46,7 +46,7 @@ export function LcMsMsResultsTable({ runs }: Props) {
   return (
     <div className="space-y-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-        Séquence {latestRun.id} · {latestRun.injections.length} injection(s)
+        Séquence {latestRun.id} · {latestRun.injections.length} injection(s) · {latestRun.methodId}
       </p>
       {latestRun.injections.map((inj) => (
         <InjectionBlock key={inj.vialId} injection={inj} />
@@ -56,11 +56,12 @@ export function LcMsMsResultsTable({ runs }: Props) {
 }
 
 function InjectionBlock({ injection }: { injection: InjectionMeasurement }) {
+  const displayName = injection.sampleName || injection.vialLabel;
   if (injection.status === "no_extract_context") {
     return (
       <div className="rounded-[0.9rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        <span className="font-semibold">{injection.vialLabel}</span> — pas d&apos;extrait (slot{" "}
-        {injection.rackSlotId})
+        <span className="font-semibold">{displayName}</span> — pas d&apos;extrait (slot{" "}
+        {injection.rackSlotId}) · {injection.outputFilename}
       </div>
     );
   }
@@ -77,10 +78,13 @@ function InjectionBlock({ injection }: { injection: InjectionMeasurement }) {
     <div className="overflow-hidden rounded-[0.9rem] border border-slate-200 bg-white">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5">
-        <span className="text-xs font-semibold text-slate-700">{injection.vialLabel}</span>
+        <span className="text-xs font-semibold text-slate-700">{displayName}</span>
         <span className="text-[10px] text-slate-400">slot {injection.rackSlotId}</span>
         <IstdBadge applied={istdApplied} phase={istdPhase} />
       </div>
+      <p className="border-b border-slate-100 px-3 py-1 font-mono text-[10px] text-slate-400">
+        {injection.outputFilename} · {injection.injectionVolumeUl} µL · rep {injection.replicateIndex}
+      </p>
 
       {/* Compounds */}
       {injection.compounds.length === 0 ? (
@@ -139,12 +143,17 @@ function CalibrationBlock({ injection }: { injection: InjectionMeasurement }) {
   return (
     <div className="overflow-hidden rounded-[0.9rem] border border-rose-200 bg-white">
       <div className="flex items-center justify-between gap-2 border-b border-rose-100 bg-rose-50 px-3 py-1.5">
-        <span className="text-xs font-semibold text-rose-700">{injection.vialLabel}</span>
+        <span className="text-xs font-semibold text-rose-700">
+          {injection.sampleName || injection.vialLabel}
+        </span>
         <span className="text-[10px] text-slate-400">slot {injection.rackSlotId}</span>
         <span className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-rose-700">
           CAL {level !== null ? `${level} ng/mL` : ""}
         </span>
       </div>
+      <p className="border-b border-rose-100 px-3 py-1 font-mono text-[10px] text-slate-400">
+        {injection.outputFilename} · {injection.injectionVolumeUl} µL · rep {injection.replicateIndex}
+      </p>
       {injection.compounds.length === 0 ? (
         <p className="px-3 py-2 text-xs text-slate-400">Aucun composé.</p>
       ) : (

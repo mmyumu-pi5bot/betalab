@@ -5698,4 +5698,76 @@ describe("LabScene", () => {
     );
   });
 
+  it("opens the LC-MS/MS console from the instrument and launches its configured sequence", async () => {
+    const experiment = makeWorkbenchExperiment({
+      rackSlots: makeRackSlots([
+        {
+          tool: makeTool({
+            id: "calibration_vial",
+            fieldLabelText: "Cal 10",
+            calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] },
+          }),
+        },
+        {
+          tool: makeTool({
+            id: "sample_vial",
+            fieldLabelText: "Apple A",
+          }),
+        },
+      ]),
+      workspaceWidgets: makeWorkspaceWidgets([
+        {},
+        {},
+        {},
+        {},
+        {},
+        { isPresent: true },
+        { isPresent: true },
+      ]),
+    });
+    vi.mocked(createExperiment).mockResolvedValue(experiment);
+    vi.mocked(sendExperimentCommand).mockResolvedValue(experiment);
+
+    render(<PesticideWorkbench />);
+
+    const acquisitionConsoleToggle = await screen.findByRole("button", {
+      name: "Open acquisition console",
+    });
+    fireEvent.click(acquisitionConsoleToggle);
+    expect(screen.getByRole("dialog", { name: "LC-MS/MS acquisition console" })).toBeInTheDocument();
+    expect(acquisitionConsoleToggle).toHaveAccessibleName("Close acquisition console");
+    expect(
+      screen.getAllByRole("button", { name: "Close acquisition console" }),
+    ).toHaveLength(1);
+
+    fireEvent.click(acquisitionConsoleToggle);
+    expect(
+      screen.queryByRole("dialog", { name: "LC-MS/MS acquisition console" }),
+    ).not.toBeInTheDocument();
+    expect(acquisitionConsoleToggle).toHaveAccessibleName("Open acquisition console");
+
+    fireEvent.click(acquisitionConsoleToggle);
+    fireEvent.click(screen.getByRole("button", { name: "Launch acquisition" }));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "run_sequence",
+      {
+        method_id: "apple_pesticides_mrm_v1",
+        injections: [
+          expect.objectContaining({
+            rack_slot_id: "rack_slot_1",
+            sample_name: "Cal 10",
+            sample_type: "calibration",
+          }),
+          expect.objectContaining({
+            rack_slot_id: "rack_slot_2",
+            sample_name: "Apple A",
+            sample_type: "sample",
+          }),
+        ],
+      },
+    );
+  });
+
 });

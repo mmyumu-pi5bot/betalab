@@ -221,6 +221,23 @@ export type RestoreTrashedToolToRackSlotPayload = {
   rack_slot_id: string;
 };
 
+// ── LC-MS/MS acquisition ────────────────────────────────────────────────────
+
+export type AcquisitionSequenceLinePayload = {
+  rack_slot_id: string;
+  sample_name: string;
+  sample_type: "calibration" | "sample";
+  calibration_level_ng_per_ml: number | null;
+  injection_volume_ul: number;
+  repetitions: number;
+  output_filename: string;
+};
+
+export type RunSequencePayload = {
+  method_id: "apple_pesticides_mrm_v1";
+  injections: AcquisitionSequenceLinePayload[];
+};
+
 // ── LIMS ─────────────────────────────────────────────────────────────────────
 
 export type CreateLimsReceptionPayload = {

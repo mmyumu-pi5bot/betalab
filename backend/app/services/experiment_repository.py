@@ -13,11 +13,13 @@ from pydantic_core import to_jsonable_python
 
 from app.domain.models import (
     CalibrationContext,
+    CompoundMeasurement,
     ContainerLabel,
     EntityOrigin,
     Experiment,
     ExperimentStatus,
     InjectionContext,
+    InjectionMeasurement,
     LimsLabel,
     LimsReception,
     ManualLabel,
@@ -30,6 +32,7 @@ from app.domain.models import (
     QuechersState,
     Rack,
     RackSlot,
+    SequenceRun,
     SpatulaState,
     Trash,
     TrashProduceLotEntry,
@@ -338,6 +341,34 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                 produce_lots=[_deserialize_produce_lot(lot) for lot in widget.produce_lots],
                 liquids=[_deserialize_workbench_liquid(liquid) for liquid in widget.liquids],
                 produce_fractions=[_deserialize_produce_fraction(fraction) for fraction in widget.produce_fractions],
+                sequence_runs=[
+                    SequenceRun(
+                        id=run.id,
+                        method_id=run.method_id,
+                        injections=[
+                            InjectionMeasurement(
+                                vial_id=injection.vial_id,
+                                vial_label=injection.vial_label,
+                                rack_slot_id=injection.rack_slot_id,
+                                status=injection.status,
+                                compounds=[
+                                    CompoundMeasurement(**compound.model_dump())
+                                    for compound in injection.compounds
+                                ],
+                                sample_name=injection.sample_name,
+                                sample_type=injection.sample_type,
+                                calibration_level_ng_per_ml=(
+                                    injection.calibration_level_ng_per_ml
+                                ),
+                                injection_volume_ul=injection.injection_volume_ul,
+                                replicate_index=injection.replicate_index,
+                                output_filename=injection.output_filename,
+                            )
+                            for injection in run.injections
+                        ],
+                    )
+                    for run in widget.sequence_runs
+                ],
             )
             for widget in schema.workspace.widgets
         ],

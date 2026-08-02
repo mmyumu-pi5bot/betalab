@@ -1531,12 +1531,13 @@ export async function addCalibrationToVial(
 
 export async function runSequence(
   experimentId: string,
-  payload?: MutationPayload,
+  payload: MutationPayload,
 ): Promise<Experiment> {
-  void payload;
+  const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {
     method: "POST",
     path: `/experiments/${experimentId}/lcmsms/run-sequence`,
+    body,
   });
 }
 
@@ -2287,12 +2288,28 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
   if (!Array.isArray(raw)) return [];
   return raw.map((run: Record<string, unknown>) => ({
     id: String(run.id ?? ""),
+    methodId: String(run.methodId ?? run.method_id ?? "apple_pesticides_mrm_v1"),
     injections: Array.isArray(run.injections)
       ? run.injections.map((inj: Record<string, unknown>) => ({
           vialId: String(inj.vialId ?? inj.vial_id ?? ""),
           vialLabel: String(inj.vialLabel ?? inj.vial_label ?? ""),
           rackSlotId: String(inj.rackSlotId ?? inj.rack_slot_id ?? ""),
           status: String(inj.status ?? "ok") as "ok" | "no_extract_context" | "calibration",
+          sampleName: String(inj.sampleName ?? inj.sample_name ?? ""),
+          sampleType: String(inj.sampleType ?? inj.sample_type ?? "sample") as
+            | "calibration"
+            | "sample",
+          calibrationLevelNgPerMl:
+            inj.calibrationLevelNgPerMl != null
+              ? Number(inj.calibrationLevelNgPerMl)
+              : inj.calibration_level_ng_per_ml != null
+                ? Number(inj.calibration_level_ng_per_ml)
+                : null,
+          injectionVolumeUl: Number(
+            inj.injectionVolumeUl ?? inj.injection_volume_ul ?? 5,
+          ),
+          replicateIndex: Number(inj.replicateIndex ?? inj.replicate_index ?? 1),
+          outputFilename: String(inj.outputFilename ?? inj.output_filename ?? ""),
           compounds: Array.isArray(inj.compounds)
             ? inj.compounds.map((c: Record<string, unknown>) => ({
                 compoundId: String(c.compoundId ?? c.compound_id ?? ""),

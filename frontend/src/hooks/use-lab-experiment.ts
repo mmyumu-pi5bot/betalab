@@ -61,6 +61,7 @@ import type {
   RestoreTrashedToolToRackSlotPayload,
   RestoreTrashedToolToVortexPayload,
   RestoreTrashedToolToWorkbenchSlotPayload,
+  RunSequencePayload,
   MoveRackToolToVortexPayload,
   MoveVortexToolToWorkbenchPayload,
   MoveWorkbenchToolToVortexPayload,
@@ -373,7 +374,7 @@ export function useLabExperiment({
         exec(mutationFns.addCalibrationToVial, p),
       pourExtract: (p: { tube_tool_id: string; vial_tool_id: string }) =>
         exec(mutationFns.pourExtractToVial, p),
-      runSequence: () => exec(mutationFns.runSequence),
+      runSequence: (p: RunSequencePayload) => exec(mutationFns.runSequence, p),
     },
 
     // ── Produce / debug ───────────────────────────────────────────────────────

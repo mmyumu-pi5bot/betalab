@@ -1,7 +1,10 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.schemas.experiment import ExperimentSchema
 from app.services.domain_services.lcmsms import (
+    AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
     PourExtractToVialRequest,
@@ -36,6 +39,21 @@ class AddCalibrationBody(BaseModel):
     level_ng_per_ml: float
 
 
+class AcquisitionSequenceLineBody(BaseModel):
+    rack_slot_id: str
+    sample_name: str
+    sample_type: Literal["calibration", "sample"]
+    calibration_level_ng_per_ml: float | None = None
+    injection_volume_ul: float
+    repetitions: int
+    output_filename: str
+
+
+class RunSequenceBody(BaseModel):
+    method_id: str
+    injections: list[AcquisitionSequenceLineBody]
+
+
 @router.post("/{experiment_id}/lcmsms/add-calibration", response_model=ExperimentSchema)
 def add_calibration_to_vial(experiment_id: str, body: AddCalibrationBody) -> ExperimentSchema:
     return handle_service_errors(
@@ -50,10 +68,24 @@ def add_calibration_to_vial(experiment_id: str, body: AddCalibrationBody) -> Exp
 
 
 @router.post("/{experiment_id}/lcmsms/run-sequence", response_model=ExperimentSchema)
-def run_sequence(experiment_id: str) -> ExperimentSchema:
+def run_sequence(experiment_id: str, body: RunSequenceBody) -> ExperimentSchema:
     return handle_service_errors(
         lambda: RunSequenceService(experiment_service).run(
             experiment_id,
-            RunSequenceRequest(),
+            RunSequenceRequest(
+                method_id=body.method_id,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id=line.rack_slot_id,
+                        sample_name=line.sample_name,
+                        sample_type=line.sample_type,
+                        calibration_level_ng_per_ml=line.calibration_level_ng_per_ml,
+                        injection_volume_ul=line.injection_volume_ul,
+                        repetitions=line.repetitions,
+                        output_filename=line.output_filename,
+                    )
+                    for line in body.injections
+                ],
+            ),
         )
     )

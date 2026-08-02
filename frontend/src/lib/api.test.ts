@@ -14,6 +14,7 @@ import {
   listExperiments,
   moveObject,
   openWorkbenchTool,
+  runSequence,
   subscribeToExperimentStream,
 } from "@/lib/api";
 import type { Experiment, ExperimentListEntry } from "@/types/experiment";
@@ -80,6 +81,48 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("sends the configured LC-MS/MS sequence to the acquisition route", async () => {
+    const experiment = makeExperiment();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const payload = {
+      method_id: "apple_pesticides_mrm_v1",
+      injections: [
+        {
+          rack_slot_id: "rack_slot_1",
+          sample_name: "Cal 10",
+          sample_type: "calibration",
+          calibration_level_ng_per_ml: 10,
+          injection_volume_ul: 5,
+          repetitions: 1,
+          output_filename: "cal_10.mzML",
+        },
+        {
+          rack_slot_id: "rack_slot_2",
+          sample_name: "Apple A",
+          sample_type: "sample",
+          calibration_level_ng_per_ml: null,
+          injection_volume_ul: 5,
+          repetitions: 1,
+          output_filename: "apple_a.mzML",
+        },
+      ],
+    };
+
+    await runSequence("experiment_test", payload);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/experiment_test/lcmsms/run-sequence",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    );
+  });
+
   it("loads private state from the dedicated debug endpoint", async () => {
     const debugState = { volume_ml: 0.5, true_volume_ml: 0.49 };
     const fetchMock = vi.fn().mockResolvedValue({

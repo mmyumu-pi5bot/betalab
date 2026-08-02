@@ -164,6 +164,12 @@ class InjectionMeasurement:
     rack_slot_id: str
     status: str  # "ok" | "no_extract_context"
     compounds: list[CompoundMeasurement]
+    sample_name: str = ""
+    sample_type: Literal["calibration", "sample"] = "sample"
+    calibration_level_ng_per_ml: float | None = None
+    injection_volume_ul: float = 5.0
+    replicate_index: int = 1
+    output_filename: str = ""
 
 
 @dataclass
@@ -171,6 +177,7 @@ class SequenceRun:
     """One LC-MS/MS sequence run; stored on the instrument workspace widget."""
     id: str
     injections: list[InjectionMeasurement]
+    method_id: str = "apple_pesticides_mrm_v1"
 
 
 @dataclass

@@ -479,11 +479,18 @@ export type InjectionMeasurement = {
   rackSlotId: string;
   status: "ok" | "no_extract_context" | "calibration";
   compounds: CompoundMeasurement[];
+  sampleName: string;
+  sampleType: "calibration" | "sample";
+  calibrationLevelNgPerMl: number | null;
+  injectionVolumeUl: number;
+  replicateIndex: number;
+  outputFilename: string;
 };
 
 export type SequenceRun = {
   id: string;
   injections: InjectionMeasurement[];
+  methodId: string;
 };
 
 export type SpatulaState = {

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from typing import Literal
 
 from app.domain.models import (
     CalibrationContext,
@@ -12,6 +13,7 @@ from app.domain.models import (
     InjectionMeasurement,
     ProduceLot,
     ProduceMaterialState,
+    RackSlot,
     SequenceRun,
     WorkbenchTool,
     new_id,
@@ -28,6 +30,7 @@ APPLE_EXTRACT_ID = "apple_extract"
 ISTD_REFERENCE_CONC_NG_PER_ML = 100.0
 CALIBRATION_STANDARD_VOLUME_ML = 1.0
 ENV_NOISE_SIGMA = 0.005  # 0.5% environmental noise per measurement
+FIXED_ACQUISITION_METHOD_ID = "apple_pesticides_mrm_v1"
 
 
 # ---------------------------------------------------------------------------
@@ -247,8 +250,20 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
+class AcquisitionSequenceLineRequest:
+    rack_slot_id: str
+    sample_name: str
+    sample_type: Literal["calibration", "sample"]
+    calibration_level_ng_per_ml: float | None
+    injection_volume_ul: float
+    repetitions: int
+    output_filename: str
+
+
+@dataclass(frozen=True, slots=True)
 class RunSequenceRequest:
-    pass
+    method_id: str
+    injections: list[AcquisitionSequenceLineRequest]
 
 
 class RunSequenceService(WriteDomainService[RunSequenceRequest]):
@@ -268,47 +283,53 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         if not vials_in_rack:
             raise ValueError("The autosampler rack contains no vials.")
 
+        configured_by_slot = _validate_acquisition_sequence(request, vials_in_rack)
+
         injections: list[InjectionMeasurement] = []
         for rack_slot in vials_in_rack:
             vial = rack_slot.tool
             assert vial is not None  # guaranteed by the filter above
+            configured = configured_by_slot[rack_slot.id]
 
-            if vial.calibration_context is not None:
+            for replicate_index in range(1, configured.repetitions + 1):
+                if vial.calibration_context is not None:
+                    status = "calibration"
+                    compounds = _compute_calibration_compounds(vial.calibration_context)
+                elif vial.injection_context is None:
+                    status = "no_extract_context"
+                    compounds = []
+                else:
+                    status = "ok"
+                    compounds = _compute_compounds(vial, vial.injection_context)
                 injections.append(
                     InjectionMeasurement(
                         vial_id=vial.id,
                         vial_label=vial.label,
                         rack_slot_id=rack_slot.id,
-                        status="calibration",
-                        compounds=_compute_calibration_compounds(vial.calibration_context),
+                        status=status,
+                        compounds=compounds,
+                        sample_name=configured.sample_name.strip(),
+                        sample_type=configured.sample_type,
+                        calibration_level_ng_per_ml=(
+                            configured.calibration_level_ng_per_ml
+                            if configured.sample_type == "calibration"
+                            else None
+                        ),
+                        injection_volume_ul=configured.injection_volume_ul,
+                        replicate_index=replicate_index,
+                        output_filename=_replicate_output_filename(
+                            configured.output_filename.strip(),
+                            replicate_index,
+                            configured.repetitions,
+                        ),
                     )
                 )
-                continue
 
-            if vial.injection_context is None:
-                injections.append(
-                    InjectionMeasurement(
-                        vial_id=vial.id,
-                        vial_label=vial.label,
-                        rack_slot_id=rack_slot.id,
-                        status="no_extract_context",
-                        compounds=[],
-                    )
-                )
-                continue
-
-            compounds = _compute_compounds(vial, vial.injection_context)
-            injections.append(
-                InjectionMeasurement(
-                    vial_id=vial.id,
-                    vial_label=vial.label,
-                    rack_slot_id=rack_slot.id,
-                    status="ok",
-                    compounds=compounds,
-                )
-            )
-
-        run = SequenceRun(id=new_id("seq"), injections=injections)
+        run = SequenceRun(
+            id=new_id("seq"),
+            injections=injections,
+            method_id=request.method_id,
+        )
         instrument.sequence_runs.append(run)
 
         n_ok = sum(1 for inj in injections if inj.status == "ok")
@@ -316,6 +337,74 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             f"LC-MS/MS sequence run {run.id}: {len(injections)} vial(s) injected, "
             f"{n_ok} with extract context."
         )
+
+
+def _validate_acquisition_sequence(
+    request: RunSequenceRequest,
+    occupied_slots: list[RackSlot],
+) -> dict[str, AcquisitionSequenceLineRequest]:
+    if request.method_id != FIXED_ACQUISITION_METHOD_ID:
+        raise ValueError(
+            f"Step-one acquisition method must be {FIXED_ACQUISITION_METHOD_ID}."
+        )
+
+    occupied_slot_ids = [slot.id for slot in occupied_slots]
+    configured_slot_ids = [line.rack_slot_id for line in request.injections]
+    if len(configured_slot_ids) != len(set(configured_slot_ids)):
+        raise ValueError("Each occupied rack position must appear exactly once.")
+    if set(configured_slot_ids) != set(occupied_slot_ids):
+        raise ValueError("The acquisition sequence must match the occupied rack positions.")
+
+    calibration_count = sum(
+        line.sample_type == "calibration" for line in request.injections
+    )
+    sample_count = sum(line.sample_type == "sample" for line in request.injections)
+    if calibration_count != 1 or sample_count != 1 or len(request.injections) != 2:
+        raise ValueError("Step one requires exactly one calibration and one sample.")
+
+    filenames: set[str] = set()
+    for line in request.injections:
+        if not line.sample_name.strip():
+            raise ValueError("Every acquisition line requires a sample name.")
+        if line.sample_type not in {"calibration", "sample"}:
+            raise ValueError("Sample type must be calibration or sample.")
+        if (
+            line.sample_type == "calibration"
+            and (
+                line.calibration_level_ng_per_ml is None
+                or line.calibration_level_ng_per_ml <= 0
+            )
+        ):
+            raise ValueError("The calibration line requires a positive level.")
+        if line.injection_volume_ul <= 0 or line.injection_volume_ul > 100:
+            raise ValueError("Injection volume must be between 0 and 100 µL.")
+        if line.repetitions < 1 or line.repetitions > 10:
+            raise ValueError("Repetitions must be between 1 and 10.")
+        output_filename = line.output_filename.strip()
+        if not output_filename.lower().endswith(".mzml"):
+            raise ValueError("Every output filename must end with .mzML.")
+        for replicate_index in range(1, line.repetitions + 1):
+            result_filename = _replicate_output_filename(
+                output_filename,
+                replicate_index,
+                line.repetitions,
+            ).lower()
+            if result_filename in filenames:
+                raise ValueError("Output filenames must be unique.")
+            filenames.add(result_filename)
+
+    return {line.rack_slot_id: line for line in request.injections}
+
+
+def _replicate_output_filename(
+    output_filename: str,
+    replicate_index: int,
+    repetitions: int,
+) -> str:
+    if repetitions == 1:
+        return output_filename
+    stem = output_filename[:-5]
+    return f"{stem}_r{replicate_index}.mzML"
 
 
 # ---------------------------------------------------------------------------

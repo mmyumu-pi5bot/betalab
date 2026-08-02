@@ -37,7 +37,7 @@ import type {
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
 } from "@/types/workbench";
-import type { MoveObjectPayload } from "@/types/api-payloads";
+import type { MoveObjectPayload, RunSequencePayload } from "@/types/api-payloads";
 
 type LabSceneViewProps = {
   experiment: Experiment;
@@ -171,7 +171,7 @@ type LabSceneViewProps = {
     onToggleCentrifugeToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
-    onRunSequence: () => void;
+    onRunSequence: (payload: RunSequencePayload) => void;
     onTareAnalyticalBalance: () => void;
   };
 };

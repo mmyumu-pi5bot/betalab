@@ -4,7 +4,9 @@ from __future__ import annotations
 import random
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.api.experiment_routes import lcmsms as lcmsms_routes
 from app.domain.models import (
     CalibrationContext,
     InjectionContext,
@@ -12,7 +14,10 @@ from app.domain.models import (
     WorkbenchTool,
     new_id,
 )
+from app.main import app
 from app.services.domain_services.lcmsms import (
+    FIXED_ACQUISITION_METHOD_ID,
+    AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
     RunSequenceRequest,
@@ -304,44 +309,158 @@ class TestComputeCalibrationCompounds:
 # ---------------------------------------------------------------------------
 
 class TestRunSequenceWithCalibration:
-    def test_calibration_vial_produces_calibration_status(self) -> None:
+    def test_console_configuration_drives_injection_order_and_metadata(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        vial_id = _place_vial_in_rack(service, exp_id)
+        sample_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_4")
+        calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
 
         AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=50.0)
+            exp_id,
+            AddCalibrationToVialRequest(
+                vial_tool_id=calibration_vial_id,
+                level_ng_per_ml=50.0,
+            ),
         )
-        RunSequenceService(service).run(exp_id, RunSequenceRequest())
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=FIXED_ACQUISITION_METHOD_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_4",
+                        sample_name="Apple sample",
+                        sample_type="sample",
+                        calibration_level_ng_per_ml=None,
+                        injection_volume_ul=3.0,
+                        repetitions=2,
+                        output_filename="apple_sample.mzML",
+                    ),
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_2",
+                        sample_name="Calibration 50",
+                        sample_type="calibration",
+                        calibration_level_ng_per_ml=50.0,
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="calibration_50.mzML",
+                    ),
+                ],
+            ),
+        )
 
         exp = service._require_experiment(exp_id)
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
         assert len(instrument.sequence_runs) == 1
         run = instrument.sequence_runs[0]
-        assert len(run.injections) == 1
-        inj = run.injections[0]
-        assert inj.status == "calibration"
-        assert len(inj.compounds) > 0
-        for c in inj.compounds:
+        assert run.method_id == FIXED_ACQUISITION_METHOD_ID
+        assert [injection.rack_slot_id for injection in run.injections] == [
+            "rack_slot_2",
+            "rack_slot_4",
+            "rack_slot_4",
+        ]
+        calibration = run.injections[0]
+        assert calibration.vial_id == calibration_vial_id
+        assert calibration.sample_name == "Calibration 50"
+        assert calibration.sample_type == "calibration"
+        assert calibration.calibration_level_ng_per_ml == 50.0
+        assert calibration.injection_volume_ul == 5.0
+        assert calibration.replicate_index == 1
+        assert calibration.output_filename == "calibration_50.mzML"
+        assert calibration.status == "calibration"
+        assert len(calibration.compounds) > 0
+        for c in calibration.compounds:
             assert c.nominal_conc_ng_per_ml == 50.0
             assert c.calculated_conc_ug_per_kg is None
             assert c.extraction_manip_factor == 1.0
             assert not c.istd_correction_applied
             assert c.pesticide_signal > 0
 
-    def test_empty_vial_produces_no_extract_context(self) -> None:
+        first_sample, second_sample = run.injections[1:]
+        assert first_sample.vial_id == sample_vial_id
+        assert first_sample.sample_name == "Apple sample"
+        assert first_sample.sample_type == "sample"
+        assert first_sample.injection_volume_ul == 3.0
+        assert first_sample.replicate_index == 1
+        assert first_sample.output_filename == "apple_sample_r1.mzML"
+        assert second_sample.replicate_index == 2
+        assert second_sample.output_filename == "apple_sample_r2.mzML"
+
+    def test_declared_roles_do_not_change_the_physical_vial_contents(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        _place_vial_in_rack(service, exp_id)
+        physical_calibration_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        empty_sample_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
+        AddCalibrationToVialService(service).run(
+            exp_id,
+            AddCalibrationToVialRequest(
+                vial_tool_id=physical_calibration_id,
+                level_ng_per_ml=20.0,
+            ),
+        )
 
-        RunSequenceService(service).run(exp_id, RunSequenceRequest())
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=FIXED_ACQUISITION_METHOD_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Declared sample",
+                        sample_type="sample",
+                        calibration_level_ng_per_ml=None,
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="declared_sample.mzML",
+                    ),
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_2",
+                        sample_name="Declared calibration",
+                        sample_type="calibration",
+                        calibration_level_ng_per_ml=10.0,
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="declared_calibration.mzML",
+                    ),
+                ],
+            ),
+        )
 
         exp = service._require_experiment(exp_id)
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
-        inj = instrument.sequence_runs[0].injections[0]
-        assert inj.status == "no_extract_context"
+        physical_calibration, empty_sample = instrument.sequence_runs[0].injections
+        assert physical_calibration.sample_type == "sample"
+        assert physical_calibration.status == "calibration"
+        assert empty_sample.vial_id == empty_sample_id
+        assert empty_sample.sample_type == "calibration"
+        assert empty_sample.status == "no_extract_context"
+
+    def test_step_one_requires_one_calibration_and_one_sample(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+
+        with pytest.raises(ValueError, match="one calibration and one sample"):
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    injections=[
+                        AcquisitionSequenceLineRequest(
+                            rack_slot_id="rack_slot_1",
+                            sample_name="Only sample",
+                            sample_type="sample",
+                            calibration_level_ng_per_ml=None,
+                            injection_volume_ul=5.0,
+                            repetitions=1,
+                            output_filename="only_sample.mzML",
+                        )
+                    ],
+                ),
+            )
 
     def test_no_vials_in_rack_raises(self) -> None:
         service = ExperimentRuntimeService()
@@ -349,14 +468,126 @@ class TestRunSequenceWithCalibration:
         _deploy_instrument_and_rack(service, exp_id)
 
         with pytest.raises(ValueError, match="no vials"):
-            RunSequenceService(service).run(exp_id, RunSequenceRequest())
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    injections=[],
+                ),
+            )
 
     def test_instrument_not_deployed_raises(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
 
         with pytest.raises(ValueError, match="instrument"):
-            RunSequenceService(service).run(exp_id, RunSequenceRequest())
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    injections=[],
+                ),
+            )
+
+    def test_roundtrip_preserves_acquisition_metadata(self, tmp_path) -> None:
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _place_vial_in_rack(service, exp_id, "rack_slot_2")
+        AddCalibrationToVialService(service).run(
+            exp_id,
+            AddCalibrationToVialRequest(
+                vial_tool_id=calibration_vial_id,
+                level_ng_per_ml=10.0,
+            ),
+        )
+        request = RunSequenceRequest(
+            method_id=FIXED_ACQUISITION_METHOD_ID,
+            injections=[
+                AcquisitionSequenceLineRequest(
+                    rack_slot_id="rack_slot_1",
+                    sample_name="Cal 10",
+                    sample_type="calibration",
+                    calibration_level_ng_per_ml=10.0,
+                    injection_volume_ul=5.0,
+                    repetitions=1,
+                    output_filename="cal_10.mzML",
+                ),
+                AcquisitionSequenceLineRequest(
+                    rack_slot_id="rack_slot_2",
+                    sample_name="Apple A",
+                    sample_type="sample",
+                    calibration_level_ng_per_ml=None,
+                    injection_volume_ul=3.0,
+                    repetitions=1,
+                    output_filename="apple_a.mzML",
+                ),
+            ],
+        )
+        RunSequenceService(service).run(exp_id, request)
+
+        reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        instrument = next(w for w in reloaded.workspace.widgets if w.id == "instrument")
+        run = instrument.sequence_runs[0]
+        assert run.method_id == FIXED_ACQUISITION_METHOD_ID
+        assert run.injections[0].sample_name == "Cal 10"
+        assert run.injections[0].output_filename == "cal_10.mzML"
+        assert run.injections[1].sample_name == "Apple A"
+        assert run.injections[1].injection_volume_ul == 3.0
+
+
+def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
+    service = ExperimentRuntimeService()
+    monkeypatch.setattr(lcmsms_routes, "experiment_service", service)
+    exp_id = _create(service)
+    _deploy_instrument_and_rack(service, exp_id)
+    calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+    _place_vial_in_rack(service, exp_id, "rack_slot_2")
+    AddCalibrationToVialService(service).run(
+        exp_id,
+        AddCalibrationToVialRequest(
+            vial_tool_id=calibration_vial_id,
+            level_ng_per_ml=10.0,
+        ),
+    )
+
+    response = TestClient(app).post(
+        f"/experiments/{exp_id}/lcmsms/run-sequence",
+        json={
+            "method_id": FIXED_ACQUISITION_METHOD_ID,
+            "injections": [
+                {
+                    "rack_slot_id": "rack_slot_1",
+                    "sample_name": "Cal 10",
+                    "sample_type": "calibration",
+                    "calibration_level_ng_per_ml": 10,
+                    "injection_volume_ul": 5,
+                    "repetitions": 1,
+                    "output_filename": "cal_10.mzML",
+                },
+                {
+                    "rack_slot_id": "rack_slot_2",
+                    "sample_name": "Apple A",
+                    "sample_type": "sample",
+                    "calibration_level_ng_per_ml": None,
+                    "injection_volume_ul": 5,
+                    "repetitions": 1,
+                    "output_filename": "apple_a.mzML",
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    instrument = next(
+        widget
+        for widget in response.json()["workspace"]["widgets"]
+        if widget["id"] == "instrument"
+    )
+    assert instrument["sequence_runs"][0]["method_id"] == FIXED_ACQUISITION_METHOD_ID
+    assert instrument["sequence_runs"][0]["injections"][1]["sample_name"] == "Apple A"
 
 
 # ---------------------------------------------------------------------------

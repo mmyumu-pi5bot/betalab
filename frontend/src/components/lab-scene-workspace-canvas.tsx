@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject, SetStateAction } from "react";
+import { useState, type Dispatch, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type SetStateAction } from "react";
 import type { DragEvent } from "react";
 
 import { AnalyticalBalanceWidget } from "@/components/analytical-balance-widget";
@@ -12,6 +12,7 @@ import { GrinderWidgetContent } from "@/components/grinder-widget-content";
 import { GrossBalanceWidget } from "@/components/gross-balance-widget";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
 import { LcMsMsResultsTable } from "@/components/lcmsms-results-table";
+import { LcMsMsAcquisitionConsole } from "@/components/lcmsms-acquisition-console";
 import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon";
 import { LimsWidget } from "@/components/lims-widget";
 import { ProduceBasketWidget } from "@/components/produce-basket-widget";
@@ -45,7 +46,7 @@ import type {
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
 } from "@/types/workbench";
-import type { MoveObjectPayload } from "@/types/api-payloads";
+import type { MoveObjectPayload, RunSequencePayload } from "@/types/api-payloads";
 
 type LabSceneWorkspaceCanvasProps = {
   balances: {
@@ -160,7 +161,7 @@ type LabSceneWorkspaceCanvasProps = {
     onToggleCentrifugeToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
-    onRunSequence: () => void;
+    onRunSequence: (payload: RunSequencePayload) => void;
     onTareAnalyticalBalance: () => void;
   };
 };
@@ -178,6 +179,7 @@ export function LabSceneWorkspaceCanvas({
   workspace,
   workspaceActions,
 }: LabSceneWorkspaceCanvasProps) {
+  const [isAcquisitionConsoleOpen, setIsAcquisitionConsoleOpen] = useState(false);
   const pendingGrossBalanceDropDraft =
     dropDraft.pendingDropDraft?.targetKind === "workspace_widget" &&
     dropDraft.pendingDropDraft.targetId === "gross_balance"
@@ -582,12 +584,24 @@ export function LabSceneWorkspaceCanvas({
                     <button
                       className="rounded-full bg-sky-600 px-5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 disabled:opacity-40"
                       disabled={rack.instrumentStatus !== "ready" || ui.isCommandPending}
-                      onClick={workspaceActions.onRunSequence}
+                      onClick={() => setIsAcquisitionConsoleOpen((current) => !current)}
                       type="button"
                     >
-                      Run sequence
+                      {isAcquisitionConsoleOpen
+                        ? "Close acquisition console"
+                        : "Open acquisition console"}
                     </button>
                   </div>
+                  {isAcquisitionConsoleOpen ? (
+                    <LcMsMsAcquisitionConsole
+                      isCommandPending={ui.isCommandPending}
+                      onRun={(payload) => {
+                        workspaceActions.onRunSequence(payload);
+                        setIsAcquisitionConsoleOpen(false);
+                      }}
+                      rackSlots={display.rackSlots}
+                    />
+                  ) : null}
                   <div className="mt-4">
                     <LcMsMsResultsTable runs={widget.sequenceRuns ?? []} />
                   </div>
