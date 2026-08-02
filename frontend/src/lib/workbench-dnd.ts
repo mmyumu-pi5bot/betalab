@@ -9,6 +9,7 @@ import type {
   GrossBalanceToolDragPayload,
   LimsLabelTicketDragPayload,
   ProduceDragPayload,
+  RackDragPayload,
   RackToolDragPayload,
   SampleLabelDragPayload,
   TrashToolDragPayload,
@@ -33,6 +34,7 @@ export type EquipmentToolDragPayload =
 const WORKBENCH_DRAG_MIME = "application/x-betalab-workbench-item";
 const EQUIPMENT_TOOL_DRAG_MIME = "application/x-betalab-tool-item";
 const WORKSPACE_WIDGET_DRAG_MIME = "application/x-betalab-workspace-widget-item";
+const RACK_DRAG_MIME = "application/x-betalab-rack";
 const WORKSPACE_LIQUID_DRAG_MIME = "application/x-betalab-workspace-liquid-item";
 const PRODUCE_DRAG_MIME = "application/x-betalab-produce-item";
 const SAMPLE_LABEL_DRAG_MIME = "application/x-betalab-sample-label-item";
@@ -54,7 +56,8 @@ function isDropTargetType(targetType: unknown): targetType is DropTargetType {
     targetType === "gross_balance_widget" ||
     targetType === "analytical_balance_widget" ||
     targetType === "vortex_widget" ||
-    targetType === "centrifuge_widget"
+    targetType === "centrifuge_widget" ||
+    targetType === "lcmsms_instrument"
   );
 }
 
@@ -140,6 +143,17 @@ export function writeWorkspaceWidgetDragPayload(
   dataTransfer.setData("text/plain", serialized);
   payload.allowedDropTargets.forEach((targetType) => {
     dataTransfer.setData(getDropTargetMime(targetType), payload.widgetId);
+  });
+  dataTransfer.effectAllowed = "move";
+}
+
+export function writeRackDragPayload(dataTransfer: DataTransfer, payload: RackDragPayload) {
+  const serialized = JSON.stringify(payload);
+
+  dataTransfer.setData(RACK_DRAG_MIME, serialized);
+  dataTransfer.setData("text/plain", serialized);
+  payload.allowedDropTargets.forEach((targetType) => {
+    dataTransfer.setData(getDropTargetMime(targetType), payload.rackId);
   });
   dataTransfer.effectAllowed = "move";
 }
@@ -472,6 +486,39 @@ export function readWorkspaceWidgetDragPayload(
   return null;
 }
 
+export function readRackDragPayload(dataTransfer: DataTransfer): RackDragPayload | null {
+  const rawPayload =
+    dataTransfer.getData(RACK_DRAG_MIME) || dataTransfer.getData("text/plain");
+
+  if (!rawPayload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawPayload) as Partial<RackDragPayload>;
+    const allowedDropTargets = parsed.allowedDropTargets?.filter(isDropTargetType) ?? [];
+    if (
+      parsed.entityKind === "rack" &&
+      parsed.rackId === "autosampler_rack" &&
+      parsed.sourceKind === "rack" &&
+      parsed.sourceId === "autosampler_rack" &&
+      allowedDropTargets.includes("lcmsms_instrument")
+    ) {
+      return {
+        allowedDropTargets,
+        entityKind: "rack",
+        rackId: "autosampler_rack",
+        sourceId: "autosampler_rack",
+        sourceKind: "rack",
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export function readProduceDragPayload(dataTransfer: DataTransfer): ProduceDragPayload | null {
   const rawPayload =
     dataTransfer.getData(PRODUCE_DRAG_MIME) || dataTransfer.getData("text/plain");
@@ -610,6 +657,7 @@ export function toDragDescriptor(
     | ToolbarDragPayload
     | EquipmentToolDragPayload
     | WorkspaceWidgetDragPayload
+    | RackDragPayload
     | WorkspaceLiquidDragPayload
     | ProduceDragPayload
     | SampleLabelDragPayload
@@ -716,6 +764,16 @@ export function toDragDescriptor(
     };
   }
 
+  if ("rackId" in payload) {
+    return {
+      allowedDropTargets: payload.allowedDropTargets,
+      entityKind: "rack",
+      rackId: payload.rackId,
+      sourceId: payload.sourceId,
+      sourceKind: payload.sourceKind,
+    };
+  }
+
   if ("toolId" in payload) {
     const p = payload as EquipmentToolDragPayload;
     return {
@@ -754,6 +812,11 @@ export function readDragDescriptor(dataTransfer: DataTransfer): DragDescriptor |
   const workspaceWidgetPayload = readWorkspaceWidgetDragPayload(dataTransfer);
   if (workspaceWidgetPayload) {
     return toDragDescriptor(workspaceWidgetPayload);
+  }
+
+  const rackPayload = readRackDragPayload(dataTransfer);
+  if (rackPayload) {
+    return toDragDescriptor(rackPayload);
   }
 
   const workspaceLiquidPayload = readWorkspaceLiquidDragPayload(dataTransfer);

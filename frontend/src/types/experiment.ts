@@ -11,6 +11,7 @@ import type {
   PipetteState,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
+  DropTargetType,
 } from "@/types/workbench";
 
 export type ExperimentWorkbench = {
@@ -18,6 +19,9 @@ export type ExperimentWorkbench = {
 };
 
 export type ExperimentRack = {
+  allowedDropTargets: DropTargetType[];
+  isDraggable: boolean;
+  state: "available" | "loaded" | "locked" | "completed";
   slots: RackSlot[];
 };
 

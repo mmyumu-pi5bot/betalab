@@ -12,6 +12,7 @@ import {
   getExperiment,
   getToolbarCatalog,
   listExperiments,
+  loadRackIntoInstrument,
   moveObject,
   openWorkbenchTool,
   runSequence,
@@ -28,6 +29,9 @@ const makeExperiment = (): Experiment => ({
     slots: [],
   },
   rack: {
+    allowedDropTargets: ["lcmsms_instrument"],
+    isDraggable: true,
+    state: "available",
     slots: [],
   },
   trash: {
@@ -81,6 +85,32 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("loads the autosampler rack into the LC-MS/MS", async () => {
+    const experiment = makeExperiment();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...experiment,
+        rack: {
+          allowed_drop_targets: [],
+          is_draggable: false,
+          slots: experiment.rack.slots,
+          state: "loaded",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await loadRackIntoInstrument("experiment_test");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/experiment_test/lcmsms/load-rack",
+      { method: "POST" },
+    );
+    expect(result.rack.state).toBe("loaded");
+    expect(result.rack.isDraggable).toBe(false);
+  });
+
   it("sends the configured LC-MS/MS sequence to the acquisition route", async () => {
     const experiment = makeExperiment();
     const fetchMock = vi.fn().mockResolvedValue({

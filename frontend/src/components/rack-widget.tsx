@@ -12,10 +12,13 @@ type RackWidgetProps = {
   getSlotPosition: (slotIndex: number) => { left: string; top: string };
   headerAction?: ReactNode;
   isSlotHighlighted: (rackSlot: RackSlot) => boolean;
+  isLoadedIntoInstrument: boolean;
+  isCommandPending: boolean;
   loadedCount: number;
   occupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
   occupiedSlots: number[];
   onItemDragEnd: () => void;
+  onRackDragStart: (dataTransfer: DataTransfer) => void;
   onRackSlotDragOver: (event: DragEvent<HTMLDivElement>, rackSlot: RackSlot) => void;
   onRackSlotDrop: (event: DragEvent<HTMLDivElement>, slotIndex: number) => void;
   onRackToolDragStart: (
@@ -32,10 +35,13 @@ export function RackWidget({
   getSlotPosition,
   headerAction,
   isSlotHighlighted,
+  isLoadedIntoInstrument,
+  isCommandPending,
   loadedCount,
   occupiedSlotLiquids,
   occupiedSlots,
   onItemDragEnd,
+  onRackDragStart,
   onRackSlotDragOver,
   onRackSlotDrop,
   onRackToolDragStart,
@@ -133,6 +139,27 @@ export function RackWidget({
           ) : (
             <p className="text-sm text-slate-500">No vial staged yet.</p>
           )}
+        </div>
+        <div
+          aria-disabled={dndDisabled || isCommandPending}
+          className={`mx-auto flex w-full max-w-[25.75rem] items-center justify-center rounded-[1rem] border border-dashed px-4 py-2.5 text-xs font-semibold transition-colors ${
+            dndDisabled || isCommandPending
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+              : `${dragAffordanceClassName} border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100`
+          }`}
+          data-testid="autosampler-rack-drag-handle"
+          draggable={!dndDisabled && !isCommandPending}
+          onDragEnd={onItemDragEnd}
+          onDragStart={(event) => {
+            if (dndDisabled || isCommandPending) {
+              return;
+            }
+            onRackDragStart(event.dataTransfer);
+          }}
+        >
+          {isLoadedIntoInstrument
+            ? "Rack loaded in LC-MS/MS"
+            : "Drag rack into LC-MS/MS"}
         </div>
       </div>
     </WorkspaceEquipmentWidget>

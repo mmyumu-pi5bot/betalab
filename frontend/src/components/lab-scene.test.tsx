@@ -429,6 +429,7 @@ function makeWorkbenchExperiment({
   lastSimulationAt = "2026-03-28T19:00:00Z",
   limsReception = makeLimsReception(),
   limsEntries = limsReception.labSampleCode ? [limsReception] : [],
+  rackState = "available",
   rackSlots = makeRackSlots(),
   snapshotVersion = 1,
   slots = makeSlots(),
@@ -444,6 +445,7 @@ function makeWorkbenchExperiment({
   lastSimulationAt?: string;
   limsEntries?: LimsReception[];
   limsReception?: LimsReception;
+  rackState?: Experiment["rack"]["state"];
   rackSlots?: RackSlot[];
   snapshotVersion?: number;
   slots?: BenchSlot[];
@@ -478,7 +480,12 @@ function makeWorkbenchExperiment({
     last_simulation_at: lastSimulationAt,
     snapshot_version: snapshotVersion,
     workbench: { slots: normalizedSlots },
-    rack: { slots: normalizedRackSlots },
+    rack: {
+      allowedDropTargets: rackState === "available" ? ["lcmsms_instrument"] : [],
+      isDraggable: rackState === "available",
+      state: rackState,
+      slots: normalizedRackSlots,
+    },
     trash: { children: (trashTools ?? []).map((tool) => makeTool(tool)), discardedFrom: {}, produceLots: trashProduceLots, sampleLabels: trashSampleLabels },
     workspace: { produceBasketLots: basketProduceLots, widgets: normalizedWorkspaceWidgets },
     basketTools: basketTools.map((tool) => makeTool(tool)),
@@ -5184,7 +5191,7 @@ describe("LabScene", () => {
     ).toBeInTheDocument();
   });
 
-  it("marks the rack and instrument as ready when a vial is staged in the rack", async () => {
+  it("keeps the instrument idle until the staged rack is loaded", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({
         slots: makeSlots([{ tool: makeTool() }]),
@@ -5230,8 +5237,13 @@ describe("LabScene", () => {
     );
     expect(screen.getByTestId("lc-msms-instrument-illustration")).toHaveAttribute(
       "data-status",
-      "ready",
+      "idle",
     );
+    expect(screen.getByTestId("autosampler-rack-drag-handle")).toHaveAttribute(
+      "draggable",
+      "true",
+    );
+    expect(screen.getByText("Drag rack into LC-MS/MS")).toBeInTheDocument();
   });
 
   it("tares the analytical balance from its button", async () => {
@@ -5698,8 +5710,57 @@ describe("LabScene", () => {
     );
   });
 
+  it("loads the rack into the LC-MS/MS before enabling the acquisition console", async () => {
+    const experiment = makeWorkbenchExperiment({
+      rackSlots: makeRackSlots([{ tool: makeTool({ id: "sample_vial" }) }]),
+      workspaceWidgets: makeWorkspaceWidgets([
+        {},
+        {},
+        {},
+        {},
+        {},
+        { isPresent: true },
+        { isPresent: true },
+      ]),
+    });
+    const loadedExperiment = {
+      ...experiment,
+      snapshot_version: experiment.snapshot_version + 1,
+      rack: { ...experiment.rack, state: "loaded" as const },
+    };
+    vi.mocked(createExperiment).mockResolvedValue(experiment);
+    vi.mocked(sendExperimentCommand).mockResolvedValue(loadedExperiment);
+
+    render(<PesticideWorkbench />);
+
+    expect(
+      await screen.findByRole("button", { name: "Open acquisition console" }),
+    ).toBeDisabled();
+    const dataTransfer = createDataTransfer();
+    fireEvent.dragStart(screen.getByTestId("autosampler-rack-drag-handle"), {
+      dataTransfer,
+    });
+    const instrumentDropzone = screen.getByTestId("lcmsms-instrument-dropzone");
+    expect(instrumentDropzone).toHaveAttribute("data-drop-highlighted", "true");
+    const dragOverEvent = createEvent.dragOver(instrumentDropzone, { dataTransfer });
+    fireEvent(instrumentDropzone, dragOverEvent);
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    fireEvent.drop(instrumentDropzone, { dataTransfer });
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "load_rack_into_instrument",
+      {},
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open acquisition console" })).toBeEnabled();
+    });
+    expect(screen.getByText("Rack loaded in LC-MS/MS")).toBeInTheDocument();
+  });
+
   it("opens the LC-MS/MS console from the instrument and launches its configured sequence", async () => {
     const experiment = makeWorkbenchExperiment({
+      rackState: "loaded",
       rackSlots: makeRackSlots([
         {
           tool: makeTool({

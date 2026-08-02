@@ -374,6 +374,7 @@ export function useLabExperiment({
         exec(mutationFns.addCalibrationToVial, p),
       pourExtract: (p: { tube_tool_id: string; vial_tool_id: string }) =>
         exec(mutationFns.pourExtractToVial, p),
+      loadRack: () => exec(mutationFns.loadRackIntoInstrument),
       runSequence: (p: RunSequencePayload) => exec(mutationFns.runSequence, p),
     },
 

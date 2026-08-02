@@ -6,6 +6,7 @@ from typing import Literal, cast
 from pydantic import BaseModel, Field, computed_field
 
 from app.domain.centrifuge_rules import get_centrifuge_start_block_reason
+from app.domain.dnd_contracts import get_dnd_contract
 from app.domain.dnd_rules import (
     can_tool_be_discarded,
     can_tool_be_stored,
@@ -519,6 +520,17 @@ class RackSlotSchema(BaseModel):
 
 class RackSchema(BaseModel):
     slots: list[RackSlotSchema]
+    state: Literal["available", "loaded", "locked", "completed"] = "available"
+
+    @computed_field
+    def is_draggable(self) -> bool:
+        return self.state == "available"
+
+    @computed_field
+    def allowed_drop_targets(self) -> list[str]:
+        if not self.is_draggable:
+            return []
+        return list(get_dnd_contract("rack", "autosampler_rack").allowed_drop_targets)
 
 
 class TrashProduceLotEntrySchema(BaseModel):

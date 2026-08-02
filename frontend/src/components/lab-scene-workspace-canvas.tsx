@@ -33,6 +33,7 @@ import type { VortexDndApi } from "@/hooks/use-vortex-dnd";
 import type { WorkbenchDndApi } from "@/hooks/use-workbench-dnd";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
 import { isWorkspaceEquipmentWidgetId } from "@/lib/workspace-widget-ids";
+import { hasCompatibleDropTarget, readRackDragPayload } from "@/lib/workbench-dnd";
 import type { Experiment } from "@/types/experiment";
 import type {
   BenchSlot,
@@ -90,7 +91,7 @@ type LabSceneWorkspaceCanvasProps = {
   experiment: Experiment;
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
-    instrumentStatus: "idle" | "ready";
+    instrumentStatus: "completed" | "idle" | "ready";
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
@@ -161,6 +162,7 @@ type LabSceneWorkspaceCanvasProps = {
     onToggleCentrifugeToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
+    onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
     onTareAnalyticalBalance: () => void;
   };
@@ -551,14 +553,19 @@ export function LabSceneWorkspaceCanvas({
                 />
               ) : widgetId === "rack" ? (
                 <RackWidget
-                  dndDisabled={dnd.dndDisabledByAction}
+                  dndDisabled={
+                    dnd.dndDisabledByAction || experiment.rack.state !== "available"
+                  }
                   getSlotPosition={rack.getRackIllustrationSlotPosition}
                   headerAction={renderStoreWidgetAction(widget)}
                   isSlotHighlighted={dnd.rack.canDropOnRackSlotFromActiveDrag}
+                  isCommandPending={ui.isCommandPending}
+                  isLoadedIntoInstrument={experiment.rack.state !== "available"}
                   loadedCount={rack.rackLoadedCount}
                   occupiedSlotLiquids={rack.rackOccupiedSlotLiquids}
                   occupiedSlots={rack.rackOccupiedSlots}
                   onItemDragEnd={dnd.clearDropTargets}
+                  onRackDragStart={dnd.rack.handleRackDragStart}
                   onRackSlotDragOver={dnd.rack.handleRackSlotDragOver}
                   onRackSlotDrop={dnd.rack.handleRackSlotDrop}
                   onRackToolDragStart={dnd.rack.handleRackToolDragStart}
@@ -567,12 +574,38 @@ export function LabSceneWorkspaceCanvas({
                 />
               ) : widgetId === "instrument" ? (
                 <WorkspaceEquipmentWidget
+                  dataDropHighlighted={
+                    dnd.isDropTargetHighlighted("lcmsms_instrument") ? "true" : "false"
+                  }
+                  dropZoneTestId="lcmsms-instrument-dropzone"
                   eyebrow="LC-MS/MS"
                   headerAction={renderStoreWidgetAction(widget)}
+                  onDragOver={(event) => {
+                    if (!hasCompatibleDropTarget(event.dataTransfer, "lcmsms_instrument")) {
+                      return;
+                    }
+                    event.preventDefault();
+                  }}
+                  onDrop={(event) => {
+                    if (
+                      !hasCompatibleDropTarget(event.dataTransfer, "lcmsms_instrument") ||
+                      !readRackDragPayload(event.dataTransfer)
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    dnd.clearDropTargets();
+                    workspaceActions.onLoadRackIntoInstrument();
+                  }}
                   footer={
-                    rack.instrumentStatus === "ready"
-                      ? "The instrument reads as sequence-ready because the rack now contains at least one autosampler vial."
-                      : "Populate the rack with at least one autosampler vial to switch the instrument preview into a ready state."
+                    rack.instrumentStatus === "completed"
+                      ? "Acquisition completed. The instrument results are available below."
+                      : rack.instrumentStatus === "ready"
+                      ? "Rack loaded. The acquisition sequence can now be configured and started."
+                      : rack.rackLoadedCount > 0
+                        ? "Drag the staged rack onto the LC-MS/MS to load it into the autosampler."
+                        : "Populate the rack with at least one autosampler vial before loading it."
                   }
                 >
                   <LcMsMsInstrumentIllustration

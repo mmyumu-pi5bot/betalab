@@ -61,6 +61,7 @@ export type DndTargetId =
   | "gross-balance-dropzone"
   | "analytical-balance-dropzone"
   | "inventory-dropzone"
+  | "lcmsms-instrument-dropzone"
   | "rack-illustration-slot-1"
   | "vortex-dropzone"
   | "widget-workspace"
@@ -214,6 +215,7 @@ export const dndTargetCases: {
   { id: "gross-balance-dropzone", label: "gross balance", assertDragOver: true },
   { id: "analytical-balance-dropzone", label: "analytical balance", assertDragOver: true },
   { id: "inventory-dropzone", label: "inventory", assertDragOver: true },
+  { id: "lcmsms-instrument-dropzone", label: "LC-MS/MS", assertDragOver: true },
   { id: "rack-illustration-slot-1", label: "rack slot", assertDragOver: true },
   { id: "vortex-dropzone", label: "vortex", assertDragOver: true },
   { id: "widget-workspace", label: "workspace canvas", assertDragOver: false },
@@ -387,7 +389,7 @@ function makeWorkspaceWidgets(
       anchor: "top-left",
       offsetX: 812,
       offsetY: 886,
-      isPresent: false,
+      isPresent: true,
       isTrashed: false,
     },
     {
@@ -558,7 +560,12 @@ function makeExperiment({
     last_simulation_at: "2026-03-28T19:00:00Z",
     snapshot_version: 1,
     workbench: { slots },
-    rack: { slots: rackSlots },
+    rack: {
+      allowedDropTargets: ["lcmsms_instrument"],
+      isDraggable: true,
+      state: "available",
+      slots: rackSlots,
+    },
     trash: { children: trashTools, discardedFrom: {}, produceLots: trashProduceLots, sampleLabels: trashSampleLabels },
     workspace: { produceBasketLots, widgets: workspaceWidgets },
     basketTools,
@@ -1218,6 +1225,50 @@ function createRackSourceCase(): DndSourceCase {
           destinationId: "trash_bin",
         }),
       },
+    },
+  };
+}
+
+function createAutosamplerRackSourceCase(): DndSourceCase {
+  return {
+    id: "autosampler-rack",
+    label: "autosampler rack",
+    sourceTestId: "autosampler-rack-drag-handle",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "inventory-dropzone",
+      "lcmsms-instrument-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        rackSlots: makeRackSlots([{ tool: makeTool(sampleVialItem) }]),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: false, command: null },
+      "bench-slot-station_2": { compatible: false, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: false, command: null },
+      "analytical-balance-dropzone": { compatible: false, command: null },
+      "inventory-dropzone": { compatible: false, command: null },
+      "lcmsms-instrument-dropzone": {
+        compatible: true,
+        command: { type: "load_rack_into_instrument", payload: {} },
+      },
+      "rack-illustration-slot-1": { compatible: false, command: null },
+      "vortex-dropzone": { compatible: false, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: false, command: null },
     },
   };
 }
@@ -2268,6 +2319,7 @@ const baseDndSourceCases: DndSourceCase[] = [
   createTrashProduceLotSourceCase(),
   createTrashSampleLabelSourceCase(),
   createRackSourceCase(),
+  createAutosamplerRackSourceCase(),
   ...trashableToolItems.map(createTrashToolSourceCase),
   createTrashWidgetSourceCase("rack", "autosampler_rack", "Autosampler rack"),
   createTrashWidgetSourceCase("instrument", "lc_msms_instrument", "LC-MS/MS"),
@@ -2605,6 +2657,11 @@ export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCas
     "vortex-dropzone":
       sourceCase.targetExpectations["vortex-dropzone"] ??
       getVortexTargetExpectation(sourceCase),
+    "lcmsms-instrument-dropzone":
+      sourceCase.targetExpectations["lcmsms-instrument-dropzone"] ?? {
+        compatible: false,
+        command: null,
+      },
   };
 
   return {
@@ -2615,6 +2672,7 @@ export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCas
         : [...sourceCase.availableTargets, "gross-balance-dropzone"]),
       "analytical-balance-dropzone",
       "vortex-dropzone",
+      "lcmsms-instrument-dropzone",
     ],
     targetExpectations,
   };

@@ -90,7 +90,7 @@ type LabSceneViewProps = {
   };
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
-    instrumentStatus: "idle" | "ready";
+    instrumentStatus: "completed" | "idle" | "ready";
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
@@ -171,6 +171,7 @@ type LabSceneViewProps = {
     onToggleCentrifugeToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
+    onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
     onTareAnalyticalBalance: () => void;
   };

@@ -241,7 +241,8 @@ def _deserialize_experiment(payload: dict) -> Experiment:
                     tool=_deserialize_workbench_tool(slot.tool),
                 )
                 for slot in schema.rack.slots
-            ]
+            ],
+            state=schema.rack.state,
         ),
         trash=Trash(
             children=[_deserialize_non_null_workbench_tool(tool_schema) for tool_schema in schema.trash.children],

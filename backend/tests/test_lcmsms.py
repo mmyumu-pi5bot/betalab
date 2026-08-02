@@ -20,6 +20,8 @@ from app.services.domain_services.lcmsms import (
     AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
+    LoadRackIntoInstrumentRequest,
+    LoadRackIntoInstrumentService,
     RunSequenceRequest,
     RunSequenceService,
     _compute_calibration_compounds,
@@ -69,6 +71,10 @@ def _deploy_instrument_and_rack(service: ExperimentRuntimeService, exp_id: str) 
     for widget in exp.workspace.widgets:
         if widget.id in ("instrument", "rack"):
             widget.is_present = True
+
+
+def _load_rack_into_instrument(service: ExperimentRuntimeService, exp_id: str) -> None:
+    LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +314,32 @@ class TestComputeCalibrationCompounds:
 # RunSequenceService — calibration vials
 # ---------------------------------------------------------------------------
 
+class TestLoadRackIntoInstrument:
+    def test_loads_a_non_empty_deployed_rack_and_persists_the_state(self, tmp_path) -> None:
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id)
+
+        result = LoadRackIntoInstrumentService(service).run(
+            exp_id,
+            LoadRackIntoInstrumentRequest(),
+        )
+
+        assert result.rack.state == "loaded"
+        reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        assert reloaded.rack.state == "loaded"
+
+    def test_rejects_an_empty_rack(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+
+        with pytest.raises(ValueError, match="contains no vials"):
+            _load_rack_into_instrument(service, exp_id)
+
+
 class TestRunSequenceWithCalibration:
     def test_console_configuration_drives_injection_order_and_metadata(self) -> None:
         service = ExperimentRuntimeService()
@@ -323,6 +355,7 @@ class TestRunSequenceWithCalibration:
                 level_ng_per_ml=50.0,
             ),
         )
+        _load_rack_into_instrument(service, exp_id)
         RunSequenceService(service).run(
             exp_id,
             RunSequenceRequest(
@@ -400,6 +433,7 @@ class TestRunSequenceWithCalibration:
                 level_ng_per_ml=20.0,
             ),
         )
+        _load_rack_into_instrument(service, exp_id)
 
         RunSequenceService(service).run(
             exp_id,
@@ -442,6 +476,7 @@ class TestRunSequenceWithCalibration:
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
         _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
 
         with pytest.raises(ValueError, match="one calibration and one sample"):
             RunSequenceService(service).run(
@@ -468,6 +503,21 @@ class TestRunSequenceWithCalibration:
         _deploy_instrument_and_rack(service, exp_id)
 
         with pytest.raises(ValueError, match="no vials"):
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    injections=[],
+                ),
+            )
+
+    def test_rack_not_loaded_into_instrument_raises(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+
+        with pytest.raises(ValueError, match="loaded into the LC-MS/MS"):
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
@@ -503,6 +553,7 @@ class TestRunSequenceWithCalibration:
                 level_ng_per_ml=10.0,
             ),
         )
+        _load_rack_into_instrument(service, exp_id)
         request = RunSequenceRequest(
             method_id=FIXED_ACQUISITION_METHOD_ID,
             injections=[
@@ -552,6 +603,7 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
             level_ng_per_ml=10.0,
         ),
     )
+    _load_rack_into_instrument(service, exp_id)
 
     response = TestClient(app).post(
         f"/experiments/{exp_id}/lcmsms/run-sequence",
@@ -588,6 +640,18 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
     )
     assert instrument["sequence_runs"][0]["method_id"] == FIXED_ACQUISITION_METHOD_ID
     assert instrument["sequence_runs"][0]["injections"][1]["sample_name"] == "Apple A"
+
+
+def test_load_rack_route_marks_the_rack_as_loaded(monkeypatch) -> None:
+    service = ExperimentRuntimeService()
+    monkeypatch.setattr(lcmsms_routes, "experiment_service", service)
+    exp_id = _create(service)
+    _deploy_instrument_and_rack(service, exp_id)
+    _place_vial_in_rack(service, exp_id)
+
+    response = lcmsms_routes.load_rack_into_instrument(exp_id)
+
+    assert response.rack.state == "loaded"
 
 
 # ---------------------------------------------------------------------------

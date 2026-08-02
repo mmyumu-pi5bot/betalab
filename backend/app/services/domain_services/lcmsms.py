@@ -250,6 +250,29 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
+class LoadRackIntoInstrumentRequest:
+    pass
+
+
+class LoadRackIntoInstrumentService(WriteDomainService[LoadRackIntoInstrumentRequest]):
+    def _run(self, experiment: Experiment, request: LoadRackIntoInstrumentRequest) -> None:
+        del request
+        instrument = find_workspace_widget(experiment.workspace, "instrument")
+        if not instrument.is_present:
+            raise ValueError("LC-MS/MS instrument is not deployed on the bench.")
+
+        rack_widget = find_workspace_widget(experiment.workspace, "rack")
+        if not rack_widget.is_present:
+            raise ValueError("Autosampler rack is not deployed.")
+        if not any(slot.tool is not None for slot in experiment.rack.slots):
+            raise ValueError("The autosampler rack contains no vials.")
+        if experiment.rack.state != "available":
+            raise ValueError("The autosampler rack is already loaded into the LC-MS/MS.")
+
+        experiment.rack.state = "loaded"
+        experiment.audit_log.append("Autosampler rack loaded into the LC-MS/MS.")
+
+@dataclass(frozen=True, slots=True)
 class AcquisitionSequenceLineRequest:
     rack_slot_id: str
     sample_name: str
@@ -282,6 +305,8 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         vials_in_rack = [slot for slot in experiment.rack.slots if slot.tool is not None]
         if not vials_in_rack:
             raise ValueError("The autosampler rack contains no vials.")
+        if experiment.rack.state != "loaded":
+            raise ValueError("The autosampler rack is not loaded into the LC-MS/MS.")
 
         configured_by_slot = _validate_acquisition_sequence(request, vials_in_rack)
 
@@ -331,6 +356,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             method_id=request.method_id,
         )
         instrument.sequence_runs.append(run)
+        experiment.rack.state = "completed"
 
         n_ok = sum(1 for inj in injections if inj.status == "ok")
         experiment.audit_log.append(

@@ -348,6 +348,7 @@ class RackSlot:
 @dataclass
 class Rack:
     slots: list[RackSlot] = field(default_factory=list)
+    state: Literal["available", "loaded", "locked", "completed"] = "available"
 
 
 @dataclass

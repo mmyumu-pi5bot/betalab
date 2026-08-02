@@ -94,6 +94,7 @@ import {
   pourExtractToVial,
   aspiratePipette,
   dispensePipette,
+  loadRackIntoInstrument,
   runSequence,
 } from "@/lib/api";
 import type { Experiment } from "@/types/experiment";
@@ -196,5 +197,6 @@ export const mutationFns = {
   pourExtractToVial,
   aspiratePipette,
   dispensePipette,
+  loadRackIntoInstrument,
   runSequence,
 } satisfies Record<string, MutationFn>;

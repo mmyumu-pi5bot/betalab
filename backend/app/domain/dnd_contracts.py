@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-DndEntityKind = Literal["tool", "produce_lot", "liquid", "sample_label", "lims_label_ticket", "workspace_widget"]
+DndEntityKind = Literal["tool", "produce_lot", "liquid", "sample_label", "lims_label_ticket", "workspace_widget", "rack"]
 DndDropTargetType = Literal[
     "analytical_balance_widget",
     "centrifuge_widget",
     "grinder_widget",
     "gross_balance_widget",
+    "lcmsms_instrument",
     "rack_slot",
     "trash_bin",
     "vortex_widget",
@@ -145,6 +146,11 @@ def get_dnd_contract(entity_kind: DndEntityKind, entity_type: str) -> DndEntityC
             entity_kind="workspace_widget",
             allowed_drop_targets=("workspace_canvas",),
             is_storable=True,
+        )
+    if entity_kind == "rack":
+        return DndEntityContract(
+            entity_kind="rack",
+            allowed_drop_targets=("lcmsms_instrument",),
         )
     raise ValueError(f"Unsupported DnD entity kind: {entity_kind}")
 

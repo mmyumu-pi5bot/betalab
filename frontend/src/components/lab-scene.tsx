@@ -316,6 +316,10 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     dndDisabledByAction,
     dragState: { activeDragItem, activeDropTargets, clearDropTargets, setActiveDragItem, showDropTargets },
     experimentApi: dndApi,
+    rackAllowedDropTargets:
+      state.status === "ready" ? state.experiment.rack.allowedDropTargets : [],
+    rackIsDraggable:
+      state.status === "ready" ? state.experiment.rack.isDraggable : false,
     rackSlots,
   });
 
@@ -515,7 +519,12 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const rackOccupiedSlotLiquids = Object.fromEntries(
     rackSlots.flatMap((slot, index) => (slot.tool ? [[index + 1, slot.tool.liquids] as const] : [])),
   );
-  const instrumentStatus = rackLoadedCount > 0 ? ("ready" as const) : ("idle" as const);
+  const instrumentStatus =
+    rackLoadedCount > 0 && state.experiment.rack.state === "completed"
+      ? ("completed" as const)
+      : rackLoadedCount > 0 && state.experiment.rack.state === "loaded"
+        ? ("ready" as const)
+        : ("idle" as const);
   const isTrashEmpty =
     trashedTools.length === 0 &&
     trashedProduceLots.length === 0 &&
@@ -641,6 +650,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       }}
       workspaceActions={{
         ...workspaceActions,
+        onLoadRackIntoInstrument: () => { void experimentApi.lcmsms.loadRack(); },
         onRunSequence: (payload) => { void experimentApi.lcmsms.runSequence(payload); },
         onStartCentrifuge: () => { void experimentApi.centrifuge.start(); },
         onToggleCentrifugeToolSeal: () => {

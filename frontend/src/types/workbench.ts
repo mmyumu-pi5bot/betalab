@@ -9,7 +9,8 @@ export type DropTargetType =
   | "gross_balance_widget"
   | "analytical_balance_widget"
   | "vortex_widget"
-  | "centrifuge_widget";
+  | "centrifuge_widget"
+  | "lcmsms_instrument";
 
 type ToolbarBaseItem = {
   allowedDropTargets: DropTargetType[];
@@ -74,7 +75,8 @@ export type DragEntityKind =
   | "workspace_widget"
   | "produce"
   | "sample_label"
-  | "lims_label_ticket";
+  | "lims_label_ticket"
+  | "rack";
 type DragSourceKind =
   | "palette"
   | "debug_palette"
@@ -256,6 +258,13 @@ export type RackToolDragPayload = BaseDragPayload & {
   toolType: ToolType;
 };
 
+export type RackDragPayload = BaseDragPayload & {
+  entityKind: "rack";
+  rackId: "autosampler_rack";
+  sourceId: "autosampler_rack";
+  sourceKind: "rack";
+};
+
 export type GrossBalanceToolDragPayload = BaseDragPayload & {
   entityId: string;
   entityKind: "tool";
@@ -311,6 +320,10 @@ export type WorkspaceWidgetDragPayload = BaseDragPayload & {
 };
 
 export type DragDescriptor =
+  | (BaseDragPayload & {
+      entityKind: "rack";
+      rackId: "autosampler_rack";
+    })
   | (BaseDragPayload & {
       entityId: string;
       entityKind: "tool";

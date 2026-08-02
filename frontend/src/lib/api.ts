@@ -1541,7 +1541,19 @@ export async function runSequence(
   });
 }
 
+export async function loadRackIntoInstrument(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lcmsms/load-rack`,
+  });
+}
+
 function normalizeExperiment(experiment: Experiment): Experiment {
+  const rawRack = experiment.rack as Experiment["rack"] & Record<string, unknown>;
   const rawTrash = experiment.trash as Experiment["trash"] & Record<string, unknown>;
   const rawWorkspace = experiment.workspace as Experiment["workspace"] & Record<string, unknown>;
   const materialStates = ((
@@ -1573,6 +1585,13 @@ function normalizeExperiment(experiment: Experiment): Experiment {
       slots: experiment.workbench.slots.map((slot) => normalizeBenchSlot(slot, materialStates)),
     },
     rack: {
+      allowedDropTargets: normalizeAllowedDropTargets(
+        experiment.rack.allowedDropTargets ?? rawRack.allowed_drop_targets,
+      ),
+      isDraggable: Boolean(
+        experiment.rack.isDraggable ?? rawRack.is_draggable ?? false,
+      ),
+      state: String(experiment.rack.state ?? rawRack.state ?? "available") as Experiment["rack"]["state"],
       slots: experiment.rack.slots.map((slot) => normalizeRackSlot(slot, materialStates)),
     },
     trash: {

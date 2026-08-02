@@ -7,6 +7,8 @@ from app.services.domain_services.lcmsms import (
     AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
+    LoadRackIntoInstrumentRequest,
+    LoadRackIntoInstrumentService,
     PourExtractToVialRequest,
     PourExtractToVialService,
     RunSequenceRequest,
@@ -52,6 +54,16 @@ class AcquisitionSequenceLineBody(BaseModel):
 class RunSequenceBody(BaseModel):
     method_id: str
     injections: list[AcquisitionSequenceLineBody]
+
+
+@router.post("/{experiment_id}/lcmsms/load-rack", response_model=ExperimentSchema)
+def load_rack_into_instrument(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: LoadRackIntoInstrumentService(experiment_service).run(
+            experiment_id,
+            LoadRackIntoInstrumentRequest(),
+        )
+    )
 
 
 @router.post("/{experiment_id}/lcmsms/add-calibration", response_model=ExperimentSchema)

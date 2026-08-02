@@ -52,7 +52,7 @@ mais la hauteur exacte de la pointe dans le tube n'est pas encore simulée.
 | 8. Séparation | Même tube de 50 mL, fermé | Centrifugeuse | Séparer visiblement la phase organique supérieure, la matrice et le culot solide | Aucun pendant la centrifugation |
 | 9. Préparation du vial | Vial d'autosampler d'environ 2 mL | Pipette | Prélever uniquement la phase organique supérieure sans toucher l'interface ni le culot | Tube de 50 mL → vial |
 | 10. Mise en séquence | Vials échantillon, calibrants et blancs | Rack autosampler | Fermer puis placer les vials dans l'ordre d'injection | Paillasse → rack |
-| 11. Analyse | Vials présents dans le rack | LC-MS/MS | Lancer la séquence et analyser les injections | Rack → instrument automatiquement |
+| 11. Analyse | Vials présents dans le rack | LC-MS/MS | Charger le rack par glisser-déposer, puis lancer la séquence et analyser les injections | Rack → instrument |
 
 ### Enchaînement central du mode simplifié
 
@@ -99,7 +99,7 @@ les pertes de récupération auront une conséquence visible dans les résultats
 | 11. Deuxième séparation | Même tube d-SPE, fermé | Centrifugeuse | Déposer les sorbants et les impuretés au fond du tube | Aucun pendant la centrifugation |
 | 12. Préparation du vial | Vial d'autosampler d'environ 2 mL | Pipette | Prélever uniquement l'extrait clarifié supérieur | Tube d-SPE → vial |
 | 13. Mise en séquence | Vials échantillon, calibrants et blancs | Rack autosampler | Fermer puis placer les vials dans l'ordre d'injection | Paillasse → rack |
-| 14. Analyse | Vials présents dans le rack | LC-MS/MS | Lancer la séquence et analyser les injections | Rack → instrument automatiquement |
+| 14. Analyse | Vials présents dans le rack | LC-MS/MS | Charger le rack par glisser-déposer, puis lancer la séquence et analyser les injections | Rack → instrument |
 
 ### Enchaînement central du mode complet
 

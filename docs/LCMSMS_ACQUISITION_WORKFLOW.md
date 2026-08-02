@@ -184,8 +184,14 @@ Le chargement est refusé si :
 
 ### 6.5. État actuel
 
-Cette manipulation n'existe pas encore. Aujourd'hui, la simple présence d'un
-vial dans un rack déployé rend automatiquement l'instrument prêt.
+Cette manipulation est implémentée par glisser-déposer. Le technicien saisit la
+poignée `Drag rack into LC-MS/MS` sous le rack puis dépose le rack entier sur le
+widget LC-MS/MS. La cible est mise en évidence pendant le déplacement.
+
+Le chargement exige que le rack et l'instrument soient déployés et que le rack
+contienne au moins un vial. Le rack passe alors de `available` à `loaded`, ses
+positions ne sont plus modifiables et la console d'acquisition devient
+accessible. Le retrait du rack après acquisition reste à implémenter.
 
 ## 7. Étape C — Ouvrir la console constructeur
 
@@ -577,7 +583,7 @@ de retry sont hors périmètre du premier parcours.
 | Ordre déterminé par les positions | Implémenté | Conserver |
 | Préparation d'un calibrant | Implémentée | Conserver |
 | Préparation d'un sample | Implémentée | Conserver |
-| Chargement physique du rack dans l'instrument | Absent | À implémenter |
+| Chargement physique du rack dans l'instrument | Implémenté par glisser-déposer | Ajouter le retrait après acquisition |
 | Console constructeur | Absente | À implémenter |
 | Déclaration calibration/sample | Déduite implicitement du vial | À rendre visible et confirmable |
 | Méthode d'acquisition | Absente | Méthode fixe à ajouter |

@@ -5,11 +5,12 @@ import {
   readEquipmentToolDragPayload,
   readToolbarDragPayload,
   writeEquipmentToolDragPayload,
+  writeRackDragPayload,
 } from "@/lib/workbench-dnd";
 import { containmentAcceptsDescriptor } from "@/lib/containment-resolver";
 import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
-import type { BenchToolInstance, RackSlot } from "@/types/workbench";
+import type { BenchToolInstance, DropTargetType, RackSlot } from "@/types/workbench";
 import type { DragStateApi } from "@/hooks/use-drag-state";
 import type { MoveObjectPayload } from "@/types/api-payloads";
 
@@ -22,12 +23,15 @@ type RackDndOptions = {
   dragState: Pick<DragStateApi, "activeDragItem" | "activeDropTargets" | "clearDropTargets" | "setActiveDragItem" | "showDropTargets">;
   experimentApi: RackDndExperimentApi;
   rackSlots: RackSlot[];
+  rackAllowedDropTargets: DropTargetType[];
+  rackIsDraggable: boolean;
 };
 
 export type RackDndApi = {
   canDropOnRackSlotFromActiveDrag: (rackSlot: RackSlot) => boolean;
   handleRackSlotDragOver: (event: DragEvent<HTMLDivElement>, targetRackSlot: RackSlot) => void;
   handleRackSlotDrop: (event: DragEvent<HTMLDivElement>, slotIndex: number) => void;
+  handleRackDragStart: (dataTransfer: DataTransfer) => void;
   handleRackToolDragStart: (
     rackSlot: RackSlot,
     tool: BenchToolInstance,
@@ -40,6 +44,8 @@ export function useRackDnd({
   dragState,
   experimentApi,
   rackSlots,
+  rackAllowedDropTargets,
+  rackIsDraggable,
 }: RackDndOptions): RackDndApi {
   const { activeDragItem, activeDropTargets, clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
 
@@ -134,8 +140,25 @@ export function useRackDnd({
     setActiveDragItem(descriptor);
   };
 
+  const handleRackDragStart = (dataTransfer: DataTransfer) => {
+    if (dndDisabledByAction || !rackIsDraggable) {
+      return;
+    }
+    const payload = {
+      allowedDropTargets: rackAllowedDropTargets,
+      entityKind: "rack" as const,
+      rackId: "autosampler_rack" as const,
+      sourceId: "autosampler_rack" as const,
+      sourceKind: "rack" as const,
+    };
+    writeRackDragPayload(dataTransfer, payload);
+    showDropTargets(payload.allowedDropTargets);
+    setActiveDragItem(payload);
+  };
+
   return {
     canDropOnRackSlotFromActiveDrag,
+    handleRackDragStart,
     handleRackSlotDragOver,
     handleRackSlotDrop,
     handleRackToolDragStart,
