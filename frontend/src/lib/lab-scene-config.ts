@@ -3,9 +3,11 @@ import type { DropDraftField } from "@/components/drop-draft-card";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
 import type {
   BenchToolInstance,
+  DebugToolPresetId,
   DropTargetType,
   ExperimentProduceLot,
   ExperimentWorkspaceWidgetId,
+  ToolbarAccent,
   ToolCatalogItem,
   ToolType,
 } from "@/types/workbench";
@@ -119,14 +121,123 @@ export const debugVortexedSlurryTubePreset: ToolCatalogItem = {
   ],
 };
 
+export const debugSeparatedSlurryTubePreset: ToolCatalogItem = {
+  id: "separated_slurry_centrifuge_tube",
+  name: "Centrifuged slurry tube",
+  subtitle: "50 mL centrifuge tube · ready to pipette",
+  description:
+    "Debug tube taken through the full QuEChERS prep and centrifuged — open, with a pipettable supernatant ready to transfer into a rack vial.",
+  accent: "rose",
+  itemType: "tool",
+  toolType: "centrifuge_tube",
+  capacity_ml: 50,
+  allowedDropTargets: [
+    "workbench_slot",
+    "trash_bin",
+    "gross_balance_widget",
+    "analytical_balance_widget",
+    "vortex_widget",
+  ],
+};
+
+export const debugCalibrationVialPreset: ToolCatalogItem = {
+  id: "calibration_standard_vial",
+  name: "Calibration point vial",
+  subtitle: "Autosampler vial · 100 ng/mL standard",
+  description:
+    "Debug autosampler vial prepared as a multi-residue calibration standard — drop it straight into the rack.",
+  accent: "rose",
+  itemType: "tool",
+  toolType: "sample_vial",
+  capacity_ml: 2,
+  allowedDropTargets: [
+    "workbench_slot",
+    "rack_slot",
+    "trash_bin",
+    "gross_balance_widget",
+    "analytical_balance_widget",
+  ],
+};
+
+export const debugCalibrationTubePreset: ToolCatalogItem = {
+  id: "calibration_standard_tube",
+  name: "Calibration stock tube",
+  subtitle: "50 mL tube · 100 ng/mL standard",
+  description:
+    "Debug centrifuge tube filled with a multi-residue calibration standard — pipette it into a rack vial yourself; the pipette carries the calibration identity across.",
+  accent: "rose",
+  itemType: "tool",
+  toolType: "centrifuge_tube",
+  capacity_ml: 50,
+  allowedDropTargets: [
+    "workbench_slot",
+    "trash_bin",
+    "gross_balance_widget",
+    "analytical_balance_widget",
+    "vortex_widget",
+  ],
+};
+
 export const debugToolPresets: ToolCatalogItem[] = [
   debugSlurryTubePreset,
   debugVortexedSlurryTubePreset,
+  debugSeparatedSlurryTubePreset,
+  debugCalibrationVialPreset,
+  debugCalibrationTubePreset,
 ];
 
 export const debugToolPresetsById: Record<string, ToolCatalogItem> = Object.fromEntries(
   debugToolPresets.map((preset) => [preset.id, preset]),
 );
+
+const debugSlurryPreviewLot: ExperimentProduceLot = {
+  id: "debug_slurry_preview",
+  label: "Apple slurry",
+  produceType: "apple",
+  totalMassG: 10,
+  unitCount: null,
+  materialState: "slurry",
+  isDraggable: true,
+  allowedDropTargets: [],
+};
+
+export type DebugToolPresetPreview = {
+  accent: ToolbarAccent;
+  containsSlurry: boolean;
+  detailLabel: string;
+  fillRatio: number;
+  iconKind: ToolType;
+  produceLots: ExperimentProduceLot[];
+};
+
+const debugCalibrationPresetIds = new Set<DebugToolPresetId>([
+  "calibration_standard_vial",
+  "calibration_standard_tube",
+]);
+
+// The debug palette renders each tool preset with a small preview of what it spawns.
+// Slurry tubes show an apple-slurry fill; calibration presets show a clear liquid
+// standard instead of produce.
+export function getDebugToolPresetPreview(preset: ToolCatalogItem): DebugToolPresetPreview {
+  if (debugCalibrationPresetIds.has(preset.id as DebugToolPresetId)) {
+    return {
+      accent: preset.accent,
+      containsSlurry: false,
+      detailLabel: "100 ng/mL calibration",
+      fillRatio: 0.55,
+      iconKind: preset.toolType,
+      produceLots: [],
+    };
+  }
+  return {
+    accent: preset.accent,
+    containsSlurry: true,
+    detailLabel: "10 g apple slurry",
+    fillRatio: 0.4,
+    iconKind: preset.toolType,
+    produceLots: [debugSlurryPreviewLot],
+  };
+}
 
 export const knifeCursor =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none'%3E%3Cg transform='rotate(-142 12 12)'%3E%3Crect x='4.1' y='9.9' width='8.6' height='4.2' rx='1.2' fill='%230f172a'/%3E%3Crect x='4.1' y='9.9' width='8.6' height='4.2' rx='1.2' stroke='%230f172a' stroke-width='1.15'/%3E%3Cpath d='M12.7 9.9H15.9L19.8 12L15.9 14.1H12.7V9.9Z' fill='%23e2e8f0' stroke='%230f172a' stroke-width='1.15' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E\") 22 8, auto";
@@ -242,4 +353,27 @@ export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
       wheelStep: 5,
     },
   ];
+}
+
+export function buildDebugCalibrationVialDraftFields(): DropDraftField[] {
+  return [
+    {
+      ariaLabel: "Debug calibration level",
+      id: "level_ng_per_ml",
+      inputStep: 1,
+      label: "Level",
+      minValue: 1,
+      stepAmount: 10,
+      unitLabel: "ng/mL",
+      value: 100,
+      wheelStep: 10,
+    },
+  ];
+}
+
+export function buildDebugToolPresetDraftFields(presetId: DebugToolPresetId): DropDraftField[] {
+  if (debugCalibrationPresetIds.has(presetId)) {
+    return buildDebugCalibrationVialDraftFields();
+  }
+  return buildDebugSlurryTubeDraftFields();
 }

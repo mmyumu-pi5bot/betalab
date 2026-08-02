@@ -3,6 +3,7 @@
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
 import { LabAssetIcon } from "@/components/icons/lab-asset-icon";
+import { getDebugToolPresetPreview } from "@/lib/lab-scene-config";
 import type {
   DebugProducePresetId,
   ExperimentProduceLot,
@@ -37,48 +38,40 @@ export function DebugProducePalette({
         </p>
       </div>
       <div className="space-y-3 px-4 py-4">
-        {toolPresets.map((preset) => (
-          <div
-            className="flex cursor-grab items-center gap-3 rounded-[1rem] border border-rose-200 bg-[linear-gradient(180deg,#fff7f7,#fff1f2)] p-3 active:cursor-grabbing"
-            data-testid={`debug-palette-preset-${preset.id}`}
-            draggable={Boolean(onToolPresetDragStart)}
-            key={preset.id}
-            onDragEnd={onItemDragEnd}
-            onDragStart={
-              onToolPresetDragStart
-                ? (event) => onToolPresetDragStart(preset, event.dataTransfer)
-                : undefined
-            }
-          >
-            <div className="h-16 w-12 shrink-0">
-              <LabAssetIcon
-                accent={preset.accent}
-                containsSlurry
-                fillRatio={0.4}
-                kind={preset.toolType}
-                produceLots={[
-                  {
-                    id: "debug_slurry_preview",
-                    label: "Apple slurry",
-                    produceType: "apple",
-                    totalMassG: 10,
-                    unitCount: null,
-                    materialState: "slurry",
-                    isDraggable: true,
-                    allowedDropTargets: [],
-                  },
-                ]}
-              />
+        {toolPresets.map((preset) => {
+          const preview = getDebugToolPresetPreview(preset);
+          return (
+            <div
+              className="flex cursor-grab items-center gap-3 rounded-[1rem] border border-rose-200 bg-[linear-gradient(180deg,#fff7f7,#fff1f2)] p-3 active:cursor-grabbing"
+              data-testid={`debug-palette-preset-${preset.id}`}
+              draggable={Boolean(onToolPresetDragStart)}
+              key={preset.id}
+              onDragEnd={onItemDragEnd}
+              onDragStart={
+                onToolPresetDragStart
+                  ? (event) => onToolPresetDragStart(preset, event.dataTransfer)
+                  : undefined
+              }
+            >
+              <div className="h-16 w-12 shrink-0">
+                <LabAssetIcon
+                  accent={preview.accent}
+                  containsSlurry={preview.containsSlurry}
+                  fillRatio={preview.fillRatio}
+                  kind={preview.iconKind}
+                  produceLots={preview.produceLots}
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900">{preset.name}</p>
+                <p className="text-xs text-slate-500">{preset.subtitle}</p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-700">
+                  {preview.detailLabel}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900">{preset.name}</p>
-              <p className="text-xs text-slate-500">{preset.subtitle}</p>
-              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-700">
-                10 g apple slurry
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {presets.map((preset) => (
           <ProduceLotCard
             className="rounded-[1rem] border-amber-200 bg-[linear-gradient(180deg,#fffdf5,#fff7e8)]"

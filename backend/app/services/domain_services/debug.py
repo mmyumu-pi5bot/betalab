@@ -15,6 +15,7 @@ from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.gross_balance import GrossBalanceProduceLotTarget
+from app.services.domain_services.lcmsms import apply_calibration_standard
 from app.services.helpers.lookups import find_workbench_slot
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
 from app.services.helpers.tool_liquids import ACETONITRILE_ID
@@ -27,7 +28,28 @@ _physical_simulation_service = PhysicalSimulationService()
 # Debug tube presets that prefill a 50 mL centrifuge tube with apple slurry.
 _RAW_SLURRY_TUBE_PRESET = "apple_slurry_centrifuge_tube"
 _VORTEXED_SLURRY_TUBE_PRESET = "vortexed_slurry_centrifuge_tube"
-_SLURRY_TUBE_PRESETS = frozenset({_RAW_SLURRY_TUBE_PRESET, _VORTEXED_SLURRY_TUBE_PRESET})
+_SEPARATED_SLURRY_TUBE_PRESET = "separated_slurry_centrifuge_tube"
+_SLURRY_TUBE_PRESETS = frozenset(
+    {_RAW_SLURRY_TUBE_PRESET, _VORTEXED_SLURRY_TUBE_PRESET, _SEPARATED_SLURRY_TUBE_PRESET}
+)
+_SLURRY_PRESET_LABELS = {
+    _RAW_SLURRY_TUBE_PRESET: "Apple slurry",
+    _VORTEXED_SLURRY_TUBE_PRESET: "vortexed apple slurry",
+    _SEPARATED_SLURRY_TUBE_PRESET: "centrifuged apple slurry",
+}
+
+# Debug calibration presets that prepare a multi-residue calibration standard (a
+# calibration point) at a known concentration. The vial variant is dropped straight
+# into the rack; the tube variant is a stock the user pipettes into a rack vial (the
+# pipette carries the calibration identity across — see AspiratePipetteService).
+_CALIBRATION_VIAL_PRESET = "calibration_standard_vial"
+_CALIBRATION_TUBE_PRESET = "calibration_standard_tube"
+_CALIBRATION_PRESETS = frozenset({_CALIBRATION_VIAL_PRESET, _CALIBRATION_TUBE_PRESET})
+_CALIBRATION_PRESET_TOOL_IDS = {
+    _CALIBRATION_VIAL_PRESET: "sample_vial_lcms",
+    _CALIBRATION_TUBE_PRESET: "centrifuge_tube_50ml",
+}
+_DEFAULT_CALIBRATION_LEVEL_NG_PER_ML = 100.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +77,7 @@ class CreateDebugToolPresetRequest:
     destination_id: str
     produce_mass_g: float | None = None
     temperature_c: float | None = None
+    level_ng_per_ml: float | None = None
 
 
 class CreateDebugProduceLotOnWorkbenchService(WriteDomainService[CreateDebugProduceLotOnWorkbenchRequest]):
@@ -114,10 +137,14 @@ class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduce
 
 class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetRequest]):
     def _run(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
+        if request.preset_id in _CALIBRATION_PRESETS:
+            self._spawn_calibration_standard(experiment, request)
+            return
         if request.preset_id not in _SLURRY_TUBE_PRESETS:
             raise ValueError("Unknown debug tool preset")
-        prepared_extract = request.preset_id == _VORTEXED_SLURRY_TUBE_PRESET
+        self._spawn_slurry_tube(experiment, request)
 
+    def _spawn_slurry_tube(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
         produce_mass_g = request.produce_mass_g if request.produce_mass_g is not None else 10.0
         temperature_c = request.temperature_c if request.temperature_c is not None else 20.0
         if produce_mass_g <= 0:
@@ -139,10 +166,10 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
                 location_kind="workbench_tool",
                 location_id=slot.id,
             )
-            if prepared_extract:
-                _prepare_vortexed_extract(tool)
-            label = "vortexed apple slurry" if prepared_extract else "Apple slurry"
-            experiment.audit_log.append(f"Debug {label} added to {tool.label} on {slot.label}.")
+            _apply_slurry_extract_preset(request.preset_id, tool)
+            experiment.audit_log.append(
+                f"Debug {_SLURRY_PRESET_LABELS[request.preset_id]} added to {tool.label} on {slot.label}."
+            )
             return
 
         tool = build_workbench_tool("centrifuge_tube_50ml")
@@ -154,8 +181,7 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             location_kind="workbench_tool",
             location_id=tool.id,
         )
-        if prepared_extract:
-            _prepare_vortexed_extract(tool)
+        _apply_slurry_extract_preset(request.preset_id, tool)
 
         place_new_tool(
             self._runtime,
@@ -174,6 +200,39 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
         for fraction in tool.produce_fractions:
             fraction.location_kind = location_kind
             fraction.location_id = location_id
+
+    def _spawn_calibration_standard(
+        self, experiment: Experiment, request: CreateDebugToolPresetRequest
+    ) -> None:
+        level_ng_per_ml = (
+            request.level_ng_per_ml
+            if request.level_ng_per_ml is not None
+            else _DEFAULT_CALIBRATION_LEVEL_NG_PER_ML
+        )
+        if request.destination_kind == "workbench_tool":
+            slot = find_workbench_slot(experiment.workbench, request.destination_id)
+            if slot.tool is None or slot.tool.tool_type not in {"sample_vial", "centrifuge_tube"}:
+                raise ValueError(
+                    "A calibration standard requires an autosampler vial or centrifuge tube."
+                )
+            if slot.tool.is_sealed:
+                raise ValueError(f"Open {slot.tool.label} before adding a calibration standard.")
+            container = slot.tool
+            apply_calibration_standard(experiment, container, level_ng_per_ml)
+            experiment.audit_log.append(
+                f"Debug calibration standard {level_ng_per_ml} ng/mL added to {container.label} on {slot.label}."
+            )
+            return
+
+        container = build_workbench_tool(_CALIBRATION_PRESET_TOOL_IDS[request.preset_id])
+        apply_calibration_standard(experiment, container, level_ng_per_ml)
+        place_new_tool(
+            self._runtime,
+            experiment,
+            container,
+            DndObjectRef(kind=request.destination_kind, id=request.destination_id),
+            source_label="Debug palette",
+        )
 
 
 def _fill_tool_with_debug_slurry(
@@ -213,6 +272,14 @@ def _fill_tool_with_debug_slurry(
             container_label=tool.label,
         )
     )
+def _apply_slurry_extract_preset(preset_id: str, tool: WorkbenchTool) -> None:
+    """Advance a freshly filled slurry tube to the extraction state its preset encodes."""
+    if preset_id == _VORTEXED_SLURRY_TUBE_PRESET:
+        _prepare_vortexed_extract(tool)
+    elif preset_id == _SEPARATED_SLURRY_TUBE_PRESET:
+        _prepare_separated_extract(tool)
+
+
 def _prepare_vortexed_extract(tool: WorkbenchTool) -> None:
     """Bring a debug slurry tube to the post-vortex "mixed" state.
 
@@ -235,6 +302,21 @@ def _prepare_vortexed_extract(tool: WorkbenchTool) -> None:
     tool.contents_homogeneity = 1.0
     _physical_simulation_service.complete_quechers_extraction(tool)
     tool.is_sealed = True
+
+
+def _prepare_separated_extract(tool: WorkbenchTool) -> None:
+    """Bring a debug slurry tube to the post-centrifuge "separated" state.
+
+    Runs the full vortex prep, then stratifies the tube the way a finished centrifuge
+    run does: the matrix pellet settles and the acetonitrile supernatant sits on top,
+    ready to pipette. The tube is left unsealed so the very next action is aspiration
+    straight into a rack vial (see AspiratePipetteService: a separated centrifuge tube
+    carrying a valid extract yields a supernatant-only draw).
+    """
+    _prepare_vortexed_extract(tool)
+    tool.quechers_state.phase = "separated"
+    tool.quechers_state.separation_progress = 1.0
+    tool.is_sealed = False
 
 
 def _build_debug_produce_lot(

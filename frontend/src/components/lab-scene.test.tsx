@@ -944,6 +944,103 @@ describe("LabScene", () => {
     );
   });
 
+  it("configures and spawns the centrifuged slurry tube ready to pipette", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId(
+      "debug-palette-preset-separated_slurry_centrifuge_tube",
+    );
+    expect(preset).toHaveTextContent("Centrifuged slurry tube");
+
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(await screen.findByText("Configure Centrifuged slurry tube")).toBeInTheDocument();
+    expect(screen.getByLabelText("Debug slurry apple mass")).toHaveValue(10);
+    fireEvent.click(screen.getByText("Spawn"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      {
+        destination_id: "station_1",
+        destination_kind: "workbench_slot",
+        preset_id: "separated_slurry_centrifuge_tube",
+        produce_mass_g: 10,
+        temperature_c: 20,
+      },
+    );
+  });
+
+  it("configures and spawns a calibration point vial at the chosen level", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId(
+      "debug-palette-preset-calibration_standard_vial",
+    );
+    expect(preset).toHaveTextContent("Calibration point vial");
+
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(await screen.findByText("Configure Calibration point vial")).toBeInTheDocument();
+    expect(screen.getByLabelText("Debug calibration level")).toHaveValue(100);
+    fireEvent.click(screen.getByText("Spawn"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      {
+        destination_id: "station_1",
+        destination_kind: "workbench_slot",
+        preset_id: "calibration_standard_vial",
+        level_ng_per_ml: 100,
+      },
+    );
+  });
+
+  it("configures and spawns a calibration stock tube to pipette later", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId(
+      "debug-palette-preset-calibration_standard_tube",
+    );
+    expect(preset).toHaveTextContent("Calibration stock tube");
+
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(await screen.findByText("Configure Calibration stock tube")).toBeInTheDocument();
+    expect(screen.getByLabelText("Debug calibration level")).toHaveValue(100);
+    fireEvent.click(screen.getByText("Spawn"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      {
+        destination_id: "station_1",
+        destination_kind: "workbench_slot",
+        preset_id: "calibration_standard_tube",
+        level_ng_per_ml: 100,
+      },
+    );
+  });
+
   it.each([
     ["centrifuge tube", "centrifuge_tube_50ml", "centrifuge_tube"],
     ["autosampler vial", "sample_vial_lcms", "sample_vial"],

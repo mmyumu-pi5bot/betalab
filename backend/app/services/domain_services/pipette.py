@@ -23,7 +23,11 @@ from app.services.helpers.produce_canonical import (
     _split_produce_fraction,
     get_tool_remaining_fill_capacity_ml,
 )
-from app.services.helpers.tool_liquids import raise_if_quechers_unusable, transfer_liquid_portion
+from app.services.helpers.tool_liquids import (
+    CALIBRATION_SOLUTION_ID,
+    raise_if_quechers_unusable,
+    transfer_liquid_portion,
+)
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 
@@ -561,6 +565,13 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
         pipette.true_volume_ml = _pipette_true_content_volume_ml(pipette)
         pipette.source_tool_id = source.id
         pipette.injection_context = aspirated_context
+        # The calibration identity rides along with the calibration solution: once the
+        # pipette holds any of the standard, it carries the source's fixed level so the
+        # vial it is later dispensed into is recognised as a calibration point.
+        if source.calibration_context is not None and any(
+            liquid.liquid_id == CALIBRATION_SOLUTION_ID for liquid in pipette.liquids
+        ):
+            pipette.calibration_context = deepcopy(source.calibration_context)
         if not source.liquids and not source.produce_fractions:
             source.injection_context = None
         experiment.audit_log.append(f"Pipette aspirated {requested_ml:.3f} mL from {source.label}.")
@@ -770,6 +781,17 @@ class DispensePipetteService(WriteDomainService[DispensePipetteRequest]):
             else:
                 _merge_injection_context(target.injection_context, addition)
 
+        # A vial that receives the calibration standard becomes a calibration point at
+        # the same (fixed) level. Calibration and extract identities are mutually
+        # exclusive, so a vial already carrying an extract is never re-labelled.
+        if (
+            pipette.calibration_context is not None
+            and target.calibration_context is None
+            and target.injection_context is None
+            and any(liquid.liquid_id == CALIBRATION_SOLUTION_ID for liquid in target.liquids)
+        ):
+            target.calibration_context = deepcopy(pipette.calibration_context)
+
         remaining_ratio = max(volume_before_ml - dispensed_ml, 0.0) / volume_before_ml
         pipette.volume_ml = _pipette_content_volume_ml(pipette)
         pipette.true_volume_ml = _pipette_true_content_volume_ml(pipette)
@@ -783,5 +805,8 @@ class DispensePipetteService(WriteDomainService[DispensePipetteRequest]):
             pipette.injection_context = None
         elif pipette_context is not None:
             _shrink_injection_context(pipette_context, remaining_ratio, pipette.volume_ml)
+        # Once no standard remains in the pipette, drop the calibration identity too.
+        if not any(liquid.liquid_id == CALIBRATION_SOLUTION_ID for liquid in pipette.liquids):
+            pipette.calibration_context = None
         target.contents_homogeneity = 0.0 if target_had_contents else 1.0
         experiment.audit_log.append(f"Pipette dispensed {dispensed_ml:.3f} mL into {target.label}.")

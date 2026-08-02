@@ -966,6 +966,126 @@ function createVortexedSlurryTubePresetSourceCase(): DndSourceCase {
   };
 }
 
+function createSeparatedSlurryTubePresetSourceCase(): DndSourceCase {
+  // Spawn-only preset: like the vortexed tube it never fills an existing tube. It
+  // spawns a fully centrifuged tube (separated supernatant, ready to pipette) through
+  // the same configuration draft, so it shares the vortexed tube's target matrix.
+  return {
+    id: "debug-palette-separated_slurry_centrifuge_tube",
+    label: "debug palette separated slurry centrifuge tube preset",
+    sourceTestId: "debug-palette-preset-separated_slurry_centrifuge_tube",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        slots: makeSlots(),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: true, command: null },
+      "bench-slot-station_2": { compatible: true, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: true, command: null },
+      "analytical-balance-dropzone": { compatible: true, command: null },
+      "rack-illustration-slot-1": { compatible: false, command: null },
+      "vortex-dropzone": { compatible: true, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: true, command: null },
+    },
+  };
+}
+
+function createCalibrationVialPresetSourceCase(): DndSourceCase {
+  // Spawn-only vial preset (a calibration point). Because it is an autosampler vial it
+  // is the mirror image of the tube presets: the rack accepts it while the vortex does
+  // not. Every compatible target spawns a prepared calibration standard via the draft.
+  return {
+    id: "debug-palette-calibration_standard_vial",
+    label: "debug palette calibration standard vial preset",
+    sourceTestId: "debug-palette-preset-calibration_standard_vial",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        slots: makeSlots(),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: true, command: null },
+      "bench-slot-station_2": { compatible: true, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: true, command: null },
+      "analytical-balance-dropzone": { compatible: true, command: null },
+      "rack-illustration-slot-1": { compatible: true, command: null },
+      "vortex-dropzone": { compatible: false, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: true, command: null },
+    },
+  };
+}
+
+function createCalibrationTubePresetSourceCase(): DndSourceCase {
+  // Spawn-only calibration stock tube. As a centrifuge tube it shares the slurry tubes'
+  // matrix (rack rejects it, vortex accepts it); the user pipettes it into a rack vial
+  // separately. Every compatible target spawns a prepared standard via the draft.
+  return {
+    id: "debug-palette-calibration_standard_tube",
+    label: "debug palette calibration standard tube preset",
+    sourceTestId: "debug-palette-preset-calibration_standard_tube",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        slots: makeSlots(),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: true, command: null },
+      "bench-slot-station_2": { compatible: true, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: true, command: null },
+      "analytical-balance-dropzone": { compatible: true, command: null },
+      "rack-illustration-slot-1": { compatible: false, command: null },
+      "vortex-dropzone": { compatible: true, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: true, command: null },
+    },
+  };
+}
+
 function createWorkbenchToolSourceCase(item: ToolCatalogItem): DndSourceCase {
   return {
     id: `workbench-${item.id}`,
@@ -2131,6 +2251,9 @@ const baseDndSourceCases: DndSourceCase[] = [
   createDebugProducePresetSourceCase(),
   createDebugSlurryTubePresetSourceCase(),
   createVortexedSlurryTubePresetSourceCase(),
+  createSeparatedSlurryTubePresetSourceCase(),
+  createCalibrationVialPresetSourceCase(),
+  createCalibrationTubePresetSourceCase(),
   ...toolItems.map(createWorkbenchToolSourceCase),
   createBasketReceivedBagSourceCase(),
   createBasketProduceSourceCase(),

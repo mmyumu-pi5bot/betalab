@@ -27,7 +27,7 @@ import {
 } from "@/hooks/use-workspace-layout";
 import {
   buildDebugProduceDraftFields,
-  buildDebugSlurryTubeDraftFields,
+  buildDebugToolPresetDraftFields,
   debugProducePresets,
   debugToolPresets,
   debugToolPresetsById,
@@ -42,7 +42,8 @@ import {
   type LabSceneWidgetId,
 } from "@/lib/lab-scene-config";
 import { getToolbarCatalog } from "@/lib/api";
-import type { ToolbarCategory } from "@/types/workbench";
+import type { CreateDebugToolPresetPayload } from "@/types/api-payloads";
+import type { DebugToolPresetId, ToolbarCategory } from "@/types/workbench";
 
 const defaultStatusMessage = "Start by dragging an extraction tool onto the bench.";
 const defaultErrorMessage = "Unable to load lab scene";
@@ -139,13 +140,9 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
       setPendingDropDraft({
         commandType: "create_debug_tool_preset",
         confirmLabel: "Spawn",
-        destinationKind: payload.destination.kind as
-          | "analytical_balance"
-          | "gross_balance"
-          | "trash_bin"
-          | "vortex"
-          | "workbench_slot",
-        fields: buildDebugSlurryTubeDraftFields(),
+        destinationKind:
+          payload.destination.kind as CreateDebugToolPresetPayload["destination_kind"],
+        fields: buildDebugToolPresetDraftFields(preset.id as DebugToolPresetId),
         presetId: preset.id,
         targetId: payload.destination.id,
         targetKind: "workspace_widget",

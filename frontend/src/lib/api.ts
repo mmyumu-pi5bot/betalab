@@ -1083,6 +1083,7 @@ export async function createDebugToolPreset(
       destination_id: requireString(body, "destination_id"),
       ...optionalNumberBody(body, "produce_mass_g"),
       ...optionalNumberBody(body, "temperature_c"),
+      ...optionalNumberBody(body, "level_ng_per_ml"),
     },
   });
 }
@@ -1994,7 +1995,22 @@ function normalizePipetteState(
     materialState: statesById.get(fraction.produceMaterialStateId)?.materialState,
   }));
   const statesByLotId = new Map(materialStates.map((state) => [state.produceLotId, state]));
+  const rawCalibrationContext = (pipette.calibrationContext ?? pipette.calibration_context) as
+    | Record<string, unknown>
+    | null
+    | undefined;
   return {
+    ...(rawCalibrationContext
+      ? {
+          calibrationContext: {
+            levelNgPerMl: Number(
+              rawCalibrationContext.levelNgPerMl ?? rawCalibrationContext.level_ng_per_ml ?? 0,
+            ),
+            compoundIds: (rawCalibrationContext.compoundIds ??
+              rawCalibrationContext.compound_ids ?? []) as string[],
+          },
+        }
+      : {}),
     capacityMl: Number(pipette.capacityMl ?? pipette.capacity_ml ?? 1.0),
     liquids: Array.isArray(pipette.liquids) ? pipette.liquids.map(normalizeBenchLiquid) : [],
     produceFractions,

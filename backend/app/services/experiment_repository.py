@@ -292,6 +292,9 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             injection_context=_deserialize_injection_context(
                 schema.pipette.injection_context
             ),
+            calibration_context=_deserialize_calibration_context(
+                schema.pipette.calibration_context
+            ),
             liquids=[
                 _deserialize_workbench_liquid(liquid)
                 for liquid in schema.pipette.liquids
@@ -411,15 +414,7 @@ def _deserialize_workbench_tool(tool_schema) -> WorkbenchTool | None:
             else None
         ),
         injection_context=_deserialize_injection_context(tool_schema.injection_context),
-        calibration_context=(
-            CalibrationContext(
-                level_ng_per_ml=tool_schema.calibration_context.level_ng_per_ml,
-                compound_ids=list(tool_schema.calibration_context.compound_ids),
-                true_level_ng_per_ml=tool_schema.calibration_context.true_level_ng_per_ml,
-            )
-            if tool_schema.calibration_context is not None
-            else None
-        ),
+        calibration_context=_deserialize_calibration_context(tool_schema.calibration_context),
     )
 
 
@@ -431,6 +426,16 @@ def _deserialize_workbench_liquid(liquid_schema) -> WorkbenchLiquid:
         volume_ml=liquid_schema.volume_ml,
         accent=liquid_schema.accent,
         true_volume_ml=liquid_schema.true_volume_ml,
+    )
+
+
+def _deserialize_calibration_context(context_schema) -> CalibrationContext | None:
+    if context_schema is None:
+        return None
+    return CalibrationContext(
+        level_ng_per_ml=context_schema.level_ng_per_ml,
+        compound_ids=list(context_schema.compound_ids),
+        true_level_ng_per_ml=context_schema.true_level_ng_per_ml,
     )
 
 

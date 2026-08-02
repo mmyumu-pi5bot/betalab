@@ -92,7 +92,10 @@ type DragSourceKind =
 export type DebugProducePresetId = "apple_powder_residual_co2";
 export type DebugToolPresetId =
   | "apple_slurry_centrifuge_tube"
-  | "vortexed_slurry_centrifuge_tube";
+  | "vortexed_slurry_centrifuge_tube"
+  | "separated_slurry_centrifuge_tube"
+  | "calibration_standard_vial"
+  | "calibration_standard_tube";
 
 export type ToolCatalogItem = ToolbarBaseItem & {
   canReceiveLiquids?: boolean;
@@ -500,6 +503,7 @@ export type SpatulaState = {
 };
 
 export type PipetteState = {
+  calibrationContext?: CalibrationContext | null;
   capacityMl: number;
   liquids?: BenchLiquidPortion[];
   produceFractions?: ProduceFraction[];

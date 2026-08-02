@@ -257,6 +257,7 @@ export type CreateDebugToolPresetPayload = {
   destination_kind:
     | "analytical_balance"
     | "gross_balance"
+    | "rack_slot"
     | "trash_bin"
     | "vortex"
     | "workbench_slot"
@@ -264,6 +265,7 @@ export type CreateDebugToolPresetPayload = {
   destination_id: string;
   produce_mass_g?: number;
   temperature_c?: number;
+  level_ng_per_ml?: number;
 };
 
 export type PlaceToolOnVortexPayload = {

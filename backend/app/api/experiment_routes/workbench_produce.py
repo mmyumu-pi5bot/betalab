@@ -63,6 +63,7 @@ def create_debug_tool_preset(
                 destination_id=request.destination_id,
                 produce_mass_g=request.produce_mass_g,
                 temperature_c=request.temperature_c,
+                level_ng_per_ml=request.level_ng_per_ml,
             ),
         )
     )

@@ -699,6 +699,35 @@ describe("api client", () => {
     expect("trueVolumeMl" in normalized.pipette).toBe(false);
   });
 
+  it("normalizes calibration context carried by the pipette", async () => {
+    const experiment = {
+      ...makeExperiment(),
+      pipette: {
+        capacity_ml: 1,
+        volume_ml: 0.5,
+        source_tool_id: "bench_tool_1",
+        calibration_context: {
+          level_ng_per_ml: 100,
+          compound_ids: ["acetamiprid", "boscalid"],
+        },
+        liquids: [],
+        produce_lots: [],
+        produce_fractions: [],
+      },
+    } as unknown as Experiment;
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => experiment,
+    }));
+
+    const normalized = await getExperiment("experiment_123");
+    expect(normalized.pipette.calibrationContext).toEqual({
+      levelNgPerMl: 100,
+      compoundIds: ["acetamiprid", "boscalid"],
+    });
+  });
+
   it("normalizes mixed state on the produce fraction only", async () => {
     const experiment = {
       ...makeExperiment(),

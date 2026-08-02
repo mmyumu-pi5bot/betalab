@@ -120,13 +120,25 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
       pendingDropDraft.presetId &&
       pendingDropDraft.destinationKind
     ) {
-      void experimentApi.createDebugToolPreset({
+      // Presets carry different draft fields (slurry tubes → mass/temperature, the
+      // calibration vial → level), so only forward the fields the draft actually holds.
+      const hasField = (fieldId: string) =>
+        pendingDropDraft.fields.some((field) => field.id === fieldId);
+      const payload: CreateDebugToolPresetPayload = {
         preset_id: pendingDropDraft.presetId,
         destination_kind: pendingDropDraft.destinationKind,
         destination_id: pendingDropDraft.targetId,
-        produce_mass_g: getNumericFieldValue("produce_mass_g"),
-        temperature_c: getNumericFieldValue("temperature_c"),
-      });
+      };
+      if (hasField("produce_mass_g")) {
+        payload.produce_mass_g = getNumericFieldValue("produce_mass_g");
+      }
+      if (hasField("temperature_c")) {
+        payload.temperature_c = getNumericFieldValue("temperature_c");
+      }
+      if (hasField("level_ng_per_ml")) {
+        payload.level_ng_per_ml = getNumericFieldValue("level_ng_per_ml");
+      }
+      void experimentApi.createDebugToolPreset(payload);
       setPendingDropDraft(null);
       return;
     }

@@ -328,44 +328,56 @@ class AddCalibrationToVialRequest:
     level_ng_per_ml: float
 
 
+def apply_calibration_standard(
+    experiment: Experiment,
+    vial: WorkbenchTool,
+    level_ng_per_ml: float,
+) -> None:
+    """Mark ``vial`` as a multi-residue calibration standard at ``level_ng_per_ml``.
+
+    Draws the hidden true concentration, records the calibration context and adds the
+    calibration solution. Shared by the manual ``AddCalibrationToVialService`` drop and
+    the debug calibration-vial preset so both prepare an identical standard.
+    """
+    from app.domain.dnd_rules import can_tool_receive_liquids
+    from app.domain.pesticide_catalog import APPLE_PESTICIDE_CATALOG
+
+    if level_ng_per_ml <= 0:
+        raise ValueError("Calibration level must be positive.")
+    # A liquid can physically go into any container that holds liquids. If the
+    # container can never enter the autosampler rack (e.g. a centrifuge tube) the
+    # calibrant is simply never injected — useless, but not an error.
+    if not can_tool_receive_liquids(vial.tool_type):
+        raise ValueError(f"{vial.label} cannot receive liquids.")
+    if vial.calibration_context is not None:
+        raise ValueError(f"{vial.label} already contains a calibration standard.")
+    if vial.injection_context is not None:
+        raise ValueError(f"{vial.label} already contains a sample extract.")
+
+    compound_ids = [p.compound_id for p in APPLE_PESTICIDE_CATALOG]
+    true_level = round(PhysicalSimulationService.draw_prepared_level(level_ng_per_ml), 6)
+    vial.calibration_context = CalibrationContext(
+        level_ng_per_ml=round(level_ng_per_ml, 4),
+        compound_ids=compound_ids,
+        true_level_ng_per_ml=true_level,
+    )
+    add_liquid_to_tool(
+        experiment,
+        vial,
+        liquid_id="calibration_solution",
+        volume_ml=CALIBRATION_STANDARD_VOLUME_ML,
+    )
+
+
 class AddCalibrationToVialService(WriteDomainService[AddCalibrationToVialRequest]):
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
 
     def _run(self, experiment: Experiment, request: AddCalibrationToVialRequest) -> None:
-        from app.domain.pesticide_catalog import APPLE_PESTICIDE_CATALOG
-
-        if request.level_ng_per_ml <= 0:
-            raise ValueError("Calibration level must be positive.")
-
-        from app.domain.dnd_rules import can_tool_receive_liquids
-
         vial = _find_tool_anywhere(experiment, request.vial_tool_id)
         if vial is None:
             raise ValueError("Tool not found.")
-        # A liquid can physically go into any container that holds liquids. If the
-        # container can never enter the autosampler rack (e.g. a centrifuge tube) the
-        # calibrant is simply never injected — useless, but not an error.
-        if not can_tool_receive_liquids(vial.tool_type):
-            raise ValueError(f"{vial.label} cannot receive liquids.")
-        if vial.calibration_context is not None:
-            raise ValueError(f"{vial.label} already contains a calibration standard.")
-        if vial.injection_context is not None:
-            raise ValueError(f"{vial.label} already contains a sample extract.")
-
-        compound_ids = [p.compound_id for p in APPLE_PESTICIDE_CATALOG]
-        true_level = round(PhysicalSimulationService.draw_prepared_level(request.level_ng_per_ml), 6)
-        vial.calibration_context = CalibrationContext(
-            level_ng_per_ml=round(request.level_ng_per_ml, 4),
-            compound_ids=compound_ids,
-            true_level_ng_per_ml=true_level,
-        )
-        add_liquid_to_tool(
-            experiment,
-            vial,
-            liquid_id="calibration_solution",
-            volume_ml=CALIBRATION_STANDARD_VOLUME_ML,
-        )
+        apply_calibration_standard(experiment, vial, request.level_ng_per_ml)
         experiment.audit_log.append(
             f"Calibration standard {request.level_ng_per_ml} ng/mL prepared in {vial.label}."
         )

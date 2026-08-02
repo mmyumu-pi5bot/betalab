@@ -92,6 +92,181 @@ def test_debug_vortexed_slurry_tube_is_ready_to_centrifuge() -> None:
     assert tool.is_sealed is True
 
 
+def test_debug_separated_slurry_tube_is_ready_to_pipette() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="separated_slurry_centrifuge_tube",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+        ),
+    )
+
+    tool = updated.workbench.slots[0].tool
+    assert tool is not None
+    assert tool.tool_id == "centrifuge_tube_50ml"
+    # Full extraction is present: slurry, solvent, salts and a valid extract result.
+    assert tool.produce_fractions[0].mass_g == pytest.approx(10.0)
+    assert [liq.liquid_id for liq in tool.liquids] == ["acetonitrile_extraction"]
+    assert tool.quechers_state.salts_added is True
+    assert tool.quechers_extraction_result is not None
+    # Post-centrifuge state: separated and left open so the pipette can aspirate the
+    # supernatant straight into a rack vial with no further steps.
+    assert tool.quechers_state.phase == "separated"
+    assert tool.quechers_state.separation_progress == pytest.approx(1.0)
+    assert tool.is_sealed is False
+
+
+def test_debug_separated_slurry_tube_aspirates_as_supernatant() -> None:
+    from app.services.domain_services.pipette import (
+        AspiratePipetteRequest,
+        AspiratePipetteService,
+    )
+
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="separated_slurry_centrifuge_tube",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+        ),
+    )
+    tube = updated.workbench.slots[0].tool
+    assert tube is not None
+
+    aspirated = AspiratePipetteService(service).run(
+        experiment.id,
+        AspiratePipetteRequest(source_tool_id=tube.id, delta_volume_ml=1.0),
+    )
+
+    # A separated tube pipettes the supernatant only: solvent enters the pipette while
+    # the settled matrix pellet stays behind in the tube.
+    assert aspirated.pipette.volume_ml == pytest.approx(1.0)
+    assert aspirated.pipette.injection_context is not None
+    assert aspirated.pipette.produce_fractions == []
+
+
+def test_debug_calibration_vial_defaults_to_level_100_in_rack() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="calibration_standard_vial",
+            destination_kind="rack_slot",
+            destination_id="rack_slot_1",
+        ),
+    )
+
+    slot = next(slot for slot in updated.rack.slots if slot.id == "rack_slot_1")
+    vial = slot.tool
+    assert vial is not None
+    assert vial.tool_id == "sample_vial_lcms"
+    assert vial.calibration_context is not None
+    assert vial.calibration_context.level_ng_per_ml == pytest.approx(100.0)
+    assert [liq.liquid_id for liq in vial.liquids] == ["calibration_solution"]
+
+
+def test_debug_calibration_vial_honors_custom_level_on_workbench() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="calibration_standard_vial",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+            level_ng_per_ml=250.0,
+        ),
+    )
+
+    vial = updated.workbench.slots[0].tool
+    assert vial is not None
+    assert vial.tool_id == "sample_vial_lcms"
+    assert vial.calibration_context is not None
+    assert vial.calibration_context.level_ng_per_ml == pytest.approx(250.0)
+
+
+def test_debug_calibration_tube_spawns_a_centrifuge_tube_stock() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="calibration_standard_tube",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+        ),
+    )
+
+    tube = updated.workbench.slots[0].tool
+    assert tube is not None
+    assert tube.tool_id == "centrifuge_tube_50ml"
+    assert tube.calibration_context is not None
+    assert tube.calibration_context.level_ng_per_ml == pytest.approx(100.0)
+    assert [liq.liquid_id for liq in tube.liquids] == ["calibration_solution"]
+
+
+def test_debug_calibration_tube_pipettes_into_a_recognized_calibration_vial() -> None:
+    from app.services.domain_services.pipette import (
+        AspiratePipetteRequest,
+        AspiratePipetteService,
+        DispensePipetteRequest,
+        DispensePipetteService,
+    )
+
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="calibration_standard_tube",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+            level_ng_per_ml=100.0,
+        ),
+    )
+    placed = PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_2", tool_id="sample_vial_lcms"),
+    )
+    tube = placed.workbench.slots[0].tool
+    vial = placed.workbench.slots[1].tool
+    assert tube is not None
+    assert vial is not None
+    tube_id = tube.id
+    vial_id = vial.id
+
+    AspiratePipetteService(service).run(
+        experiment.id,
+        AspiratePipetteRequest(source_tool_id=tube_id, delta_volume_ml=1.0),
+    )
+    updated = DispensePipetteService(service).run(
+        experiment.id,
+        DispensePipetteRequest(target_tool_id=vial_id, delta_volume_ml=1.0),
+    )
+
+    vial = updated.workbench.slots[1].tool
+    assert vial is not None
+    # The pipette carried the calibration identity across: the vial is now a recognised
+    # calibration point at the same (fixed) level, ready to place in the rack and inject.
+    assert vial.calibration_context is not None
+    assert vial.calibration_context.level_ng_per_ml == pytest.approx(100.0)
+    assert [liq.liquid_id for liq in vial.liquids] == ["calibration_solution"]
+    # The pipette is emptied and no longer carries the calibration identity.
+    assert updated.pipette.calibration_context is None
+
+
 def test_debug_unknown_tool_preset_is_rejected() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()

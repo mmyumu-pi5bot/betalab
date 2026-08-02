@@ -288,6 +288,7 @@ class PipetteState:
     true_volume_ml: float | None = None
     source_tool_id: str | None = None
     injection_context: InjectionContext | None = None
+    calibration_context: CalibrationContext | None = None
     liquids: list[WorkbenchLiquid] = field(default_factory=list)
     produce_lots: list[ProduceLot] = field(default_factory=list)
     produce_fractions: list[ProduceFraction] = field(default_factory=list)

@@ -16,7 +16,8 @@ export function PipetteIcon({ active = false, fillRatio, className = "" }: {
     >
       <g transform="rotate(38 12 12)">
         <rect x="9" y="2" width="6" height="4" rx="1.2" fill="currentColor" opacity="0.25" />
-        <rect x="8" y="5" width="8" height="10" rx="2" fill="white" stroke="currentColor" strokeWidth="1.3" />
+        <rect x="8" y="5" width="8" height="10" rx="2" fill="currentColor" opacity="0.9" />
+        <rect x="8" y="5" width="8" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
         {boundedFillRatio > 0 ? (
           <rect
             x="9"

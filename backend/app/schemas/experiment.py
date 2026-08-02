@@ -207,6 +207,7 @@ class PipetteStateSchema(BaseModel):
     true_volume_ml: float | None = Field(default=None, exclude=True)
     source_tool_id: str | None = None
     injection_context: InjectionContextSchema | None = None
+    calibration_context: CalibrationContextSchema | None = None
     liquids: list[WorkbenchLiquidSchema] = Field(default_factory=list)
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
@@ -884,6 +885,7 @@ class DebugToolPresetSpawnSchema(BaseModel):
     destination_kind: Literal[
         "analytical_balance",
         "gross_balance",
+        "rack_slot",
         "trash_bin",
         "vortex",
         "workbench_slot",
@@ -892,6 +894,7 @@ class DebugToolPresetSpawnSchema(BaseModel):
     destination_id: str
     produce_mass_g: float | None = None
     temperature_c: float | None = None
+    level_ng_per_ml: float | None = None
 
 
 class ReceivedBagPlacementSchema(BaseModel):
