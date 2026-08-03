@@ -12,7 +12,11 @@ import { GrinderWidgetContent } from "@/components/grinder-widget-content";
 import { GrossBalanceWidget } from "@/components/gross-balance-widget";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
 import { LcMsMsResultsTable } from "@/components/lcmsms-results-table";
-import { LcMsMsAcquisitionConsole } from "@/components/lcmsms-acquisition-console";
+import {
+  buildDefaultRunSequencePayload,
+  LcMsMsAcquisitionConsole,
+  validateLines,
+} from "@/components/lcmsms-acquisition-console";
 import { StoreInInventoryIcon } from "@/components/icons/store-in-inventory-icon";
 import { LimsWidget } from "@/components/lims-widget";
 import { ProduceBasketWidget } from "@/components/produce-basket-widget";
@@ -183,6 +187,22 @@ export function LabSceneWorkspaceCanvas({
   workspaceActions,
 }: LabSceneWorkspaceCanvasProps) {
   const [isAcquisitionConsoleOpen, setIsAcquisitionConsoleOpen] = useState(false);
+  const [acquisitionSequenceDraft, setAcquisitionSequenceDraft] =
+    useState<RunSequencePayload | null>(null);
+  const acquisitionSequence =
+    acquisitionSequenceDraft ?? buildDefaultRunSequencePayload(display.rackSlots);
+  const acquisitionValidationMessage = validateLines(acquisitionSequence.injections);
+  const handleRunAcquisition = () => {
+    if (
+      rack.instrumentStatus !== "ready" ||
+      ui.isCommandPending ||
+      acquisitionValidationMessage !== null
+    ) {
+      return;
+    }
+    workspaceActions.onRunSequence(acquisitionSequence);
+    setIsAcquisitionConsoleOpen(false);
+  };
   const pendingGrossBalanceDropDraft =
     dropDraft.pendingDropDraft?.targetKind === "workspace_widget" &&
     dropDraft.pendingDropDraft.targetId === "gross_balance"
@@ -610,7 +630,14 @@ export function LabSceneWorkspaceCanvas({
                   }
                 >
                   <LcMsMsInstrumentIllustration
-                    className="mx-auto max-w-[36rem]"
+                    className="mx-auto max-w-[26rem]"
+                    onStartClick={handleRunAcquisition}
+                    startDisabled={
+                      rack.instrumentStatus !== "ready" ||
+                      ui.isCommandPending ||
+                      acquisitionValidationMessage !== null
+                    }
+                    startLabel="Start the acquisition run"
                     status={rack.instrumentStatus}
                     testId="lc-msms-instrument-illustration"
                   />
@@ -632,6 +659,7 @@ export function LabSceneWorkspaceCanvas({
                         disabled={ui.isCommandPending}
                         onClick={() => {
                           setIsAcquisitionConsoleOpen(false);
+                          setAcquisitionSequenceDraft(null);
                           workspaceActions.onUnloadRackFromInstrument();
                         }}
                         type="button"
@@ -643,11 +671,9 @@ export function LabSceneWorkspaceCanvas({
                   {isAcquisitionConsoleOpen ? (
                     <LcMsMsAcquisitionConsole
                       isCommandPending={ui.isCommandPending}
-                      onRun={(payload) => {
-                        workspaceActions.onRunSequence(payload);
-                        setIsAcquisitionConsoleOpen(false);
-                      }}
-                      rackSlots={display.rackSlots}
+                      onRun={handleRunAcquisition}
+                      onSequenceChange={setAcquisitionSequenceDraft}
+                      sequence={acquisitionSequence}
                     />
                   ) : null}
                   <div className="mt-4">

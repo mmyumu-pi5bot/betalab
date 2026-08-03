@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import type {
   AcquisitionSequenceLinePayload,
@@ -12,8 +12,9 @@ const METHOD_ID = "apple_pesticides_mrm_v1" as const;
 
 type Props = {
   isCommandPending: boolean;
-  onRun: (payload: RunSequencePayload) => void;
-  rackSlots: RackSlot[];
+  onRun: () => void;
+  onSequenceChange: (payload: RunSequencePayload) => void;
+  sequence: RunSequencePayload;
 };
 
 function rackPosition(slot: RackSlot): number {
@@ -56,12 +57,16 @@ function buildInitialLines(rackSlots: RackSlot[]): AcquisitionSequenceLinePayloa
     });
 }
 
+export function buildDefaultRunSequencePayload(rackSlots: RackSlot[]): RunSequencePayload {
+  return { method_id: METHOD_ID, injections: buildInitialLines(rackSlots) };
+}
+
 function replicateFilename(filename: string, replicateIndex: number, repetitions: number): string {
   if (repetitions === 1) return filename;
   return `${filename.slice(0, -5)}_r${replicateIndex}.mzML`;
 }
 
-function validateLines(lines: AcquisitionSequenceLinePayload[]): string | null {
+export function validateLines(lines: AcquisitionSequenceLinePayload[]): string | null {
   const calibrationCount = lines.filter((line) => line.sample_type === "calibration").length;
   const sampleCount = lines.filter((line) => line.sample_type === "sample").length;
   if (lines.length !== 2 || calibrationCount !== 1 || sampleCount !== 1) {
@@ -102,14 +107,16 @@ function validateLines(lines: AcquisitionSequenceLinePayload[]): string | null {
 export function LcMsMsAcquisitionConsole({
   isCommandPending,
   onRun,
-  rackSlots,
+  onSequenceChange,
+  sequence,
 }: Props) {
-  const [lines, setLines] = useState(() => buildInitialLines(rackSlots));
+  const lines = sequence.injections;
   const validationMessage = useMemo(() => validateLines(lines), [lines]);
 
   function updateLine(index: number, patch: Partial<AcquisitionSequenceLinePayload>) {
-    setLines((current) =>
-      current.map((line, lineIndex) =>
+    onSequenceChange({
+      ...sequence,
+      injections: lines.map((line, lineIndex) =>
         lineIndex === index
           ? {
               ...line,
@@ -121,7 +128,7 @@ export function LcMsMsAcquisitionConsole({
             }
           : line,
       ),
-    );
+    });
   }
 
   return (
@@ -248,7 +255,7 @@ export function LcMsMsAcquisitionConsole({
         <button
           className="shrink-0 rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={validationMessage !== null || isCommandPending}
-          onClick={() => onRun({ method_id: METHOD_ID, injections: lines })}
+          onClick={onRun}
           type="button"
         >
           Launch acquisition

@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { LcMsMsAcquisitionConsole } from "@/components/lcmsms-acquisition-console";
+import {
+  buildDefaultRunSequencePayload,
+  LcMsMsAcquisitionConsole,
+} from "@/components/lcmsms-acquisition-console";
+import type { RunSequencePayload } from "@/types/api-payloads";
 import type { RackSlot } from "@/types/workbench";
 
 function rackSlot(
@@ -34,12 +39,29 @@ function rackSlot(
   } as RackSlot;
 }
 
+function AcquisitionConsoleHarness({
+  onRun,
+  rackSlots,
+}: {
+  onRun: (payload: RunSequencePayload) => void;
+  rackSlots: RackSlot[];
+}) {
+  const [sequence, setSequence] = useState(() => buildDefaultRunSequencePayload(rackSlots));
+  return (
+    <LcMsMsAcquisitionConsole
+      isCommandPending={false}
+      onRun={() => onRun(sequence)}
+      onSequenceChange={setSequence}
+      sequence={sequence}
+    />
+  );
+}
+
 describe("LcMsMsAcquisitionConsole", () => {
   it("reads occupied rack positions, prefills roles and submits a ready sequence", () => {
     const onRun = vi.fn();
     render(
-      <LcMsMsAcquisitionConsole
-        isCommandPending={false}
+      <AcquisitionConsoleHarness
         onRun={onRun}
         rackSlots={[rackSlot(4, "sample"), rackSlot(2, "calibration")]}
       />,
@@ -78,8 +100,7 @@ describe("LcMsMsAcquisitionConsole", () => {
 
   it("blocks launch until the step-one calibration/sample contract is valid", () => {
     render(
-      <LcMsMsAcquisitionConsole
-        isCommandPending={false}
+      <AcquisitionConsoleHarness
         onRun={vi.fn()}
         rackSlots={[rackSlot(1, "sample"), rackSlot(2, "sample")]}
       />,

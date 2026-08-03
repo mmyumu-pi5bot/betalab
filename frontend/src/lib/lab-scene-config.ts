@@ -47,7 +47,7 @@ export const labSceneWidgetFrameSpecs: Record<LabSceneWidgetId, WidgetLayout> = 
   workbench: { x: 24, y: 24, width: 1105, fallbackHeight: 860 },
   trash: { x: 1276, y: 24, width: 164, fallbackHeight: 214 },
   rack: { x: 234, y: 886, width: 500, fallbackHeight: 392 },
-  instrument: { x: 812, y: 886, width: 650, fallbackHeight: 392 },
+  instrument: { x: 812, y: 886, width: 520, fallbackHeight: 392 },
   basket: { x: 1276, y: 262, width: 198, fallbackHeight: 236 },
   grinder: { x: 980, y: 886, width: 430, fallbackHeight: 340 },
   gross_balance: { x: 364, y: 886, width: 300, fallbackHeight: 280 },

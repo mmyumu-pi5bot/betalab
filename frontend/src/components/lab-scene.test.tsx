@@ -5870,4 +5870,73 @@ describe("LabScene", () => {
     );
   });
 
+  it("starts the configured acquisition run from the illustration power button", async () => {
+    const experiment = makeWorkbenchExperiment({
+      rackState: "loaded",
+      rackSlots: makeRackSlots([
+        {
+          tool: makeTool({
+            id: "calibration_vial",
+            fieldLabelText: "Cal 10",
+            calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] },
+          }),
+        },
+        {
+          tool: makeTool({
+            id: "sample_vial",
+            fieldLabelText: "Apple A",
+          }),
+        },
+      ]),
+      workspaceWidgets: makeWorkspaceWidgets([
+        {},
+        {},
+        {},
+        {},
+        {},
+        { isPresent: true },
+        { isPresent: true },
+      ]),
+    });
+    vi.mocked(createExperiment).mockResolvedValue(experiment);
+    vi.mocked(sendExperimentCommand).mockResolvedValue(experiment);
+
+    render(<PesticideWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Open acquisition console" }),
+    );
+    const sampleRow = screen.getAllByTestId("acquisition-sequence-row")[1];
+    fireEvent.change(within(sampleRow).getByLabelText("Sample name"), {
+      target: { value: "Configured apple sample" },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Start the acquisition run" }),
+    );
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "run_sequence",
+      {
+        method_id: "apple_pesticides_mrm_v1",
+        injections: [
+          expect.objectContaining({
+            rack_slot_id: "rack_slot_1",
+            sample_name: "Cal 10",
+            sample_type: "calibration",
+          }),
+          expect.objectContaining({
+            rack_slot_id: "rack_slot_2",
+            sample_name: "Configured apple sample",
+            sample_type: "sample",
+          }),
+        ],
+      },
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "LC-MS/MS acquisition console" }),
+    ).not.toBeInTheDocument();
+  });
+
 });
