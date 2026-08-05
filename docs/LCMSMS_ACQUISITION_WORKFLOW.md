@@ -502,16 +502,48 @@ Le générateur reçoit :
 - les transitions MRM ;
 - les paramètres de bruit et de variation instrumentale.
 
-### 13.2. Sortie interne minimale
+### 13.2. Sortie interne — `TransitionTrace`
 
-Pour chaque transition, le moteur produit au minimum :
+Le moteur produit une trace par transition déclarée dans la méthode :
 
-- une suite de temps ;
-- une intensité pour chaque temps ;
-- les métadonnées de la transition ;
-- les métadonnées d'acquisition requises par le futur mzML.
+```text
+TransitionTrace
+├── injection_id
+├── transition           (snapshot de la transition déclarée)
+├── times_s[]
+├── intensities[]
+└── acquisition          (durée, points, pas, dwell, polarité,
+                          matched_reference_transition,
+                          acquired_in_retention_window)
+```
 
-### 13.3. Modèle pédagogique du Step 1
+Le résultat d'une injection est donc un ensemble de chromatogrammes MRM bruts.
+Il ne contient ni aire intégrée, ni courbe de calibration, ni concentration.
+
+### 13.3. Règle de correspondance instrumentale
+
+La correspondance est **numérique**. Une transition voit un composé uniquement
+si son couple `(Q1, Q3)` tombe dans `MZ_MATCH_TOLERANCE` d'un canal du
+catalogue de référence. Le `compound_id` écrit dans la méthode est une
+étiquette pour l'humain : les quadripôles ne le lisent jamais.
+
+| Situation | Trace obtenue |
+|---|---|
+| Composé présent, masses correctes, RT dans la fenêtre | pic gaussien + bruit |
+| Composé absent du vial | bruit de fond |
+| Couple Q1/Q3 ne correspondant à aucun composé | bruit de fond |
+| Bonnes masses, mauvais nom de composé | pic quand même |
+| Bon nom de composé, mauvaises masses | bruit de fond |
+| Fenêtre de rétention déclarée ratant l'élution réelle | bruit de fond |
+
+Quantifier et qualifier produisent deux traces distinctes ; le qualifier est
+plus faible d'un rapport constant, ce qui rend le rapport d'ions exploitable.
+
+La génération est pseudo-aléatoire et reproductible : `RunSequenceService`
+accepte un générateur injecté, donc un test rejoue une acquisition à
+l'identique.
+
+### 13.4. Modèle pédagogique du Step 1
 
 Le Step 1 peut utiliser :
 
@@ -527,7 +559,7 @@ Le Step 1 peut utiliser :
 Le moteur ne calcule pas la chimie de l'ionisation ou de la fragmentation à
 partir de la structure moléculaire.
 
-### 13.4. Frontière avec l'application de traitement
+### 13.5. Frontière avec l'application de traitement
 
 La sortie officielle de Betalab ne doit pas contenir :
 
@@ -643,10 +675,10 @@ de retry sont hors périmètre du premier parcours.
 | Catalogue MRM de référence | Placeholders pédagogiques | Remplacer par des données réelles |
 | Lancement de la séquence | Calcul instantané existant | Remplacer par un run structuré |
 | Exécution injection par injection | Absente | À implémenter |
-| Signal numérique agrégé | Implémenté | Réutiliser comme entrée éventuelle du générateur |
-| Traces temps/intensité | Absentes | À implémenter |
+| Signal numérique agrégé | Remplacé par les traces MRM | Conserver |
+| Traces temps/intensité | Implémentées | Conserver |
 | Sortie mzML | Absente | À implémenter selon les exemples |
-| Tableau de concentrations et vérité cachée | Présent dans l'UI actuelle | Retirer de la sortie officielle ou réserver au debug |
+| Tableau de concentrations et vérité cachée | Retiré | Conserver hors de Betalab |
 
 ## 18. Découpage d'implémentation recommandé
 

@@ -10,7 +10,6 @@ from app.domain.acquisition_methods import (
 )
 from app.domain.models import (
     CalibrationContext,
-    CompoundMeasurement,
     Experiment,
     InjectionContext,
     InjectionMeasurement,
@@ -21,7 +20,9 @@ from app.domain.models import (
     WorkbenchTool,
     new_id,
 )
+from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
+from app.services.domain_services.mrm_signal import generate_transition_traces
 from app.services.helpers.lookups import find_workspace_widget
 from app.services.helpers.produce_material_states import find_material_state
 from app.services.helpers.tool_liquids import add_liquid_to_tool
@@ -315,8 +316,10 @@ class RunSequenceRequest:
 
 
 class RunSequenceService(WriteDomainService[RunSequenceRequest]):
-    def __init__(self, runtime: ExperimentRuntime) -> None:
+    def __init__(self, runtime: ExperimentRuntime, rng: random.Random | None = None) -> None:
         super().__init__(runtime)
+        # Injectable so a test can reproduce a whole acquisition byte for byte.
+        self._rng = rng if rng is not None else random.Random()
 
     def _run(self, experiment: Experiment, request: RunSequenceRequest) -> None:
         instrument = find_workspace_widget(experiment.workspace, "instrument")
@@ -345,20 +348,28 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             for replicate_index in range(1, configured.repetitions + 1):
                 if vial.calibration_context is not None:
                     status = "calibration"
-                    compounds = _compute_calibration_compounds(vial.calibration_context)
+                    responses = _compute_calibration_responses(vial.calibration_context)
                 elif vial.injection_context is None:
                     status = "no_extract_context"
-                    compounds = []
+                    responses = {}
                 else:
                     status = "ok"
-                    compounds = _compute_compounds(vial, vial.injection_context)
+                    responses = _compute_sample_responses(vial, vial.injection_context)
+
+                injection_id = new_id("inj")
+                # An empty vial is still injected and still records every channel:
+                # the run produces flat traces rather than no data at all.
+                traces = generate_transition_traces(
+                    injection_id, method, responses, self._rng
+                )
                 injections.append(
                     InjectionMeasurement(
+                        id=injection_id,
                         vial_id=vial.id,
                         vial_label=vial.label,
                         rack_slot_id=rack_slot.id,
                         status=status,
-                        compounds=compounds,
+                        traces=traces,
                         sample_name=configured.sample_name.strip(),
                         injection_volume_ul=configured.injection_volume_ul,
                         replicate_index=replicate_index,
@@ -497,44 +508,35 @@ class AddCalibrationToVialService(WriteDomainService[AddCalibrationToVialRequest
         )
 
 
-def _compute_calibration_compounds(ctx: CalibrationContext) -> list[CompoundMeasurement]:
-    """Simulate LC-MS/MS measurements for a multi-residue calibration standard.
+def _compute_calibration_responses(ctx: CalibrationContext) -> dict[str, float]:
+    """Extract concentration seen by the detector for a calibration standard.
 
-    Signal is proportional to nominal concentration with small environmental noise only —
-    no extraction variance applies since the standard is a pure solution.
+    A pure solution carries no extraction variance: the response follows the
+    truly prepared concentration, with environmental noise only.
     """
     true_level = ctx.true_level_ng_per_ml if ctx.true_level_ng_per_ml is not None else ctx.level_ng_per_ml
-    results: list[CompoundMeasurement] = []
-    for compound_id in ctx.compound_ids:
-        env_noise = random.gauss(1.0, ENV_NOISE_SIGMA)
-        signal = true_level * env_noise
-        results.append(
-            CompoundMeasurement(
-                compound_id=compound_id,
-                true_effective_ug_per_kg=0.0,
-                calculated_conc_ug_per_kg=None,
-                pesticide_signal=round(signal, 6),
-                istd_signal=None,
-                extraction_manip_factor=1.0,
-                istd_correction_applied=False,
-                istd_phase=None,
-                nominal_conc_ng_per_ml=ctx.level_ng_per_ml,
-            )
-        )
-    return results
+    return {
+        compound_id: round(true_level * random.gauss(1.0, ENV_NOISE_SIGMA), 6)
+        for compound_id in ctx.compound_ids
+    }
 
 
-def _compute_compounds(
+def _compute_sample_responses(
     vial: WorkbenchTool, ctx: InjectionContext
-) -> list[CompoundMeasurement]:
-    """Apply the two-tier variance model to compute per-compound LC-MS/MS results."""
-    results: list[CompoundMeasurement] = []
+) -> dict[str, float]:
+    """Apply the two-tier variance model to get per-compound detector responses.
+
+    Returns the concentration reaching the detector for each compound, plus the
+    internal standard under its own compound id when one was added. Everything
+    downstream of this — ratios, calibration curves, concentrations — belongs to
+    the analysis application, not to Betalab.
+    """
+    del vial  # physics lives entirely in the injection context
+    responses: dict[str, float] = {}
     extraction_result = ctx.extraction_result
 
-    # Determine if ISTD correction is applicable
     extraction_manip = extraction_result.extraction_manip_factor if extraction_result else 1.0
     istd_manip = extraction_result.istd_manip_factor if extraction_result else None
-    istd_phase = extraction_result.istd_phase if extraction_result else None
 
     # Resolve true vs nominal volumes with fallbacks
     extract_true_v = ctx.extract_true_volume_ml if ctx.extract_true_volume_ml is not None else ctx.extract_volume_ml
@@ -554,38 +556,17 @@ def _compute_compounds(
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
         # Concentration in the extract using the TRUE delivered solvent volume
         pesticide_conc = (pesticide_amount_ng * extraction_manip) / extract_true_v
-        pesticide_signal = pesticide_conc * env_pest
+        responses[compound_id] = round(pesticide_conc * env_pest, 6)
 
-        istd_signal: float | None = None
-        calculated: float | None = None
-        correction_applied = False
-
-        if istd_true_v is not None and istd_manip is not None:
-            # ISTD was present in the tube during extraction at some phase
-            istd_amount_ng_true = istd_true_v * ctx.istd_reference_conc_ng_per_ml
-            env_istd = random.gauss(1.0, ENV_NOISE_SIGMA)
-            istd_conc = (istd_amount_ng_true * istd_manip) / extract_true_v
-            istd_signal = istd_conc * env_istd
-            ratio = pesticide_signal / istd_signal
-            # Back-calc uses the chemist's ASSUMED (nominal) ISTD amount ->
-            # the pipetting error (true vs nominal) surfaces here as an uncorrectable bias.
-            istd_amount_ng_nominal = (ctx.istd_volume_ml if ctx.istd_volume_ml is not None else istd_true_v) * ctx.istd_reference_conc_ng_per_ml
-            calculated = ratio * istd_amount_ng_nominal / (ctx.sample_mass_g * 1e-3)
-            correction_applied = True
-        else:
-            # External calibration: read concentration back to ug/kg via the NOMINAL dilution.
-            calculated = pesticide_signal * ctx.extract_volume_ml / (ctx.sample_mass_g * 1e-3)
-
-        results.append(
-            CompoundMeasurement(
-                compound_id=compound_id,
-                true_effective_ug_per_kg=round(true_effective_ug_per_kg, 4),
-                calculated_conc_ug_per_kg=round(calculated, 4) if calculated is not None else None,
-                pesticide_signal=round(pesticide_signal, 6),
-                istd_signal=round(istd_signal, 6) if istd_signal is not None else None,
-                extraction_manip_factor=round(extraction_manip, 4),
-                istd_correction_applied=correction_applied,
-                istd_phase=istd_phase,
-            )
+    if istd_true_v is not None and istd_manip is not None:
+        # The ISTD travelled with the sample through the extraction, so it carries
+        # its own manip factor and the same true solvent volume. Its channel is a
+        # transition like any other; whether it is used to correct anything is the
+        # analysis application's decision.
+        istd_amount_ng_true = istd_true_v * ctx.istd_reference_conc_ng_per_ml
+        istd_conc = (istd_amount_ng_true * istd_manip) / extract_true_v
+        responses[INTERNAL_STANDARD_COMPOUND_ID] = round(
+            istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6
         )
-    return results
+
+    return responses

@@ -20,7 +20,6 @@ from app.domain.acquisition_methods import (
 )
 from app.domain.models import (
     CalibrationContext,
-    CompoundMeasurement,
     ContainerLabel,
     EntityOrigin,
     Experiment,
@@ -41,6 +40,8 @@ from app.domain.models import (
     RackSlot,
     SequenceRun,
     SpatulaState,
+    TraceAcquisitionMetadata,
+    TransitionTrace,
     Trash,
     TrashProduceLotEntry,
     TrashSampleLabelEntry,
@@ -52,7 +53,11 @@ from app.domain.models import (
     WorkspaceWidget,
 )
 from app.schemas.acquisition_method import AcquisitionMethodSchema
-from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
+from app.schemas.experiment import (
+    ExperimentListEntrySchema,
+    ExperimentSchema,
+    TransitionTraceSchema,
+)
 from app.services.helpers.produce_canonical import (
     sync_canonical_produce_model,
     sync_pesticide_material_states,
@@ -361,6 +366,16 @@ def _deserialize_acquisition_method(schema: AcquisitionMethodSchema) -> Acquisit
     )
 
 
+def _deserialize_transition_trace(schema: TransitionTraceSchema) -> TransitionTrace:
+    return TransitionTrace(
+        injection_id=schema.injection_id,
+        transition=MrmTransition(**schema.transition.model_dump()),
+        times_s=list(schema.times_s),
+        intensities=list(schema.intensities),
+        acquisition=TraceAcquisitionMetadata(**schema.acquisition.model_dump()),
+    )
+
+
 def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
     workspace = Workspace(
         widgets=[
@@ -392,13 +407,14 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                         method_snapshot=_deserialize_acquisition_method(run.method_snapshot),
                         injections=[
                             InjectionMeasurement(
+                                id=injection.id,
                                 vial_id=injection.vial_id,
                                 vial_label=injection.vial_label,
                                 rack_slot_id=injection.rack_slot_id,
                                 status=injection.status,
-                                compounds=[
-                                    CompoundMeasurement(**compound.model_dump())
-                                    for compound in injection.compounds
+                                traces=[
+                                    _deserialize_transition_trace(trace)
+                                    for trace in injection.traces
                                 ],
                                 sample_name=injection.sample_name,
                                 injection_volume_ul=injection.injection_volume_ul,

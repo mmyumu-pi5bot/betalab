@@ -10,6 +10,7 @@ from app.domain.acquisition_methods import (
     APPLE_PESTICIDES_MRM_V1,
     APPLE_PESTICIDES_MRM_V1_ID,
     AcquisitionMethod,
+    MrmTransition,
 )
 from app.domain.rules import can_workspace_widget_store_now
 
@@ -146,29 +147,45 @@ class CalibrationContext:
             self.true_level_ng_per_ml = self.level_ng_per_ml
 
 
+@dataclass(frozen=True, slots=True)
+class TraceAcquisitionMetadata:
+    """How one MRM channel was acquired, and whether it could see anything."""
+    run_duration_s: float
+    point_count: int
+    sampling_interval_s: float
+    dwell_time_ms: float
+    polarity: str
+    #: The declared (Q1, Q3) pair addresses a real reference channel.
+    matched_reference_transition: bool
+    #: The declared retention window covers the moment the compound truly elutes.
+    acquired_in_retention_window: bool
+
+
 @dataclass
-class CompoundMeasurement:
-    """Single-compound result from an LC-MS/MS injection."""
-    compound_id: str
-    true_effective_ug_per_kg: float      # ground truth for transparency
-    calculated_conc_ug_per_kg: float | None
-    pesticide_signal: float              # raw signal in simulation units
-    istd_signal: float | None
-    extraction_manip_factor: float
-    istd_correction_applied: bool
-    istd_phase: str | None
-    # Set for calibration standard injections only (None for sample injections).
-    nominal_conc_ng_per_ml: float | None = None
+class TransitionTrace:
+    """Raw chromatogram recorded on one MRM channel of one injection.
+
+    This is instrumental output only: a time axis, an intensity axis, and the
+    frozen declaration of the channel that produced them. No peak integration,
+    no calibration curve and no concentration — those belong to the downstream
+    analysis application.
+    """
+    injection_id: str
+    transition: MrmTransition
+    times_s: list[float]
+    intensities: list[float]
+    acquisition: TraceAcquisitionMetadata
 
 
 @dataclass
 class InjectionMeasurement:
     """Per-vial result within a sequence run."""
+    id: str
     vial_id: str
     vial_label: str
     rack_slot_id: str
-    status: str  # "ok" | "no_extract_context"
-    compounds: list[CompoundMeasurement]
+    status: str  # "ok" | "no_extract_context" | "calibration"
+    traces: list[TransitionTrace]
     sample_name: str = ""
     injection_volume_ul: float = 5.0
     replicate_index: int = 1

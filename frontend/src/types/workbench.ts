@@ -474,24 +474,34 @@ export type InjectionContext = {
   istdReferenceConcNgPerMl: number;
 };
 
-export type CompoundMeasurement = {
-  compoundId: string;
-  trueEffectiveUgPerKg: number;
-  calculatedConcUgPerKg: number | null;
-  pesticideSignal: number;
-  istdSignal: number | null;
-  extractionManipFactor: number;
-  istdCorrectionApplied: boolean;
-  istdPhase: "pre_solvent" | "pre_salts" | "post_salts" | null;
-  nominalConcNgPerMl: number | null;
+export type TraceAcquisitionMetadata = {
+  runDurationS: number;
+  pointCount: number;
+  samplingIntervalS: number;
+  dwellTimeMs: number;
+  polarity: "positive" | "negative";
+  /** The declared (Q1, Q3) pair addresses a real reference channel. */
+  matchedReferenceTransition: boolean;
+  /** The declared retention window covers the moment the compound truly elutes. */
+  acquiredInRetentionWindow: boolean;
+};
+
+/** Raw chromatogram recorded on one MRM channel — no integration, no concentration. */
+export type TransitionTrace = {
+  injectionId: string;
+  transition: MrmTransition;
+  timesS: number[];
+  intensities: number[];
+  acquisition: TraceAcquisitionMetadata;
 };
 
 export type InjectionMeasurement = {
+  id: string;
   vialId: string;
   vialLabel: string;
   rackSlotId: string;
   status: "ok" | "no_extract_context" | "calibration";
-  compounds: CompoundMeasurement[];
+  traces: TransitionTrace[];
   sampleName: string;
   injectionVolumeUl: number;
   replicateIndex: number;

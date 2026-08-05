@@ -1,8 +1,11 @@
 """Tests for LC-MS/MS domain services: calibration preparation and sequence execution."""
 from __future__ import annotations
 
+import json
 import random
+import sqlite3
 from dataclasses import replace
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +22,7 @@ from app.domain.models import (
     WorkbenchTool,
     new_id,
 )
+from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
 from app.main import app
 from app.services.domain_services.lcmsms import (
     AcquisitionSequenceLineRequest,
@@ -30,8 +34,8 @@ from app.services.domain_services.lcmsms import (
     RunSequenceService,
     UnloadRackFromInstrumentRequest,
     UnloadRackFromInstrumentService,
-    _compute_calibration_compounds,
-    _compute_compounds,
+    _compute_calibration_responses,
+    _compute_sample_responses,
 )
 from app.services.domain_services.rack import (
     PlaceToolInRackSlotRequest,
@@ -282,8 +286,8 @@ class TestDrawPreparedLevel:
 # _compute_calibration_compounds — true-level-driven signal scatter
 # ---------------------------------------------------------------------------
 
-class TestComputeCalibrationCompounds:
-    def test_signal_scales_with_true_level_while_nominal_is_fixed(self) -> None:
+class TestComputeCalibrationResponses:
+    def test_response_follows_the_truly_prepared_level_not_the_declared_one(self) -> None:
         nominal = 50.0
         true_level_a = 49.0
         true_level_b = 52.0
@@ -299,21 +303,29 @@ class TestComputeCalibrationCompounds:
         )
 
         random.seed(SEED)
-        results_a = _compute_calibration_compounds(ctx_a)
+        responses_a = _compute_calibration_responses(ctx_a)
         random.seed(SEED)
-        results_b = _compute_calibration_compounds(ctx_b)
+        responses_b = _compute_calibration_responses(ctx_b)
 
-        assert len(results_a) == 1
-        assert len(results_b) == 1
-        m_a, m_b = results_a[0], results_b[0]
-
-        # Same seed → same env_noise draw → signals differ exactly by the true-level ratio.
-        assert m_b.pesticide_signal == pytest.approx(
-            m_a.pesticide_signal * (true_level_b / true_level_a), rel=1e-6
+        # Same seed → same env_noise draw → responses differ exactly by the true-level ratio.
+        assert responses_b["chlorpyrifos"] == pytest.approx(
+            responses_a["chlorpyrifos"] * (true_level_b / true_level_a), rel=1e-6
         )
-        # Nominal concentration (what the calibration curve assumes) is unaffected.
-        assert m_a.nominal_conc_ng_per_ml == nominal
-        assert m_b.nominal_conc_ng_per_ml == nominal
+
+    def test_covers_every_compound_of_the_standard(self) -> None:
+        ctx = CalibrationContext(
+            level_ng_per_ml=10.0,
+            compound_ids=["boscalid", "acetamiprid"],
+        )
+
+        responses = _compute_calibration_responses(ctx)
+
+        assert set(responses) == {"boscalid", "acetamiprid"}
+
+    def test_a_pure_standard_carries_no_internal_standard_channel(self) -> None:
+        ctx = CalibrationContext(level_ng_per_ml=10.0, compound_ids=["boscalid"])
+
+        assert INTERNAL_STANDARD_COMPOUND_ID not in _compute_calibration_responses(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -432,13 +444,14 @@ class TestRunSequenceWithCalibration:
         assert calibration.replicate_index == 1
         assert calibration.output_filename == "calibration_50.mzML"
         assert calibration.status == "calibration"
-        assert len(calibration.compounds) > 0
-        for c in calibration.compounds:
-            assert c.nominal_conc_ng_per_ml == 50.0
-            assert c.calculated_conc_ug_per_kg is None
-            assert c.extraction_manip_factor == 1.0
-            assert not c.istd_correction_applied
-            assert c.pesticide_signal > 0
+        assert calibration.id
+        # Every declared channel is recorded, whatever the vial holds.
+        assert len(calibration.traces) == len(APPLE_PESTICIDES_MRM_V1.transitions)
+        assert all(trace.injection_id == calibration.id for trace in calibration.traces)
+        boscalid_quantifier = next(
+            trace for trace in calibration.traces if trace.transition.id == "boscalid__quantifier"
+        )
+        assert max(boscalid_quantifier.intensities) > 1000.0
 
         first_sample, second_sample = run.injections[1:]
         assert first_sample.vial_id == sample_vial_id
@@ -745,6 +758,190 @@ class TestRunSequenceWithCalibration:
         with pytest.raises(AttributeError):
             run.method_snapshot.version = "9.9.9"  # type: ignore[misc]
 
+    def test_an_injected_run_is_reproducible_from_its_seed(self) -> None:
+        def run_once() -> list[list[float]]:
+            service = ExperimentRuntimeService()
+            exp_id = _create(service)
+            _deploy_instrument_and_rack(service, exp_id)
+            vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+            AddCalibrationToVialService(service).run(
+                exp_id,
+                AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0),
+            )
+            _load_rack_into_instrument(service, exp_id)
+            RunSequenceService(service, rng=random.Random(4242)).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                    injections=[
+                        AcquisitionSequenceLineRequest(
+                            rack_slot_id="rack_slot_1",
+                            sample_name="Cal 10",
+                            injection_volume_ul=5.0,
+                            repetitions=1,
+                            output_filename="cal_10.mzML",
+                        )
+                    ],
+                ),
+            )
+            exp = service._require_experiment(exp_id)
+            instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+            return [
+                trace.intensities
+                for trace in instrument.sequence_runs[0].injections[0].traces
+            ]
+
+        random.seed(SEED)
+        first = run_once()
+        random.seed(SEED)
+        second = run_once()
+
+        assert first == second
+
+    def test_traces_follow_the_selected_method(self) -> None:
+        """A method declaring fewer channels records fewer traces."""
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+        two_channel_method = replace(
+            APPLE_PESTICIDES_MRM_V1,
+            id="two_channel_educational",
+            transitions=APPLE_PESTICIDES_MRM_V1.transitions[:2],
+        )
+
+        with patch(
+            "app.services.domain_services.lcmsms.get_acquisition_method",
+            return_value=two_channel_method,
+        ):
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id="two_channel_educational",
+                    injections=[
+                        AcquisitionSequenceLineRequest(
+                            rack_slot_id="rack_slot_1",
+                            sample_name="Apple A",
+                            injection_volume_ul=5.0,
+                            repetitions=1,
+                            output_filename="apple_a.mzML",
+                        )
+                    ],
+                ),
+            )
+
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        injection = instrument.sequence_runs[0].injections[0]
+        assert len(injection.traces) == 2
+        assert [trace.transition.id for trace in injection.traces] == [
+            t.id for t in two_channel_method.transitions
+        ]
+
+    def test_roundtrip_preserves_the_traces(self, tmp_path) -> None:
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        AddCalibrationToVialService(service).run(
+            exp_id,
+            AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=25.0),
+        )
+        _load_rack_into_instrument(service, exp_id)
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Cal 25",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="cal_25.mzML",
+                    )
+                ],
+            ),
+        )
+        original = next(
+            w for w in service._require_experiment(exp_id).workspace.widgets
+            if w.id == "instrument"
+        ).sequence_runs[0].injections[0]
+
+        reloaded_experiment = ExperimentRuntimeService(
+            repository=repository
+        )._require_experiment(exp_id)
+        instrument = next(
+            w for w in reloaded_experiment.workspace.widgets if w.id == "instrument"
+        )
+        reloaded = instrument.sequence_runs[0].injections[0]
+
+        assert reloaded.id == original.id
+        assert len(reloaded.traces) == len(original.traces)
+        assert reloaded.traces[0].times_s == original.traces[0].times_s
+        assert reloaded.traces[0].intensities == original.traces[0].intensities
+        assert reloaded.traces[0].transition == original.traces[0].transition
+        assert reloaded.traces[0].acquisition == original.traces[0].acquisition
+
+    def test_a_pre_trace_run_reloads_without_traces(self, tmp_path) -> None:
+        """Explicit migration: runs acquired before traces existed keep their metadata.
+
+        Raw signal cannot be reconstructed after the fact — the generator state is
+        gone — so such a run reloads with an empty trace list rather than with
+        invented data.
+        """
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Legacy",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="legacy.mzML",
+                    )
+                ],
+            ),
+        )
+        # Rewrite the stored payload in the pre-trace shape.
+        with sqlite3.connect(str(tmp_path / "experiments.sqlite3")) as connection:
+            row = connection.execute(
+                "SELECT payload FROM experiments WHERE id = ?", (exp_id,)
+            ).fetchone()
+            payload = json.loads(row[0])
+            for widget in payload["workspace"]["widgets"]:
+                for run in widget.get("sequence_runs", []):
+                    for injection in run["injections"]:
+                        injection.pop("traces", None)
+                        injection.pop("id", None)
+                        injection["compounds"] = [
+                            {"compound_id": "boscalid", "pesticide_signal": 1.0}
+                        ]
+            connection.execute(
+                "UPDATE experiments SET payload = ? WHERE id = ?",
+                (json.dumps(payload), exp_id),
+            )
+            connection.commit()
+
+        reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        instrument = next(w for w in reloaded.workspace.widgets if w.id == "instrument")
+        injection = instrument.sequence_runs[0].injections[0]
+
+        assert injection.traces == []
+        assert injection.sample_name == "Legacy"
+        assert injection.output_filename == "legacy.mzML"
+        assert not hasattr(injection, "compounds")
+
     def test_rejects_an_unknown_acquisition_method(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
@@ -1005,112 +1202,102 @@ def _make_ctx(
 SEED = 1234
 
 
-class TestComputeCompoundsInvariants:
-    def test_recovers_truth_with_all_factors_one(self) -> None:
-        """INV0: all factors = 1, true == nominal → calculated == true_effective exactly."""
+
+
+class TestSampleResponseInvariants:
+    """The extraction physics, restated on the raw observable.
+
+    Betalab no longer computes a concentration, so these invariants are asserted
+    where they are actually visible: on the detector response, and on the
+    pesticide/ISTD response ratio the analysis application will work from.
+    """
+
+    def _ratio(self, responses: dict[str, float]) -> float:
+        return responses["chlorpyrifos"] / responses[INTERNAL_STANDARD_COMPOUND_ID]
+
+    def test_response_ratio_matches_the_theoretical_amount_ratio(self) -> None:
+        """INV0: all factors = 1 → the ratio is amount_pesticide / amount_istd."""
         ctx = _make_ctx(
             true_effective_ug_per_kg=100.0,
             sample_mass_g=10.0,
+            sample_true_mass_g=10.0,
             extract_nominal=10.0,
             extract_true=10.0,
             istd_nominal=0.05,
             istd_true=0.05,
             extraction_manip=1.0,
             istd_manip=1.0,
-            istd_phase="pre_solvent",
             ref_conc=100.0,
         )
-        random.seed(SEED)
-        results = _compute_compounds(_make_vial(), ctx)
-        assert len(results) == 1
-        m = results[0]
-        assert m.istd_correction_applied is True
-        # With same seed, env noise cancels in ratio: calculated ≈ true_effective
-        assert m.calculated_conc_ug_per_kg == pytest.approx(100.0, rel=0.02)
 
-    def test_solvent_error_self_corrects_inv1(self) -> None:
-        """INV1: extract_true differs from extract_nominal but ISTD present → calculated unchanged."""
-        ctx_nominal = _make_ctx(
-            extract_nominal=10.0,
-            extract_true=10.0,
-            istd_nominal=0.05,
-            istd_true=0.05,
+        random.seed(SEED)
+        responses = _compute_sample_responses(_make_vial(), ctx)
+
+        expected = (100.0 * 10.0 * 1e-3) / (0.05 * 100.0)
+        assert self._ratio(responses) == pytest.approx(expected, rel=0.02)
+
+    def test_solvent_volume_error_cancels_in_the_ratio_inv1(self) -> None:
+        """INV1: a wrong solvent volume dilutes analyte and ISTD alike."""
+        ctx_nominal = _make_ctx(extract_nominal=10.0, extract_true=10.0)
+        ctx_biased = _make_ctx(extract_nominal=10.0, extract_true=8.0)
+
+        random.seed(SEED)
+        nominal = _compute_sample_responses(_make_vial(), ctx_nominal)
+        random.seed(SEED)
+        biased = _compute_sample_responses(_make_vial(), ctx_biased)
+
+        # Both channels rise by 10/8, so the ratio is untouched...
+        assert self._ratio(biased) == pytest.approx(self._ratio(nominal), rel=1e-4)
+        # ...while the raw responses themselves clearly moved.
+        assert biased["chlorpyrifos"] == pytest.approx(
+            nominal["chlorpyrifos"] * (10.0 / 8.0), rel=1e-4
         )
-        ctx_biased = _make_ctx(
-            extract_nominal=10.0,
-            extract_true=8.0,   # wrong delivered volume
-            istd_nominal=0.05,
-            istd_true=0.05,
-        )
 
-        random.seed(SEED)
-        results_nominal = _compute_compounds(_make_vial(), ctx_nominal)
-        random.seed(SEED)
-        results_biased = _compute_compounds(_make_vial(), ctx_biased)
-
-        calc_nominal = results_nominal[0].calculated_conc_ug_per_kg
-        calc_biased = results_biased[0].calculated_conc_ug_per_kg
-
-        assert calc_nominal is not None
-        assert calc_biased is not None
-        # Extract volume cancels in ratio — ISTD auto-corrects the shared solvent error
-        assert calc_biased == pytest.approx(calc_nominal, rel=1e-6)
-
-    def test_hidden_sample_mass_bias_survives_istd_correction(self) -> None:
+    def test_hidden_sample_mass_bias_survives_in_the_ratio(self) -> None:
         baseline = _make_ctx(sample_mass_g=10.0, sample_true_mass_g=10.0)
         undersampled = _make_ctx(sample_mass_g=10.0, sample_true_mass_g=8.0)
 
         random.seed(SEED)
-        baseline_result = _compute_compounds(_make_vial(), baseline)[0]
+        baseline_responses = _compute_sample_responses(_make_vial(), baseline)
         random.seed(SEED)
-        undersampled_result = _compute_compounds(_make_vial(), undersampled)[0]
+        undersampled_responses = _compute_sample_responses(_make_vial(), undersampled)
 
-        assert baseline_result.calculated_conc_ug_per_kg is not None
-        assert undersampled_result.calculated_conc_ug_per_kg is not None
-        assert (
-            undersampled_result.calculated_conc_ug_per_kg
-            / baseline_result.calculated_conc_ug_per_kg
-        ) == pytest.approx(0.8)
+        # Less sample really was weighed, and no ISTD ratio can hide it.
+        assert self._ratio(undersampled_responses) / self._ratio(baseline_responses) == (
+            pytest.approx(0.8, rel=1e-4)
+        )
 
-    def test_istd_pipetting_error_biases_inv2(self) -> None:
-        """INV2: istd_true != istd_nominal → calculated biased by istd_nominal / istd_true."""
+    def test_istd_pipetting_error_biases_the_ratio_inv2(self) -> None:
         istd_nominal = 0.05
-        istd_true = 0.04   # chemist delivered less than expected
+        istd_true = 0.04
 
-        ctx_baseline = _make_ctx(
-            istd_nominal=istd_nominal,
-            istd_true=istd_nominal,  # true == nominal (no pipetting error)
-        )
-        ctx_biased = _make_ctx(
-            istd_nominal=istd_nominal,
-            istd_true=istd_true,  # true != nominal (ISTD pipetting error)
-        )
+        ctx_baseline = _make_ctx(istd_nominal=istd_nominal, istd_true=istd_nominal)
+        ctx_biased = _make_ctx(istd_nominal=istd_nominal, istd_true=istd_true)
 
         random.seed(SEED)
-        results_baseline = _compute_compounds(_make_vial(), ctx_baseline)
+        baseline_responses = _compute_sample_responses(_make_vial(), ctx_baseline)
         random.seed(SEED)
-        results_biased = _compute_compounds(_make_vial(), ctx_biased)
+        biased_responses = _compute_sample_responses(_make_vial(), ctx_biased)
 
-        calc_baseline = results_baseline[0].calculated_conc_ug_per_kg
-        calc_biased = results_biased[0].calculated_conc_ug_per_kg
+        # Too little ISTD delivered → its channel is weaker → the ratio inflates.
+        assert self._ratio(biased_responses) / self._ratio(baseline_responses) == (
+            pytest.approx(istd_nominal / istd_true, rel=1e-4)
+        )
+        assert biased_responses["chlorpyrifos"] == pytest.approx(
+            baseline_responses["chlorpyrifos"], rel=1e-4
+        )
 
-        assert calc_baseline is not None
-        assert calc_biased is not None
-        expected_ratio = istd_nominal / istd_true  # = 0.05 / 0.04 = 1.25
-        actual_ratio = calc_biased / calc_baseline
-        assert actual_ratio == pytest.approx(expected_ratio, rel=1e-6)
-
-    def test_external_calibration_biased_inv4(self) -> None:
-        """INV4: no ISTD, extraction_manip != 1 and extract_true != extract_nominal → calculated biased."""
+    def test_without_istd_the_response_carries_the_full_bias_inv4(self) -> None:
+        """INV4: no ISTD channel, so extraction and solvent errors stay visible."""
         true_effective = 100.0
         extraction_manip = 0.9
         extract_true = 8.0
-        extract_nominal = 10.0
 
         ctx = _make_ctx(
             true_effective_ug_per_kg=true_effective,
             sample_mass_g=10.0,
-            extract_nominal=extract_nominal,
+            sample_true_mass_g=10.0,
+            extract_nominal=10.0,
             extract_true=extract_true,
             istd_nominal=None,
             istd_true=None,
@@ -1120,12 +1307,14 @@ class TestComputeCompoundsInvariants:
         )
 
         random.seed(SEED)
-        results = _compute_compounds(_make_vial(), ctx)
-        m = results[0]
-        assert m.istd_correction_applied is False
-        # expected: pesticide_conc = (true_effective * sample_mass * 1e-3 * extraction_manip) / extract_true
-        # calculated = pesticide_signal * extract_nominal / (sample_mass * 1e-3)
-        # = pesticide_conc * env * extract_nominal / (sample_mass * 1e-3)
-        # ignoring env noise:  = true_effective * extraction_manip * extract_nominal / extract_true
-        expected_no_noise = true_effective * extraction_manip * (extract_nominal / extract_true)
-        assert m.calculated_conc_ug_per_kg == pytest.approx(expected_no_noise, rel=0.02)
+        responses = _compute_sample_responses(_make_vial(), ctx)
+
+        assert INTERNAL_STANDARD_COMPOUND_ID not in responses
+        expected = (true_effective * 10.0 * 1e-3 * extraction_manip) / extract_true
+        assert responses["chlorpyrifos"] == pytest.approx(expected, rel=0.02)
+
+    def test_returns_no_quantification_only_raw_responses(self) -> None:
+        responses = _compute_sample_responses(_make_vial(), _make_ctx())
+
+        assert set(responses) == {"chlorpyrifos", INTERNAL_STANDARD_COMPOUND_ID}
+        assert all(isinstance(value, float) for value in responses.values())

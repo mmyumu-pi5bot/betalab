@@ -40,7 +40,7 @@ from app.domain.spatula_rules import (
     SPATULA_LOAD_SOURCE_TOOL_TYPES,
     SPATULA_POUR_TARGET_TOOL_TYPES,
 )
-from app.schemas.acquisition_method import AcquisitionMethodSchema
+from app.schemas.acquisition_method import AcquisitionMethodSchema, MrmTransitionSchema
 
 
 class WorkbenchLiquidSchema(BaseModel):
@@ -92,24 +92,31 @@ class InjectionContextSchema(BaseModel):
     istd_true_volume_ml: float | None = Field(default=None, exclude=True)
 
 
-class CompoundMeasurementSchema(BaseModel):
-    compound_id: str
-    true_effective_ug_per_kg: float
-    calculated_conc_ug_per_kg: float | None = None
-    pesticide_signal: float
-    istd_signal: float | None = None
-    extraction_manip_factor: float
-    istd_correction_applied: bool
-    istd_phase: str | None = None
-    nominal_conc_ng_per_ml: float | None = None
+class TraceAcquisitionMetadataSchema(BaseModel):
+    run_duration_s: float
+    point_count: int
+    sampling_interval_s: float
+    dwell_time_ms: float
+    polarity: str
+    matched_reference_transition: bool
+    acquired_in_retention_window: bool
+
+
+class TransitionTraceSchema(BaseModel):
+    injection_id: str
+    transition: MrmTransitionSchema
+    times_s: list[float] = Field(default_factory=list)
+    intensities: list[float] = Field(default_factory=list)
+    acquisition: TraceAcquisitionMetadataSchema
 
 
 class InjectionMeasurementSchema(BaseModel):
+    id: str = ""
     vial_id: str
     vial_label: str
     rack_slot_id: str
     status: str
-    compounds: list[CompoundMeasurementSchema] = Field(default_factory=list)
+    traces: list[TransitionTraceSchema] = Field(default_factory=list)
     sample_name: str = ""
     injection_volume_ul: float = 5.0
     replicate_index: int = 1

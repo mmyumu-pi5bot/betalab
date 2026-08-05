@@ -11,7 +11,7 @@ import { FloatingWidget } from "@/components/floating-widget";
 import { GrinderWidgetContent } from "@/components/grinder-widget-content";
 import { GrossBalanceWidget } from "@/components/gross-balance-widget";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
-import { LcMsMsResultsTable } from "@/components/lcmsms-results-table";
+import { LcMsMsRunResults } from "@/components/lcmsms-run-results";
 import {
   buildDefaultRunSequencePayload,
   LcMsMsAcquisitionConsole,
@@ -677,7 +677,7 @@ export function LabSceneWorkspaceCanvas({
                     />
                   ) : null}
                   <div className="mt-4">
-                    <LcMsMsResultsTable runs={widget.sequenceRuns ?? []} />
+                    <LcMsMsRunResults runs={widget.sequenceRuns ?? []} />
                   </div>
                 </WorkspaceEquipmentWidget>
               ) : widgetId === "vortex" ? (

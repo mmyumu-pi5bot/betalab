@@ -23,6 +23,8 @@ import type {
   SpatulaState,
   ToolbarCategory,
   ToolbarItem,
+  TraceAcquisitionMetadata,
+  TransitionTrace,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
   WidgetAnchor,
@@ -2438,6 +2440,7 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
     methodSnapshot: normalizeAcquisitionMethod(run.methodSnapshot ?? run.method_snapshot),
     injections: Array.isArray(run.injections)
       ? run.injections.map((inj: Record<string, unknown>) => ({
+          id: String(inj.id ?? ""),
           vialId: String(inj.vialId ?? inj.vial_id ?? ""),
           vialLabel: String(inj.vialLabel ?? inj.vial_label ?? ""),
           rackSlotId: String(inj.rackSlotId ?? inj.rack_slot_id ?? ""),
@@ -2448,47 +2451,47 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
           ),
           replicateIndex: Number(inj.replicateIndex ?? inj.replicate_index ?? 1),
           outputFilename: String(inj.outputFilename ?? inj.output_filename ?? ""),
-          compounds: Array.isArray(inj.compounds)
-            ? inj.compounds.map((c: Record<string, unknown>) => ({
-                compoundId: String(c.compoundId ?? c.compound_id ?? ""),
-                trueEffectiveUgPerKg: Number(
-                  c.trueEffectiveUgPerKg ?? c.true_effective_ug_per_kg ?? 0,
-                ),
-                calculatedConcUgPerKg:
-                  c.calculatedConcUgPerKg != null
-                    ? Number(c.calculatedConcUgPerKg)
-                    : c.calculated_conc_ug_per_kg != null
-                      ? Number(c.calculated_conc_ug_per_kg)
-                      : null,
-                pesticideSignal: Number(c.pesticideSignal ?? c.pesticide_signal ?? 0),
-                istdSignal:
-                  c.istdSignal != null
-                    ? Number(c.istdSignal)
-                    : c.istd_signal != null
-                      ? Number(c.istd_signal)
-                      : null,
-                extractionManipFactor: Number(
-                  c.extractionManipFactor ?? c.extraction_manip_factor ?? 1,
-                ),
-                istdCorrectionApplied: Boolean(
-                  c.istdCorrectionApplied ?? c.istd_correction_applied ?? false,
-                ),
-                istdPhase: (c.istdPhase ?? c.istd_phase ?? null) as
-                  | "pre_solvent"
-                  | "pre_salts"
-                  | "post_salts"
-                  | null,
-                nominalConcNgPerMl:
-                  c.nominalConcNgPerMl != null
-                    ? Number(c.nominalConcNgPerMl)
-                    : c.nominal_conc_ng_per_ml != null
-                      ? Number(c.nominal_conc_ng_per_ml)
-                      : null,
-              }))
+          traces: Array.isArray(inj.traces)
+            ? (inj.traces as Record<string, unknown>[]).map(normalizeTransitionTrace)
             : [],
         }))
       : [],
   }));
+}
+
+export function normalizeTransitionTrace(raw: Record<string, unknown>): TransitionTrace {
+  const acquisition = (raw.acquisition ?? {}) as Record<string, unknown>;
+  return {
+    injectionId: String(raw.injectionId ?? raw.injection_id ?? ""),
+    transition: normalizeMrmTransition((raw.transition ?? {}) as Record<string, unknown>),
+    timesS: Array.isArray(raw.timesS ?? raw.times_s)
+      ? ((raw.timesS ?? raw.times_s) as unknown[]).map(Number)
+      : [],
+    intensities: Array.isArray(raw.intensities)
+      ? (raw.intensities as unknown[]).map(Number)
+      : [],
+    acquisition: {
+      runDurationS: Number(acquisition.runDurationS ?? acquisition.run_duration_s ?? 0),
+      pointCount: Number(acquisition.pointCount ?? acquisition.point_count ?? 0),
+      samplingIntervalS: Number(
+        acquisition.samplingIntervalS ?? acquisition.sampling_interval_s ?? 0,
+      ),
+      dwellTimeMs: Number(acquisition.dwellTimeMs ?? acquisition.dwell_time_ms ?? 0),
+      polarity: String(
+        acquisition.polarity ?? "positive",
+      ) as TraceAcquisitionMetadata["polarity"],
+      matchedReferenceTransition: Boolean(
+        acquisition.matchedReferenceTransition ??
+          acquisition.matched_reference_transition ??
+          false,
+      ),
+      acquiredInRetentionWindow: Boolean(
+        acquisition.acquiredInRetentionWindow ??
+          acquisition.acquired_in_retention_window ??
+          false,
+      ),
+    },
+  };
 }
 
 type ProduceLotNormalizationContext = {
