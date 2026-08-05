@@ -105,8 +105,6 @@ class InjectionMeasurementSchema(BaseModel):
     status: str
     compounds: list[CompoundMeasurementSchema] = Field(default_factory=list)
     sample_name: str = ""
-    sample_type: Literal["calibration", "sample"] = "sample"
-    calibration_level_ng_per_ml: float | None = None
     injection_volume_ul: float = 5.0
     replicate_index: int = 1
     output_filename: str = ""

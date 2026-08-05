@@ -396,8 +396,6 @@ class TestRunSequenceWithCalibration:
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_4",
                         sample_name="Apple sample",
-                        sample_type="sample",
-                        calibration_level_ng_per_ml=None,
                         injection_volume_ul=3.0,
                         repetitions=2,
                         output_filename="apple_sample.mzML",
@@ -405,8 +403,6 @@ class TestRunSequenceWithCalibration:
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_2",
                         sample_name="Calibration 50",
-                        sample_type="calibration",
-                        calibration_level_ng_per_ml=50.0,
                         injection_volume_ul=5.0,
                         repetitions=1,
                         output_filename="calibration_50.mzML",
@@ -428,8 +424,6 @@ class TestRunSequenceWithCalibration:
         calibration = run.injections[0]
         assert calibration.vial_id == calibration_vial_id
         assert calibration.sample_name == "Calibration 50"
-        assert calibration.sample_type == "calibration"
-        assert calibration.calibration_level_ng_per_ml == 50.0
         assert calibration.injection_volume_ul == 5.0
         assert calibration.replicate_index == 1
         assert calibration.output_filename == "calibration_50.mzML"
@@ -445,19 +439,18 @@ class TestRunSequenceWithCalibration:
         first_sample, second_sample = run.injections[1:]
         assert first_sample.vial_id == sample_vial_id
         assert first_sample.sample_name == "Apple sample"
-        assert first_sample.sample_type == "sample"
         assert first_sample.injection_volume_ul == 3.0
         assert first_sample.replicate_index == 1
         assert first_sample.output_filename == "apple_sample_r1.mzML"
         assert second_sample.replicate_index == 2
         assert second_sample.output_filename == "apple_sample_r2.mzML"
 
-    def test_declared_roles_do_not_change_the_physical_vial_contents(self) -> None:
+    def test_injection_status_follows_the_physical_vial_only(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
         physical_calibration_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-        empty_sample_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
+        empty_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
         AddCalibrationToVialService(service).run(
             exp_id,
             AddCalibrationToVialRequest(
@@ -474,21 +467,17 @@ class TestRunSequenceWithCalibration:
                 injections=[
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_1",
-                        sample_name="Declared sample",
-                        sample_type="sample",
-                        calibration_level_ng_per_ml=None,
+                        sample_name="Vial one",
                         injection_volume_ul=5.0,
                         repetitions=1,
-                        output_filename="declared_sample.mzML",
+                        output_filename="vial_one.mzML",
                     ),
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_2",
-                        sample_name="Declared calibration",
-                        sample_type="calibration",
-                        calibration_level_ng_per_ml=10.0,
+                        sample_name="Vial two",
                         injection_volume_ul=5.0,
                         repetitions=1,
-                        output_filename="declared_calibration.mzML",
+                        output_filename="vial_two.mzML",
                     ),
                 ],
             ),
@@ -496,21 +485,119 @@ class TestRunSequenceWithCalibration:
 
         exp = service._require_experiment(exp_id)
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
-        physical_calibration, empty_sample = instrument.sequence_runs[0].injections
-        assert physical_calibration.sample_type == "sample"
+        physical_calibration, empty_vial = instrument.sequence_runs[0].injections
+        assert physical_calibration.vial_id == physical_calibration_id
         assert physical_calibration.status == "calibration"
-        assert empty_sample.vial_id == empty_sample_id
-        assert empty_sample.sample_type == "calibration"
-        assert empty_sample.status == "no_extract_context"
+        assert empty_vial.vial_id == empty_vial_id
+        assert empty_vial.status == "no_extract_context"
 
-    def test_step_one_requires_one_calibration_and_one_sample(self) -> None:
+    def test_accepts_a_single_vial(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
         _place_vial_in_rack(service, exp_id, "rack_slot_1")
         _load_rack_into_instrument(service, exp_id)
 
-        with pytest.raises(ValueError, match="one calibration and one sample"):
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=FIXED_ACQUISITION_METHOD_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Lone vial",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="lone_vial.mzML",
+                    )
+                ],
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        assert [inj.sample_name for inj in instrument.sequence_runs[0].injections] == [
+            "Lone vial"
+        ]
+
+    def test_accepts_two_calibrants_and_one_sample(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        first_calibrant_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        second_calibrant_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
+        _place_vial_in_rack(service, exp_id, "rack_slot_3")
+        for vial_id, level in ((first_calibrant_id, 10.0), (second_calibrant_id, 50.0)):
+            AddCalibrationToVialService(service).run(
+                exp_id,
+                AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=level),
+            )
+        _load_rack_into_instrument(service, exp_id)
+
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=FIXED_ACQUISITION_METHOD_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id=f"rack_slot_{position}",
+                        sample_name=name,
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename=f"{name.lower()}.mzML",
+                    )
+                    for position, name in ((1, "Cal10"), (2, "Cal50"), (3, "AppleA"))
+                ],
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        injections = instrument.sequence_runs[0].injections
+        assert [inj.sample_name for inj in injections] == ["Cal10", "Cal50", "AppleA"]
+        assert [inj.status for inj in injections] == [
+            "calibration",
+            "calibration",
+            "no_extract_context",
+        ]
+
+    def test_accepts_several_samples_without_any_calibrant(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        for position in (1, 2, 3):
+            _place_vial_in_rack(service, exp_id, f"rack_slot_{position}")
+        _load_rack_into_instrument(service, exp_id)
+
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=FIXED_ACQUISITION_METHOD_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id=f"rack_slot_{position}",
+                        sample_name=f"Apple {position}",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename=f"apple_{position}.mzML",
+                    )
+                    for position in (1, 2, 3)
+                ],
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        assert len(instrument.sequence_runs[0].injections) == 3
+
+    def test_rejects_a_sequence_line_without_a_sample_name(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+
+        with pytest.raises(ValueError, match="sample name"):
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
@@ -518,13 +605,62 @@ class TestRunSequenceWithCalibration:
                     injections=[
                         AcquisitionSequenceLineRequest(
                             rack_slot_id="rack_slot_1",
-                            sample_name="Only sample",
-                            sample_type="sample",
-                            calibration_level_ng_per_ml=None,
+                            sample_name="   ",
                             injection_volume_ul=5.0,
                             repetitions=1,
-                            output_filename="only_sample.mzML",
+                            output_filename="unnamed.mzML",
                         )
+                    ],
+                ),
+            )
+
+    def test_rejects_duplicate_rack_positions(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+
+        with pytest.raises(ValueError, match="exactly once"):
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    injections=[
+                        AcquisitionSequenceLineRequest(
+                            rack_slot_id="rack_slot_1",
+                            sample_name=name,
+                            injection_volume_ul=5.0,
+                            repetitions=1,
+                            output_filename=f"{name}.mzML",
+                        )
+                        for name in ("first", "second")
+                    ],
+                ),
+            )
+
+    def test_rejects_duplicate_output_filenames(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _place_vial_in_rack(service, exp_id, "rack_slot_2")
+        _load_rack_into_instrument(service, exp_id)
+
+        with pytest.raises(ValueError, match="unique"):
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    injections=[
+                        AcquisitionSequenceLineRequest(
+                            rack_slot_id=f"rack_slot_{position}",
+                            sample_name=f"Vial {position}",
+                            injection_volume_ul=5.0,
+                            repetitions=1,
+                            output_filename="same.mzML",
+                        )
+                        for position in (1, 2)
                     ],
                 ),
             )
@@ -592,8 +728,6 @@ class TestRunSequenceWithCalibration:
                 AcquisitionSequenceLineRequest(
                     rack_slot_id="rack_slot_1",
                     sample_name="Cal 10",
-                    sample_type="calibration",
-                    calibration_level_ng_per_ml=10.0,
                     injection_volume_ul=5.0,
                     repetitions=1,
                     output_filename="cal_10.mzML",
@@ -601,8 +735,6 @@ class TestRunSequenceWithCalibration:
                 AcquisitionSequenceLineRequest(
                     rack_slot_id="rack_slot_2",
                     sample_name="Apple A",
-                    sample_type="sample",
-                    calibration_level_ng_per_ml=None,
                     injection_volume_ul=3.0,
                     repetitions=1,
                     output_filename="apple_a.mzML",
@@ -645,8 +777,6 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
                 {
                     "rack_slot_id": "rack_slot_1",
                     "sample_name": "Cal 10",
-                    "sample_type": "calibration",
-                    "calibration_level_ng_per_ml": 10,
                     "injection_volume_ul": 5,
                     "repetitions": 1,
                     "output_filename": "cal_10.mzML",
@@ -654,8 +784,6 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
                 {
                     "rack_slot_id": "rack_slot_2",
                     "sample_name": "Apple A",
-                    "sample_type": "sample",
-                    "calibration_level_ng_per_ml": None,
                     "injection_volume_ul": 5,
                     "repetitions": 1,
                     "output_filename": "apple_a.mzML",

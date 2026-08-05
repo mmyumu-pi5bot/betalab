@@ -493,8 +493,6 @@ export type InjectionMeasurement = {
   status: "ok" | "no_extract_context" | "calibration";
   compounds: CompoundMeasurement[];
   sampleName: string;
-  sampleType: "calibration" | "sample";
-  calibrationLevelNgPerMl: number | null;
   injectionVolumeUl: number;
   replicateIndex: number;
   outputFilename: string;

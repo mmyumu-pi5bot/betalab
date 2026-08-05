@@ -226,8 +226,6 @@ export type RestoreTrashedToolToRackSlotPayload = {
 export type AcquisitionSequenceLinePayload = {
   rack_slot_id: string;
   sample_name: string;
-  sample_type: "calibration" | "sample";
-  calibration_level_ng_per_ml: number | null;
   injection_volume_ul: number;
   repetitions: number;
   output_filename: string;

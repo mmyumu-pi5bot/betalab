@@ -5858,12 +5858,10 @@ describe("LabScene", () => {
           expect.objectContaining({
             rack_slot_id: "rack_slot_1",
             sample_name: "Cal 10",
-            sample_type: "calibration",
           }),
           expect.objectContaining({
             rack_slot_id: "rack_slot_2",
             sample_name: "Apple A",
-            sample_type: "sample",
           }),
         ],
       },
@@ -5924,12 +5922,10 @@ describe("LabScene", () => {
           expect.objectContaining({
             rack_slot_id: "rack_slot_1",
             sample_name: "Cal 10",
-            sample_type: "calibration",
           }),
           expect.objectContaining({
             rack_slot_id: "rack_slot_2",
             sample_name: "Configured apple sample",
-            sample_type: "sample",
           }),
         ],
       },

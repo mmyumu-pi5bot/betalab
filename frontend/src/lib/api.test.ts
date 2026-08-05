@@ -143,8 +143,6 @@ describe("api client", () => {
         {
           rack_slot_id: "rack_slot_1",
           sample_name: "Cal 10",
-          sample_type: "calibration",
-          calibration_level_ng_per_ml: 10,
           injection_volume_ul: 5,
           repetitions: 1,
           output_filename: "cal_10.mzML",
@@ -152,8 +150,6 @@ describe("api client", () => {
         {
           rack_slot_id: "rack_slot_2",
           sample_name: "Apple A",
-          sample_type: "sample",
-          calibration_level_ng_per_ml: null,
           injection_volume_ul: 5,
           repetitions: 1,
           output_filename: "apple_a.mzML",

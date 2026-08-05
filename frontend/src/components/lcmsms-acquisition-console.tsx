@@ -42,14 +42,9 @@ function buildInitialLines(rackSlots: RackSlot[]): AcquisitionSequenceLinePayloa
     .sort((left, right) => rackPosition(left) - rackPosition(right))
     .map((slot) => {
       const name = sampleName(slot.tool);
-      const isCalibration = slot.tool.calibrationContext !== null && slot.tool.calibrationContext !== undefined;
       return {
         rack_slot_id: slot.id,
         sample_name: name,
-        sample_type: isCalibration ? "calibration" : "sample",
-        calibration_level_ng_per_ml: isCalibration
-          ? slot.tool.calibrationContext?.levelNgPerMl ?? null
-          : null,
         injection_volume_ul: 5,
         repetitions: 1,
         output_filename: `${String(rackPosition(slot)).padStart(2, "0")}_${safeFilenamePart(name)}.mzML`,
@@ -67,22 +62,15 @@ function replicateFilename(filename: string, replicateIndex: number, repetitions
 }
 
 export function validateLines(lines: AcquisitionSequenceLinePayload[]): string | null {
-  const calibrationCount = lines.filter((line) => line.sample_type === "calibration").length;
-  const sampleCount = lines.filter((line) => line.sample_type === "sample").length;
-  if (lines.length !== 2 || calibrationCount !== 1 || sampleCount !== 1) {
-    return "Step one requires exactly one calibration and one sample.";
+  if (lines.length === 0) {
+    return "The sequence needs at least one vial in the rack.";
+  }
+  const slotIds = lines.map((line) => line.rack_slot_id);
+  if (new Set(slotIds).size !== slotIds.length) {
+    return "Each occupied rack position must appear exactly once.";
   }
   if (lines.some((line) => !line.sample_name.trim())) {
     return "Every line needs a sample name.";
-  }
-  if (
-    lines.some(
-      (line) =>
-        line.sample_type === "calibration" &&
-        (line.calibration_level_ng_per_ml === null || line.calibration_level_ng_per_ml <= 0),
-    )
-  ) {
-    return "The calibration line needs a positive level.";
   }
   if (lines.some((line) => line.injection_volume_ul <= 0 || line.injection_volume_ul > 100)) {
     return "Injection volume must be between 0 and 100 µL.";
@@ -117,16 +105,7 @@ export function LcMsMsAcquisitionConsole({
     onSequenceChange({
       ...sequence,
       injections: lines.map((line, lineIndex) =>
-        lineIndex === index
-          ? {
-              ...line,
-              ...patch,
-              calibration_level_ng_per_ml:
-                patch.sample_type === "sample"
-                  ? null
-                  : patch.calibration_level_ng_per_ml ?? line.calibration_level_ng_per_ml,
-            }
-          : line,
+        lineIndex === index ? { ...line, ...patch } : line,
       ),
     });
   }
@@ -177,40 +156,6 @@ export function LcMsMsAcquisitionConsole({
                 />
               </label>
               <label className="text-[10px] text-slate-400">
-                Type
-                <select
-                  aria-label="Type"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                  onChange={(event) =>
-                    updateLine(index, {
-                      sample_type: event.target.value as AcquisitionSequenceLinePayload["sample_type"],
-                    })
-                  }
-                  value={line.sample_type}
-                >
-                  <option value="calibration">Calibration</option>
-                  <option value="sample">Sample</option>
-                </select>
-              </label>
-              <label className="text-[10px] text-slate-400">
-                Calibration level (ng/mL)
-                <input
-                  aria-label="Calibration level (ng/mL)"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white disabled:text-slate-600"
-                  disabled={line.sample_type !== "calibration"}
-                  min="0.001"
-                  onChange={(event) =>
-                    updateLine(index, {
-                      calibration_level_ng_per_ml:
-                        event.target.value === "" ? null : Number(event.target.value),
-                    })
-                  }
-                  step="any"
-                  type="number"
-                  value={line.calibration_level_ng_per_ml ?? ""}
-                />
-              </label>
-              <label className="text-[10px] text-slate-400">
                 Injection volume (µL)
                 <input
                   aria-label="Injection volume (µL)"
@@ -250,7 +195,8 @@ export function LcMsMsAcquisitionConsole({
 
       <div className="mt-4 flex items-center justify-between gap-4">
         <p className={`text-xs ${validationMessage ? "text-amber-300" : "text-emerald-300"}`}>
-          {validationMessage ?? "Sequence ready: one calibration and one sample."}
+          {validationMessage ??
+            `Sequence ready: ${lines.length} injection line${lines.length > 1 ? "s" : ""}.`}
         </p>
         <button
           className="shrink-0 rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"

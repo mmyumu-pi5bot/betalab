@@ -2326,15 +2326,6 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
           rackSlotId: String(inj.rackSlotId ?? inj.rack_slot_id ?? ""),
           status: String(inj.status ?? "ok") as "ok" | "no_extract_context" | "calibration",
           sampleName: String(inj.sampleName ?? inj.sample_name ?? ""),
-          sampleType: String(inj.sampleType ?? inj.sample_type ?? "sample") as
-            | "calibration"
-            | "sample",
-          calibrationLevelNgPerMl:
-            inj.calibrationLevelNgPerMl != null
-              ? Number(inj.calibrationLevelNgPerMl)
-              : inj.calibration_level_ng_per_ml != null
-                ? Number(inj.calibration_level_ng_per_ml)
-                : null,
           injectionVolumeUl: Number(
             inj.injectionVolumeUl ?? inj.injection_volume_ul ?? 5,
           ),

@@ -357,10 +357,6 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                                     for compound in injection.compounds
                                 ],
                                 sample_name=injection.sample_name,
-                                sample_type=injection.sample_type,
-                                calibration_level_ng_per_ml=(
-                                    injection.calibration_level_ng_per_ml
-                                ),
                                 injection_volume_ul=injection.injection_volume_ul,
                                 replicate_index=injection.replicate_index,
                                 output_filename=injection.output_filename,

@@ -58,7 +58,7 @@ function AcquisitionConsoleHarness({
 }
 
 describe("LcMsMsAcquisitionConsole", () => {
-  it("reads occupied rack positions, prefills roles and submits a ready sequence", () => {
+  it("reads occupied rack positions and submits a ready sequence", () => {
     const onRun = vi.fn();
     render(
       <AcquisitionConsoleHarness
@@ -71,9 +71,8 @@ describe("LcMsMsAcquisitionConsole", () => {
     const rows = screen.getAllByTestId("acquisition-sequence-row");
     expect(within(rows[0]).getByText("Position 2")).toBeInTheDocument();
     expect(within(rows[0]).getByDisplayValue("Cal 10")).toBeInTheDocument();
-    expect(within(rows[0]).getByDisplayValue("Calibration")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Position 4")).toBeInTheDocument();
-    expect(within(rows[1]).getByDisplayValue("Sample")).toBeInTheDocument();
+    expect(within(rows[1]).getByDisplayValue("Apple A")).toBeInTheDocument();
 
     const launchButton = screen.getByRole("button", { name: "Launch acquisition" });
     expect(launchButton).toBeEnabled();
@@ -85,20 +84,53 @@ describe("LcMsMsAcquisitionConsole", () => {
         expect.objectContaining({
           rack_slot_id: "rack_slot_2",
           sample_name: "Cal 10",
-          sample_type: "calibration",
-          calibration_level_ng_per_ml: 10,
         }),
         expect.objectContaining({
           rack_slot_id: "rack_slot_4",
           sample_name: "Apple A",
-          sample_type: "sample",
-          calibration_level_ng_per_ml: null,
         }),
       ],
     });
   });
 
-  it("blocks launch until the step-one calibration/sample contract is valid", () => {
+  it("never asks how a vial will be used analytically", () => {
+    render(
+      <AcquisitionConsoleHarness
+        onRun={vi.fn()}
+        rackSlots={[rackSlot(1, "calibration"), rackSlot(2, "sample")]}
+      />,
+    );
+
+    expect(screen.queryByLabelText("Type")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Calibration level (ng/mL)")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("acquisition-sequence-row")[0]).not.toHaveTextContent(
+      /calibration level/i,
+    );
+  });
+
+  it.each([
+    ["a single vial", [rackSlot(1, "sample")]],
+    ["several samples", [rackSlot(1, "sample"), rackSlot(2, "sample"), rackSlot(3, "sample")]],
+    [
+      "two calibrants and one sample",
+      [rackSlot(1, "calibration"), rackSlot(2, "calibration"), rackSlot(3, "sample")],
+    ],
+  ])("accepts a sequence made of %s", (_label, rackSlots) => {
+    render(<AcquisitionConsoleHarness onRun={vi.fn()} rackSlots={rackSlots} />);
+
+    expect(screen.getAllByTestId("acquisition-sequence-row")).toHaveLength(rackSlots.length);
+    expect(screen.getByText(/sequence ready/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
+  });
+
+  it("blocks launch when the rack holds no vial", () => {
+    render(<AcquisitionConsoleHarness onRun={vi.fn()} rackSlots={[]} />);
+
+    expect(screen.getByText(/at least one vial/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeDisabled();
+  });
+
+  it("blocks launch on an empty sample name and recovers when it is filled", () => {
     render(
       <AcquisitionConsoleHarness
         onRun={vi.fn()}
@@ -106,18 +138,34 @@ describe("LcMsMsAcquisitionConsole", () => {
       />,
     );
 
-    expect(screen.getByText(/one calibration and one sample/i)).toBeInTheDocument();
+    const firstRow = screen.getAllByTestId("acquisition-sequence-row")[0];
+    fireEvent.change(within(firstRow).getByLabelText("Sample name"), {
+      target: { value: "  " },
+    });
+    expect(screen.getByText(/needs a sample name/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeDisabled();
 
-    const firstRow = screen.getAllByTestId("acquisition-sequence-row")[0];
-    fireEvent.change(within(firstRow).getByLabelText("Type"), {
-      target: { value: "calibration" },
+    fireEvent.change(within(firstRow).getByLabelText("Sample name"), {
+      target: { value: "Apple B" },
     });
-    fireEvent.change(within(firstRow).getByLabelText("Calibration level (ng/mL)"), {
-      target: { value: "25" },
-    });
-
     expect(screen.getByText(/sequence ready/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
+  });
+
+  it("blocks launch on duplicated output filenames", () => {
+    render(
+      <AcquisitionConsoleHarness
+        onRun={vi.fn()}
+        rackSlots={[rackSlot(1, "sample"), rackSlot(2, "sample")]}
+      />,
+    );
+
+    const firstRow = screen.getAllByTestId("acquisition-sequence-row")[0];
+    fireEvent.change(within(firstRow).getByLabelText("Output filename"), {
+      target: { value: "02_apple_a.mzML" },
+    });
+
+    expect(screen.getByText(/filenames must be unique/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeDisabled();
   });
 });

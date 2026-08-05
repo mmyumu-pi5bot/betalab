@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic import BaseModel
 
 from app.schemas.experiment import ExperimentSchema
@@ -46,8 +44,6 @@ class AddCalibrationBody(BaseModel):
 class AcquisitionSequenceLineBody(BaseModel):
     rack_slot_id: str
     sample_name: str
-    sample_type: Literal["calibration", "sample"]
-    calibration_level_ng_per_ml: float | None = None
     injection_volume_ul: float
     repetitions: int
     output_filename: str
@@ -102,8 +98,6 @@ def run_sequence(experiment_id: str, body: RunSequenceBody) -> ExperimentSchema:
                     AcquisitionSequenceLineRequest(
                         rack_slot_id=line.rack_slot_id,
                         sample_name=line.sample_name,
-                        sample_type=line.sample_type,
-                        calibration_level_ng_per_ml=line.calibration_level_ng_per_ml,
                         injection_volume_ul=line.injection_volume_ul,
                         repetitions=line.repetitions,
                         output_filename=line.output_filename,

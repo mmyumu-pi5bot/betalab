@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Literal
 
 from app.domain.models import (
     CalibrationContext,
@@ -301,8 +300,6 @@ class UnloadRackFromInstrumentService(WriteDomainService[UnloadRackFromInstrumen
 class AcquisitionSequenceLineRequest:
     rack_slot_id: str
     sample_name: str
-    sample_type: Literal["calibration", "sample"]
-    calibration_level_ng_per_ml: float | None
     injection_volume_ul: float
     repetitions: int
     output_filename: str
@@ -359,12 +356,6 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                         status=status,
                         compounds=compounds,
                         sample_name=configured.sample_name.strip(),
-                        sample_type=configured.sample_type,
-                        calibration_level_ng_per_ml=(
-                            configured.calibration_level_ng_per_ml
-                            if configured.sample_type == "calibration"
-                            else None
-                        ),
                         injection_volume_ul=configured.injection_volume_ul,
                         replicate_index=replicate_index,
                         output_filename=_replicate_output_filename(
@@ -406,27 +397,10 @@ def _validate_acquisition_sequence(
     if set(configured_slot_ids) != set(occupied_slot_ids):
         raise ValueError("The acquisition sequence must match the occupied rack positions.")
 
-    calibration_count = sum(
-        line.sample_type == "calibration" for line in request.injections
-    )
-    sample_count = sum(line.sample_type == "sample" for line in request.injections)
-    if calibration_count != 1 or sample_count != 1 or len(request.injections) != 2:
-        raise ValueError("Step one requires exactly one calibration and one sample.")
-
     filenames: set[str] = set()
     for line in request.injections:
         if not line.sample_name.strip():
             raise ValueError("Every acquisition line requires a sample name.")
-        if line.sample_type not in {"calibration", "sample"}:
-            raise ValueError("Sample type must be calibration or sample.")
-        if (
-            line.sample_type == "calibration"
-            and (
-                line.calibration_level_ng_per_ml is None
-                or line.calibration_level_ng_per_ml <= 0
-            )
-        ):
-            raise ValueError("The calibration line requires a positive level.")
         if line.injection_volume_ul <= 0 or line.injection_volume_ul > 100:
             raise ValueError("Injection volume must be between 0 and 100 µL.")
         if line.repetitions < 1 or line.repetitions > 10:

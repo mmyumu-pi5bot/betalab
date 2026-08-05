@@ -14,21 +14,25 @@ petits incréments cohérents.
 
 ## 2. Périmètre du Step 1
 
-Le premier parcours complet contient seulement deux injections :
+Le premier parcours complet couvre une séquence de 1 à N injections, quelle que
+soit la préparation des vials. Le cas de référence utilisé dans les exemples
+reste :
 
 1. un vial de calibration à une concentration choisie pendant sa préparation ;
 2. un vial contenant l'extrait du sample.
 
+Mais rien n'impose cette composition : deux calibrants et un sample, plusieurs
+samples sans calibrant, ou un seul vial sont des séquences valides.
+
 Le technicien doit pouvoir :
 
-1. placer les deux vials dans les positions de son choix dans le rack ;
+1. placer les vials dans les positions de son choix dans le rack ;
 2. charger physiquement le rack dans le LC-MS/MS ;
 3. ouvrir la console d'acquisition de l'instrument ;
-4. vérifier ou renseigner le rôle de chaque vial ;
-5. utiliser une méthode LC-MS/MS prédéfinie ;
-6. lancer la séquence ;
-7. suivre les deux injections ;
-8. obtenir les fichiers mzML générés.
+4. utiliser une méthode LC-MS/MS prédéfinie ;
+5. lancer la séquence ;
+6. suivre les injections ;
+7. obtenir les fichiers mzML générés.
 
 Le Step 1 ne couvre pas :
 
@@ -78,18 +82,22 @@ La console constructeur décrit la manière dont le technicien déclare chaque
 injection à l'instrument :
 
 - nom du sample ;
-- type d'injection ;
-- niveau de calibration déclaré ;
 - méthode d'acquisition ;
 - volume d'injection ;
+- nombre de répétitions ;
 - nom du fichier de sortie.
 
-Dans le parcours nominal, ces informations sont préremplies depuis le vial.
-Le technicien les vérifie avant de lancer la séquence.
+Ces informations sont des paramètres d'acquisition. Elles ne décrivent pas
+l'usage analytique futur du vial.
 
-À terme, une déclaration incorrecte pourra être conservée comme erreur de
-manipulation : elle ne changera pas le contenu réel du vial, mais elle changera
-les métadonnées transmises à l'application de traitement.
+La séquence est neutre : elle ne demande jamais au technicien si une fiole est
+un calibrant, un sample, un blanc ou un QC. Ce rôle appartient à
+l'interprétation des données, donc à l'application de traitement en aval. Ce que
+Betalab injecte dépend uniquement du contenu physique du vial
+(`CalibrationContext` ou `InjectionContext`), jamais d'une déclaration.
+
+Dans le parcours nominal, le nom et le fichier de sortie sont préremplis depuis
+le vial et sa position. Le technicien les vérifie avant de lancer la séquence.
 
 ## 4. Vue d'ensemble du parcours
 
@@ -98,13 +106,11 @@ Rack avec vials prêts
   → chargement physique du rack dans le LC-MS/MS
   → ouverture de la console constructeur
   → création automatique de la table de séquence
-  → vérification calibrant + sample
+  → vérification des noms et des fichiers de sortie
   → sélection de la méthode fixe
   → contrôles avant acquisition
   → lancement de la séquence
-  → injection du calibrant
-  → génération de ses données instrumentales
-  → injection du sample
+  → injection de chaque vial dans l'ordre des positions
   → génération de ses données instrumentales
   → finalisation des mzML
   → fichiers disponibles pour l'application de traitement
@@ -220,12 +226,12 @@ Exemple conceptuel :
 ┌─────────────────────────────────────────────────────────────┐
 │ LC-MS/MS Acquisition                           READY        │
 │ Method: Apple pesticides — MRM v1                           │
-├──────┬───────────────────┬─────────────┬──────────┬─────────┤
-│ Pos. │ Sample name       │ Type        │ Level    │ File    │
-├──────┼───────────────────┼─────────────┼──────────┼─────────┤
-│ 1    │ CAL-10            │ Calibration │ 10 ng/mL │ CAL-10  │
-│ 2    │ APP-2026-0001     │ Sample      │ —        │ APP...  │
-└──────┴───────────────────┴─────────────┴──────────┴─────────┘
+├──────┬───────────────────┬──────────┬──────┬────────────────┤
+│ Pos. │ Sample name       │ Vol (µL) │ Rep. │ File           │
+├──────┼───────────────────┼──────────┼──────┼────────────────┤
+│ 1    │ CAL-10            │ 5        │ 1    │ 01_cal-10.mzML │
+│ 2    │ APP-2026-0001     │ 5        │ 1    │ 02_app....mzML │
+└──────┴───────────────────┴──────────┴──────┴────────────────┘
 
                        [ Start acquisition ]
 ```
@@ -243,35 +249,30 @@ Pour chaque ligne, elle préremplit les informations connues :
 |---|---|
 | Position | Position physique dans le rack |
 | Nom | Étiquette LIMS ou nom du vial |
-| Type | Contexte de calibration ou contexte d'injection du vial |
-| Niveau | Concentration nominale du calibrant |
 | Méthode | Méthode fixe du Step 1 |
 | Volume d'injection | Valeur fixe de la méthode |
 | Répétitions | `1` |
 | Nom de sortie | Dérivé du nom et de la position |
 
-### 8.2. Types disponibles au Step 1
+### 8.2. Composition libre de la séquence
 
-Le Step 1 propose seulement :
+La séquence accepte de 1 à N lignes, sans contrainte sur la nature des vials.
+La console n'affiche aucun champ `Type` ni `Calibration level` : ces notions
+appartiennent au traitement des données, pas à l'acquisition.
 
-- `calibration` ;
-- `sample`.
-
-Les types `blank`, `qc` et autres catégories spécialisées sont hors périmètre.
+Les catégories `calibration`, `sample`, `blank` ou `qc` ne sont donc déclarées
+nulle part dans Betalab.
 
 ### 8.3. Action du technicien
 
 Le technicien vérifie que :
 
-- le calibrant est déclaré comme `calibration` ;
-- son niveau déclaré correspond à la préparation ;
-- le sample est déclaré comme `sample` ;
 - les noms sont corrects ;
-- le calibrant est placé avant le sample dans le parcours recommandé ;
+- les volumes d'injection et les répétitions conviennent ;
 - les noms de fichiers ne sont pas ambigus.
 
-La modification du type ou du niveau déclaré peut être autorisée, mais ne doit
-jamais modifier le contenu physique du vial.
+Aucune modification de la table de séquence ne doit jamais changer le contenu
+physique du vial.
 
 ## 9. Étape E — Sélectionner la méthode d'acquisition
 
@@ -336,13 +337,14 @@ obligatoires sont satisfaits.
 
 - le LC-MS/MS est déployé ;
 - un rack est chargé dans l'instrument ;
-- le rack contient au moins un calibrant et un sample ;
+- le rack contient au moins un vial ;
+- chaque position occupée apparaît exactement une fois dans la séquence ;
 - chaque ligne possède un nom ;
-- chaque ligne possède un type reconnu ;
-- le calibrant possède un niveau déclaré strictement positif ;
+- chaque volume d'injection est valide ;
+- chaque nombre de répétitions est valide ;
 - une méthode d'acquisition est sélectionnée ;
-- chaque ligne possède un nom de sortie ;
-- les noms de sortie sont uniques dans la séquence ;
+- chaque ligne possède un nom de sortie `.mzML` ;
+- les noms de sortie sont uniques dans la séquence, répétitions comprises ;
 - aucune acquisition n'est déjà active.
 
 La fermeture des vials peut être ajoutée comme contrôle bloquant si le modèle
@@ -350,10 +352,9 @@ visuel du vial expose clairement un bouchon manipulable.
 
 ### 10.2. Avertissements non bloquants possibles
 
-- sample placé avant le calibrant ;
-- niveau déclaré différent du contenu préparé ;
 - positions vides entre deux injections ;
-- vial sans étiquette métier explicite.
+- vial sans étiquette métier explicite ;
+- vial sans contenu injectable.
 
 Ces avertissements ne sont pas indispensables au premier incrément.
 
@@ -368,7 +369,7 @@ Le technicien clique sur `Start acquisition` puis confirme le lancement.
 Au lancement, Betalab crée un snapshot immuable de la séquence :
 
 - ordre des injections ;
-- identité et déclaration des vials ;
+- identité des vials ;
 - contenu physique nécessaire à la simulation ;
 - méthode et version ;
 - paramètres d'acquisition ;
@@ -393,13 +394,12 @@ Pendant la séquence :
 
 Le moteur traite les lignes l'une après l'autre selon l'ordre du snapshot.
 
-Pour le Step 1 :
-
 ```text
-Injection 1 : calibrant
-  → fin du run calibrant
-Injection 2 : sample
-  → fin du run sample
+Injection 1 : vial de la première position occupée
+  → fin du run
+Injection 2 : vial de la position occupée suivante
+  → fin du run
+…
 Fin de séquence
 ```
 
@@ -447,7 +447,6 @@ le modèle doit rester compatible avec une acquisition progressive.
 Le générateur reçoit :
 
 - le contenu physique du vial ;
-- le type déclaré dans la séquence ;
 - la méthode d'acquisition ;
 - les transitions MRM ;
 - les paramètres de bruit et de variation instrumentale.
@@ -565,9 +564,9 @@ Le Step 1 doit au moins représenter les erreurs suivantes :
 | Rack vide | Chargement ou lancement refusé |
 | Aucun rack chargé | Lancement refusé |
 | Méthode absente | Lancement refusé |
-| Aucun calibrant déclaré | Lancement refusé |
-| Aucun sample déclaré | Lancement refusé |
-| Niveau de calibrant invalide | Lancement refusé |
+| Position occupée déclarée deux fois | Lancement refusé |
+| Ligne sans nom | Lancement refusé |
+| Volume d'injection ou répétitions invalides | Lancement refusé |
 | Nom de sortie dupliqué | Lancement refusé |
 | Déplacement pendant le run | Action refusée |
 | Erreur de génération du signal | Injection et séquence marquées `failed` |
@@ -586,8 +585,8 @@ de retry sont hors périmètre du premier parcours.
 | Préparation d'un calibrant | Implémentée | Conserver |
 | Préparation d'un sample | Implémentée | Conserver |
 | Chargement et retrait physique du rack | Implémentés | Conserver |
-| Console constructeur | Absente | À implémenter |
-| Déclaration calibration/sample | Déduite implicitement du vial | À rendre visible et confirmable |
+| Console constructeur | Implémentée | Conserver |
+| Rôle analytique des vials | Jamais déclaré | Conserver : la séquence reste neutre |
 | Méthode d'acquisition | Absente | Méthode fixe à ajouter |
 | Lancement de la séquence | Calcul instantané existant | Remplacer par un run structuré |
 | Exécution injection par injection | Absente | À implémenter |
@@ -611,8 +610,7 @@ Chaque incrément doit être utilisable ou vérifiable indépendamment.
 
 - ouvrir une console depuis le LC-MS/MS ;
 - construire les lignes à partir des positions occupées ;
-- préremplir `calibration` ou `sample` ;
-- préremplir le niveau du calibrant ;
+- préremplir le nom et le fichier de sortie depuis le vial et sa position ;
 - afficher les contrôles de readiness.
 
 ### Incrément 3 — Méthode fixe
@@ -657,11 +655,11 @@ debug :
 
 1. le joueur prépare un vial de calibration à un niveau positif ;
 2. le joueur prépare un vial contenant l'extrait de pomme ;
-3. il place le calibrant dans une position antérieure au sample ;
+3. il place les vials dans les positions de son choix ;
 4. il charge le rack complet dans le LC-MS/MS ;
 5. il ouvre la console constructeur ;
-6. la console préremplit une ligne `calibration` et une ligne `sample` ;
-7. le joueur vérifie les noms, le niveau et la méthode fixe ;
+6. la console préremplit une ligne par position occupée, sans demander de rôle ;
+7. le joueur vérifie les noms, les fichiers de sortie et la méthode fixe ;
 8. les contrôles passent à l'état `ready` ;
 9. il lance la séquence ;
 10. le rack et les vials sont verrouillés ;
