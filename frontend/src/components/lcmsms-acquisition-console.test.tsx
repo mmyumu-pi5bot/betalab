@@ -9,6 +9,7 @@ import {
   LcMsMsAcquisitionConsole,
 } from "@/components/lcmsms-acquisition-console";
 import {
+  duplicateAcquisitionMethod,
   getAcquisitionMethod,
   getAcquisitionMethodCatalog,
   resetApiMocks,
@@ -242,6 +243,24 @@ describe("LcMsMsAcquisitionConsole", () => {
 
     expect(await screen.findByText("Method service unavailable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
+  });
+
+  it("duplicating a method selects the copy for the sequence", async () => {
+    const onRun = vi.fn();
+    render(<AcquisitionConsoleHarness onRun={onRun} rackSlots={[rackSlot(1, "sample")]} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Duplicate method" }));
+
+    await waitFor(() =>
+      expect(duplicateAcquisitionMethod).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceMethodId: "apple_pesticides_mrm_v1" }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Launch acquisition" }));
+    expect(onRun).toHaveBeenCalledWith(
+      expect.objectContaining({ method_id: "apple_pesticides_mrm_v1_copy" }),
+    );
   });
 
   it("blocks launch on duplicated output filenames", () => {

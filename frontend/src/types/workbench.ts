@@ -561,6 +561,32 @@ export type AcquisitionMethod = {
   transitions: MrmTransition[];
 };
 
+export type MethodWarning = {
+  code: string;
+  transitionId: string;
+  message: string;
+};
+
+export type SavedAcquisitionMethod = {
+  method: AcquisitionMethod;
+  warnings: MethodWarning[];
+};
+
+export type ReferenceCompound = {
+  compoundId: string;
+  compoundLabel: string;
+  compoundKind: "analyte" | "internal_standard";
+  transitions: {
+    q1Mz: number;
+    q3Mz: number;
+    polarity: "positive" | "negative";
+    role: "quantifier" | "qualifier";
+    collisionEnergyV: number;
+    expectedRetentionTimeS: number;
+    provenance: string;
+  }[];
+};
+
 export type AcquisitionMethodSummary = {
   id: string;
   name: string;

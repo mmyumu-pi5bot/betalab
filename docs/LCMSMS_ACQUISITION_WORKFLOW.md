@@ -39,7 +39,6 @@ Le Step 1 ne couvre pas :
 - les blancs ;
 - les QC ;
 - les gammes de calibration multipoints ;
-- le développement interactif d'une méthode MRM ;
 - l'intégration des pics ;
 - la construction d'une courbe de calibration ;
 - la quantification finale ;
@@ -276,16 +275,56 @@ physique du vial.
 
 ## 9. Étape E — Sélectionner la méthode d'acquisition
 
-### 9.1. Décision du Step 1
+### 9.1. Méthode intégrée et méthodes utilisateur
 
-Le Step 1 utilise une seule méthode préinstallée et non modifiable :
+Betalab fournit une méthode intégrée, non modifiable :
 
 `apple_pesticides_mrm_v1`
 
-Le technicien la sélectionne ou vérifie qu'elle est sélectionnée. Il ne
-développe pas les transitions MRM dans ce parcours.
+Le technicien peut la sélectionner telle quelle, ou la dupliquer pour obtenir
+une copie éditable.
 
-### 9.2. Visualiseur de méthode
+**Duplication obligatoire.** Une méthode intégrée est immuable : toute tentative
+de l'écraser ou de la supprimer est refusée. Le parcours est donc
+`Duplicate method` → modifier la copie → `Save as new version`.
+
+L'éditeur propose deux niveaux :
+
+1. **Mode simple** — cocher les pesticides ciblés ; le catalogue de référence
+   propose automatiquement leurs transitions connues.
+2. **Mode avancé** — modifier Q1, Q3, polarité, CE, dwell, RT et fenêtre de
+   rétention transition par transition.
+
+### 9.2. Erreurs bloquantes et avertissements
+
+La distinction est volontaire et structurante.
+
+**Bloquant** (la méthode ne serait pas programmable) :
+
+- méthode vide ;
+- `m/z` négatif ou nul ;
+- dwell time nul ou négatif ;
+- fenêtre de rétention nulle ou négative ;
+- identifiants de transition dupliqués ;
+- composé ciblé sans transition `quantifier` ;
+- nom, version ou durée de run manquants.
+
+**Non bloquant** (la méthode est valide, mais ne verra pas ce qu'on croit) :
+
+- couple `Q1/Q3` ne correspondant à aucun composé du catalogue ;
+- fenêtre de rétention déclarée ne couvrant pas l'élution réelle ;
+- `Q3` plus lourd que `Q1`.
+
+Une transition physiquement bien formée qui ne correspond à rien **doit**
+pouvoir être enregistrée : lancer la séquence et constater une trace plate est
+précisément l'exercice pédagogique. L'avertissement s'affiche, le bouton
+d'enregistrement reste actif.
+
+Les méthodes utilisateur sont persistées côté backend, et chaque run fige le
+snapshot exact de la méthode utilisée : éditer une méthode après coup ne réécrit
+jamais un run déjà terminé.
+
+### 9.3. Visualiseur de méthode
 
 La console affiche un visualiseur en lecture seule de la méthode sélectionnée :
 
@@ -306,14 +345,14 @@ sans devoir la modifier.
 La méthode intégrée reste non modifiable : le visualiseur ne rend aucun champ
 éditable.
 
-### 9.3. Sélection de la méthode
+### 9.4. Sélection de la méthode
 
 Le sélecteur de méthode est alimenté par le catalogue backend. La méthode
 choisie appartient à la séquence : elle ne dépend jamais des fioles présentes
 dans le rack, et c'est bien la méthode sélectionnée qui part dans la commande
 de lancement.
 
-### 9.4. Données nécessaires au moteur
+### 9.5. Données nécessaires au moteur
 
 La méthode devra fournir, pour chaque canal MRM :
 
@@ -335,7 +374,7 @@ Betalab ne simule pas la fragmentation physique des ions. Une transition est
 un canal instrumental prédéfini auquel le moteur associe une trace
 temps/intensité.
 
-### 9.5. État actuel du modèle de méthode
+### 9.6. État actuel du modèle de méthode
 
 La méthode est désormais un objet métier structuré et versionné, et non plus un
 identifiant codé en dur :
@@ -364,7 +403,7 @@ lecture seule :
 la méthode dans le run. Une future version publiée sous le même identifiant ne
 peut donc pas réécrire l'histoire d'un run passé.
 
-### 9.6. Statut pédagogique des valeurs
+### 9.7. Statut pédagogique des valeurs
 
 `apple_pesticides_mrm_v1` porte `is_educational = true` et chaque transition
 porte `provenance = "educational_placeholder"`.
@@ -673,6 +712,8 @@ de retry sont hors périmètre du premier parcours.
 | Méthode d'acquisition | Modèle structuré et versionné | Conserver |
 | Snapshot de méthode dans le run | Implémenté | Conserver |
 | Catalogue MRM de référence | Placeholders pédagogiques | Remplacer par des données réelles |
+| Duplication et édition de méthode | Implémentées | Conserver |
+| Persistance des méthodes utilisateur | Implémentée | Conserver |
 | Lancement de la séquence | Calcul instantané existant | Remplacer par un run structuré |
 | Exécution injection par injection | Absente | À implémenter |
 | Signal numérique agrégé | Remplacé par les traces MRM | Conserver |

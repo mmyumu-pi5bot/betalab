@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getAcquisitionMethod, getAcquisitionMethodCatalog } from "@/lib/api";
 import type { AcquisitionMethod, AcquisitionMethodSummary } from "@/types/workbench";
@@ -10,6 +10,8 @@ type AcquisitionMethodState = {
   error: string | null;
   isLoading: boolean;
   method: AcquisitionMethod | null;
+  /** Adopt a method that was just saved, and refresh the catalog around it. */
+  reload: (method: AcquisitionMethod) => void;
 };
 
 /**
@@ -24,6 +26,8 @@ export function useAcquisitionMethod(methodId: string): AcquisitionMethodState {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [catalogRevision, setCatalogRevision] = useState(0);
+
   useEffect(() => {
     let isCurrent = true;
     getAcquisitionMethodCatalog()
@@ -36,6 +40,11 @@ export function useAcquisitionMethod(methodId: string): AcquisitionMethodState {
     return () => {
       isCurrent = false;
     };
+  }, [catalogRevision]);
+
+  const reload = useCallback((saved: AcquisitionMethod) => {
+    setMethod(saved);
+    setCatalogRevision((revision) => revision + 1);
   }, []);
 
   useEffect(() => {
@@ -59,5 +68,5 @@ export function useAcquisitionMethod(methodId: string): AcquisitionMethodState {
     };
   }, [methodId]);
 
-  return { catalog, error, isLoading, method };
+  return { catalog, error, isLoading, method, reload };
 }

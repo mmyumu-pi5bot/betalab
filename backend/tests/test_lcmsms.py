@@ -5,7 +5,6 @@ import json
 import random
 import sqlite3
 from dataclasses import replace
-from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -811,25 +810,21 @@ class TestRunSequenceWithCalibration:
             transitions=APPLE_PESTICIDES_MRM_V1.transitions[:2],
         )
 
-        with patch(
-            "app.services.domain_services.lcmsms.get_acquisition_method",
-            return_value=two_channel_method,
-        ):
-            RunSequenceService(service).run(
-                exp_id,
-                RunSequenceRequest(
-                    method_id="two_channel_educational",
-                    injections=[
-                        AcquisitionSequenceLineRequest(
-                            rack_slot_id="rack_slot_1",
-                            sample_name="Apple A",
-                            injection_volume_ul=5.0,
-                            repetitions=1,
-                            output_filename="apple_a.mzML",
-                        )
-                    ],
-                ),
-            )
+        RunSequenceService(service, method_resolver=lambda _id: two_channel_method).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id="two_channel_educational",
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Apple A",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="apple_a.mzML",
+                    )
+                ],
+            ),
+        )
 
         exp = service._require_experiment(exp_id)
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.acquisition_methods import (
-    get_acquisition_method,
+    AcquisitionMethod,
     snapshot_acquisition_method,
 )
 from app.domain.models import (
@@ -21,6 +22,7 @@ from app.domain.models import (
     new_id,
 )
 from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
+from app.services.acquisition_method_service import acquisition_method_service
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.mrm_signal import generate_transition_traces
 from app.services.helpers.lookups import find_workspace_widget
@@ -316,10 +318,21 @@ class RunSequenceRequest:
 
 
 class RunSequenceService(WriteDomainService[RunSequenceRequest]):
-    def __init__(self, runtime: ExperimentRuntime, rng: random.Random | None = None) -> None:
+    def __init__(
+        self,
+        runtime: ExperimentRuntime,
+        rng: random.Random | None = None,
+        method_resolver: Callable[[str], AcquisitionMethod] | None = None,
+    ) -> None:
         super().__init__(runtime)
         # Injectable so a test can reproduce a whole acquisition byte for byte.
         self._rng = rng if rng is not None else random.Random()
+        # Resolves built-in *and* user-authored methods; injectable for tests.
+        self._resolve_method = (
+            method_resolver
+            if method_resolver is not None
+            else acquisition_method_service.get_method
+        )
 
     def _run(self, experiment: Experiment, request: RunSequenceRequest) -> None:
         instrument = find_workspace_widget(experiment.workspace, "instrument")
@@ -336,7 +349,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         if experiment.rack.state != "loaded":
             raise ValueError("The autosampler rack is not loaded into the LC-MS/MS.")
 
-        method = get_acquisition_method(request.method_id)
+        method = self._resolve_method(request.method_id)
         configured_by_slot = _validate_acquisition_sequence(request, vials_in_rack)
 
         injections: list[InjectionMeasurement] = []

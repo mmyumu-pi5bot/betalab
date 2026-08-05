@@ -15,6 +15,7 @@ those channels actually see anything is decided by
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from app.domain.mrm_reference import (
@@ -22,6 +23,7 @@ from app.domain.mrm_reference import (
     MRM_REFERENCE_CATALOG,
     CompoundKind,
     Polarity,
+    ReferenceTransition,
     TransitionProvenance,
     TransitionRole,
 )
@@ -107,36 +109,39 @@ def _transition_id(compound_id: str, role: TransitionRole) -> str:
     return f"{compound_id}__{role}"
 
 
+_DWELL_BY_COMPOUND_KIND = {"analyte": 25.0, "internal_standard": 40.0}
+
+
+def _transition_from_reference(reference: ReferenceTransition) -> MrmTransition:
+    return MrmTransition(
+        id=_transition_id(reference.compound_id, reference.role),
+        compound_id=reference.compound_id,
+        compound_label=reference.compound_label,
+        compound_kind=reference.compound_kind,
+        q1_mz=reference.q1_mz,
+        q3_mz=reference.q3_mz,
+        polarity=reference.polarity,
+        role=reference.role,
+        collision_energy_v=reference.collision_energy_v,
+        dwell_time_ms=_DWELL_BY_COMPOUND_KIND[reference.compound_kind],
+        expected_retention_time_s=reference.expected_retention_time_s,
+        retention_window_s=60.0,
+        internal_standard_id=(
+            None
+            if reference.compound_kind == "internal_standard"
+            else INTERNAL_STANDARD_COMPOUND_ID
+        ),
+        provenance=reference.provenance,
+    )
+
+
 def _built_in_transitions() -> tuple[MrmTransition, ...]:
     """Mirror the reference catalog into a correctly configured method.
 
     The built-in method is the "right answer": every declared channel addresses a
-    real reference channel. Step-5 user methods are free to drift away from it.
+    real reference channel. User methods are free to drift away from it.
     """
-    dwell_by_kind = {"analyte": 25.0, "internal_standard": 40.0}
-    return tuple(
-        MrmTransition(
-            id=_transition_id(reference.compound_id, reference.role),
-            compound_id=reference.compound_id,
-            compound_label=reference.compound_label,
-            compound_kind=reference.compound_kind,
-            q1_mz=reference.q1_mz,
-            q3_mz=reference.q3_mz,
-            polarity=reference.polarity,
-            role=reference.role,
-            collision_energy_v=reference.collision_energy_v,
-            dwell_time_ms=dwell_by_kind[reference.compound_kind],
-            expected_retention_time_s=reference.expected_retention_time_s,
-            retention_window_s=60.0,
-            internal_standard_id=(
-                None
-                if reference.compound_kind == "internal_standard"
-                else INTERNAL_STANDARD_COMPOUND_ID
-            ),
-            provenance=reference.provenance,
-        )
-        for reference in MRM_REFERENCE_CATALOG
-    )
+    return tuple(_transition_from_reference(reference) for reference in MRM_REFERENCE_CATALOG)
 
 
 APPLE_PESTICIDES_MRM_V1 = AcquisitionMethod(
@@ -186,12 +191,12 @@ _BUILT_IN_BY_ID: dict[str, AcquisitionMethod] = {
 }
 
 
-def list_acquisition_methods() -> tuple[AcquisitionMethod, ...]:
+def list_built_in_acquisition_methods() -> tuple[AcquisitionMethod, ...]:
     """Return every method the console may offer, built-in ones first."""
     return BUILT_IN_ACQUISITION_METHODS
 
 
-def get_acquisition_method(method_id: str) -> AcquisitionMethod:
+def get_built_in_acquisition_method(method_id: str) -> AcquisitionMethod:
     """Return the method registered under ``method_id``.
 
     Raises:
@@ -201,6 +206,49 @@ def get_acquisition_method(method_id: str) -> AcquisitionMethod:
     if method is None:
         raise ValueError(f"Unknown acquisition method '{method_id}'.")
     return method
+
+
+def duplicate_acquisition_method(
+    source: AcquisitionMethod,
+    new_id: str,
+    name: str,
+    version: str,
+) -> AcquisitionMethod:
+    """Return an editable copy of ``source``.
+
+    Duplication is the only way to obtain an editable method: a built-in one is
+    immutable, so the user copies it, edits the copy and saves it as a new
+    version. The copy keeps the source's provenance marker — duplicating an
+    educational method does not turn its numbers into validated data.
+    """
+    return replace(
+        source,
+        id=new_id,
+        name=name,
+        version=version,
+        is_built_in=False,
+    )
+
+
+def build_transitions_for_compounds(compound_ids: Sequence[str]) -> tuple[MrmTransition, ...]:
+    """Return the reference channels of ``compound_ids``, ready to be edited.
+
+    This is what the console's simple mode offers: pick the pesticides to target
+    and the catalog proposes their known transitions. The advanced mode then
+    edits whatever it wants on top.
+    """
+    wanted = list(dict.fromkeys(compound_ids))
+    known = {reference.compound_id for reference in MRM_REFERENCE_CATALOG}
+    unknown = [compound_id for compound_id in wanted if compound_id not in known]
+    if unknown:
+        raise ValueError(f"Unknown compound(s): {', '.join(sorted(unknown))}.")
+
+    by_compound = {compound_id: index for index, compound_id in enumerate(wanted)}
+    selected = [
+        reference for reference in MRM_REFERENCE_CATALOG if reference.compound_id in by_compound
+    ]
+    selected.sort(key=lambda reference: by_compound[reference.compound_id])
+    return tuple(_transition_from_reference(reference) for reference in selected)
 
 
 def snapshot_acquisition_method(method: AcquisitionMethod) -> AcquisitionMethod:

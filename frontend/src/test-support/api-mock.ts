@@ -3,12 +3,16 @@ import { vi } from "vitest";
 import {
   acquisitionMethodCatalogFixture,
   acquisitionMethodFixture,
+  mrmReferenceCatalogFixture,
 } from "@/test-support/acquisition-method-fixture";
 import { toolbarCatalogFixture } from "@/test-support/toolbar-catalog-fixture";
 import type { Experiment } from "@/types/experiment";
 import type {
   AcquisitionMethod,
   AcquisitionMethodSummary,
+  MrmTransition,
+  ReferenceCompound,
+  SavedAcquisitionMethod,
   ToolbarCategory,
 } from "@/types/workbench";
 
@@ -21,6 +25,44 @@ export const getAcquisitionMethodCatalog = vi.fn<() => Promise<AcquisitionMethod
 );
 export const getAcquisitionMethod = vi.fn<(methodId: string) => Promise<AcquisitionMethod>>(
   () => Promise.resolve(acquisitionMethodFixture),
+);
+export const getMrmReferenceCatalog = vi.fn<() => Promise<ReferenceCompound[]>>(() =>
+  Promise.resolve(mrmReferenceCatalogFixture),
+);
+export const proposeMrmTransitions = vi.fn<(compoundIds: string[]) => Promise<MrmTransition[]>>(
+  () => Promise.resolve(acquisitionMethodFixture.transitions),
+);
+export const duplicateAcquisitionMethod = vi.fn<
+  (payload: {
+    name: string;
+    newMethodId: string;
+    sourceMethodId: string;
+    version: string;
+  }) => Promise<SavedAcquisitionMethod>
+>((payload) =>
+  Promise.resolve({
+    method: { ...acquisitionMethodFixture, id: payload.newMethodId, isBuiltIn: false },
+    warnings: [],
+  }),
+);
+export const saveAcquisitionMethod = vi.fn<
+  (
+    methodId: string,
+    payload: {
+      name: string;
+      runtimeS: number;
+      transitions: MrmTransition[];
+      version: string;
+    },
+  ) => Promise<SavedAcquisitionMethod>
+>((methodId) =>
+  Promise.resolve({
+    method: { ...acquisitionMethodFixture, id: methodId, isBuiltIn: false },
+    warnings: [],
+  }),
+);
+export const deleteAcquisitionMethod = vi.fn<(methodId: string) => Promise<void>>(() =>
+  Promise.resolve(),
 );
 export const sendExperimentCommand = vi.fn<
   (experimentId: string, type: string, payload: Record<string, unknown>) => Promise<Experiment>
@@ -203,5 +245,20 @@ export function resetApiMocks() {
   getToolbarCatalog.mockResolvedValue(toolbarCatalogFixture);
   getAcquisitionMethodCatalog.mockResolvedValue(acquisitionMethodCatalogFixture);
   getAcquisitionMethod.mockResolvedValue(acquisitionMethodFixture);
+  getMrmReferenceCatalog.mockResolvedValue(mrmReferenceCatalogFixture);
+  proposeMrmTransitions.mockResolvedValue(acquisitionMethodFixture.transitions);
+  duplicateAcquisitionMethod.mockImplementation((payload) =>
+    Promise.resolve({
+      method: { ...acquisitionMethodFixture, id: payload.newMethodId, isBuiltIn: false },
+      warnings: [],
+    }),
+  );
+  saveAcquisitionMethod.mockImplementation((methodId) =>
+    Promise.resolve({
+      method: { ...acquisitionMethodFixture, id: methodId, isBuiltIn: false },
+      warnings: [],
+    }),
+  );
+  deleteAcquisitionMethod.mockResolvedValue(undefined);
   streamSubscriptions.clear();
 }

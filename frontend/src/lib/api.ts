@@ -20,6 +20,8 @@ import type {
   ProduceMaterialState,
   PrintedLabelTicket,
   RackSlot,
+  ReferenceCompound,
+  SavedAcquisitionMethod,
   SpatulaState,
   ToolbarCategory,
   ToolbarItem,
@@ -329,6 +331,156 @@ export async function getAcquisitionMethod(methodId: string): Promise<Acquisitio
   }
 
   return normalizeAcquisitionMethod(await response.json());
+}
+
+export async function getMrmReferenceCatalog(): Promise<ReferenceCompound[]> {
+  const response = await fetch(`${API_BASE_URL}/experiments/catalog/mrm-reference`);
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to fetch the MRM reference catalog");
+  }
+
+  const payload = (await response.json()) as Array<Record<string, unknown>>;
+  return payload.map((entry) => ({
+    compoundId: String(entry.compoundId ?? entry.compound_id ?? ""),
+    compoundLabel: String(entry.compoundLabel ?? entry.compound_label ?? ""),
+    compoundKind: String(
+      entry.compoundKind ?? entry.compound_kind ?? "analyte",
+    ) as ReferenceCompound["compoundKind"],
+    transitions: Array.isArray(entry.transitions)
+      ? (entry.transitions as Record<string, unknown>[]).map((transition) => ({
+          q1Mz: Number(transition.q1Mz ?? transition.q1_mz ?? 0),
+          q3Mz: Number(transition.q3Mz ?? transition.q3_mz ?? 0),
+          polarity: String(
+            transition.polarity ?? "positive",
+          ) as ReferenceCompound["transitions"][number]["polarity"],
+          role: String(
+            transition.role ?? "quantifier",
+          ) as ReferenceCompound["transitions"][number]["role"],
+          collisionEnergyV: Number(
+            transition.collisionEnergyV ?? transition.collision_energy_v ?? 0,
+          ),
+          expectedRetentionTimeS: Number(
+            transition.expectedRetentionTimeS ?? transition.expected_retention_time_s ?? 0,
+          ),
+          provenance: String(transition.provenance ?? ""),
+        }))
+      : [],
+  }));
+}
+
+export async function proposeMrmTransitions(compoundIds: string[]): Promise<MrmTransition[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/catalog/acquisition-methods/propose-transitions`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ compound_ids: compoundIds }),
+    },
+  );
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to propose transitions");
+  }
+
+  const payload = (await response.json()) as Array<Record<string, unknown>>;
+  return payload.map(normalizeMrmTransition);
+}
+
+function normalizeSavedMethod(payload: Record<string, unknown>): SavedAcquisitionMethod {
+  return {
+    method: normalizeAcquisitionMethod(payload.method),
+    warnings: Array.isArray(payload.warnings)
+      ? (payload.warnings as Record<string, unknown>[]).map((warning) => ({
+          code: String(warning.code ?? ""),
+          transitionId: String(warning.transitionId ?? warning.transition_id ?? ""),
+          message: String(warning.message ?? ""),
+        }))
+      : [],
+  };
+}
+
+export async function duplicateAcquisitionMethod(payload: {
+  name: string;
+  newMethodId: string;
+  sourceMethodId: string;
+  version: string;
+}): Promise<SavedAcquisitionMethod> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/catalog/acquisition-methods/duplicate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_method_id: payload.sourceMethodId,
+        new_method_id: payload.newMethodId,
+        name: payload.name,
+        version: payload.version,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to duplicate the acquisition method");
+  }
+
+  return normalizeSavedMethod(await response.json());
+}
+
+export async function saveAcquisitionMethod(
+  methodId: string,
+  payload: {
+    name: string;
+    runtimeS: number;
+    transitions: MrmTransition[];
+    version: string;
+  },
+): Promise<SavedAcquisitionMethod> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/catalog/acquisition-methods/${methodId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: payload.name,
+        version: payload.version,
+        runtime_s: payload.runtimeS,
+        transitions: payload.transitions.map((transition) => ({
+          id: transition.id,
+          compound_id: transition.compoundId,
+          compound_label: transition.compoundLabel,
+          compound_kind: transition.compoundKind,
+          q1_mz: transition.q1Mz,
+          q3_mz: transition.q3Mz,
+          polarity: transition.polarity,
+          role: transition.role,
+          collision_energy_v: transition.collisionEnergyV,
+          dwell_time_ms: transition.dwellTimeMs,
+          expected_retention_time_s: transition.expectedRetentionTimeS,
+          retention_window_s: transition.retentionWindowS,
+          internal_standard_id: transition.internalStandardId,
+          provenance: transition.provenance,
+        })),
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to save the acquisition method");
+  }
+
+  return normalizeSavedMethod(await response.json());
+}
+
+export async function deleteAcquisitionMethod(methodId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/catalog/acquisition-methods/${methodId}`,
+    { method: "DELETE" },
+  );
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to delete the acquisition method");
+  }
 }
 
 export async function deleteExperiment(experimentId: string): Promise<void> {

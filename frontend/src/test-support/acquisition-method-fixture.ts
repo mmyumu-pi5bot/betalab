@@ -1,4 +1,8 @@
-import type { AcquisitionMethod, AcquisitionMethodSummary } from "@/types/workbench";
+import type {
+  AcquisitionMethod,
+  AcquisitionMethodSummary,
+  ReferenceCompound,
+} from "@/types/workbench";
 
 export const acquisitionMethodFixture: AcquisitionMethod = {
   id: "apple_pesticides_mrm_v1",
@@ -92,5 +96,40 @@ export const acquisitionMethodCatalogFixture: AcquisitionMethodSummary[] = [
     isBuiltIn: acquisitionMethodFixture.isBuiltIn,
     compoundCount: 2,
     transitionCount: acquisitionMethodFixture.transitions.length,
+  },
+];
+
+export const mrmReferenceCatalogFixture: ReferenceCompound[] = [
+  {
+    compoundId: "boscalid",
+    compoundLabel: "Boscalid",
+    compoundKind: "analyte",
+    transitions: [
+      {
+        q1Mz: 343,
+        q3Mz: 307,
+        polarity: "positive",
+        role: "quantifier",
+        collisionEnergyV: 24,
+        expectedRetentionTimeS: 402,
+        provenance: "educational_placeholder",
+      },
+    ],
+  },
+  {
+    compoundId: "acetamiprid",
+    compoundLabel: "Acetamiprid",
+    compoundKind: "analyte",
+    transitions: [
+      {
+        q1Mz: 223.1,
+        q3Mz: 126,
+        polarity: "positive",
+        role: "quantifier",
+        collisionEnergyV: 22,
+        expectedRetentionTimeS: 204,
+        provenance: "educational_placeholder",
+      },
+    ],
   },
 ];

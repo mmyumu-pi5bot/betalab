@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { LcMsMsMethodEditor } from "@/components/lcmsms-method-editor";
 import { LcMsMsMethodViewer } from "@/components/lcmsms-method-viewer";
 import { useAcquisitionMethod } from "@/hooks/use-acquisition-method";
 import type {
@@ -103,8 +104,13 @@ export function LcMsMsAcquisitionConsole({
   const lines = sequence.injections;
   const validationMessage = useMemo(() => validateLines(lines), [lines]);
   // The method belongs to the sequence, never to the vials sitting in the rack.
-  const { catalog, error: methodError, isLoading: isMethodLoading, method } =
-    useAcquisitionMethod(sequence.method_id);
+  const {
+    catalog,
+    error: methodError,
+    isLoading: isMethodLoading,
+    method,
+    reload: reloadMethod,
+  } = useAcquisitionMethod(sequence.method_id);
 
   function updateLine(index: number, patch: Partial<AcquisitionSequenceLinePayload>) {
     onSequenceChange({
@@ -155,6 +161,16 @@ export function LcMsMsAcquisitionConsole({
         isLoading={isMethodLoading}
         method={method}
       />
+
+      {method !== null ? (
+        <LcMsMsMethodEditor
+          method={method}
+          onMethodSaved={reloadMethod}
+          onMethodSelected={(methodId) =>
+            onSequenceChange({ ...sequence, method_id: methodId })
+          }
+        />
+      ) : null}
 
       <div className="mt-4 space-y-3">
         {lines.map((line, index) => (

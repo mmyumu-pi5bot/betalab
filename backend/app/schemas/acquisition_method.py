@@ -79,6 +79,38 @@ class AcquisitionMethodSummarySchema(BaseModel):
     transition_count: int
 
 
+class MethodWarningSchema(BaseModel):
+    """A non-blocking remark about what the method will actually record."""
+
+    code: str
+    transition_id: str
+    message: str
+
+
+class SavedAcquisitionMethodSchema(BaseModel):
+    """A user method plus the warnings it was saved with."""
+
+    method: AcquisitionMethodSchema
+    warnings: list[MethodWarningSchema] = Field(default_factory=list)
+
+
+class ReferenceTransitionSchema(BaseModel):
+    q1_mz: float
+    q3_mz: float
+    polarity: str
+    role: str
+    collision_energy_v: float
+    expected_retention_time_s: float
+    provenance: str
+
+
+class ReferenceCompoundSchema(BaseModel):
+    compound_id: str
+    compound_label: str
+    compound_kind: str
+    transitions: list[ReferenceTransitionSchema] = Field(default_factory=list)
+
+
 def to_method_summary(method: AcquisitionMethod) -> AcquisitionMethodSummarySchema:
     return AcquisitionMethodSummarySchema(
         id=method.id,

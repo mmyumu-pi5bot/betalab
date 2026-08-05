@@ -8,8 +8,8 @@ from app.domain.acquisition_methods import (
     APPLE_PESTICIDES_MRM_V1,
     APPLE_PESTICIDES_MRM_V1_ID,
     AcquisitionMethod,
-    get_acquisition_method,
-    list_acquisition_methods,
+    get_built_in_acquisition_method,
+    list_built_in_acquisition_methods,
     snapshot_acquisition_method,
 )
 from app.domain.mrm_reference import (
@@ -68,12 +68,12 @@ class TestMrmReferenceCatalog:
 
 class TestAcquisitionMethodRegistry:
     def test_lists_the_built_in_method(self) -> None:
-        methods = list_acquisition_methods()
+        methods = list_built_in_acquisition_methods()
 
         assert [method.id for method in methods] == [APPLE_PESTICIDES_MRM_V1_ID]
 
     def test_reads_a_method_by_id(self) -> None:
-        method = get_acquisition_method(APPLE_PESTICIDES_MRM_V1_ID)
+        method = get_built_in_acquisition_method(APPLE_PESTICIDES_MRM_V1_ID)
 
         assert method is APPLE_PESTICIDES_MRM_V1
         assert method.version == "1.0.0"
@@ -81,7 +81,7 @@ class TestAcquisitionMethodRegistry:
 
     def test_unknown_method_id_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown acquisition method"):
-            get_acquisition_method("does_not_exist")
+            get_built_in_acquisition_method("does_not_exist")
 
     def test_built_in_method_is_flagged_educational_and_immutable(self) -> None:
         assert APPLE_PESTICIDES_MRM_V1.is_educational is True
