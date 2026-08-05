@@ -14,6 +14,8 @@ import {
   listExperiments,
   loadRackIntoInstrument,
   moveObject,
+  normalizeAcquisitionMethod,
+  normalizeAcquisitionMethodSummary,
   openWorkbenchTool,
   runSequence,
   subscribeToExperimentStream,
@@ -166,6 +168,95 @@ describe("api client", () => {
         body: JSON.stringify(payload),
       }),
     );
+  });
+
+  it("normalizes a snake_case acquisition method into camelCase", () => {
+    const method = normalizeAcquisitionMethod({
+      id: "apple_pesticides_mrm_v1",
+      name: "Apple pesticides — MRM",
+      version: "1.0.0",
+      runtime_s: 720,
+      is_educational: true,
+      provenance_note: "Educational method.",
+      is_built_in: true,
+      liquid_chromatography: {
+        column_label: "C18",
+        column_temperature_c: 40,
+        mobile_phase_a: "Water",
+        mobile_phase_b: "Methanol",
+        flow_ml_per_min: 0.4,
+        gradient: [{ time_s: 0, mobile_phase_b_percent: 5 }],
+      },
+      ion_source: {
+        source_type: "ESI",
+        ion_spray_voltage_v: 4500,
+        source_temperature_c: 450,
+        nebulizer_gas_psi: 50,
+        heater_gas_psi: 55,
+        curtain_gas_psi: 30,
+      },
+      transitions: [
+        {
+          id: "boscalid__quantifier",
+          compound_id: "boscalid",
+          compound_label: "Boscalid",
+          compound_kind: "analyte",
+          q1_mz: 343,
+          q3_mz: 307,
+          polarity: "positive",
+          role: "quantifier",
+          collision_energy_v: 24,
+          dwell_time_ms: 25,
+          expected_retention_time_s: 402,
+          retention_window_s: 60,
+          internal_standard_id: "istd_triphenyl_phosphate_d15",
+          provenance: "educational_placeholder",
+        },
+      ],
+    });
+
+    expect(method.runtimeS).toBe(720);
+    expect(method.isEducational).toBe(true);
+    expect(method.isBuiltIn).toBe(true);
+    expect(method.liquidChromatography.flowMlPerMin).toBe(0.4);
+    expect(method.liquidChromatography.gradient).toEqual([
+      { timeS: 0, mobilePhaseBPercent: 5 },
+    ]);
+    expect(method.ionSource.ionSprayVoltageV).toBe(4500);
+    expect(method.transitions[0]).toEqual({
+      id: "boscalid__quantifier",
+      compoundId: "boscalid",
+      compoundLabel: "Boscalid",
+      compoundKind: "analyte",
+      q1Mz: 343,
+      q3Mz: 307,
+      polarity: "positive",
+      role: "quantifier",
+      collisionEnergyV: 24,
+      dwellTimeMs: 25,
+      expectedRetentionTimeS: 402,
+      retentionWindowS: 60,
+      internalStandardId: "istd_triphenyl_phosphate_d15",
+      provenance: "educational_placeholder",
+    });
+  });
+
+  it("normalizes an acquisition method summary", () => {
+    const summary = normalizeAcquisitionMethodSummary({
+      id: "apple_pesticides_mrm_v1",
+      name: "Apple pesticides — MRM",
+      version: "1.0.0",
+      runtime_s: 720,
+      is_educational: true,
+      provenance_note: "Educational method.",
+      is_built_in: true,
+      compound_count: 13,
+      transition_count: 25,
+    });
+
+    expect(summary.compoundCount).toBe(13);
+    expect(summary.transitionCount).toBe(25);
+    expect(summary.isEducational).toBe(true);
   });
 
   it("loads private state from the dedicated debug endpoint", async () => {

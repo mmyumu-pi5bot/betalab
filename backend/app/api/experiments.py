@@ -1,4 +1,5 @@
 from app.api.experiment_routes import (
+    acquisition_methods,
     analytical_balance,
     centrifuge,
     core,
@@ -22,6 +23,7 @@ from app.api.experiment_routes.common import router
 from app.services.experiment_service import ExperimentRuntimeService
 
 _route_modules = (
+    acquisition_methods,
     analytical_balance,
     centrifuge,
     core,

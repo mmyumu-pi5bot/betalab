@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime
 from typing import Literal, cast
 
 from pydantic import BaseModel, Field, computed_field
 
+from app.domain.acquisition_methods import (
+    APPLE_PESTICIDES_MRM_V1,
+    APPLE_PESTICIDES_MRM_V1_ID,
+)
 from app.domain.centrifuge_rules import get_centrifuge_start_block_reason
 from app.domain.dnd_contracts import get_dnd_contract
 from app.domain.dnd_rules import (
@@ -35,6 +40,7 @@ from app.domain.spatula_rules import (
     SPATULA_LOAD_SOURCE_TOOL_TYPES,
     SPATULA_POUR_TARGET_TOOL_TYPES,
 )
+from app.schemas.acquisition_method import AcquisitionMethodSchema
 
 
 class WorkbenchLiquidSchema(BaseModel):
@@ -113,7 +119,12 @@ class InjectionMeasurementSchema(BaseModel):
 class SequenceRunSchema(BaseModel):
     id: str
     injections: list[InjectionMeasurementSchema] = Field(default_factory=list)
-    method_id: str = "apple_pesticides_mrm_v1"
+    method_id: str = APPLE_PESTICIDES_MRM_V1_ID
+    method_snapshot: AcquisitionMethodSchema = Field(
+        default_factory=lambda: AcquisitionMethodSchema.model_validate(
+            asdict(APPLE_PESTICIDES_MRM_V1)
+        )
+    )
 
 
 class ProduceMaterialStateSchema(BaseModel):

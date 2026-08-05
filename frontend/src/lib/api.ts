@@ -1,7 +1,10 @@
 import type { Experiment, ExperimentListEntry } from "@/types/experiment";
 import type {
+  AcquisitionMethod,
+  AcquisitionMethodSummary,
   AnalyticalBalanceState,
   BenchLabel,
+  MrmTransition,
   BenchLiquidPortion,
   BenchSlot,
   BenchToolInstance,
@@ -2314,11 +2317,102 @@ function normalizeWorkspaceWidget(
   };
 }
 
+export function normalizeMrmTransition(raw: Record<string, unknown>): MrmTransition {
+  return {
+    id: String(raw.id ?? ""),
+    compoundId: String(raw.compoundId ?? raw.compound_id ?? ""),
+    compoundLabel: String(raw.compoundLabel ?? raw.compound_label ?? ""),
+    compoundKind: String(
+      raw.compoundKind ?? raw.compound_kind ?? "analyte",
+    ) as MrmTransition["compoundKind"],
+    q1Mz: Number(raw.q1Mz ?? raw.q1_mz ?? 0),
+    q3Mz: Number(raw.q3Mz ?? raw.q3_mz ?? 0),
+    polarity: String(raw.polarity ?? "positive") as MrmTransition["polarity"],
+    role: String(raw.role ?? "quantifier") as MrmTransition["role"],
+    collisionEnergyV: Number(raw.collisionEnergyV ?? raw.collision_energy_v ?? 0),
+    dwellTimeMs: Number(raw.dwellTimeMs ?? raw.dwell_time_ms ?? 0),
+    expectedRetentionTimeS: Number(
+      raw.expectedRetentionTimeS ?? raw.expected_retention_time_s ?? 0,
+    ),
+    retentionWindowS: Number(raw.retentionWindowS ?? raw.retention_window_s ?? 0),
+    internalStandardId:
+      raw.internalStandardId != null
+        ? String(raw.internalStandardId)
+        : raw.internal_standard_id != null
+          ? String(raw.internal_standard_id)
+          : null,
+    provenance: String(raw.provenance ?? ""),
+  };
+}
+
+export function normalizeAcquisitionMethod(raw: unknown): AcquisitionMethod {
+  const method = (raw ?? {}) as Record<string, unknown>;
+  const chromatography = (method.liquidChromatography ??
+    method.liquid_chromatography ??
+    {}) as Record<string, unknown>;
+  const source = (method.ionSource ?? method.ion_source ?? {}) as Record<string, unknown>;
+  const gradient = (chromatography.gradient ?? []) as Record<string, unknown>[];
+  return {
+    id: String(method.id ?? ""),
+    name: String(method.name ?? ""),
+    version: String(method.version ?? ""),
+    runtimeS: Number(method.runtimeS ?? method.runtime_s ?? 0),
+    isEducational: Boolean(method.isEducational ?? method.is_educational ?? false),
+    provenanceNote: String(method.provenanceNote ?? method.provenance_note ?? ""),
+    isBuiltIn: Boolean(method.isBuiltIn ?? method.is_built_in ?? false),
+    liquidChromatography: {
+      columnLabel: String(chromatography.columnLabel ?? chromatography.column_label ?? ""),
+      columnTemperatureC: Number(
+        chromatography.columnTemperatureC ?? chromatography.column_temperature_c ?? 0,
+      ),
+      mobilePhaseA: String(chromatography.mobilePhaseA ?? chromatography.mobile_phase_a ?? ""),
+      mobilePhaseB: String(chromatography.mobilePhaseB ?? chromatography.mobile_phase_b ?? ""),
+      flowMlPerMin: Number(chromatography.flowMlPerMin ?? chromatography.flow_ml_per_min ?? 0),
+      gradient: Array.isArray(gradient)
+        ? gradient.map((step) => ({
+            timeS: Number(step.timeS ?? step.time_s ?? 0),
+            mobilePhaseBPercent: Number(
+              step.mobilePhaseBPercent ?? step.mobile_phase_b_percent ?? 0,
+            ),
+          }))
+        : [],
+    },
+    ionSource: {
+      sourceType: String(source.sourceType ?? source.source_type ?? ""),
+      ionSprayVoltageV: Number(source.ionSprayVoltageV ?? source.ion_spray_voltage_v ?? 0),
+      sourceTemperatureC: Number(source.sourceTemperatureC ?? source.source_temperature_c ?? 0),
+      nebulizerGasPsi: Number(source.nebulizerGasPsi ?? source.nebulizer_gas_psi ?? 0),
+      heaterGasPsi: Number(source.heaterGasPsi ?? source.heater_gas_psi ?? 0),
+      curtainGasPsi: Number(source.curtainGasPsi ?? source.curtain_gas_psi ?? 0),
+    },
+    transitions: Array.isArray(method.transitions)
+      ? (method.transitions as Record<string, unknown>[]).map(normalizeMrmTransition)
+      : [],
+  };
+}
+
+export function normalizeAcquisitionMethodSummary(
+  raw: Record<string, unknown>,
+): AcquisitionMethodSummary {
+  return {
+    id: String(raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    version: String(raw.version ?? ""),
+    runtimeS: Number(raw.runtimeS ?? raw.runtime_s ?? 0),
+    isEducational: Boolean(raw.isEducational ?? raw.is_educational ?? false),
+    provenanceNote: String(raw.provenanceNote ?? raw.provenance_note ?? ""),
+    isBuiltIn: Boolean(raw.isBuiltIn ?? raw.is_built_in ?? false),
+    compoundCount: Number(raw.compoundCount ?? raw.compound_count ?? 0),
+    transitionCount: Number(raw.transitionCount ?? raw.transition_count ?? 0),
+  };
+}
+
 function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").SequenceRun[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((run: Record<string, unknown>) => ({
     id: String(run.id ?? ""),
     methodId: String(run.methodId ?? run.method_id ?? "apple_pesticides_mrm_v1"),
+    methodSnapshot: normalizeAcquisitionMethod(run.methodSnapshot ?? run.method_snapshot),
     injections: Array.isArray(run.injections)
       ? run.injections.map((inj: Record<string, unknown>) => ({
           vialId: String(inj.vialId ?? inj.vial_id ?? ""),

@@ -4,6 +4,10 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
+from app.domain.acquisition_methods import (
+    get_acquisition_method,
+    snapshot_acquisition_method,
+)
 from app.domain.models import (
     CalibrationContext,
     CompoundMeasurement,
@@ -29,7 +33,6 @@ APPLE_EXTRACT_ID = "apple_extract"
 ISTD_REFERENCE_CONC_NG_PER_ML = 100.0
 CALIBRATION_STANDARD_VOLUME_ML = 1.0
 ENV_NOISE_SIGMA = 0.005  # 0.5% environmental noise per measurement
-FIXED_ACQUISITION_METHOD_ID = "apple_pesticides_mrm_v1"
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +333,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         if experiment.rack.state != "loaded":
             raise ValueError("The autosampler rack is not loaded into the LC-MS/MS.")
 
+        method = get_acquisition_method(request.method_id)
         configured_by_slot = _validate_acquisition_sequence(request, vials_in_rack)
 
         injections: list[InjectionMeasurement] = []
@@ -369,7 +373,8 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         run = SequenceRun(
             id=new_id("seq"),
             injections=injections,
-            method_id=request.method_id,
+            method_id=method.id,
+            method_snapshot=snapshot_acquisition_method(method),
         )
         instrument.sequence_runs.append(run)
         experiment.rack.state = "completed"
@@ -385,11 +390,6 @@ def _validate_acquisition_sequence(
     request: RunSequenceRequest,
     occupied_slots: list[RackSlot],
 ) -> dict[str, AcquisitionSequenceLineRequest]:
-    if request.method_id != FIXED_ACQUISITION_METHOD_ID:
-        raise ValueError(
-            f"Step-one acquisition method must be {FIXED_ACQUISITION_METHOD_ID}."
-        )
-
     occupied_slot_ids = [slot.id for slot in occupied_slots]
     configured_slot_ids = [line.rack_slot_id for line in request.injections]
     if len(configured_slot_ids) != len(set(configured_slot_ids)):

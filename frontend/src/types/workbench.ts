@@ -498,10 +498,77 @@ export type InjectionMeasurement = {
   outputFilename: string;
 };
 
+export type MrmTransition = {
+  id: string;
+  compoundId: string;
+  compoundLabel: string;
+  compoundKind: "analyte" | "internal_standard";
+  q1Mz: number;
+  q3Mz: number;
+  polarity: "positive" | "negative";
+  role: "quantifier" | "qualifier";
+  collisionEnergyV: number;
+  dwellTimeMs: number;
+  expectedRetentionTimeS: number;
+  retentionWindowS: number;
+  internalStandardId: string | null;
+  provenance: string;
+};
+
+export type GradientStep = {
+  timeS: number;
+  mobilePhaseBPercent: number;
+};
+
+export type LiquidChromatographyParameters = {
+  columnLabel: string;
+  columnTemperatureC: number;
+  mobilePhaseA: string;
+  mobilePhaseB: string;
+  flowMlPerMin: number;
+  gradient: GradientStep[];
+};
+
+export type IonSourceParameters = {
+  sourceType: string;
+  ionSprayVoltageV: number;
+  sourceTemperatureC: number;
+  nebulizerGasPsi: number;
+  heaterGasPsi: number;
+  curtainGasPsi: number;
+};
+
+export type AcquisitionMethod = {
+  id: string;
+  name: string;
+  version: string;
+  runtimeS: number;
+  isEducational: boolean;
+  provenanceNote: string;
+  isBuiltIn: boolean;
+  liquidChromatography: LiquidChromatographyParameters;
+  ionSource: IonSourceParameters;
+  transitions: MrmTransition[];
+};
+
+export type AcquisitionMethodSummary = {
+  id: string;
+  name: string;
+  version: string;
+  runtimeS: number;
+  isEducational: boolean;
+  provenanceNote: string;
+  isBuiltIn: boolean;
+  compoundCount: number;
+  transitionCount: number;
+};
+
 export type SequenceRun = {
   id: string;
   injections: InjectionMeasurement[];
   methodId: string;
+  /** Immutable copy of the method this run was acquired with. */
+  methodSnapshot: AcquisitionMethod;
 };
 
 export type SpatulaState = {

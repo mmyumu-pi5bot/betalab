@@ -319,14 +319,49 @@ Betalab ne simule pas la fragmentation physique des ions. Une transition est
 un canal instrumental prédéfini auquel le moteur associe une trace
 temps/intensité.
 
-### 9.4. Informations encore attendues
+### 9.4. État actuel du modèle de méthode
 
-Le catalogue exact des transitions et les constantes de la méthode seront
-définis ultérieurement :
+La méthode est désormais un objet métier structuré et versionné, et non plus un
+identifiant codé en dur :
 
-- à partir d'une méthode réelle fournie par l'utilisateur ;
-- à partir des métadonnées présentes dans les exemples mzML ;
-- ou à partir d'un catalogue pédagogique documenté.
+```text
+AcquisitionMethod
+├── id, name, version
+├── runtime_s
+├── liquid_chromatography (colonne, phases, débit, gradient)
+├── ion_source (type, tensions, températures, gaz)
+└── transitions[] (MrmTransition)
+```
+
+Une `MrmTransition` porte : identifiant stable, composé annoté, Q1, Q3,
+polarité, rôle `quantifier` / `qualifier`, énergie de collision, dwell time,
+temps de rétention attendu, fenêtre de rétention, étalon interne associé et
+provenance.
+
+Le registre backend expose la méthode intégrée `apple_pesticides_mrm_v1` en
+lecture seule :
+
+- `GET /experiments/catalog/acquisition-methods` — liste résumée ;
+- `GET /experiments/catalog/acquisition-methods/{method_id}` — détail complet.
+
+`RunSequenceService` refuse une méthode inconnue et fige un snapshot immuable de
+la méthode dans le run. Une future version publiée sous le même identifiant ne
+peut donc pas réécrire l'histoire d'un run passé.
+
+### 9.5. Statut pédagogique des valeurs
+
+`apple_pesticides_mrm_v1` porte `is_educational = true` et chaque transition
+porte `provenance = "educational_placeholder"`.
+
+Les m/z, énergies de collision et temps de rétention sont des valeurs
+pédagogiques cohérentes entre elles, **écrites pour Betalab**. Elles ne
+proviennent ni d'une méthode de laboratoire validée, ni d'une note
+d'application constructeur, ni de la littérature, et ne doivent pas être
+réutilisées comme données analytiques de référence.
+
+Le jour où une méthode réelle est fournie, elle remplacera ce contenu sans
+changer la structure : seuls les nombres et les marqueurs de provenance
+changent.
 
 ## 10. Étape F — Contrôles avant lancement
 
@@ -587,7 +622,9 @@ de retry sont hors périmètre du premier parcours.
 | Chargement et retrait physique du rack | Implémentés | Conserver |
 | Console constructeur | Implémentée | Conserver |
 | Rôle analytique des vials | Jamais déclaré | Conserver : la séquence reste neutre |
-| Méthode d'acquisition | Absente | Méthode fixe à ajouter |
+| Méthode d'acquisition | Modèle structuré et versionné | Conserver |
+| Snapshot de méthode dans le run | Implémenté | Conserver |
+| Catalogue MRM de référence | Placeholders pédagogiques | Remplacer par des données réelles |
 | Lancement de la séquence | Calcul instantané existant | Remplacer par un run structuré |
 | Exécution injection par injection | Absente | À implémenter |
 | Signal numérique agrégé | Implémenté | Réutiliser comme entrée éventuelle du générateur |
@@ -615,9 +652,9 @@ Chaque incrément doit être utilisable ou vérifiable indépendamment.
 
 ### Incrément 3 — Méthode fixe
 
-- créer le modèle de méthode d'acquisition ;
-- ajouter `apple_pesticides_mrm_v1` ;
-- ajouter un premier catalogue de transitions ;
+- créer le modèle de méthode d'acquisition — fait ;
+- ajouter `apple_pesticides_mrm_v1` — fait ;
+- ajouter un premier catalogue de transitions — fait, en valeurs pédagogiques ;
 - afficher le résumé en lecture seule.
 
 ### Incrément 4 — Cycle d'acquisition
@@ -674,8 +711,9 @@ debug :
 
 Les points suivants seront tranchés avant ou pendant les incréments concernés :
 
-1. contenu exact de la méthode `apple_pesticides_mrm_v1` ;
-2. transitions MRM et temps de rétention ;
+1. contenu réel de la méthode `apple_pesticides_mrm_v1` — la structure est
+   figée, seules les valeurs pédagogiques restent à remplacer ;
+2. transitions MRM et temps de rétention réels ;
 3. durée et fréquence d'acquisition ;
 4. un mzML par injection ou un mzML par séquence ;
 5. structure exacte attendue par l'application consommatrice ;

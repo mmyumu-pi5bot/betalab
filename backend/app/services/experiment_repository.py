@@ -11,6 +11,13 @@ from typing import Protocol
 
 from pydantic_core import to_jsonable_python
 
+from app.domain.acquisition_methods import (
+    AcquisitionMethod,
+    GradientStep,
+    IonSourceParameters,
+    LiquidChromatographyParameters,
+    MrmTransition,
+)
 from app.domain.models import (
     CalibrationContext,
     CompoundMeasurement,
@@ -44,6 +51,7 @@ from app.domain.models import (
     Workspace,
     WorkspaceWidget,
 )
+from app.schemas.acquisition_method import AcquisitionMethodSchema
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
 from app.services.helpers.produce_canonical import (
     sync_canonical_produce_model,
@@ -318,6 +326,41 @@ def _deserialize_experiment(payload: dict) -> Experiment:
     return experiment
 
 
+def _deserialize_acquisition_method(schema: AcquisitionMethodSchema) -> AcquisitionMethod:
+    """Rebuild the frozen method a run was acquired with.
+
+    Reads only from the stored snapshot — never from the live registry — so a
+    method republished under the same id cannot rewrite the history of past runs.
+    """
+    return AcquisitionMethod(
+        id=schema.id,
+        name=schema.name,
+        version=schema.version,
+        runtime_s=schema.runtime_s,
+        is_educational=schema.is_educational,
+        provenance_note=schema.provenance_note,
+        is_built_in=schema.is_built_in,
+        liquid_chromatography=LiquidChromatographyParameters(
+            column_label=schema.liquid_chromatography.column_label,
+            column_temperature_c=schema.liquid_chromatography.column_temperature_c,
+            mobile_phase_a=schema.liquid_chromatography.mobile_phase_a,
+            mobile_phase_b=schema.liquid_chromatography.mobile_phase_b,
+            flow_ml_per_min=schema.liquid_chromatography.flow_ml_per_min,
+            gradient=tuple(
+                GradientStep(
+                    time_s=step.time_s,
+                    mobile_phase_b_percent=step.mobile_phase_b_percent,
+                )
+                for step in schema.liquid_chromatography.gradient
+            ),
+        ),
+        ion_source=IonSourceParameters(**schema.ion_source.model_dump()),
+        transitions=tuple(
+            MrmTransition(**transition.model_dump()) for transition in schema.transitions
+        ),
+    )
+
+
 def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
     workspace = Workspace(
         widgets=[
@@ -346,6 +389,7 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                     SequenceRun(
                         id=run.id,
                         method_id=run.method_id,
+                        method_snapshot=_deserialize_acquisition_method(run.method_snapshot),
                         injections=[
                             InjectionMeasurement(
                                 vial_id=injection.vial_id,

@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.experiment_routes import lcmsms as lcmsms_routes
+from app.domain.acquisition_methods import (
+    APPLE_PESTICIDES_MRM_V1,
+    APPLE_PESTICIDES_MRM_V1_ID,
+)
 from app.domain.models import (
     CalibrationContext,
     InjectionContext,
@@ -16,7 +21,6 @@ from app.domain.models import (
 )
 from app.main import app
 from app.services.domain_services.lcmsms import (
-    FIXED_ACQUISITION_METHOD_ID,
     AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
@@ -391,7 +395,7 @@ class TestRunSequenceWithCalibration:
         RunSequenceService(service).run(
             exp_id,
             RunSequenceRequest(
-                method_id=FIXED_ACQUISITION_METHOD_ID,
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
                 injections=[
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_4",
@@ -415,7 +419,7 @@ class TestRunSequenceWithCalibration:
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
         assert len(instrument.sequence_runs) == 1
         run = instrument.sequence_runs[0]
-        assert run.method_id == FIXED_ACQUISITION_METHOD_ID
+        assert run.method_id == APPLE_PESTICIDES_MRM_V1_ID
         assert [injection.rack_slot_id for injection in run.injections] == [
             "rack_slot_2",
             "rack_slot_4",
@@ -463,7 +467,7 @@ class TestRunSequenceWithCalibration:
         RunSequenceService(service).run(
             exp_id,
             RunSequenceRequest(
-                method_id=FIXED_ACQUISITION_METHOD_ID,
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
                 injections=[
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_1",
@@ -501,7 +505,7 @@ class TestRunSequenceWithCalibration:
         RunSequenceService(service).run(
             exp_id,
             RunSequenceRequest(
-                method_id=FIXED_ACQUISITION_METHOD_ID,
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
                 injections=[
                     AcquisitionSequenceLineRequest(
                         rack_slot_id="rack_slot_1",
@@ -537,7 +541,7 @@ class TestRunSequenceWithCalibration:
         RunSequenceService(service).run(
             exp_id,
             RunSequenceRequest(
-                method_id=FIXED_ACQUISITION_METHOD_ID,
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
                 injections=[
                     AcquisitionSequenceLineRequest(
                         rack_slot_id=f"rack_slot_{position}",
@@ -572,7 +576,7 @@ class TestRunSequenceWithCalibration:
         RunSequenceService(service).run(
             exp_id,
             RunSequenceRequest(
-                method_id=FIXED_ACQUISITION_METHOD_ID,
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
                 injections=[
                     AcquisitionSequenceLineRequest(
                         rack_slot_id=f"rack_slot_{position}",
@@ -601,7 +605,7 @@ class TestRunSequenceWithCalibration:
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
-                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
                     injections=[
                         AcquisitionSequenceLineRequest(
                             rack_slot_id="rack_slot_1",
@@ -625,7 +629,7 @@ class TestRunSequenceWithCalibration:
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
-                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
                     injections=[
                         AcquisitionSequenceLineRequest(
                             rack_slot_id="rack_slot_1",
@@ -651,7 +655,7 @@ class TestRunSequenceWithCalibration:
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
-                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
                     injections=[
                         AcquisitionSequenceLineRequest(
                             rack_slot_id=f"rack_slot_{position}",
@@ -674,7 +678,7 @@ class TestRunSequenceWithCalibration:
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
-                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
                     injections=[],
                 ),
             )
@@ -689,7 +693,7 @@ class TestRunSequenceWithCalibration:
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
-                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
                     injections=[],
                 ),
             )
@@ -702,10 +706,115 @@ class TestRunSequenceWithCalibration:
             RunSequenceService(service).run(
                 exp_id,
                 RunSequenceRequest(
-                    method_id=FIXED_ACQUISITION_METHOD_ID,
+                    method_id=APPLE_PESTICIDES_MRM_V1_ID,
                     injections=[],
                 ),
             )
+
+    def test_freezes_an_immutable_method_snapshot_into_the_run(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Apple A",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="apple_a.mzML",
+                    )
+                ],
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        run = instrument.sequence_runs[0]
+        assert run.method_id == APPLE_PESTICIDES_MRM_V1_ID
+        assert run.method_snapshot == APPLE_PESTICIDES_MRM_V1
+        assert run.method_snapshot.version == "1.0.0"
+        assert run.method_snapshot.is_educational is True
+        assert len(run.method_snapshot.transitions) == len(APPLE_PESTICIDES_MRM_V1.transitions)
+        with pytest.raises(AttributeError):
+            run.method_snapshot.version = "9.9.9"  # type: ignore[misc]
+
+    def test_rejects_an_unknown_acquisition_method(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+
+        with pytest.raises(ValueError, match="Unknown acquisition method"):
+            RunSequenceService(service).run(
+                exp_id,
+                RunSequenceRequest(
+                    method_id="not_a_method",
+                    injections=[
+                        AcquisitionSequenceLineRequest(
+                            rack_slot_id="rack_slot_1",
+                            sample_name="Apple A",
+                            injection_volume_ul=5.0,
+                            repetitions=1,
+                            output_filename="apple_a.mzML",
+                        )
+                    ],
+                ),
+            )
+
+    def test_roundtrip_rebuilds_the_stored_snapshot_rather_than_the_registry(
+        self, tmp_path
+    ) -> None:
+        """A past run must reload its own frozen method, not today's registry entry."""
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        _load_rack_into_instrument(service, exp_id)
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Apple A",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="apple_a.mzML",
+                    )
+                ],
+            ),
+        )
+        # Rewrite the persisted run as if it had been acquired with an older
+        # revision of the method: two transitions only, and a different version.
+        experiment = service._require_experiment(exp_id)
+        instrument = next(w for w in experiment.workspace.widgets if w.id == "instrument")
+        instrument.sequence_runs[0].method_snapshot = replace(
+            APPLE_PESTICIDES_MRM_V1,
+            version="0.9.0",
+            transitions=APPLE_PESTICIDES_MRM_V1.transitions[:2],
+        )
+        repository.save(experiment)
+
+        reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        instrument = next(w for w in reloaded.workspace.widgets if w.id == "instrument")
+        snapshot = instrument.sequence_runs[0].method_snapshot
+
+        assert snapshot.version == "0.9.0"
+        assert len(snapshot.transitions) == 2
+        assert snapshot.transitions[0] == APPLE_PESTICIDES_MRM_V1.transitions[0]
+        assert isinstance(snapshot.transitions, tuple)
+        assert isinstance(snapshot.liquid_chromatography.gradient, tuple)
+        assert snapshot.ion_source == APPLE_PESTICIDES_MRM_V1.ion_source
 
     def test_roundtrip_preserves_acquisition_metadata(self, tmp_path) -> None:
         repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
@@ -723,7 +832,7 @@ class TestRunSequenceWithCalibration:
         )
         _load_rack_into_instrument(service, exp_id)
         request = RunSequenceRequest(
-            method_id=FIXED_ACQUISITION_METHOD_ID,
+            method_id=APPLE_PESTICIDES_MRM_V1_ID,
             injections=[
                 AcquisitionSequenceLineRequest(
                     rack_slot_id="rack_slot_1",
@@ -746,7 +855,7 @@ class TestRunSequenceWithCalibration:
         reloaded = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
         instrument = next(w for w in reloaded.workspace.widgets if w.id == "instrument")
         run = instrument.sequence_runs[0]
-        assert run.method_id == FIXED_ACQUISITION_METHOD_ID
+        assert run.method_id == APPLE_PESTICIDES_MRM_V1_ID
         assert run.injections[0].sample_name == "Cal 10"
         assert run.injections[0].output_filename == "cal_10.mzML"
         assert run.injections[1].sample_name == "Apple A"
@@ -772,7 +881,7 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
     response = TestClient(app).post(
         f"/experiments/{exp_id}/lcmsms/run-sequence",
         json={
-            "method_id": FIXED_ACQUISITION_METHOD_ID,
+            "method_id": APPLE_PESTICIDES_MRM_V1_ID,
             "injections": [
                 {
                     "rack_slot_id": "rack_slot_1",
@@ -798,7 +907,7 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
         for widget in response.json()["workspace"]["widgets"]
         if widget["id"] == "instrument"
     )
-    assert instrument["sequence_runs"][0]["method_id"] == FIXED_ACQUISITION_METHOD_ID
+    assert instrument["sequence_runs"][0]["method_id"] == APPLE_PESTICIDES_MRM_V1_ID
     assert instrument["sequence_runs"][0]["injections"][1]["sample_name"] == "Apple A"
 
 

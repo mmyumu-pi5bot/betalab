@@ -6,6 +6,11 @@ from enum import StrEnum
 from typing import Generic, Literal, TypeVar
 from uuid import uuid4
 
+from app.domain.acquisition_methods import (
+    APPLE_PESTICIDES_MRM_V1,
+    APPLE_PESTICIDES_MRM_V1_ID,
+    AcquisitionMethod,
+)
 from app.domain.rules import can_workspace_widget_store_now
 
 T = TypeVar("T")
@@ -175,7 +180,10 @@ class SequenceRun:
     """One LC-MS/MS sequence run; stored on the instrument workspace widget."""
     id: str
     injections: list[InjectionMeasurement]
-    method_id: str = "apple_pesticides_mrm_v1"
+    method_id: str = APPLE_PESTICIDES_MRM_V1_ID
+    # Immutable copy of the method as it was when the run started. A later
+    # version published under the same id must never change how a past run reads.
+    method_snapshot: AcquisitionMethod = APPLE_PESTICIDES_MRM_V1
 
 
 @dataclass
