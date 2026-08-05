@@ -1,12 +1,26 @@
 import { vi } from "vitest";
 
+import {
+  acquisitionMethodCatalogFixture,
+  acquisitionMethodFixture,
+} from "@/test-support/acquisition-method-fixture";
 import { toolbarCatalogFixture } from "@/test-support/toolbar-catalog-fixture";
 import type { Experiment } from "@/types/experiment";
-import type { ToolbarCategory } from "@/types/workbench";
+import type {
+  AcquisitionMethod,
+  AcquisitionMethodSummary,
+  ToolbarCategory,
+} from "@/types/workbench";
 
 export const createExperiment = vi.fn<() => Promise<Experiment>>();
 export const getToolbarCatalog = vi.fn<() => Promise<ToolbarCategory[]>>(() =>
   Promise.resolve(toolbarCatalogFixture),
+);
+export const getAcquisitionMethodCatalog = vi.fn<() => Promise<AcquisitionMethodSummary[]>>(
+  () => Promise.resolve(acquisitionMethodCatalogFixture),
+);
+export const getAcquisitionMethod = vi.fn<(methodId: string) => Promise<AcquisitionMethod>>(
+  () => Promise.resolve(acquisitionMethodFixture),
 );
 export const sendExperimentCommand = vi.fn<
   (experimentId: string, type: string, payload: Record<string, unknown>) => Promise<Experiment>
@@ -187,5 +201,7 @@ export function emitExperimentSnapshot(experimentId: string, experiment: Experim
 export function resetApiMocks() {
   vi.clearAllMocks();
   getToolbarCatalog.mockResolvedValue(toolbarCatalogFixture);
+  getAcquisitionMethodCatalog.mockResolvedValue(acquisitionMethodCatalogFixture);
+  getAcquisitionMethod.mockResolvedValue(acquisitionMethodFixture);
   streamSubscriptions.clear();
 }

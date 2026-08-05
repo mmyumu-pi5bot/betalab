@@ -306,6 +306,29 @@ export async function getToolbarCatalog(): Promise<ToolbarCategory[]> {
   }));
 }
 
+export async function getAcquisitionMethodCatalog(): Promise<AcquisitionMethodSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/experiments/catalog/acquisition-methods`);
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to fetch acquisition methods");
+  }
+
+  const payload = (await response.json()) as Array<Record<string, unknown>>;
+  return payload.map(normalizeAcquisitionMethodSummary);
+}
+
+export async function getAcquisitionMethod(methodId: string): Promise<AcquisitionMethod> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/catalog/acquisition-methods/${methodId}`,
+  );
+
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to fetch acquisition method");
+  }
+
+  return normalizeAcquisitionMethod(await response.json());
+}
+
 export async function deleteExperiment(experimentId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/experiments/${experimentId}`, {
     method: "DELETE",

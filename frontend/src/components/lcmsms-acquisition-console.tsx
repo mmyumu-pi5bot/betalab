@@ -2,13 +2,15 @@
 
 import { useMemo } from "react";
 
+import { LcMsMsMethodViewer } from "@/components/lcmsms-method-viewer";
+import { useAcquisitionMethod } from "@/hooks/use-acquisition-method";
 import type {
   AcquisitionSequenceLinePayload,
   RunSequencePayload,
 } from "@/types/api-payloads";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
 
-const METHOD_ID = "apple_pesticides_mrm_v1" as const;
+const METHOD_ID = "apple_pesticides_mrm_v1";
 
 type Props = {
   isCommandPending: boolean;
@@ -100,6 +102,9 @@ export function LcMsMsAcquisitionConsole({
 }: Props) {
   const lines = sequence.injections;
   const validationMessage = useMemo(() => validateLines(lines), [lines]);
+  // The method belongs to the sequence, never to the vials sitting in the rack.
+  const { catalog, error: methodError, isLoading: isMethodLoading, method } =
+    useAcquisitionMethod(sequence.method_id);
 
   function updateLine(index: number, patch: Partial<AcquisitionSequenceLinePayload>) {
     onSequenceChange({
@@ -125,12 +130,31 @@ export function LcMsMsAcquisitionConsole({
 
       <label className="mt-4 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
         Acquisition method
-        <input
-          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 font-mono text-xs text-cyan-200 disabled:opacity-100"
-          disabled
-          value={METHOD_ID}
-        />
+        <select
+          aria-label="Acquisition method"
+          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 font-mono text-xs text-cyan-200"
+          onChange={(event) =>
+            onSequenceChange({ ...sequence, method_id: event.target.value })
+          }
+          value={sequence.method_id}
+        >
+          {catalog.length === 0 ? (
+            <option value={sequence.method_id}>{sequence.method_id}</option>
+          ) : (
+            catalog.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name} — v{entry.version}
+              </option>
+            ))
+          )}
+        </select>
       </label>
+
+      <LcMsMsMethodViewer
+        error={methodError}
+        isLoading={isMethodLoading}
+        method={method}
+      />
 
       <div className="mt-4 space-y-3">
         {lines.map((line, index) => (

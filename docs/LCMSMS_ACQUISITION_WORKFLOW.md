@@ -285,19 +285,35 @@ Le Step 1 utilise une seule méthode préinstallée et non modifiable :
 Le technicien la sélectionne ou vérifie qu'elle est sélectionnée. Il ne
 développe pas les transitions MRM dans ce parcours.
 
-### 9.2. Résumé affiché
+### 9.2. Visualiseur de méthode
 
-La console peut afficher en lecture seule :
+La console affiche un visualiseur en lecture seule de la méthode sélectionnée :
 
-- nom et version de la méthode ;
+- nom et version ;
+- badges `Educational` et `Built-in · read-only` ;
+- note de provenance ;
 - durée du run ;
-- volume d'injection ;
-- polarité utilisée ;
-- nombre de transitions ;
-- liste des composés ciblés ;
-- liste des étalons internes.
+- nombre de composés et nombre de transitions ;
+- paramètres LC principaux : colonne, four, débit, phases, gradient ;
+- paramètres de source principaux : type, tension de spray, températures, gaz ;
+- table des transitions : composé, quantifier/qualifier, Q1, Q3, polarité, CE,
+  dwell et RT.
 
-### 9.3. Données nécessaires au moteur
+Un glossaire explique brièvement Q1, Q3, collision energy, dwell time,
+quantifier et qualifier, afin que le technicien puisse comprendre la méthode
+sans devoir la modifier.
+
+La méthode intégrée reste non modifiable : le visualiseur ne rend aucun champ
+éditable.
+
+### 9.3. Sélection de la méthode
+
+Le sélecteur de méthode est alimenté par le catalogue backend. La méthode
+choisie appartient à la séquence : elle ne dépend jamais des fioles présentes
+dans le rack, et c'est bien la méthode sélectionnée qui part dans la commande
+de lancement.
+
+### 9.4. Données nécessaires au moteur
 
 La méthode devra fournir, pour chaque canal MRM :
 
@@ -319,7 +335,7 @@ Betalab ne simule pas la fragmentation physique des ions. Une transition est
 un canal instrumental prédéfini auquel le moteur associe une trace
 temps/intensité.
 
-### 9.4. État actuel du modèle de méthode
+### 9.5. État actuel du modèle de méthode
 
 La méthode est désormais un objet métier structuré et versionné, et non plus un
 identifiant codé en dur :
@@ -348,7 +364,7 @@ lecture seule :
 la méthode dans le run. Une future version publiée sous le même identifiant ne
 peut donc pas réécrire l'histoire d'un run passé.
 
-### 9.5. Statut pédagogique des valeurs
+### 9.6. Statut pédagogique des valeurs
 
 `apple_pesticides_mrm_v1` porte `is_educational = true` et chaque transition
 porte `provenance = "educational_placeholder"`.

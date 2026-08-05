@@ -1,11 +1,18 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/api", async () => await import("@/test-support/api-mock"));
 
 import {
   buildDefaultRunSequencePayload,
   LcMsMsAcquisitionConsole,
 } from "@/components/lcmsms-acquisition-console";
+import {
+  getAcquisitionMethod,
+  getAcquisitionMethodCatalog,
+  resetApiMocks,
+} from "@/test-support/api-mock";
 import type { RunSequencePayload } from "@/types/api-payloads";
 import type { RackSlot } from "@/types/workbench";
 
@@ -58,6 +65,10 @@ function AcquisitionConsoleHarness({
 }
 
 describe("LcMsMsAcquisitionConsole", () => {
+  beforeEach(() => {
+    resetApiMocks();
+  });
+
   it("reads occupied rack positions and submits a ready sequence", () => {
     const onRun = vi.fn();
     render(
@@ -67,7 +78,6 @@ describe("LcMsMsAcquisitionConsole", () => {
       />,
     );
 
-    expect(screen.getByDisplayValue("apple_pesticides_mrm_v1")).toBeDisabled();
     const rows = screen.getAllByTestId("acquisition-sequence-row");
     expect(within(rows[0]).getByText("Position 2")).toBeInTheDocument();
     expect(within(rows[0]).getByDisplayValue("Cal 10")).toBeInTheDocument();
@@ -149,6 +159,88 @@ describe("LcMsMsAcquisitionConsole", () => {
       target: { value: "Apple B" },
     });
     expect(screen.getByText(/sequence ready/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
+  });
+
+  it("loads the selected method from the API and renders its viewer", async () => {
+    render(<AcquisitionConsoleHarness onRun={vi.fn()} rackSlots={[rackSlot(1, "sample")]} />);
+
+    expect(getAcquisitionMethodCatalog).toHaveBeenCalled();
+    expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v1");
+
+    const viewer = await screen.findByRole("region", { name: "Acquisition method details" });
+    expect(within(viewer).getByTestId("method-runtime")).toHaveTextContent("12:00");
+    expect(within(viewer).getByTestId("method-transition-count")).toHaveTextContent("3");
+    expect(within(viewer).getAllByTestId("method-transition-row")).toHaveLength(3);
+    expect(within(viewer).getByTestId("method-glossary")).toHaveTextContent(/precursor/i);
+  });
+
+  it("offers the catalog methods and keeps the choice on the sequence", async () => {
+    const onRun = vi.fn();
+    getAcquisitionMethodCatalog.mockResolvedValue([
+      {
+        id: "apple_pesticides_mrm_v1",
+        name: "Apple pesticides — MRM",
+        version: "1.0.0",
+        runtimeS: 720,
+        isEducational: true,
+        provenanceNote: "Educational method.",
+        isBuiltIn: true,
+        compoundCount: 2,
+        transitionCount: 3,
+      },
+      {
+        id: "apple_pesticides_mrm_v2",
+        name: "Apple pesticides — MRM",
+        version: "2.0.0",
+        runtimeS: 900,
+        isEducational: true,
+        provenanceNote: "Educational method.",
+        isBuiltIn: false,
+        compoundCount: 3,
+        transitionCount: 6,
+      },
+    ]);
+    render(<AcquisitionConsoleHarness onRun={onRun} rackSlots={[rackSlot(1, "sample")]} />);
+
+    const selector = await screen.findByLabelText("Acquisition method");
+    await waitFor(() =>
+      expect(within(selector).getAllByRole("option")).toHaveLength(2),
+    );
+    fireEvent.change(selector, { target: { value: "apple_pesticides_mrm_v2" } });
+
+    await waitFor(() =>
+      expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v2"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Launch acquisition" }));
+    expect(onRun).toHaveBeenCalledWith(
+      expect.objectContaining({ method_id: "apple_pesticides_mrm_v2" }),
+    );
+  });
+
+  it("selects the method independently of the vials in the rack", async () => {
+    const onRun = vi.fn();
+    const { rerender } = render(
+      <AcquisitionConsoleHarness onRun={onRun} rackSlots={[rackSlot(1, "calibration")]} />,
+    );
+    await screen.findByRole("region", { name: "Acquisition method details" });
+
+    // A rack holding only calibrants and a rack holding only samples must ask
+    // for the very same method.
+    rerender(<AcquisitionConsoleHarness onRun={onRun} rackSlots={[rackSlot(1, "sample")]} />);
+
+    expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v1");
+    expect(
+      getAcquisitionMethod.mock.calls.every(([methodId]) => methodId === "apple_pesticides_mrm_v1"),
+    ).toBe(true);
+  });
+
+  it("surfaces a method that cannot be loaded without blocking the sequence", async () => {
+    getAcquisitionMethod.mockRejectedValue(new Error("Method service unavailable"));
+    render(<AcquisitionConsoleHarness onRun={vi.fn()} rackSlots={[rackSlot(1, "sample")]} />);
+
+    expect(await screen.findByText("Method service unavailable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
   });
 

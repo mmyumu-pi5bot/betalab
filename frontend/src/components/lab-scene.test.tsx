@@ -32,6 +32,8 @@ import {
   aspiratePipette,
   createExperiment,
   emitExperimentSnapshot,
+  getAcquisitionMethod,
+  getAcquisitionMethodCatalog,
   resetApiMocks,
   sendExperimentCommand,
   subscribeToExperimentStream,
@@ -5933,6 +5935,73 @@ describe("LabScene", () => {
     expect(
       screen.queryByRole("dialog", { name: "LC-MS/MS acquisition console" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the loaded method in the console and sends the selected one at launch", async () => {
+    const experiment = makeWorkbenchExperiment({
+      rackState: "loaded",
+      rackSlots: makeRackSlots([
+        { tool: makeTool({ id: "sample_vial", fieldLabelText: "Apple A" }) },
+      ]),
+      workspaceWidgets: makeWorkspaceWidgets([
+        {},
+        {},
+        {},
+        {},
+        {},
+        { isPresent: true },
+        { isPresent: true },
+      ]),
+    });
+    vi.mocked(createExperiment).mockResolvedValue(experiment);
+    vi.mocked(sendExperimentCommand).mockResolvedValue(experiment);
+    vi.mocked(getAcquisitionMethodCatalog).mockResolvedValue([
+      {
+        id: "apple_pesticides_mrm_v1",
+        name: "Apple pesticides — MRM",
+        version: "1.0.0",
+        runtimeS: 720,
+        isEducational: true,
+        provenanceNote: "Educational method.",
+        isBuiltIn: true,
+        compoundCount: 2,
+        transitionCount: 3,
+      },
+      {
+        id: "apple_pesticides_mrm_v2",
+        name: "Apple pesticides — MRM",
+        version: "2.0.0",
+        runtimeS: 900,
+        isEducational: true,
+        provenanceNote: "Educational method.",
+        isBuiltIn: false,
+        compoundCount: 3,
+        transitionCount: 6,
+      },
+    ]);
+
+    render(<PesticideWorkbench />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Open acquisition console" }),
+    );
+
+    const viewer = await screen.findByRole("region", {
+      name: "Acquisition method details",
+    });
+    expect(within(viewer).getByTestId("method-runtime")).toHaveTextContent("12:00");
+    expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v1");
+
+    const selector = screen.getByLabelText("Acquisition method");
+    await waitFor(() => expect(within(selector).getAllByRole("option")).toHaveLength(2));
+    fireEvent.change(selector, { target: { value: "apple_pesticides_mrm_v2" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Launch acquisition" }));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "run_sequence",
+      expect.objectContaining({ method_id: "apple_pesticides_mrm_v2" }),
+    );
   });
 
 });

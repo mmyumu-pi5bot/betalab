@@ -232,7 +232,8 @@ export type AcquisitionSequenceLinePayload = {
 };
 
 export type RunSequencePayload = {
-  method_id: "apple_pesticides_mrm_v1";
+  /** Id of a method from the acquisition method catalog. */
+  method_id: string;
   injections: AcquisitionSequenceLinePayload[];
 };
 

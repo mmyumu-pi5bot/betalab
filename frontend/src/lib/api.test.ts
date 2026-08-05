@@ -8,6 +8,8 @@ import {
   createDebugToolPreset,
   createExperiment,
   deleteExperiment,
+  getAcquisitionMethod,
+  getAcquisitionMethodCatalog,
   getDebugInspection,
   getExperiment,
   getToolbarCatalog,
@@ -167,6 +169,77 @@ describe("api client", () => {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    );
+  });
+
+  it("fetches the acquisition method catalog", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: "apple_pesticides_mrm_v1",
+          name: "Apple pesticides — MRM",
+          version: "1.0.0",
+          runtime_s: 720,
+          is_educational: true,
+          provenance_note: "Educational method.",
+          is_built_in: true,
+          compound_count: 13,
+          transition_count: 25,
+        },
+      ],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const catalog = await getAcquisitionMethodCatalog();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/catalog/acquisition-methods",
+    );
+    expect(catalog).toHaveLength(1);
+    expect(catalog[0].transitionCount).toBe(25);
+    expect(catalog[0].isBuiltIn).toBe(true);
+  });
+
+  it("fetches one acquisition method by id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "apple_pesticides_mrm_v1",
+        name: "Apple pesticides — MRM",
+        version: "1.0.0",
+        runtime_s: 720,
+        is_educational: true,
+        provenance_note: "Educational method.",
+        is_built_in: true,
+        liquid_chromatography: { gradient: [] },
+        ion_source: {},
+        transitions: [],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const method = await getAcquisitionMethod("apple_pesticides_mrm_v1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/experiments/catalog/acquisition-methods/apple_pesticides_mrm_v1",
+    );
+    expect(method.version).toBe("1.0.0");
+    expect(method.runtimeS).toBe(720);
+  });
+
+  it("raises when an acquisition method cannot be fetched", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: "Unknown acquisition method 'nope'." }),
+      }),
+    );
+
+    await expect(getAcquisitionMethod("nope")).rejects.toThrow(
+      /Unknown acquisition method/,
     );
   });
 
