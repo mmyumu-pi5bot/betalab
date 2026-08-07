@@ -177,6 +177,7 @@ def reference_transitions_for(compound_id: str) -> tuple[ReferenceTransition, ..
 def find_reference_transition(
     q1_mz: float,
     q3_mz: float,
+    polarity: Polarity,
     tolerance: float = MZ_MATCH_TOLERANCE,
 ) -> ReferenceTransition | None:
     """Return the reference channel addressed by ``(q1_mz, q3_mz)``, if any.
@@ -185,10 +186,16 @@ def find_reference_transition(
     never consulted. Watching the right masses under the wrong compound name
     still yields signal, and watching the wrong masses under the right name
     still yields nothing.
+
+    Polarity is part of the address, not a label. A molecule that only ionises
+    in positive mode produces no ions at all when the source is run negative,
+    so the right masses under the wrong polarity address nothing.
     """
     best: ReferenceTransition | None = None
     best_distance = float("inf")
     for candidate in MRM_REFERENCE_CATALOG:
+        if candidate.polarity != polarity:
+            continue
         q1_delta = abs(candidate.q1_mz - q1_mz)
         q3_delta = abs(candidate.q3_mz - q3_mz)
         if q1_delta > tolerance or q3_delta > tolerance:

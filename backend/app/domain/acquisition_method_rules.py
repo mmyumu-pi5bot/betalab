@@ -102,14 +102,17 @@ def collect_acquisition_method_warnings(method: AcquisitionMethod) -> list[Metho
                 )
             )
 
-        reference = find_reference_transition(transition.q1_mz, transition.q3_mz)
+        reference = find_reference_transition(
+            transition.q1_mz, transition.q3_mz, transition.polarity
+        )
         if reference is None:
             warnings.append(
                 MethodWarning(
                     code="unmatched_transition",
                     transition_id=transition.id,
                     message=(
-                        f"No known compound responds at {transition.q1_mz} → {transition.q3_mz}. "
+                        f"No known compound responds at {transition.q1_mz} → {transition.q3_mz} "
+                        f"in {transition.polarity} mode. "
                         "This channel will record baseline noise only."
                     ),
                 )

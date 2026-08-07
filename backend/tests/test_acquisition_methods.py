@@ -41,7 +41,7 @@ class TestMrmReferenceCatalog:
     def test_matches_a_transition_on_exact_masses(self) -> None:
         reference = MRM_REFERENCE_CATALOG[0]
 
-        found = find_reference_transition(reference.q1_mz, reference.q3_mz)
+        found = find_reference_transition(reference.q1_mz, reference.q3_mz, reference.polarity)
 
         assert found is not None
         assert found.compound_id == reference.compound_id
@@ -53,17 +53,17 @@ class TestMrmReferenceCatalog:
         outside = MZ_MATCH_TOLERANCE + 1.0
 
         assert find_reference_transition(
-            reference.q1_mz + inside, reference.q3_mz
+            reference.q1_mz + inside, reference.q3_mz, reference.polarity
         ) is not None
         assert find_reference_transition(
-            reference.q1_mz + outside, reference.q3_mz
+            reference.q1_mz + outside, reference.q3_mz, reference.polarity
         ) is None
         assert find_reference_transition(
-            reference.q1_mz, reference.q3_mz + outside
+            reference.q1_mz, reference.q3_mz + outside, reference.polarity
         ) is None
 
     def test_unknown_mass_pair_matches_nothing(self) -> None:
-        assert find_reference_transition(999.9, 111.1) is None
+        assert find_reference_transition(999.9, 111.1, "positive") is None
 
 
 class TestAcquisitionMethodRegistry:
@@ -110,7 +110,9 @@ class TestAcquisitionMethodRegistry:
 
     def test_built_in_transitions_all_address_a_real_reference_channel(self) -> None:
         for transition in APPLE_PESTICIDES_MRM_V1.transitions:
-            reference = find_reference_transition(transition.q1_mz, transition.q3_mz)
+            reference = find_reference_transition(
+                transition.q1_mz, transition.q3_mz, transition.polarity
+            )
             assert reference is not None, transition.id
             assert reference.compound_id == transition.compound_id
 
