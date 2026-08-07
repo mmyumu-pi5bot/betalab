@@ -6,7 +6,6 @@ vi.mock("@/lib/api", async () => await import("@/test-support/api-mock"));
 import { LcMsMsMethodEditor } from "@/components/lcmsms-method-editor";
 import { acquisitionMethodFixture } from "@/test-support/acquisition-method-fixture";
 import {
-  duplicateAcquisitionMethod,
   getMrmReferenceCatalog,
   proposeMrmTransitions,
   resetApiMocks,
@@ -18,7 +17,6 @@ function renderEditor(overrides: Partial<Parameters<typeof LcMsMsMethodEditor>[0
     <LcMsMsMethodEditor
       method={acquisitionMethodFixture}
       onMethodSaved={vi.fn()}
-      onMethodSelected={vi.fn()}
       {...overrides}
     />,
   );
@@ -29,27 +27,13 @@ describe("LcMsMsMethodEditor", () => {
     resetApiMocks();
   });
 
-  it("refuses to edit a built-in method and offers to duplicate it", () => {
+  it("refuses to edit a built-in method and points at duplication", () => {
     renderEditor();
 
+    // Duplication is a library-level action, owned by the method manager.
     expect(screen.getByText(/built-in method.*cannot be edited/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Duplicate method" })).toBeEnabled();
     expect(screen.queryByLabelText("Q1 (m/z)")).not.toBeInTheDocument();
-  });
-
-  it("duplicates the built-in method into an editable copy", async () => {
-    const onMethodSelected = vi.fn();
-    renderEditor({ onMethodSelected });
-
-    fireEvent.click(screen.getByRole("button", { name: "Duplicate method" }));
-
-    await waitFor(() => expect(duplicateAcquisitionMethod).toHaveBeenCalled());
-    expect(duplicateAcquisitionMethod).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceMethodId: acquisitionMethodFixture.id }),
-    );
-    await waitFor(() =>
-      expect(onMethodSelected).toHaveBeenCalledWith("apple_pesticides_mrm_v1_copy"),
-    );
+    expect(screen.queryByLabelText("Method name")).not.toBeInTheDocument();
   });
 
   it("edits a user method in simple mode by picking target compounds", async () => {

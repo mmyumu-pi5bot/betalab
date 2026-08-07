@@ -163,17 +163,42 @@ describe("LcMsMsAcquisitionConsole", () => {
     expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
   });
 
-  it("loads the selected method from the API and renders its viewer", async () => {
+  it("summarises the selected method instead of unfolding it inline", async () => {
     render(<AcquisitionConsoleHarness onRun={vi.fn()} rackSlots={[rackSlot(1, "sample")]} />);
 
     expect(getAcquisitionMethodCatalog).toHaveBeenCalled();
     expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v1");
 
-    const viewer = await screen.findByRole("region", { name: "Acquisition method details" });
+    const summary = await screen.findByTestId("method-summary");
+    expect(summary).toHaveTextContent("Apple pesticides — MRM");
+    expect(summary).toHaveTextContent("v1.0.0");
+    expect(summary).toHaveTextContent("2 compounds · 3 transitions · 12:00 run");
+
+    // The transition table and the glossary belong to the manager now.
+    expect(
+      screen.queryByRole("region", { name: "Acquisition method details" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("method-glossary")).not.toBeInTheDocument();
+  });
+
+  it("opens and closes the method manager as a modal", async () => {
+    render(<AcquisitionConsoleHarness onRun={vi.fn()} rackSlots={[rackSlot(1, "sample")]} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Manage methods" }));
+
+    const manager = await screen.findByRole("dialog", { name: "Acquisition method manager" });
+    const viewer = await within(manager).findByRole("region", {
+      name: "Acquisition method details",
+    });
     expect(within(viewer).getByTestId("method-runtime")).toHaveTextContent("12:00");
-    expect(within(viewer).getByTestId("method-transition-count")).toHaveTextContent("3");
     expect(within(viewer).getAllByTestId("method-transition-row")).toHaveLength(3);
-    expect(within(viewer).getByTestId("method-glossary")).toHaveTextContent(/precursor/i);
+
+    fireEvent.click(within(manager).getByRole("button", { name: "Close method manager" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Acquisition method manager" }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it("offers the catalog methods and keeps the choice on the sequence", async () => {
@@ -225,7 +250,7 @@ describe("LcMsMsAcquisitionConsole", () => {
     const { rerender } = render(
       <AcquisitionConsoleHarness onRun={onRun} rackSlots={[rackSlot(1, "calibration")]} />,
     );
-    await screen.findByRole("region", { name: "Acquisition method details" });
+    await screen.findByTestId("method-summary");
 
     // A rack holding only calibrants and a rack holding only samples must ask
     // for the very same method.
@@ -245,11 +270,13 @@ describe("LcMsMsAcquisitionConsole", () => {
     expect(screen.getByRole("button", { name: "Launch acquisition" })).toBeEnabled();
   });
 
-  it("duplicating a method selects the copy for the sequence", async () => {
+  it("duplicating a method in the manager can hand the copy to the sequence", async () => {
     const onRun = vi.fn();
     render(<AcquisitionConsoleHarness onRun={onRun} rackSlots={[rackSlot(1, "sample")]} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Duplicate method" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Manage methods" }));
+    const manager = await screen.findByRole("dialog", { name: "Acquisition method manager" });
+    fireEvent.click(within(manager).getByRole("button", { name: "Duplicate method" }));
 
     await waitFor(() =>
       expect(duplicateAcquisitionMethod).toHaveBeenCalledWith(
@@ -257,9 +284,10 @@ describe("LcMsMsAcquisitionConsole", () => {
       ),
     );
 
+    fireEvent.click(within(manager).getByRole("button", { name: "Use for this sequence" }));
     fireEvent.click(screen.getByRole("button", { name: "Launch acquisition" }));
     expect(onRun).toHaveBeenCalledWith(
-      expect.objectContaining({ method_id: "apple_pesticides_mrm_v1_copy" }),
+      expect.objectContaining({ method_id: "apple_pesticides_mrm_copy" }),
     );
   });
 

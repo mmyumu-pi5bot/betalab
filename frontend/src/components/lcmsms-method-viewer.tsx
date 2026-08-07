@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDuration, formatNumber } from "@/lib/acquisition-method-format";
 import type { AcquisitionMethod, MrmTransition } from "@/types/workbench";
 
 type Props = {
@@ -40,16 +41,6 @@ const GLOSSARY: { term: string; explanation: string }[] = [
       "A second transition of the same compound. It is not used to quantify: its ratio to the quantifier confirms the identity and exposes interferences.",
   },
 ];
-
-function formatDuration(seconds: number): string {
-  const wholeMinutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds - wholeMinutes * 60);
-  return `${wholeMinutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
-function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
-}
 
 function ParameterRow({ label, value }: { label: string; value: string }) {
   return (

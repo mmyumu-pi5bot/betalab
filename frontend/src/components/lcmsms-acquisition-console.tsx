@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import { LcMsMsMethodEditor } from "@/components/lcmsms-method-editor";
-import { LcMsMsMethodViewer } from "@/components/lcmsms-method-viewer";
-import { useAcquisitionMethod } from "@/hooks/use-acquisition-method";
+import { LcMsMsMethodManager } from "@/components/lcmsms-method-manager";
+import {
+  useAcquisitionMethodCatalog,
+  useAcquisitionMethodDetail,
+} from "@/hooks/use-acquisition-method";
+import { formatDuration } from "@/lib/acquisition-method-format";
 import type {
   AcquisitionSequenceLinePayload,
   RunSequencePayload,
@@ -103,14 +106,27 @@ export function LcMsMsAcquisitionConsole({
 }: Props) {
   const lines = sequence.injections;
   const validationMessage = useMemo(() => validateLines(lines), [lines]);
+  const [isMethodManagerOpen, setIsMethodManagerOpen] = useState(false);
+  // Shared cache-busting counter: writes in the manager must reach the console.
+  const [methodRevision, setMethodRevision] = useState(0);
+  const bumpMethodRevision = useCallback(
+    () => setMethodRevision((revision) => revision + 1),
+    [],
+  );
   // The method belongs to the sequence, never to the vials sitting in the rack.
+  const catalog = useAcquisitionMethodCatalog(methodRevision);
   const {
-    catalog,
     error: methodError,
     isLoading: isMethodLoading,
     method,
-    reload: reloadMethod,
-  } = useAcquisitionMethod(sequence.method_id);
+  } = useAcquisitionMethodDetail(sequence.method_id, methodRevision);
+  const compoundCount = useMemo(
+    () =>
+      method === null
+        ? 0
+        : new Set(method.transitions.map((transition) => transition.compoundId)).size,
+    [method],
+  );
 
   function updateLine(index: number, patch: Partial<AcquisitionSequenceLinePayload>) {
     onSequenceChange({
@@ -156,19 +172,62 @@ export function LcMsMsAcquisitionConsole({
         </select>
       </label>
 
-      <LcMsMsMethodViewer
-        error={methodError}
-        isLoading={isMethodLoading}
-        method={method}
-      />
+      <div
+        className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-2.5"
+        data-testid="method-summary"
+      >
+        <div className="min-w-0">
+          {methodError !== null ? (
+            <p className="text-[11px] text-rose-300">{methodError}</p>
+          ) : method === null ? (
+            <p className="text-[11px] text-slate-400">
+              {isMethodLoading ? "Loading the method…" : "No method loaded."}
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-100">{method.name}</span>
+                <span className="font-mono text-[10px] text-cyan-300">v{method.version}</span>
+                {method.isEducational ? (
+                  <span
+                    className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-300"
+                    data-testid="method-educational-badge"
+                  >
+                    Educational
+                  </span>
+                ) : null}
+                {method.isBuiltIn ? (
+                  <span className="rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">
+                    Built-in
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-0.5 font-mono text-[10px] text-slate-500">
+                {compoundCount} compounds · {method.transitions.length} transitions ·{" "}
+                {formatDuration(method.runtimeS)} run
+              </p>
+            </>
+          )}
+        </div>
+        <button
+          className="shrink-0 rounded-full border border-slate-700 px-3 py-1.5 text-[11px] font-semibold text-slate-200 hover:bg-slate-800"
+          onClick={() => setIsMethodManagerOpen(true)}
+          type="button"
+        >
+          Manage methods
+        </button>
+      </div>
 
-      {method !== null ? (
-        <LcMsMsMethodEditor
-          method={method}
-          onMethodSaved={reloadMethod}
+      {isMethodManagerOpen ? (
+        <LcMsMsMethodManager
+          catalog={catalog}
+          onClose={() => setIsMethodManagerOpen(false)}
+          onLibraryChanged={bumpMethodRevision}
           onMethodSelected={(methodId) =>
             onSequenceChange({ ...sequence, method_id: methodId })
           }
+          revision={methodRevision}
+          selectedMethodId={sequence.method_id}
         />
       ) : null}
 

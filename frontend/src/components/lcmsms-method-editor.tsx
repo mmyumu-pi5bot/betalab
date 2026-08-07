@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  duplicateAcquisitionMethod,
   getMrmReferenceCatalog,
   proposeMrmTransitions,
   saveAcquisitionMethod,
@@ -22,7 +21,6 @@ import type {
 type Props = {
   method: AcquisitionMethod;
   onMethodSaved: (method: AcquisitionMethod) => void;
-  onMethodSelected: (methodId: string) => void;
 };
 
 type EditorMode = "simple" | "advanced";
@@ -32,7 +30,7 @@ function numberField(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function LcMsMsMethodEditor({ method, onMethodSaved, onMethodSelected }: Props) {
+export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
   const [mode, setMode] = useState<EditorMode>("simple");
   const [name, setName] = useState(method.name);
   const [version, setVersion] = useState(method.version);
@@ -74,25 +72,6 @@ export function LcMsMsMethodEditor({ method, onMethodSaved, onMethodSelected }: 
     () => [...new Set(transitions.map((transition) => transition.compoundId))],
     [transitions],
   );
-
-  async function handleDuplicate() {
-    setIsBusy(true);
-    setFailure(null);
-    try {
-      const saved = await duplicateAcquisitionMethod({
-        sourceMethodId: method.id,
-        newMethodId: `${method.id}_copy`,
-        name: `${method.name} (copy)`,
-        version: "0.1.0",
-      });
-      onMethodSelected(saved.method.id);
-      onMethodSaved(saved.method);
-    } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Failed to duplicate the method.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
 
   async function handleToggleCompound(compoundId: string, isSelected: boolean) {
     const nextCompoundIds = isSelected
@@ -136,20 +115,9 @@ export function LcMsMsMethodEditor({ method, onMethodSaved, onMethodSelected }: 
       >
         <p className="text-[11px] leading-relaxed text-slate-300">
           <span className="font-semibold text-slate-100">{method.name}</span> is a built-in
-          method and cannot be edited. Duplicate it to obtain an editable copy, change the
-          copy, then save it as a new version.
+          method and cannot be edited. Use <em>Duplicate method</em> in the library to obtain
+          an editable copy, change the copy, then save it as a new version.
         </p>
-        {failure !== null ? (
-          <p className="mt-2 text-[10px] text-rose-300">{failure}</p>
-        ) : null}
-        <button
-          className="mt-2 rounded-full bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:opacity-40"
-          disabled={isBusy}
-          onClick={handleDuplicate}
-          type="button"
-        >
-          Duplicate method
-        </button>
       </section>
     );
   }

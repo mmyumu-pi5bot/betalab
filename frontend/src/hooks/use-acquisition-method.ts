@@ -1,32 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { getAcquisitionMethod, getAcquisitionMethodCatalog } from "@/lib/api";
 import type { AcquisitionMethod, AcquisitionMethodSummary } from "@/types/workbench";
 
-type AcquisitionMethodState = {
-  catalog: AcquisitionMethodSummary[];
-  error: string | null;
-  isLoading: boolean;
-  method: AcquisitionMethod | null;
-  /** Adopt a method that was just saved, and refresh the catalog around it. */
-  reload: (method: AcquisitionMethod) => void;
-};
-
 /**
- * Load the read-only acquisition method catalog and the detail of `methodId`.
+ * Read the acquisition method library.
  *
- * The selection belongs to the sequence, so this hook only reads: it never
- * decides which method is selected and never depends on the vials in the rack.
+ * `revision` is a cache-busting counter, not data: bump it after any write
+ * (duplicate, save, delete) so every reader of the library converges on the
+ * same list again. The hook only reads — it never decides which method is
+ * selected, and it never depends on the vials sitting in the rack.
  */
-export function useAcquisitionMethod(methodId: string): AcquisitionMethodState {
+export function useAcquisitionMethodCatalog(revision: number): AcquisitionMethodSummary[] {
   const [catalog, setCatalog] = useState<AcquisitionMethodSummary[]>([]);
-  const [method, setMethod] = useState<AcquisitionMethod | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [catalogRevision, setCatalogRevision] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -40,12 +28,25 @@ export function useAcquisitionMethod(methodId: string): AcquisitionMethodState {
     return () => {
       isCurrent = false;
     };
-  }, [catalogRevision]);
+  }, [revision]);
 
-  const reload = useCallback((saved: AcquisitionMethod) => {
-    setMethod(saved);
-    setCatalogRevision((revision) => revision + 1);
-  }, []);
+  return catalog;
+}
+
+type AcquisitionMethodDetail = {
+  error: string | null;
+  isLoading: boolean;
+  method: AcquisitionMethod | null;
+};
+
+/** Read one method in full. Shares `revision` with the catalog hook. */
+export function useAcquisitionMethodDetail(
+  methodId: string,
+  revision: number,
+): AcquisitionMethodDetail {
+  const [method, setMethod] = useState<AcquisitionMethod | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isCurrent = true;
@@ -66,7 +67,7 @@ export function useAcquisitionMethod(methodId: string): AcquisitionMethodState {
     return () => {
       isCurrent = false;
     };
-  }, [methodId]);
+  }, [methodId, revision]);
 
-  return { catalog, error, isLoading, method, reload };
+  return { error, isLoading, method };
 }

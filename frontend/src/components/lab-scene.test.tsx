@@ -5985,11 +5985,20 @@ describe("LabScene", () => {
       await screen.findByRole("button", { name: "Open acquisition console" }),
     );
 
-    const viewer = await screen.findByRole("region", {
+    const summary = await screen.findByTestId("method-summary");
+    expect(summary).toHaveTextContent("12:00 run");
+    expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v1");
+
+    // The full method sheet lives in the modal manager, not in the console.
+    fireEvent.click(screen.getByRole("button", { name: "Manage methods" }));
+    const manager = await screen.findByRole("dialog", {
+      name: "Acquisition method manager",
+    });
+    const viewer = within(manager).getByRole("region", {
       name: "Acquisition method details",
     });
     expect(within(viewer).getByTestId("method-runtime")).toHaveTextContent("12:00");
-    expect(getAcquisitionMethod).toHaveBeenCalledWith("apple_pesticides_mrm_v1");
+    fireEvent.click(within(manager).getByRole("button", { name: "Close method manager" }));
 
     const selector = screen.getByLabelText("Acquisition method");
     await waitFor(() => expect(within(selector).getAllByRole("option")).toHaveLength(2));

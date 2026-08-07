@@ -215,16 +215,23 @@ marque réelle.
 La console comporte quatre zones :
 
 1. état de l'instrument ;
-2. méthode sélectionnée ;
+2. méthode sélectionnée, **résumée** ;
 3. table de séquence ;
 4. commandes et progression de l'acquisition.
+
+La zone méthode reste volontairement compacte : sélecteur, résumé d'une ligne et
+accès au gestionnaire de méthodes. Le détail complet (paramètres LC et source,
+table des transitions, glossaire, édition) vit dans une fenêtre modale dédiée —
+voir § 9.3 — pour que la console reste centrée sur la séquence à lancer.
 
 Exemple conceptuel :
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │ LC-MS/MS Acquisition                           READY        │
-│ Method: Apple pesticides — MRM v1                           │
+│ Method: [ Apple pesticides — MRM — v1.0.0 ▾ ]               │
+│ Apple pesticides — MRM v1.0.0  Educational  Built-in        │
+│ 13 compounds · 25 transitions · 12:00 run  [Manage methods] │
 ├──────┬───────────────────┬──────────┬──────┬────────────────┤
 │ Pos. │ Sample name       │ Vol (µL) │ Rep. │ File           │
 ├──────┼───────────────────┼──────────┼──────┼────────────────┤
@@ -288,6 +295,11 @@ une copie éditable.
 de l'écraser ou de la supprimer est refusée. Le parcours est donc
 `Duplicate method` → modifier la copie → `Save as new version`.
 
+La duplication est une action de **bibliothèque**, pas d'édition : elle vit dans
+le gestionnaire de méthodes (§ 9.3), qui demande le nom de la copie et en dérive
+un identifiant unique. Dupliquer deux fois de suite depuis la même source donne
+donc deux méthodes distinctes, jamais un conflit d'identifiant.
+
 L'éditeur propose deux niveaux :
 
 1. **Mode simple** — cocher les pesticides ciblés ; le catalogue de référence
@@ -324,9 +336,54 @@ Les méthodes utilisateur sont persistées côté backend, et chaque run fige le
 snapshot exact de la méthode utilisée : éditer une méthode après coup ne réécrit
 jamais un run déjà terminé.
 
-### 9.3. Visualiseur de méthode
+### 9.3. Gestionnaire de méthodes
 
-La console affiche un visualiseur en lecture seule de la méthode sélectionnée :
+Tout ce qui concerne la méthode — consulter, comparer, dupliquer, éditer,
+supprimer — se fait dans une **fenêtre modale**, ouverte depuis la console par
+`Manage methods`. La console elle-même ne garde qu'un résumé d'une ligne.
+
+Le motif est simple : la séquence se prépare en quelques secondes, la méthode se
+lit en plusieurs minutes. Les dérouler dans la même colonne noyait la table
+d'injections sous la table des transitions.
+
+```text
+┌─ Method manager ────────────────────────────────────────────────┐
+│ Method library      │ [ Details ] [ Edit ]                      │
+│ ┌─────────────────┐ │                                           │
+│ │ Apple pest. MRM │ │  <fiche lecture seule / éditeur>          │
+│ │ v1.0.0          │ │                                           │
+│ │ Built-in · 25 t.│ │                                           │
+│ │ In use          │ │                                           │
+│ ├─────────────────┤ │                                           │
+│ │ My method   [🗑]│ │                                           │
+│ │ v0.1.0          │ │                                           │
+│ │ User · 4 trans. │ │                                           │
+│ └─────────────────┘ │                                           │
+│ New method          │                                           │
+│ Copy name [______]  │                                           │
+│ [Duplicate method]  │                                           │
+├─────────────────────┴───────────────────────────────────────────┤
+│ Previewing a method does not change the sequence.               │
+│                                       [ Use for this sequence ] │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Règles du gestionnaire :
+
+- **Prévisualiser n'est pas sélectionner.** Parcourir la bibliothèque ne touche
+  pas à la séquence ; seul `Use for this sequence` change `method_id`.
+- **Onglet `Details`** — la fiche en lecture seule décrite ci-dessous.
+- **Onglet `Edit`** — l'éditeur (§ 9.1). Sur une méthode intégrée il n'affiche
+  qu'un rappel : dupliquer d'abord.
+- **Suppression** — réservée aux méthodes utilisateur, derrière une confirmation.
+  Supprimer la méthode en cours bascule la séquence sur une méthode intégrée.
+- Toute écriture (duplication, enregistrement, suppression) incrémente un
+  compteur de révision partagé, pour que le catalogue et le résumé de la console
+  se rechargent ensemble.
+
+#### Fiche de méthode (lecture seule)
+
+L'onglet `Details` affiche :
 
 - nom et version ;
 - badges `Educational` et `Built-in · read-only` ;
@@ -347,10 +404,14 @@ La méthode intégrée reste non modifiable : le visualiseur ne rend aucun champ
 
 ### 9.4. Sélection de la méthode
 
-Le sélecteur de méthode est alimenté par le catalogue backend. La méthode
-choisie appartient à la séquence : elle ne dépend jamais des fioles présentes
-dans le rack, et c'est bien la méthode sélectionnée qui part dans la commande
-de lancement.
+Deux chemins mènent à la même sélection :
+
+- le sélecteur de la console, pour changer vite de méthode connue ;
+- `Use for this sequence` dans le gestionnaire, après avoir consulté la fiche.
+
+Le catalogue qui les alimente vient du backend. La méthode choisie appartient à
+la séquence : elle ne dépend jamais des fioles présentes dans le rack, et c'est
+bien la méthode sélectionnée qui part dans la commande de lancement.
 
 ### 9.5. Données nécessaires au moteur
 
@@ -708,6 +769,7 @@ de retry sont hors périmètre du premier parcours.
 | Préparation d'un sample | Implémentée | Conserver |
 | Chargement et retrait physique du rack | Implémentés | Conserver |
 | Console constructeur | Implémentée | Conserver |
+| Gestionnaire de méthodes | Fenêtre modale dédiée | Conserver |
 | Rôle analytique des vials | Jamais déclaré | Conserver : la séquence reste neutre |
 | Méthode d'acquisition | Modèle structuré et versionné | Conserver |
 | Snapshot de méthode dans le run | Implémenté | Conserver |
@@ -744,7 +806,8 @@ Chaque incrément doit être utilisable ou vérifiable indépendamment.
 - créer le modèle de méthode d'acquisition — fait ;
 - ajouter `apple_pesticides_mrm_v1` — fait ;
 - ajouter un premier catalogue de transitions — fait, en valeurs pédagogiques ;
-- afficher le résumé en lecture seule.
+- afficher le résumé en lecture seule — fait ;
+- sortir la fiche complète et l'édition dans un gestionnaire modal — fait.
 
 ### Incrément 4 — Cycle d'acquisition
 
@@ -808,7 +871,9 @@ Les points suivants seront tranchés avant ou pendant les incréments concernés
 5. structure exacte attendue par l'application consommatrice ;
 6. besoin d'un manifeste de séquence à côté des mzML ;
 7. métadonnées déclaratives à inscrire dans le mzML ;
-8. apparence finale de la console constructeur ;
+8. apparence finale de la console constructeur — partiellement tranchée : la
+   console reste compacte, tout le détail méthode passe par le gestionnaire
+   modal (§ 9.3) ;
 9. comportement en cas d'arrêt ou d'échec au milieu d'une séquence.
 
 Les exemples mzML fournis ultérieurement doivent servir de source de vérité
