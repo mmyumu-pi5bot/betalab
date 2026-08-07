@@ -96,6 +96,7 @@ import {
   dispensePipette,
   loadRackIntoInstrument,
   runSequence,
+  skipAcquisition,
   unloadRackFromInstrument,
 } from "@/lib/api";
 import type { Experiment } from "@/types/experiment";
@@ -200,5 +201,6 @@ export const mutationFns = {
   dispensePipette,
   loadRackIntoInstrument,
   runSequence,
+  skipAcquisition,
   unloadRackFromInstrument,
 } satisfies Record<string, MutationFn>;

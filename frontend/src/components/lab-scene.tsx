@@ -522,9 +522,11 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   const instrumentStatus =
     rackLoadedCount > 0 && state.experiment.rack.state === "completed"
       ? ("completed" as const)
-      : rackLoadedCount > 0 && state.experiment.rack.state === "loaded"
-        ? ("ready" as const)
-        : ("idle" as const);
+      : rackLoadedCount > 0 && state.experiment.rack.state === "locked"
+        ? ("running" as const)
+        : rackLoadedCount > 0 && state.experiment.rack.state === "loaded"
+          ? ("ready" as const)
+          : ("idle" as const);
   const isTrashEmpty =
     trashedTools.length === 0 &&
     trashedProduceLots.length === 0 &&
@@ -652,6 +654,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         ...workspaceActions,
         onLoadRackIntoInstrument: () => { void experimentApi.lcmsms.loadRack(); },
         onRunSequence: (payload) => { void experimentApi.lcmsms.runSequence(payload); },
+        onSkipAcquisition: () => { void experimentApi.lcmsms.skipAcquisition(); },
         onUnloadRackFromInstrument: () => { void experimentApi.lcmsms.unloadRack(); },
         onStartCentrifuge: () => { void experimentApi.centrifuge.start(); },
         onToggleCentrifugeToolSeal: () => {

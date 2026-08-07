@@ -121,6 +121,7 @@ class InjectionMeasurementSchema(BaseModel):
     injection_volume_ul: float = 5.0
     replicate_index: int = 1
     output_filename: str = ""
+    start_offset_s: float = 0.0
 
 
 class SequenceRunSchema(BaseModel):
@@ -132,6 +133,8 @@ class SequenceRunSchema(BaseModel):
             asdict(APPLE_PESTICIDES_MRM_V1)
         )
     )
+    total_duration_s: float = 0.0
+    elapsed_s: float = 0.0
 
 
 class ProduceMaterialStateSchema(BaseModel):

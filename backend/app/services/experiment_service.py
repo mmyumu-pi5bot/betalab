@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from app.domain.models import Experiment
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
+from app.services.domain_services.acquisition_clock import advance_sequence_runs
 from app.services.domain_services.workspace import advance_workspace_cryogenics_state
 from app.services.experiment_factory import build_experiment
 from app.services.experiment_repository import ExperimentRepository, InMemoryExperimentRepository
@@ -82,6 +83,7 @@ class ExperimentRuntimeService:
         while remaining_ms > 0:
             step_ms = min(remaining_ms, 5000.0)
             advance_workspace_cryogenics_state(experiment, step_ms)
+            advance_sequence_runs(experiment, step_ms)
             remaining_ms -= step_ms
 
         experiment.last_simulation_at = now

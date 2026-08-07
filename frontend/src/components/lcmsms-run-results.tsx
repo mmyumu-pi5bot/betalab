@@ -12,8 +12,35 @@ const CHART_WIDTH = 320;
 const CHART_HEIGHT = 64;
 
 type Props = {
+  isCommandPending?: boolean;
+  onSkip?: () => void;
   runs: SequenceRun[];
 };
+
+/**
+ * Return the part of a trace the instrument has recorded so far.
+ *
+ * The backend generates every trace in full when the sequence starts, then
+ * moves a clock. Revealing here is what turns that clock into a chromatogram
+ * being drawn live, without re-sending the data on every tick.
+ */
+export function revealTrace(trace: TransitionTrace, acquiredUntilS: number): TransitionTrace {
+  if (acquiredUntilS >= trace.acquisition.runDurationS) return trace;
+  let count = 0;
+  while (count < trace.timesS.length && trace.timesS[count] <= acquiredUntilS) {
+    count += 1;
+  }
+  return {
+    ...trace,
+    timesS: trace.timesS.slice(0, count),
+    intensities: trace.intensities.slice(0, count),
+  };
+}
+
+/** Instrument seconds recorded on this injection: negative before it starts. */
+function acquiredSeconds(run: SequenceRun, injection: InjectionMeasurement): number {
+  return run.elapsedS - injection.startOffsetS;
+}
 
 function formatDuration(seconds: number): string {
   const wholeMinutes = Math.floor(seconds / 60);
@@ -25,11 +52,10 @@ function formatMz(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
 }
 
-function buildPolylinePoints(trace: TransitionTrace): string {
+function buildPolylinePoints(trace: TransitionTrace, maxTime: number): string {
   const { intensities, timesS } = trace;
   if (intensities.length === 0) return "";
   const maxIntensity = Math.max(...intensities);
-  const maxTime = timesS[timesS.length - 1] || 1;
   const scale = maxIntensity > 0 ? maxIntensity : 1;
   return intensities
     .map((intensity, index) => {
@@ -50,10 +76,20 @@ function traceWarning(trace: TransitionTrace): string | null {
   return null;
 }
 
-function TransitionChromatogram({ trace }: { trace: TransitionTrace }) {
+function TransitionChromatogram({
+  acquiredUntilS,
+  trace,
+}: {
+  acquiredUntilS: number;
+  trace: TransitionTrace;
+}) {
   const { transition } = trace;
-  const apex = trace.intensities.length > 0 ? Math.max(...trace.intensities) : 0;
-  const warning = traceWarning(trace);
+  const recorded = revealTrace(trace, acquiredUntilS);
+  const apex = recorded.intensities.length > 0 ? Math.max(...recorded.intensities) : 0;
+  // Diagnose only once the channel has had its chance: mid-run, an empty trace
+  // means "not there yet", not "misconfigured".
+  const warning =
+    acquiredUntilS >= trace.acquisition.runDurationS ? traceWarning(trace) : null;
   const isQuantifier = transition.role === "quantifier";
 
   return (
@@ -86,7 +122,7 @@ function TransitionChromatogram({ trace }: { trace: TransitionTrace }) {
       >
         <polyline
           fill="none"
-          points={buildPolylinePoints(trace)}
+          points={buildPolylinePoints(recorded, trace.acquisition.runDurationS || 1)}
           stroke={isQuantifier ? "#0284c7" : "#94a3b8"}
           strokeWidth="1.5"
           vectorEffect="non-scaling-stroke"
@@ -117,8 +153,17 @@ function TransitionChromatogram({ trace }: { trace: TransitionTrace }) {
   );
 }
 
-function InjectionPanel({ injection }: { injection: InjectionMeasurement }) {
+function InjectionPanel({
+  acquiredUntilS,
+  injection,
+}: {
+  acquiredUntilS: number;
+  injection: InjectionMeasurement;
+}) {
   const displayName = injection.sampleName || injection.vialLabel;
+  const runDurationS = injection.traces[0]?.acquisition.runDurationS ?? 0;
+  const isPending = acquiredUntilS <= 0;
+  const isRecording = acquiredUntilS > 0 && acquiredUntilS < runDurationS;
 
   return (
     <div data-testid="injection-panel">
@@ -128,6 +173,25 @@ function InjectionPanel({ injection }: { injection: InjectionMeasurement }) {
         {injection.replicateIndex} ·{" "}
         <span className="font-mono">{injection.outputFilename}</span>
       </p>
+
+      {isPending ? (
+        <p
+          className="mt-2 rounded-[0.9rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500"
+          data-testid="injection-pending"
+        >
+          Waiting in the autosampler queue.
+        </p>
+      ) : null}
+
+      {isRecording ? (
+        <p
+          className="mt-2 text-[10px] font-medium text-sky-600"
+          data-testid="injection-recording"
+        >
+          Recording · {formatDuration(acquiredUntilS)} of{" "}
+          {formatDuration(runDurationS)}
+        </p>
+      ) : null}
 
       {injection.status === "no_extract_context" ? (
         <p className="mt-2 rounded-[0.9rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
@@ -140,7 +204,11 @@ function InjectionPanel({ injection }: { injection: InjectionMeasurement }) {
       ) : (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {injection.traces.map((trace) => (
-            <TransitionChromatogram key={trace.transition.id} trace={trace} />
+            <TransitionChromatogram
+              acquiredUntilS={acquiredUntilS}
+              key={trace.transition.id}
+              trace={trace}
+            />
           ))}
         </div>
       )}
@@ -148,7 +216,7 @@ function InjectionPanel({ injection }: { injection: InjectionMeasurement }) {
   );
 }
 
-export function LcMsMsRunResults({ runs }: Props) {
+export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Props) {
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null;
   const [selectedInjectionId, setSelectedInjectionId] = useState<string | null>(null);
 
@@ -164,9 +232,23 @@ export function LcMsMsRunResults({ runs }: Props) {
     );
   }
 
+  const isRunning = latestRun.elapsedS < latestRun.totalDurationS;
+  // While the instrument works, follow it: the injection being recorded is the
+  // one worth watching. Once finished, the user drives the tabs.
+  const recordingInjection = latestRun.injections.find(
+    (injection) => acquiredSeconds(latestRun, injection) > 0
+      && acquiredSeconds(latestRun, injection)
+        < (injection.traces[0]?.acquisition.runDurationS ?? 0),
+  );
+  // An explicit click always wins: auto-follow is a default, not a cage.
   const selected =
     latestRun.injections.find((injection) => injection.id === selectedInjectionId) ??
+    (isRunning ? recordingInjection : undefined) ??
     latestRun.injections[0];
+  const progressPercent =
+    latestRun.totalDurationS > 0
+      ? Math.min(100, (latestRun.elapsedS / latestRun.totalDurationS) * 100)
+      : 100;
 
   return (
     <div className="space-y-2">
@@ -178,6 +260,37 @@ export function LcMsMsRunResults({ runs }: Props) {
         {latestRun.injections.length > 1 ? "s" : ""} · {latestRun.methodSnapshot.name} v
         {latestRun.methodSnapshot.version}
       </p>
+
+      {isRunning ? (
+        <div
+          className="rounded-[0.9rem] border border-sky-200 bg-sky-50 px-3 py-2"
+          data-testid="run-progress"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-medium text-sky-800">
+              Acquiring · {formatDuration(latestRun.elapsedS)} of{" "}
+              {formatDuration(latestRun.totalDurationS)}
+            </p>
+            {onSkip ? (
+              <button
+                className="shrink-0 rounded-full border border-sky-300 bg-white px-3 py-1 text-[10px] font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-40"
+                disabled={isCommandPending}
+                onClick={onSkip}
+                type="button"
+              >
+                Skip to end
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-sky-200">
+            <div
+              className="h-full rounded-full bg-sky-600 transition-[width] duration-200"
+              data-testid="run-progress-bar"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {latestRun.injections.length > 1 ? (
         <div className="flex flex-wrap gap-1" role="tablist">
@@ -203,7 +316,12 @@ export function LcMsMsRunResults({ runs }: Props) {
         </div>
       ) : null}
 
-      {selected !== undefined ? <InjectionPanel injection={selected} /> : null}
+      {selected !== undefined ? (
+        <InjectionPanel
+          acquiredUntilS={acquiredSeconds(latestRun, selected)}
+          injection={selected}
+        />
+      ) : null}
     </div>
   );
 }

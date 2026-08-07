@@ -1732,6 +1732,17 @@ export async function loadRackIntoInstrument(
   });
 }
 
+export async function skipAcquisition(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lcmsms/skip-acquisition`,
+  });
+}
+
 export async function unloadRackFromInstrument(
   experimentId: string,
   payload?: MutationPayload,
@@ -2590,6 +2601,8 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
     id: String(run.id ?? ""),
     methodId: String(run.methodId ?? run.method_id ?? "apple_pesticides_mrm_v1"),
     methodSnapshot: normalizeAcquisitionMethod(run.methodSnapshot ?? run.method_snapshot),
+    totalDurationS: Number(run.totalDurationS ?? run.total_duration_s ?? 0),
+    elapsedS: Number(run.elapsedS ?? run.elapsed_s ?? 0),
     injections: Array.isArray(run.injections)
       ? run.injections.map((inj: Record<string, unknown>) => ({
           id: String(inj.id ?? ""),
@@ -2603,6 +2616,7 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
           ),
           replicateIndex: Number(inj.replicateIndex ?? inj.replicate_index ?? 1),
           outputFilename: String(inj.outputFilename ?? inj.output_filename ?? ""),
+          startOffsetS: Number(inj.startOffsetS ?? inj.start_offset_s ?? 0),
           traces: Array.isArray(inj.traces)
             ? (inj.traces as Record<string, unknown>[]).map(normalizeTransitionTrace)
             : [],

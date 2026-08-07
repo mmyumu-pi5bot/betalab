@@ -506,6 +506,8 @@ export type InjectionMeasurement = {
   injectionVolumeUl: number;
   replicateIndex: number;
   outputFilename: string;
+  /** When this injection starts, in instrument seconds since the sequence began. */
+  startOffsetS: number;
 };
 
 export type MrmTransition = {
@@ -605,6 +607,10 @@ export type SequenceRun = {
   methodId: string;
   /** Immutable copy of the method this run was acquired with. */
   methodSnapshot: AcquisitionMethod;
+  /** Instrument seconds the whole sequence takes: one run duration per injection. */
+  totalDurationS: number;
+  /** Instrument seconds recorded so far. Equal to totalDurationS once finished. */
+  elapsedS: number;
 };
 
 export type SpatulaState = {

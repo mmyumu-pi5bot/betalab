@@ -90,7 +90,7 @@ type LabSceneViewProps = {
   };
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
-    instrumentStatus: "completed" | "idle" | "ready";
+    instrumentStatus: "completed" | "idle" | "ready" | "running";
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
@@ -173,6 +173,7 @@ type LabSceneViewProps = {
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
+    onSkipAcquisition: () => void;
     onUnloadRackFromInstrument: () => void;
     onTareAnalyticalBalance: () => void;
   };

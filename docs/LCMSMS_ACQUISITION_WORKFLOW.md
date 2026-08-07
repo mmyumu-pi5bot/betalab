@@ -573,11 +573,34 @@ Une injection peut avoir les états :
 - `completed` ;
 - `failed`.
 
-### 12.4. Progression temporelle
+### 12.4. Progression temporelle — implémentée
 
-L'acquisition doit progresser avec l'horloge autoritaire du backend. Les
-conséquences temporelles ne doivent pas être pilotées par un simple timer du
-frontend.
+L'acquisition progresse avec l'horloge autoritaire du backend
+(`_advance_experiment_to_now`), jamais avec un timer du frontend. Le flux
+WebSocket repousse l'expérience toutes les 250 ms, ce qui suffit à animer le
+tracé.
+
+**Durée.** Une injection dure exactement la durée de run de la méthode, fixée
+par le gradient LC. Ce n'est **pas** le dwell ni le nombre de transitions qui
+l'allongent : douze minutes restent douze minutes qu'on surveille 6 ou 60
+canaux. Une séquence dure donc `nombre d'injections × runtime_s`.
+
+**Accélération.** Attendre douze minutes par fiole serait fidèle et injouable.
+Le même déroulé est rejoué à `ACQUISITION_TIME_ACCELERATION` (×30) : un run se
+regarde en ~24 s, une séquence de cinq fioles en ~2 min. Rien d'autre n'est
+compressé — les secondes instrument inscrites dans les traces restent vraies,
+seule l'attente réelle rétrécit.
+
+**Génération.** Les traces sont produites **en totalité au lancement**, avec le
+générateur pseudo-aléatoire seedé consommé une seule fois : la reproductibilité
+est donc intacte. `SequenceRun.elapsed_s` dit ensuite jusqu'où l'instrument a
+enregistré, et les lecteurs révèlent chaque chromatogramme jusqu'à ce point.
+C'est aussi pourquoi *Skip to end* ne change jamais la donnée obtenue : il ne
+saute que l'attente.
+
+**Verrouillage.** Le rack passe à `locked` au lancement et n'atteint `completed`
+qu'une fois la dernière injection enregistrée. Il ne peut pas être déchargé
+entre les deux, exactement comme physiquement.
 
 Le frontend affiche les snapshots reçus et peut montrer :
 
@@ -623,9 +646,12 @@ Il ne contient ni aire intégrée, ni courbe de calibration, ni concentration.
 ### 13.3. Règle de correspondance instrumentale
 
 La correspondance est **numérique**. Une transition voit un composé uniquement
-si son couple `(Q1, Q3)` tombe dans `MZ_MATCH_TOLERANCE` d'un canal du
-catalogue de référence. Le `compound_id` écrit dans la méthode est une
+si son triplet `(Q1, Q3, polarité)` tombe dans `MZ_MATCH_TOLERANCE` d'un canal
+du catalogue de référence. Le `compound_id` écrit dans la méthode est une
 étiquette pour l'humain : les quadripôles ne le lisent jamais.
+
+La polarité fait partie de l'adresse, pas de l'étiquette : une molécule qui ne
+s'ionise qu'en positif ne produit aucun ion quand la source tourne en négatif.
 
 | Situation | Trace obtenue |
 |---|---|
@@ -634,7 +660,63 @@ catalogue de référence. Le `compound_id` écrit dans la méthode est une
 | Couple Q1/Q3 ne correspondant à aucun composé | bruit de fond |
 | Bonnes masses, mauvais nom de composé | pic quand même |
 | Bon nom de composé, mauvaises masses | bruit de fond |
+| Bonnes masses, mauvaise polarité | bruit de fond |
 | Fenêtre de rétention déclarée ratant l'élution réelle | bruit de fond |
+
+### 13.3 bis. Ce que chaque paramètre éditable change
+
+Aucun champ modifiable n'est décoratif. C'est la règle : un paramètre ne devient
+éditable que dans le changement qui le rend actif.
+
+| Paramètre | Effet simulé |
+|---|---|
+| `Q1` / `Q3` | Adressage : décident du composé vu, ou d'aucun |
+| Polarité | Adressage : mauvais mode d'ionisation ⇒ aucun ion |
+| Énergie de collision | Rendement de fragmentation, en cloche autour de la valeur optimisée |
+| Temps de rétention déclaré | Position de la fenêtre d'acquisition sur l'axe temps |
+| Fenêtre de rétention | Durée pendant laquelle le canal est écouté, et charge du cycle |
+| Dwell time | Temps passé par canal et par cycle ⇒ densité de points |
+| Durée du run | Longueur de la chromatographie ; un composé éluant après la fin n'est jamais vu |
+
+**Énergie de collision.** Le rendement suit une gaussienne centrée sur l'énergie
+à laquelle le canal de référence a été optimisé, d'écart-type
+`FRAGMENTATION_CE_SIGMA_V`. Trop bas, le précurseur ne casse pas ; trop haut, le
+fragment choisi se détruit à son tour. À un sigma il reste ~61 % du signal, à
+quatre sigma il ne reste que du bruit. La méthode intégrée recopiant l'énergie
+de référence, son rendement vaut exactement 1.
+
+### 13.3 ter. Le temps est un budget
+
+Un triple quadripôle n'écoute **qu'un canal à la fois**. Le générateur parcourt
+donc le run cycle par cycle :
+
+```
+canaux actifs à l'instant t = ceux dont la fenêtre de rétention est ouverte
+durée du cycle              = Σ (dwell + délai de commutation) sur ces canaux
+```
+
+Chaque canal actif est mesuré une fois par cycle, à son tour. Conséquences :
+
+- un canal n'est **jamais** échantillonné hors de sa propre fenêtre — c'est le
+  *scheduled MRM* des instruments réels, et la raison pour laquelle une fenêtre
+  mal placée produit une trace posée **à côté** du pic plutôt que dessus ;
+- encombrer une même fenêtre de transitions, ou allonger les dwell, coûte des
+  points sur chaque pic.
+
+Ordres de grandeur obtenus sur la méthode intégrée :
+
+| Méthode | Points par largeur à mi-hauteur |
+|---|---|
+| Intégrée, fenêtres de 60 s | ~97 |
+| Dwell porté à 200 ms | ~29 |
+| Toutes fenêtres ouvertes sur tout le run | ~11 |
+| Deux transitions seulement | ~118 |
+
+Un garde-fou de sérialisation limite le total à `MAX_POINTS_PER_INJECTION`
+points par injection. Ce n'est pas de la physique : l'expérience entière est
+réencodée en JSON à chaque commande. L'éclaircissement est **uniforme sur tous
+les canaux**, de sorte que les rapports de densité mérités par la méthode sont
+préservés — seule la résolution absolue baisse.
 
 Quantifier et qualifier produisent deux traces distinctes ; le qualifier est
 plus faible d'un rapport constant, ce qui rend le rapport d'ions exploitable.
@@ -777,7 +859,8 @@ de retry sont hors périmètre du premier parcours.
 | Duplication et édition de méthode | Implémentées | Conserver |
 | Persistance des méthodes utilisateur | Implémentée | Conserver |
 | Lancement de la séquence | Calcul instantané existant | Remplacer par un run structuré |
-| Exécution injection par injection | Absente | À implémenter |
+| Exécution injection par injection | Implémentée, horloge accélérée | Conserver |
+| Temps de cycle et densité de points | Dérivés du dwell et des fenêtres | Conserver |
 | Signal numérique agrégé | Remplacé par les traces MRM | Conserver |
 | Traces temps/intensité | Implémentées | Conserver |
 | Sortie mzML | Absente | À implémenter selon les exemples |
@@ -811,10 +894,12 @@ Chaque incrément doit être utilisable ou vérifiable indépendamment.
 
 ### Incrément 4 — Cycle d'acquisition
 
-- créer le snapshot de séquence ;
-- ajouter les états de séquence et d'injection ;
-- exécuter les injections dans l'ordre du rack ;
-- faire progresser l'acquisition avec l'horloge backend.
+- créer le snapshot de séquence — fait ;
+- exécuter les injections dans l'ordre du rack — fait ;
+- faire progresser l'acquisition avec l'horloge backend — fait, ×30 ;
+- permettre de sauter l'attente sans altérer la donnée — fait ;
+- exposer des états de séquence et d'injection nommés — dérivés de l'horloge
+  pour l'instant, à formaliser si le besoin apparaît.
 
 ### Incrément 5 — Génération du signal
 

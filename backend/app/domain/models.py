@@ -190,17 +190,29 @@ class InjectionMeasurement:
     injection_volume_ul: float = 5.0
     replicate_index: int = 1
     output_filename: str = ""
+    #: When this injection starts, in instrument seconds since the sequence began.
+    start_offset_s: float = 0.0
 
 
 @dataclass
 class SequenceRun:
-    """One LC-MS/MS sequence run; stored on the instrument workspace widget."""
+    """One LC-MS/MS sequence run; stored on the instrument workspace widget.
+
+    A run is not instantaneous. The traces are generated in full when the
+    sequence starts — the seeded generator is consumed once, so the run stays
+    reproducible — and ``elapsed_s`` then says how much of them the instrument
+    has actually recorded so far. Readers reveal each trace up to that point.
+    """
     id: str
     injections: list[InjectionMeasurement]
     method_id: str = APPLE_PESTICIDES_MRM_V1_ID
     # Immutable copy of the method as it was when the run started. A later
     # version published under the same id must never change how a past run reads.
     method_snapshot: AcquisitionMethod = APPLE_PESTICIDES_MRM_V1
+    #: Instrument seconds the whole sequence takes: one run duration per injection.
+    total_duration_s: float = 0.0
+    #: Instrument seconds recorded so far. Equal to total_duration_s once done.
+    elapsed_s: float = 0.0
 
 
 @dataclass

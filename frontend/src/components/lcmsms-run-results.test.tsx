@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { LcMsMsRunResults } from "@/components/lcmsms-run-results";
 import { acquisitionMethodFixture } from "@/test-support/acquisition-method-fixture";
@@ -50,6 +50,7 @@ function makeInjection(overrides: Partial<InjectionMeasurement> = {}): Injection
     injectionVolumeUl: 5,
     replicateIndex: 1,
     outputFilename: "01_apple_a.mzML",
+    startOffsetS: 0,
     traces: [
       makeTrace(quantifier, 20000),
       makeTrace(qualifier, 7000),
@@ -59,15 +60,118 @@ function makeInjection(overrides: Partial<InjectionMeasurement> = {}): Injection
   };
 }
 
+/** A finished run: every injection has been recorded in full. */
 function makeRun(overrides: Partial<SequenceRun> = {}): SequenceRun {
+  const injections = overrides.injections ?? [makeInjection()];
+  const totalDurationS = injections.length * 720;
   return {
     id: "seq_1",
     methodId: acquisitionMethodFixture.id,
     methodSnapshot: acquisitionMethodFixture,
-    injections: [makeInjection()],
+    injections,
+    totalDurationS,
+    elapsedS: totalDurationS,
     ...overrides,
   };
 }
+
+describe("LcMsMsRunResults while the instrument is still acquiring", () => {
+  it("shows the sequence progress and offers to skip the wait", () => {
+    const onSkip = vi.fn();
+    const run = makeRun({ elapsedS: 360, totalDurationS: 720 });
+
+    render(<LcMsMsRunResults onSkip={onSkip} runs={[run]} />);
+
+    expect(screen.getByTestId("run-progress")).toHaveTextContent("6:00 of 12:00");
+    expect(screen.getByTestId("run-progress-bar")).toHaveStyle({ width: "50%" });
+    fireEvent.click(screen.getByRole("button", { name: "Skip to end" }));
+    expect(onSkip).toHaveBeenCalled();
+  });
+
+  it("hides the progress bar once the sequence is finished", () => {
+    render(<LcMsMsRunResults runs={[makeRun()]} />);
+
+    expect(screen.queryByTestId("run-progress")).not.toBeInTheDocument();
+  });
+
+  it("only draws the part of the chromatogram already recorded", () => {
+    const halfway = makeRun({ elapsedS: 360, totalDurationS: 720 });
+    const finished = makeRun();
+
+    const { unmount } = render(<LcMsMsRunResults runs={[halfway]} />);
+    const partial = screen
+      .getAllByTestId("transition-chromatogram")[0]
+      .querySelector("polyline")!
+      .getAttribute("points")!;
+    unmount();
+
+    render(<LcMsMsRunResults runs={[finished]} />);
+    const complete = screen
+      .getAllByTestId("transition-chromatogram")[0]
+      .querySelector("polyline")!
+      .getAttribute("points")!;
+
+    expect(partial.split(" ").length).toBeLessThan(complete.split(" ").length);
+    // Only points already recorded are plotted: nothing is drawn past halfway.
+    const lastX = Number(partial.split(" ").pop()!.split(",")[0]);
+    expect(lastX).toBeLessThanOrEqual(160.1);
+  });
+
+  it("waits for the run to end before blaming a flat channel", () => {
+    const [quantifier] = acquisitionMethodFixture.transitions;
+    const injection = makeInjection({
+      traces: [makeTrace(quantifier, 0, { matchedReferenceTransition: false })],
+    });
+
+    render(
+      <LcMsMsRunResults
+        runs={[makeRun({ elapsedS: 100, injections: [injection], totalDurationS: 720 })]}
+      />,
+    );
+
+    expect(screen.queryByTestId("trace-warning")).not.toBeInTheDocument();
+  });
+
+  it("marks an injection still queued in the autosampler", () => {
+    const run = makeRun({
+      elapsedS: 100,
+      injections: [
+        makeInjection({ id: "inj_1" }),
+        makeInjection({ id: "inj_2", rackSlotId: "rack_slot_2", startOffsetS: 720 }),
+      ],
+      totalDurationS: 1440,
+    });
+
+    render(<LcMsMsRunResults runs={[run]} />);
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+
+    expect(screen.getByTestId("injection-pending")).toBeInTheDocument();
+  });
+
+  it("follows the injection the instrument is currently recording", () => {
+    const run = makeRun({
+      elapsedS: 900,
+      injections: [
+        makeInjection({ id: "inj_1", sampleName: "First" }),
+        makeInjection({
+          id: "inj_2",
+          rackSlotId: "rack_slot_2",
+          sampleName: "Second",
+          startOffsetS: 720,
+        }),
+      ],
+      totalDurationS: 1440,
+    });
+
+    render(<LcMsMsRunResults runs={[run]} />);
+
+    const panel = screen.getByTestId("injection-panel");
+    expect(panel).toHaveTextContent("Second");
+    expect(within(panel).getByTestId("injection-recording")).toHaveTextContent(
+      "3:00 of 12:00",
+    );
+  });
+});
 
 describe("LcMsMsRunResults", () => {
   it("invites the technician to run a sequence when there is none", () => {

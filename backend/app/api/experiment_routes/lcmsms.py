@@ -11,6 +11,8 @@ from app.services.domain_services.lcmsms import (
     PourExtractToVialService,
     RunSequenceRequest,
     RunSequenceService,
+    SkipAcquisitionRequest,
+    SkipAcquisitionService,
     UnloadRackFromInstrumentRequest,
     UnloadRackFromInstrumentService,
 )
@@ -83,6 +85,16 @@ def add_calibration_to_vial(experiment_id: str, body: AddCalibrationBody) -> Exp
                 vial_tool_id=body.vial_tool_id,
                 level_ng_per_ml=body.level_ng_per_ml,
             ),
+        )
+    )
+
+
+@router.post("/{experiment_id}/lcmsms/skip-acquisition", response_model=ExperimentSchema)
+def skip_acquisition(experiment_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: SkipAcquisitionService(experiment_service).run(
+            experiment_id,
+            SkipAcquisitionRequest(),
         )
     )
 

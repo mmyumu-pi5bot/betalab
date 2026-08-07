@@ -405,6 +405,8 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                         id=run.id,
                         method_id=run.method_id,
                         method_snapshot=_deserialize_acquisition_method(run.method_snapshot),
+                        total_duration_s=run.total_duration_s,
+                        elapsed_s=run.elapsed_s,
                         injections=[
                             InjectionMeasurement(
                                 id=injection.id,
@@ -420,6 +422,7 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                                 injection_volume_ul=injection.injection_volume_ul,
                                 replicate_index=injection.replicate_index,
                                 output_filename=injection.output_filename,
+                                start_offset_s=injection.start_offset_s,
                             )
                             for injection in run.injections
                         ],

@@ -95,7 +95,7 @@ type LabSceneWorkspaceCanvasProps = {
   experiment: Experiment;
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
-    instrumentStatus: "completed" | "idle" | "ready";
+    instrumentStatus: "completed" | "idle" | "ready" | "running";
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
@@ -168,6 +168,7 @@ type LabSceneWorkspaceCanvasProps = {
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
+    onSkipAcquisition: () => void;
     onUnloadRackFromInstrument: () => void;
     onTareAnalyticalBalance: () => void;
   };
@@ -622,6 +623,8 @@ export function LabSceneWorkspaceCanvas({
                   footer={
                     rack.instrumentStatus === "completed"
                       ? "Acquisition completed. The instrument results are available below."
+                      : rack.instrumentStatus === "running"
+                      ? "Acquisition in progress. The rack stays locked until the last injection is recorded."
                       : rack.instrumentStatus === "ready"
                       ? "Rack loaded. The acquisition sequence can now be configured and started."
                       : rack.rackLoadedCount > 0
@@ -677,7 +680,11 @@ export function LabSceneWorkspaceCanvas({
                     />
                   ) : null}
                   <div className="mt-4">
-                    <LcMsMsRunResults runs={widget.sequenceRuns ?? []} />
+                    <LcMsMsRunResults
+                      isCommandPending={ui.isCommandPending}
+                      onSkip={workspaceActions.onSkipAcquisition}
+                      runs={widget.sequenceRuns ?? []}
+                    />
                   </div>
                 </WorkspaceEquipmentWidget>
               ) : widgetId === "vortex" ? (

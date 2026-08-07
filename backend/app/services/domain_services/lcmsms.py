@@ -23,6 +23,10 @@ from app.domain.models import (
 )
 from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
 from app.services.acquisition_method_service import acquisition_method_service
+from app.services.domain_services.acquisition_clock import (
+    is_sequence_complete,
+    skip_to_end_of_sequence,
+)
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.mrm_signal import generate_transition_traces
 from app.services.helpers.lookups import find_workspace_widget
@@ -303,6 +307,31 @@ class UnloadRackFromInstrumentService(WriteDomainService[UnloadRackFromInstrumen
 
 
 @dataclass(frozen=True, slots=True)
+class SkipAcquisitionRequest:
+    """No payload: skipping applies to whatever sequence is currently running."""
+
+
+class SkipAcquisitionService(WriteDomainService[SkipAcquisitionRequest]):
+    """Fast-forward a running sequence to its end.
+
+    The traces were generated in full when the sequence started, so skipping
+    reveals the data the run would have produced anyway. It changes how long the
+    user waits, never what the instrument recorded.
+    """
+
+    def _run(self, experiment: Experiment, request: SkipAcquisitionRequest) -> None:
+        del request
+        instrument = find_workspace_widget(experiment.workspace, "instrument")
+        running = [
+            run for run in instrument.sequence_runs if not is_sequence_complete(run)
+        ]
+        if not running:
+            raise ValueError("No acquisition is currently running.")
+        for run in running:
+            skip_to_end_of_sequence(experiment, run)
+
+
+@dataclass(frozen=True, slots=True)
 class AcquisitionSequenceLineRequest:
     rack_slot_id: str
     sample_name: str
@@ -353,6 +382,9 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         configured_by_slot = _validate_acquisition_sequence(request, vials_in_rack)
 
         injections: list[InjectionMeasurement] = []
+        # Injections run one after the other, each paying the method's full
+        # chromatographic run time.
+        start_offset_s = 0.0
         for rack_slot in vials_in_rack:
             vial = rack_slot.tool
             assert vial is not None  # guaranteed by the filter above
@@ -391,22 +423,25 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                             replicate_index,
                             configured.repetitions,
                         ),
+                        start_offset_s=start_offset_s,
                     )
                 )
+                start_offset_s += method.runtime_s
 
         run = SequenceRun(
             id=new_id("seq"),
             injections=injections,
             method_id=method.id,
             method_snapshot=snapshot_acquisition_method(method),
+            total_duration_s=start_offset_s,
         )
         instrument.sequence_runs.append(run)
-        experiment.rack.state = "completed"
+        # The rack stays in the autosampler until the last injection is recorded.
+        experiment.rack.state = "locked"
 
-        n_ok = sum(1 for inj in injections if inj.status == "ok")
         experiment.audit_log.append(
-            f"LC-MS/MS sequence run {run.id}: {len(injections)} vial(s) injected, "
-            f"{n_ok} with extract context."
+            f"LC-MS/MS sequence run {run.id} started: {len(injections)} injection(s), "
+            f"{run.total_duration_s:.0f} s of acquisition."
         )
 
 
