@@ -806,6 +806,51 @@ analyte/ISTD corrige les pertes d'extraction et les erreurs de dilution, mais
 constitue une des raisons pour lesquelles la préparation d'échantillon est
 soignée avant tout le reste.
 
+#### Effet matrice — suppression d'ionisation
+
+La matrice co-éluante entre en compétition pour la charge dans la source, donc
+plus l'extrait injecté porte d'échantillon par millilitre, moins chaque analyte
+s'ionise. La **charge en matrice** vaut `masse d'échantillon / volume d'extrait`,
+soit 1 g/mL pour un QuEChERS standard.
+
+```
+survie = 1 / (1 + k × charge × matrice_locale(RT))
+```
+
+`matrice_locale` n'est pas plate : les sucres et acides polaires sortent près du
+volume mort, les cires et lipides en fin de gradient, et le milieu du run est
+comparativement propre.
+
+Trois conséquences, toutes vraies en laboratoire :
+
+| Situation | Résultat |
+|---|---|
+| Calibrant en solvant pur | Charge nulle, **aucune suppression** |
+| Extrait à 1 g/mL, composé au milieu du run | ~28 % de signal perdu |
+| Même extrait dilué 10× | Suppression quasi nulle, sensibilité moindre |
+
+La première ligne est précisément la raison d'être de la **calibration
+matrice-adaptée** : à concentration égale, un standard en solvant répond plus
+fort qu'un échantillon. La troisième est l'arbitrage du *dilute-and-shoot*.
+
+**L'étalon interne ne corrige que ce qui co-élue avec lui.** Il subit la
+suppression, mais à *son* temps de rétention. Valeurs obtenues à 1 g/mL :
+
+| Composé | RT | Survie | Rapport à l'ISTD |
+|---|---:|---:|---:|
+| Acétamipride | 204 s | 0,730 | 1,007 |
+| ISTD (TPP-d15) | 396 s | 0,725 | 1,000 |
+| Boscalid | 402 s | 0,722 | 0,996 |
+| Chlorpyrifos-méthyl | 486 s | 0,659 | 0,909 |
+| Deltaméthrine | 612 s | 0,580 | **0,800** |
+
+Un composé qui sort parmi les cires garde donc un biais de 20 % que le rapport
+n'absorbe pas — ce qui est l'argument en faveur d'étalons marqués isotopiquement
+propres à chaque analyte, plutôt que d'un seul étalon universel.
+
+Un composé dont le catalogue ignore le temps d'élution reçoit la matrice moyenne
+du run, jamais celle du volume mort où la suppression est maximale.
+
 #### Ce que la préparation ne transmet pas encore
 
 Comme tout passe par une seule concentration, la préparation ne peut rendre les

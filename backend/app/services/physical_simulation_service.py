@@ -227,6 +227,70 @@ class PhysicalSimulationService:
     sampling_factor_min = 0.35
     sampling_factor_max = 1.65
 
+    #: Ion suppression. Co-eluting matrix competes for charge in the electrospray,
+    #: so the more sample an injected extract carries per millilitre, the less of
+    #: each analyte ionises. The coefficient is a pedagogical placeholder, chosen
+    #: to land a standard 1 g/mL QuEChERS extract in the range routinely reported
+    #: for fruit — roughly a quarter of the signal lost.
+    matrix_suppression_coefficient = 0.33
+    #: Matrix does not elute evenly. Polar sugars and acids come off near the
+    #: void, waxes and lipids at the end of the gradient, and the middle of the
+    #: run is comparatively clean. Weights add to a flat baseline of one.
+    matrix_early_weight = 1.6
+    matrix_early_sigma_s = 90.0
+    matrix_late_weight = 1.2
+    matrix_late_center_s = 620.0
+    matrix_late_sigma_s = 110.0
+
+    @classmethod
+    def matrix_load_g_per_ml(cls, sample_mass_g: float, extract_volume_ml: float) -> float:
+        """Grams of sample carried by each millilitre of injected extract."""
+        if extract_volume_ml <= 0:
+            return 0.0
+        return max(0.0, sample_mass_g) / extract_volume_ml
+
+    @classmethod
+    def matrix_suppression_factor(
+        cls,
+        matrix_load_g_per_ml: float,
+        retention_time_s: float | None,
+    ) -> float:
+        """Fraction of a compound's response that survives ion suppression.
+
+        Exactly one when there is no matrix: a calibration standard prepared in
+        pure solvent is never suppressed, which is the whole reason
+        matrix-matched calibration exists. It falls as the extract carries more
+        sample per millilitre — so diluting an extract recovers response, the
+        trade-off behind dilute-and-shoot — and falls further where the matrix
+        itself elutes.
+
+        Because it depends on retention time, an internal standard only corrects
+        the suppression of compounds that elute near it. One eluting among the
+        waxes is suppressed far more than the standard, and the ratio carries
+        that difference through as a bias.
+        """
+        if matrix_load_g_per_ml <= 0:
+            return 1.0
+        if retention_time_s is None:
+            # Elution moment unknown: apply the run's average matrix rather than
+            # assuming the compound comes off in the void, where it is worst.
+            return round(
+                1.0 / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml), 6
+            )
+        early = cls.matrix_early_weight * exp(
+            -(retention_time_s**2) / (2.0 * cls.matrix_early_sigma_s**2)
+        )
+        late_offset = retention_time_s - cls.matrix_late_center_s
+        late = cls.matrix_late_weight * exp(
+            -(late_offset**2) / (2.0 * cls.matrix_late_sigma_s**2)
+        )
+        local_matrix = 1.0 + early + late
+        return round(
+            1.0
+            / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml * local_matrix),
+            6,
+        )
+
     @classmethod
     def draw_sampling_representativeness(cls, homogeneity_score: float | None) -> float:
         """How well one weighed aliquot represents the lot it was taken from.

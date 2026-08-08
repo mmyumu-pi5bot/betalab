@@ -156,3 +156,62 @@ class TestTheBiasIsPersistedButHidden:
         )
 
         assert schema.sampling_representativeness == 0.7
+
+
+class TestMatrixSuppression:
+    """Co-eluting matrix competes for charge, so an extract sees less than a standard."""
+
+    def test_a_standard_in_pure_solvent_is_never_suppressed(self) -> None:
+        assert PhysicalSimulationService.matrix_suppression_factor(0.0, 402.0) == 1.0
+
+    def test_a_loaded_extract_loses_signal(self) -> None:
+        assert PhysicalSimulationService.matrix_suppression_factor(1.0, 402.0) < 0.8
+
+    def test_diluting_the_extract_recovers_response(self) -> None:
+        """The trade-off behind dilute-and-shoot: less matrix, more of the signal."""
+        loaded = PhysicalSimulationService.matrix_suppression_factor(1.0, 402.0)
+        diluted = PhysicalSimulationService.matrix_suppression_factor(0.1, 402.0)
+
+        assert diluted > loaded
+        assert diluted == pytest.approx(1.0, abs=0.05)
+
+    def test_compounds_eluting_among_the_waxes_are_hit_hardest(self) -> None:
+        clean_middle = PhysicalSimulationService.matrix_suppression_factor(1.0, 402.0)
+        late = PhysicalSimulationService.matrix_suppression_factor(1.0, 612.0)
+
+        assert late < clean_middle
+
+    def test_an_unknown_elution_moment_gets_the_average_matrix(self) -> None:
+        """Never assume the void, where suppression is worst."""
+        unknown = PhysicalSimulationService.matrix_suppression_factor(1.0, None)
+        void = PhysicalSimulationService.matrix_suppression_factor(1.0, 0.0)
+
+        assert unknown > void
+        assert unknown == pytest.approx(1.0 / 1.33, rel=1e-3)
+
+    def test_matrix_load_is_sample_per_millilitre_injected(self) -> None:
+        assert PhysicalSimulationService.matrix_load_g_per_ml(10.0, 10.0) == 1.0
+        assert PhysicalSimulationService.matrix_load_g_per_ml(10.0, 20.0) == 0.5
+        assert PhysicalSimulationService.matrix_load_g_per_ml(10.0, 0.0) == 0.0
+
+
+class TestTheStandardOnlyCorrectsWhatCoElutesWithIt:
+    """The reason a non-co-eluting internal standard is a weak correction."""
+
+    def _corrected_ratio(self, retention_time_s: float, matrix_load: float) -> float:
+        istd = PhysicalSimulationService.matrix_suppression_factor(matrix_load, 396.0)
+        analyte = PhysicalSimulationService.matrix_suppression_factor(
+            matrix_load, retention_time_s
+        )
+        return analyte / istd
+
+    def test_a_co_eluting_compound_is_corrected_almost_perfectly(self) -> None:
+        # Boscalid elutes six seconds from the standard.
+        assert self._corrected_ratio(402.0, 1.0) == pytest.approx(1.0, abs=0.01)
+
+    def test_a_late_eluting_compound_keeps_a_visible_bias(self) -> None:
+        # Deltamethrin comes off among the waxes, far from the standard.
+        assert self._corrected_ratio(612.0, 1.0) < 0.85
+
+    def test_diluting_shrinks_the_bias_the_standard_cannot_absorb(self) -> None:
+        assert self._corrected_ratio(612.0, 0.25) > self._corrected_ratio(612.0, 1.0)

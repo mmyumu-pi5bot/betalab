@@ -21,7 +21,10 @@ from app.domain.models import (
     WorkbenchTool,
     new_id,
 )
-from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
+from app.domain.mrm_reference import (
+    INTERNAL_STANDARD_COMPOUND_ID,
+    reference_transitions_for,
+)
 from app.services.acquisition_method_service import acquisition_method_service
 from app.services.domain_services.acquisition_clock import (
     is_sequence_complete,
@@ -111,6 +114,23 @@ def _effective_residues(
             merged[compound_id] = merged.get(compound_id, 0.0) + weighted / mass
 
     return merged
+
+
+def _reference_retention_time_s(compound_id: str) -> float | None:
+    """When a compound truly elutes, read from the hidden reference catalog.
+
+    Suppression is local in time, so the signal model needs the real elution
+    moment — not the one a method happens to declare. ``None`` for a compound
+    the catalog does not know, which callers must not read as "elutes at zero".
+    """
+    references = reference_transitions_for(compound_id)
+    if not references:
+        return None
+    quantifier = next(
+        (reference for reference in references if reference.role == "quantifier"),
+        references[0],
+    )
+    return quantifier.expected_retention_time_s
 
 
 def _aliquot_homogeneity(
@@ -639,14 +659,23 @@ def _compute_sample_responses(
         else ctx.sample_mass_g
     )
 
+    # How much sample each injected millilitre carries. A calibration standard
+    # in pure solvent has none, which is why it is never suppressed.
+    matrix_load = PhysicalSimulationService.matrix_load_g_per_ml(
+        sample_true_mass_g, extract_true_v
+    )
+
     for compound_id, true_effective_ug_per_kg in ctx.effective_residues_ug_per_kg.items():
         # Pesticide amount in the extract (ng) — same unit convention as before
         pesticide_amount_ng = true_effective_ug_per_kg * sample_true_mass_g * 1e-3
 
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
+        suppression = PhysicalSimulationService.matrix_suppression_factor(
+            matrix_load, _reference_retention_time_s(compound_id)
+        )
         # Concentration in the extract using the TRUE delivered solvent volume
         pesticide_conc = (
-            pesticide_amount_ng * extraction_manip * sampling_bias
+            pesticide_amount_ng * extraction_manip * sampling_bias * suppression
         ) / extract_true_v
         responses[compound_id] = round(pesticide_conc * env_pest, 6)
 
@@ -656,7 +685,12 @@ def _compute_sample_responses(
         # transition like any other; whether it is used to correct anything is the
         # analysis application's decision.
         istd_amount_ng_true = istd_true_v * ctx.istd_reference_conc_ng_per_ml
-        istd_conc = (istd_amount_ng_true * istd_manip) / extract_true_v
+        # The standard is suppressed too, but at *its own* retention time. That is
+        # why it corrects a co-eluting compound well and a distant one badly.
+        istd_suppression = PhysicalSimulationService.matrix_suppression_factor(
+            matrix_load, _reference_retention_time_s(INTERNAL_STANDARD_COMPOUND_ID)
+        )
+        istd_conc = (istd_amount_ng_true * istd_manip * istd_suppression) / extract_true_v
         responses[INTERNAL_STANDARD_COMPOUND_ID] = round(
             istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6
         )

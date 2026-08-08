@@ -35,6 +35,7 @@ from app.services.domain_services.lcmsms import (
     UnloadRackFromInstrumentService,
     _compute_calibration_responses,
     _compute_sample_responses,
+    _reference_retention_time_s,
 )
 from app.services.domain_services.rack import (
     PlaceToolInRackSlotRequest,
@@ -1185,7 +1186,7 @@ def _make_ctx(
         sample_mass_g=sample_mass_g,
         sample_true_mass_g=sample_true_mass_g,
         extract_volume_ml=extract_nominal,
-        effective_residues_ug_per_kg={"chlorpyrifos": true_effective_ug_per_kg},
+        effective_residues_ug_per_kg={"boscalid": true_effective_ug_per_kg},
         extraction_result=extraction_result,
         istd_volume_ml=istd_nominal,
         istd_reference_conc_ng_per_ml=ref_conc,
@@ -1208,7 +1209,7 @@ class TestSampleResponseInvariants:
     """
 
     def _ratio(self, responses: dict[str, float]) -> float:
-        return responses["chlorpyrifos"] / responses[INTERNAL_STANDARD_COMPOUND_ID]
+        return responses["boscalid"] / responses[INTERNAL_STANDARD_COMPOUND_ID]
 
     def test_response_ratio_matches_the_theoretical_amount_ratio(self) -> None:
         """INV0: all factors = 1 → the ratio is amount_pesticide / amount_istd."""
@@ -1241,12 +1242,14 @@ class TestSampleResponseInvariants:
         random.seed(SEED)
         biased = _compute_sample_responses(_make_vial(), ctx_biased)
 
-        # Both channels rise by 10/8, so the ratio is untouched...
-        assert self._ratio(biased) == pytest.approx(self._ratio(nominal), rel=1e-4)
-        # ...while the raw responses themselves clearly moved.
-        assert biased["chlorpyrifos"] == pytest.approx(
-            nominal["chlorpyrifos"] * (10.0 / 8.0), rel=1e-4
-        )
+        # Both channels rise together, so the ratio is untouched. Cancellation is
+        # near-perfect rather than exact because suppression depends on retention
+        # time, and boscalid elutes six seconds from the standard.
+        assert self._ratio(biased) == pytest.approx(self._ratio(nominal), rel=0.01)
+        # The raw responses clearly moved — but by less than 10/8, because
+        # concentrating the extract concentrates the matrix and suppresses more.
+        gain = biased["boscalid"] / nominal["boscalid"]
+        assert 1.0 < gain < 10.0 / 8.0
 
     def test_hidden_sample_mass_bias_survives_in_the_ratio(self) -> None:
         baseline = _make_ctx(sample_mass_g=10.0, sample_true_mass_g=10.0)
@@ -1259,7 +1262,7 @@ class TestSampleResponseInvariants:
 
         # Less sample really was weighed, and no ISTD ratio can hide it.
         assert self._ratio(undersampled_responses) / self._ratio(baseline_responses) == (
-            pytest.approx(0.8, rel=1e-4)
+            pytest.approx(0.8, rel=1e-3)
         )
 
     def test_istd_pipetting_error_biases_the_ratio_inv2(self) -> None:
@@ -1278,8 +1281,8 @@ class TestSampleResponseInvariants:
         assert self._ratio(biased_responses) / self._ratio(baseline_responses) == (
             pytest.approx(istd_nominal / istd_true, rel=1e-4)
         )
-        assert biased_responses["chlorpyrifos"] == pytest.approx(
-            baseline_responses["chlorpyrifos"], rel=1e-4
+        assert biased_responses["boscalid"] == pytest.approx(
+            baseline_responses["boscalid"], rel=1e-4
         )
 
     def test_without_istd_the_response_carries_the_full_bias_inv4(self) -> None:
@@ -1305,11 +1308,17 @@ class TestSampleResponseInvariants:
         responses = _compute_sample_responses(_make_vial(), ctx)
 
         assert INTERNAL_STANDARD_COMPOUND_ID not in responses
-        expected = (true_effective * 10.0 * 1e-3 * extraction_manip) / extract_true
-        assert responses["chlorpyrifos"] == pytest.approx(expected, rel=0.02)
+        suppression = PhysicalSimulationService.matrix_suppression_factor(
+            PhysicalSimulationService.matrix_load_g_per_ml(10.0, extract_true),
+            _reference_retention_time_s("boscalid"),
+        )
+        expected = (
+            true_effective * 10.0 * 1e-3 * extraction_manip * suppression
+        ) / extract_true
+        assert responses["boscalid"] == pytest.approx(expected, rel=0.02)
 
     def test_returns_no_quantification_only_raw_responses(self) -> None:
         responses = _compute_sample_responses(_make_vial(), _make_ctx())
 
-        assert set(responses) == {"chlorpyrifos", INTERNAL_STANDARD_COMPOUND_ID}
+        assert set(responses) == {"boscalid", INTERNAL_STANDARD_COMPOUND_ID}
         assert all(isinstance(value, float) for value in responses.values())
