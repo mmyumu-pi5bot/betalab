@@ -18,6 +18,9 @@ export function PipetteIcon({ active = false, fillRatio, className = "" }: {
         <rect x="9" y="2" width="6" height="4" rx="1.2" fill="currentColor" opacity="0.25" />
         <rect x="8" y="5" width="8" height="10" rx="2" fill="currentColor" opacity="0.9" />
         <rect x="8" y="5" width="8" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        {/* The liquid is contents, not chrome: its colour says what is in the
+            pipette, never whether the tool is selected — the same split the
+            spatula overlay uses for its powder heap. */}
         {boundedFillRatio > 0 ? (
           <rect
             x="9"
@@ -25,7 +28,7 @@ export function PipetteIcon({ active = false, fillRatio, className = "" }: {
             width="6"
             height={liquidHeight}
             rx="1.2"
-            fill={active ? "#38bdf8" : "#7dd3fc"}
+            fill="#38bdf8"
             opacity="0.92"
           />
         ) : null}
