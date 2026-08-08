@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { NumericField } from "@/components/numeric-field";
+
 import {
   getMrmReferenceCatalog,
   proposeMrmTransitions,
@@ -24,11 +26,6 @@ type Props = {
 };
 
 type EditorMode = "simple" | "advanced";
-
-function numberField(value: string, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
 
 export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
   const [mode, setMode] = useState<EditorMode>("simple");
@@ -234,23 +231,18 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
                     ["Window (s)", "retentionWindowS"],
                   ] as const
                 ).map(([label, field]) => (
-                  <label className="text-[9px] text-slate-400" key={field}>
-                    {label}
-                    <input
-                      aria-label={label}
-                      className="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1 font-mono text-[10px] text-white"
-                      onChange={(event) =>
-                        setTransitions(
-                          updateTransition(transitions, index, {
-                            [field]: numberField(event.target.value, transition[field]),
-                          }),
-                        )
-                      }
-                      step="any"
-                      type="number"
-                      value={transition[field]}
-                    />
-                  </label>
+                  <NumericField
+                    className="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1 font-mono text-[10px] text-white"
+                    key={field}
+                    label={label}
+                    labelClassName="text-[9px] text-slate-400"
+                    onChange={(next) =>
+                      setTransitions(
+                        updateTransition(transitions, index, { [field]: next }),
+                      )
+                    }
+                    value={transition[field]}
+                  />
                 ))}
                 <label className="text-[9px] text-slate-400">
                   Polarity

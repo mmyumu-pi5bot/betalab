@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { LcMsMsMethodManager } from "@/components/lcmsms-method-manager";
+import { NumericField } from "@/components/numeric-field";
 import {
   useAcquisitionMethodCatalog,
   useAcquisitionMethodDetail,
@@ -254,30 +255,20 @@ export function LcMsMsAcquisitionConsole({
                   value={line.sample_name}
                 />
               </label>
-              <label className="text-[10px] text-slate-400">
-                Injection volume (µL)
-                <input
-                  aria-label="Injection volume (µL)"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                  min="0.1"
-                  onChange={(event) => updateLine(index, { injection_volume_ul: Number(event.target.value) })}
-                  step="0.1"
-                  type="number"
-                  value={line.injection_volume_ul}
-                />
-              </label>
-              <label className="text-[10px] text-slate-400">
-                Repetitions
-                <input
-                  aria-label="Repetitions"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                  max="10"
-                  min="1"
-                  onChange={(event) => updateLine(index, { repetitions: Number(event.target.value) })}
-                  type="number"
-                  value={line.repetitions}
-                />
-              </label>
+              <NumericField
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
+                label="Injection volume (µL)"
+                labelClassName="text-[10px] text-slate-400"
+                onChange={(next) => updateLine(index, { injection_volume_ul: next })}
+                value={line.injection_volume_ul}
+              />
+              <NumericField
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
+                label="Repetitions"
+                labelClassName="text-[10px] text-slate-400"
+                onChange={(next) => updateLine(index, { repetitions: next })}
+                value={line.repetitions}
+              />
               <label className="text-[10px] text-slate-400">
                 Output filename
                 <input

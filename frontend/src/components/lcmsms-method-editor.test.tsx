@@ -80,6 +80,56 @@ describe("LcMsMsMethodEditor", () => {
     });
   });
 
+  it("lets the technician type a decimal m/z one character at a time", () => {
+    const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
+    renderEditor({ method: userMethod });
+
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const field = within(screen.getAllByTestId("editor-transition-row")[0]).getByLabelText(
+      "Q1 (m/z)",
+    ) as HTMLInputElement;
+
+    // Real typing goes through an intermediate "343." that parses to 343. If the
+    // field is re-rendered from the parsed number, the decimal point is eaten
+    // and the value can never be given a fractional part.
+    fireEvent.change(field, { target: { value: "343." } });
+    expect(field.value).toBe("343.");
+
+    fireEvent.change(field, { target: { value: "343.7" } });
+    expect(field.value).toBe("343.7");
+  });
+
+  it("lets the technician clear a numeric field before retyping it", () => {
+    const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
+    renderEditor({ method: userMethod });
+
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const field = within(screen.getAllByTestId("editor-transition-row")[0]).getByLabelText(
+      "Q1 (m/z)",
+    ) as HTMLInputElement;
+
+    // An emptied field must stay empty, not snap to 0 and strand the cursor.
+    fireEvent.change(field, { target: { value: "" } });
+    expect(field.value).toBe("");
+  });
+
+  it("sends the typed decimal when saving", async () => {
+    const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
+    renderEditor({ method: userMethod });
+
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const field = within(screen.getAllByTestId("editor-transition-row")[0]).getByLabelText(
+      "Q1 (m/z)",
+    );
+    fireEvent.change(field, { target: { value: "343." } });
+    fireEvent.change(field, { target: { value: "343.7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+
+    await waitFor(() => expect(saveAcquisitionMethod).toHaveBeenCalled());
+    const [, payload] = vi.mocked(saveAcquisitionMethod).mock.calls[0];
+    expect(payload.transitions[0].q1Mz).toBe(343.7);
+  });
+
   it("warns about an off-catalog transition without blocking the save", async () => {
     const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
     vi.mocked(saveAcquisitionMethod).mockResolvedValue({
