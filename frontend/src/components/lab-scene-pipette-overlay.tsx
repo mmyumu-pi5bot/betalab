@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { PipetteIcon } from "@/components/pipette-icon";
+import { getLastPointerPosition, trackPointerPosition } from "@/lib/pointer-position";
 import type { PipetteState } from "@/types/workbench";
 
 export function PipetteOverlay({ hint, isPipetteMode, pipette }: {
@@ -13,7 +14,23 @@ export function PipetteOverlay({ hint, isPipetteMode, pipette }: {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    trackPointerPosition();
+  }, []);
+
+  useEffect(() => {
     if (!isPipetteMode) return;
+
+    const place = (x: number, y: number) => {
+      if (!overlayRef.current) return;
+      overlayRef.current.style.opacity = "1";
+      overlayRef.current.style.transform = `translate3d(${x + 8}px, ${y - 40}px, 0)`;
+    };
+
+    // Picked from the keyboard, no pointer event will arrive until the mouse
+    // moves, so start from wherever the cursor already is.
+    const seed = getLastPointerPosition();
+    if (seed) place(seed.x, seed.y);
+
     let frameId: number | null = null;
     let nextX = 0;
     let nextY = 0;
@@ -23,10 +40,7 @@ export function PipetteOverlay({ hint, isPipetteMode, pipette }: {
       if (frameId !== null) return;
       frameId = window.requestAnimationFrame(() => {
         frameId = null;
-        if (overlayRef.current) {
-          overlayRef.current.style.opacity = "1";
-          overlayRef.current.style.transform = `translate3d(${nextX + 8}px, ${nextY - 40}px, 0)`;
-        }
+        place(nextX, nextY);
       });
     };
     window.addEventListener("pointermove", move, { passive: true });

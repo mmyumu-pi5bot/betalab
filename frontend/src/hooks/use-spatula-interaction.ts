@@ -6,6 +6,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 
+import { getLastPointerPosition, trackPointerPosition } from "@/lib/pointer-position";
 import type { BenchToolInstance, SpatulaState } from "@/types/workbench";
 
 const HOLD_THRESHOLD_MS = 200;
@@ -131,11 +132,19 @@ export function useSpatulaInteraction({
   holdMaxRateGRef.current = holdMaxRateG;
 
   useEffect(() => {
+    trackPointerPosition();
+  }, []);
+
+  useEffect(() => {
     if (!isSpatulaMode) {
       setSpatulaCursorPosition(null);
       stopSpatulaPour();
       return;
     }
+
+    // Picked from the keyboard, no pointer event will arrive until the mouse
+    // moves, so start from wherever the cursor already is.
+    setSpatulaCursorPosition(getLastPointerPosition());
 
     const handlePointerMove = (event: PointerEvent) => {
       setSpatulaCursorPosition({ x: event.clientX, y: event.clientY });
