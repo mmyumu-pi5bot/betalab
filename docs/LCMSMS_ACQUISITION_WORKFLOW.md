@@ -767,6 +767,53 @@ Le Step 1 peut utiliser :
 Le moteur ne calcule pas la chimie de l'ionisation ou de la fragmentation à
 partir de la structure moléculaire.
 
+### 13.4 bis. Ce que la préparation transmet au chromatogramme
+
+Toute la préparation converge dans une seule grandeur par composé — une
+concentration — qui fixe la hauteur du pic :
+
+```
+conc = (résidu_effectif × masse_vraie × ε_manip × représentativité) / volume_vrai
+```
+
+| Dégradation de la préparation | Effet sur le signal | Corrigé par le rapport ISTD ? |
+|---|---|---|
+| Tube QuEChERS chauffé > 45 °C | Résidus dégradés, par composé | Non |
+| Erreur de pesée | Quantité fausse, masse déclarée inchangée | Non |
+| Erreur de volume de solvant | Dilution | **Oui**, elle touche les deux voies |
+| Efficacité d'extraction ε_manip | Perte globale | **Oui**, si l'ISTD est ajouté avant les sels |
+| ISTD ajouté après les sels | Tirage ε indépendant | Non — le rapport reste biaisé |
+| Centrifugation sans bouchon | ε_manip = 0,05 | Partiellement |
+| Volume d'ISTD pipeté | Fausse le dénominateur | Non |
+| **Broyage grossier** | Prise d'essai non représentative | **Non** |
+
+La dernière ligne est le paiement de toute la chaîne cryogénique. Les résidus
+siègent surtout sur la peau ; un broyage grossier laisse les fragments de peau
+inégalement répartis, donc la portion pesée sur- ou sous-représente le lot. Un
+seul tirage couvre tous les composés, puisque ce sont les mêmes fragments qui
+les portent, et son écart-type décroît vers zéro à mesure que le score
+d'homogénéité approche de un.
+
+Le facteur est tiré **une fois par tube** et mémorisé sur son résultat
+d'extraction : deux fioles versées du même extrait proviennent de la même prise
+d'essai et doivent porter le même biais. Il est persisté mais exclu de la
+réponse API — c'est une vérité cachée.
+
+Point pédagogique central : l'étalon interne entre dans le tube **après** la
+pesée. Il ne partage donc jamais l'erreur d'échantillonnage. Le rapport
+analyte/ISTD corrige les pertes d'extraction et les erreurs de dilution, mais
+**pas** un mauvais broyage — ce qui est exactement vrai en laboratoire, et
+constitue une des raisons pour lesquelles la préparation d'échantillon est
+soignée avant tout le reste.
+
+#### Ce que la préparation ne transmet pas encore
+
+Comme tout passe par une seule concentration, la préparation ne peut rendre les
+pics que plus grands ou plus petits. Elle ne change ni la forme du pic, ni le
+temps de rétention, ni la ligne de base, et ne produit ni effet matrice ni
+contamination croisée. Les indices par lesquels un analyste *repère* une
+mauvaise préparation dans la donnée brute sont donc encore absents.
+
 ### 13.5. Frontière avec l'application de traitement
 
 La sortie officielle de Betalab ne doit pas contenir :

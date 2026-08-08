@@ -534,7 +534,16 @@ def _deserialize_injection_context(context_schema) -> InjectionContext | None:
     if context_schema is None:
         return None
     extraction_result = (
-        QuechersExtractionResult(**context_schema.extraction_result.model_dump())
+        # Built field by field rather than from model_dump(): the hidden factors
+        # are excluded from serialization, so dumping would silently drop them.
+        QuechersExtractionResult(
+            extraction_manip_factor=context_schema.extraction_result.extraction_manip_factor,
+            istd_manip_factor=context_schema.extraction_result.istd_manip_factor,
+            istd_phase=context_schema.extraction_result.istd_phase,
+            sampling_representativeness=(
+                context_schema.extraction_result.sampling_representativeness
+            ),
+        )
         if context_schema.extraction_result is not None
         else None
     )

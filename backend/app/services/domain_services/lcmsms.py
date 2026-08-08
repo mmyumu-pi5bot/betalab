@@ -113,6 +113,25 @@ def _effective_residues(
     return merged
 
 
+def _aliquot_homogeneity(
+    produce_fractions: list,
+    material_states: list[ProduceMaterialState],
+) -> float | None:
+    """Mass-weighted grind homogeneity of the powder weighed into the tube."""
+    total_mass_g = 0.0
+    weighted = 0.0
+    for fraction in produce_fractions:
+        state = find_material_state(material_states, fraction.produce_lot_id)
+        if state is None or state.homogeneity_score is None:
+            continue
+        mass = fraction.true_mass_g if fraction.true_mass_g is not None else fraction.mass_g
+        total_mass_g += mass
+        weighted += state.homogeneity_score * mass
+    if total_mass_g <= 0:
+        return None
+    return weighted / total_mass_g
+
+
 def build_extract_injection_context(
     experiment: Experiment,
     tube: WorkbenchTool,
@@ -159,6 +178,20 @@ def build_extract_injection_context(
     )
     istd_liquid = next((liquid for liquid in tube.liquids if liquid.liquid_id == ISTD_SOLUTION_ID), None)
     effective = _effective_residues(tube.produce_fractions, all_lots, experiment.produce_material_states)
+
+    # Drawn once per tube and memoised on its extraction result: two vials poured
+    # from the same extract come from the same weighed aliquot, so they must
+    # carry the same sampling bias.
+    extraction_result = tube.quechers_extraction_result
+    if extraction_result is not None and extraction_result.sampling_representativeness is None:
+        extraction_result.sampling_representativeness = (
+            PhysicalSimulationService.draw_sampling_representativeness(
+                _aliquot_homogeneity(
+                    tube.produce_fractions, experiment.produce_material_states
+                )
+            )
+        )
+
     return InjectionContext(
         source_tube_id=tube.id,
         sample_mass_g=round(
@@ -585,6 +618,15 @@ def _compute_sample_responses(
 
     extraction_manip = extraction_result.extraction_manip_factor if extraction_result else 1.0
     istd_manip = extraction_result.istd_manip_factor if extraction_result else None
+    # The weighed aliquot may not represent the lot. This multiplies the residues
+    # only: the internal standard was pipetted into the tube afterwards, so it
+    # never carries the sampling error and the ratio cannot correct it.
+    sampling_bias = (
+        extraction_result.sampling_representativeness
+        if extraction_result is not None
+        and extraction_result.sampling_representativeness is not None
+        else 1.0
+    )
 
     # Resolve true vs nominal volumes with fallbacks
     extract_true_v = ctx.extract_true_volume_ml if ctx.extract_true_volume_ml is not None else ctx.extract_volume_ml
@@ -603,7 +645,9 @@ def _compute_sample_responses(
 
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
         # Concentration in the extract using the TRUE delivered solvent volume
-        pesticide_conc = (pesticide_amount_ng * extraction_manip) / extract_true_v
+        pesticide_conc = (
+            pesticide_amount_ng * extraction_manip * sampling_bias
+        ) / extract_true_v
         responses[compound_id] = round(pesticide_conc * env_pest, 6)
 
     if istd_true_v is not None and istd_manip is not None:

@@ -71,6 +71,7 @@ class QuechersExtractionResultSchema(BaseModel):
     extraction_manip_factor: float
     istd_manip_factor: float | None = None
     istd_phase: str | None = None
+    sampling_representativeness: float | None = Field(default=None, exclude=True)
 
 
 class CalibrationContextSchema(BaseModel):

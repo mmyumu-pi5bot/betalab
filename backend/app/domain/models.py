@@ -113,6 +113,12 @@ class QuechersExtractionResult:
     extraction_manip_factor: float
     istd_manip_factor: float | None
     istd_phase: str | None  # "pre_solvent" | "pre_salts" | "post_salts" | None
+    # How well the weighed aliquot represents the lot it was taken from. Drawn
+    # once per tube from the grind homogeneity, so every vial poured from the
+    # same extract carries the same bias. The ISTD enters the tube afterwards
+    # and therefore does not share it: unlike extraction losses, a sampling
+    # error is never corrected by the analyte/ISTD ratio.
+    sampling_representativeness: float | None = None
 
 
 @dataclass

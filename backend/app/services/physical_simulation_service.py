@@ -221,6 +221,40 @@ class PhysicalSimulationService:
     aspiration_heterogeneity_factor_min = 0.5
     aspiration_heterogeneity_factor_max = 1.5
 
+    #: Spread of the sampling error on a completely unground sample. Scales down
+    #: to zero as the grind homogeneity approaches one.
+    sampling_heterogeneity_relative_sigma = 0.22
+    sampling_factor_min = 0.35
+    sampling_factor_max = 1.65
+
+    @classmethod
+    def draw_sampling_representativeness(cls, homogeneity_score: float | None) -> float:
+        """How well one weighed aliquot represents the lot it was taken from.
+
+        A finely ground sample is uniform, so any aliquot carries the lot's true
+        residue. A coarse grind leaves skin fragments and pulp unevenly spread,
+        and residues sit mostly on the skin — so whether a few fragments landed
+        in the weighed portion decides whether it over- or under-represents the
+        lot. One draw covers every compound, because it is the same fragments
+        that carry them all.
+
+        This is the payoff of the whole cryogenic chain: grinding cold and fine
+        is what makes a sub-sample mean anything.
+        """
+        if homogeneity_score is None:
+            return 1.0
+        normalized = max(0.0, min(1.0, homogeneity_score))
+        relative_sigma = cls.sampling_heterogeneity_relative_sigma * (1.0 - normalized)
+        if relative_sigma <= 0:
+            return 1.0
+        return round(
+            max(
+                cls.sampling_factor_min,
+                min(cls.sampling_factor_max, random.gauss(1.0, relative_sigma)),
+            ),
+            4,
+        )
+
     @classmethod
     def advance_vortex_mixing(cls, tool: WorkbenchTool, elapsed_seconds: float) -> None:
         """Move the container's hidden homogeneity toward one while vortexing."""
