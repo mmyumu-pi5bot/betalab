@@ -70,15 +70,25 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
     [transitions],
   );
 
+  /**
+   * Add or remove one compound's channels, leaving every other channel alone.
+   *
+   * Asking the catalog to rebuild the whole list would silently overwrite any
+   * value tuned in advanced mode — picking a compound would undo the previous
+   * edit. Simple and advanced mode edit the same list, so neither may clobber
+   * the other.
+   */
   async function handleToggleCompound(compoundId: string, isSelected: boolean) {
-    const nextCompoundIds = isSelected
-      ? selectedCompoundIds.filter((id) => id !== compoundId)
-      : [...selectedCompoundIds, compoundId];
     setFailure(null);
-    try {
+    if (isSelected) {
       setTransitions(
-        nextCompoundIds.length === 0 ? [] : await proposeMrmTransitions(nextCompoundIds),
+        transitions.filter((transition) => transition.compoundId !== compoundId),
       );
+      return;
+    }
+    try {
+      const proposed = await proposeMrmTransitions([compoundId]);
+      setTransitions([...transitions, ...proposed]);
     } catch (cause) {
       setFailure(cause instanceof Error ? cause.message : "Failed to propose transitions.");
     }

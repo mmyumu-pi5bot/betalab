@@ -13,6 +13,7 @@ import {
   duplicateAcquisitionMethod,
   getAcquisitionMethod,
   resetApiMocks,
+  saveAcquisitionMethod,
 } from "@/test-support/api-mock";
 import type { AcquisitionMethodSummary } from "@/types/workbench";
 
@@ -159,6 +160,26 @@ describe("LcMsMsMethodManager", () => {
 
     const editor = await screen.findByRole("region", { name: "Acquisition method editor" });
     await waitFor(() => expect(within(editor).getByLabelText("Method name")).toBeInTheDocument());
+  });
+
+  it("keeps an edited m/z through the whole duplicate-then-edit flow", async () => {
+    renderManager();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Duplicate method" }));
+    await screen.findByRole("region", { name: "Acquisition method editor" });
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+
+    const rows = await screen.findAllByTestId("editor-transition-row");
+    const field = within(rows[0]).getByLabelText("Q1 (m/z)") as HTMLInputElement;
+    for (const step of ["2", "21", "213", "213.", "213.1"]) {
+      fireEvent.change(field, { target: { value: step } });
+    }
+
+    expect(field.value).toBe("213.1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+    await waitFor(() => expect(saveAcquisitionMethod).toHaveBeenCalled());
+    expect(vi.mocked(saveAcquisitionMethod).mock.calls[0][1].transitions[0].q1Mz).toBe(213.1);
   });
 
   it("refuses to edit a built-in method and points at duplication", async () => {

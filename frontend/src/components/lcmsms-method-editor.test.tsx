@@ -130,6 +130,58 @@ describe("LcMsMsMethodEditor", () => {
     expect(payload.transitions[0].q1Mz).toBe(343.7);
   });
 
+  it("keeps advanced edits when another compound is added in simple mode", async () => {
+    const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
+    renderEditor({ method: userMethod });
+
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const field = within(screen.getAllByTestId("editor-transition-row")[0]).getByLabelText(
+      "Q1 (m/z)",
+    ) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "213.1" } });
+
+    vi.mocked(proposeMrmTransitions).mockResolvedValue([
+      {
+        ...acquisitionMethodFixture.transitions[0],
+        id: "acetamiprid__quantifier",
+        compoundId: "acetamiprid",
+        compoundLabel: "Acetamiprid",
+        q1Mz: 223.1,
+        q3Mz: 126,
+      },
+    ]);
+
+    // Picking a compound must add its channels, not rebuild every other one from
+    // the catalog and silently throw the tuning away.
+    fireEvent.click(screen.getByRole("button", { name: "Simple" }));
+    await waitFor(() => expect(getMrmReferenceCatalog).toHaveBeenCalled());
+    const compounds = await screen.findByTestId("simple-mode-compounds");
+    fireEvent.click(within(compounds).getByRole("checkbox", { name: /Acetamiprid/ }));
+    await waitFor(() => expect(proposeMrmTransitions).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const reopened = within(
+      screen.getAllByTestId("editor-transition-row")[0],
+    ).getByLabelText("Q1 (m/z)") as HTMLInputElement;
+    expect(reopened.value).toBe("213.1");
+  });
+
+  it("only drops the deselected compound's channels", async () => {
+    const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
+    renderEditor({ method: userMethod });
+
+    await waitFor(() => expect(getMrmReferenceCatalog).toHaveBeenCalled());
+    const compounds = await screen.findByTestId("simple-mode-compounds");
+    fireEvent.click(within(compounds).getByRole("checkbox", { name: /Boscalid/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const rows = screen.getAllByTestId("editor-transition-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Triphenyl phosphate-d15");
+    // Removing needs no catalog round trip at all.
+    expect(proposeMrmTransitions).not.toHaveBeenCalled();
+  });
+
   it("warns about an off-catalog transition without blocking the save", async () => {
     const userMethod = { ...acquisitionMethodFixture, id: "mine", isBuiltIn: false };
     vi.mocked(saveAcquisitionMethod).mockResolvedValue({
