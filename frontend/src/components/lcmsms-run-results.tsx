@@ -67,16 +67,21 @@ function buildPolylinePoints(trace: TransitionTrace, maxTime: number): string {
     .join(" ");
 }
 
-function traceWarning(trace: TransitionTrace): string | null {
-  if (!trace.acquisition.matchedReferenceTransition) {
-    return "No compound responds at this Q1/Q3 pair — the channel records baseline only.";
-  }
-  if (!trace.acquisition.acquiredInRetentionWindow) {
-    return "The declared retention window does not cover the moment this compound elutes.";
-  }
-  return null;
-}
-
+/*
+ * Traces are shown without a diagnosis, on purpose.
+ *
+ * Betalab could say "nothing responds at this Q1/Q3" because it holds the
+ * reference catalog, but no real instrument can: the quadrupoles watch the
+ * masses they were given and count what arrives, with no notion of what exists.
+ * Announcing the answer here would also skip the reasoning the exercise is
+ * about — run a high-level calibration standard and see whether the channel
+ * stays flat, check whether the internal standard came out, compare against the
+ * method that worked before.
+ *
+ * The acquisition metadata (matchedReferenceTransition,
+ * acquiredInRetentionWindow) is still carried on every trace for the debug
+ * inspector; it is simply not spelled out to the technician.
+ */
 function TransitionChromatogram({
   acquiredUntilS,
   trace,
@@ -87,10 +92,6 @@ function TransitionChromatogram({
   const { transition } = trace;
   const recorded = revealTrace(trace, acquiredUntilS);
   const apex = recorded.intensities.length > 0 ? Math.max(...recorded.intensities) : 0;
-  // Diagnose only once the channel has had its chance: mid-run, an empty trace
-  // means "not there yet", not "misconfigured".
-  const warning =
-    acquiredUntilS >= trace.acquisition.runDurationS ? traceWarning(trace) : null;
   const isQuantifier = transition.role === "quantifier";
 
   return (
@@ -141,15 +142,6 @@ function TransitionChromatogram({
         </span>
         <span>{formatDuration(trace.acquisition.runDurationS)}</span>
       </div>
-
-      {warning !== null ? (
-        <p
-          className="mt-1 rounded bg-amber-50 px-1.5 py-1 text-[9px] leading-relaxed text-amber-700"
-          data-testid="trace-warning"
-        >
-          {warning}
-        </p>
-      ) : null}
     </div>
   );
 }

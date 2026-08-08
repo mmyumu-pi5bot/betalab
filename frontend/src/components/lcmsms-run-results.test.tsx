@@ -169,21 +169,6 @@ describe("LcMsMsRunResults while the instrument is still acquiring", () => {
     expect(lastX).toBeLessThanOrEqual(160.1);
   });
 
-  it("waits for the run to end before blaming a flat channel", () => {
-    const [quantifier] = acquisitionMethodFixture.transitions;
-    const injection = makeInjection({
-      traces: [makeTrace(quantifier, 0, { matchedReferenceTransition: false })],
-    });
-
-    render(
-      <LcMsMsRunResults
-        runs={[makeRun({ elapsedS: 100, injections: [injection], totalDurationS: 720 })]}
-      />,
-    );
-
-    expect(screen.queryByTestId("trace-warning")).not.toBeInTheDocument();
-  });
-
   it("marks an injection still queued in the autosampler", () => {
     const run = makeRun({
       elapsedS: 100,
@@ -277,42 +262,26 @@ describe("LcMsMsRunResults", () => {
     expect(expectedApex).toBeGreaterThan(1000);
   });
 
-  it("explains a flat channel whose masses match nothing", () => {
+  it.each([
+    ["masses that match nothing", { matchedReferenceTransition: false }],
+    ["a retention window that missed the peak", { acquiredInRetentionWindow: false }],
+  ])("draws a flat channel with %s without diagnosing it", (_label, acquisition) => {
     const [quantifier] = acquisitionMethodFixture.transitions;
     const run = makeRun({
       injections: [
-        makeInjection({
-          traces: [
-            makeTrace(quantifier, 0, { matchedReferenceTransition: false }),
-          ],
-        }),
+        makeInjection({ traces: [makeTrace(quantifier, 0, acquisition)] }),
       ],
     });
 
     render(<LcMsMsRunResults runs={[run]} />);
 
-    expect(screen.getByTestId("trace-warning")).toHaveTextContent(
-      /no compound responds at this Q1\/Q3 pair/i,
-    );
-  });
-
-  it("explains a flat channel whose retention window missed the peak", () => {
-    const [quantifier] = acquisitionMethodFixture.transitions;
-    const run = makeRun({
-      injections: [
-        makeInjection({
-          traces: [
-            makeTrace(quantifier, 0, { acquiredInRetentionWindow: false }),
-          ],
-        }),
-      ],
-    });
-
-    render(<LcMsMsRunResults runs={[run]} />);
-
-    expect(screen.getByTestId("trace-warning")).toHaveTextContent(
-      /retention window does not cover/i,
-    );
+    // No real instrument can tell you nothing responds at a mass pair: it only
+    // counts what arrives. Naming the cause here would also hand over the
+    // reasoning the exercise is about.
+    const chromatogram = screen.getByTestId("transition-chromatogram");
+    expect(chromatogram).toBeInTheDocument();
+    expect(chromatogram).not.toHaveTextContent(/no compound responds/i);
+    expect(chromatogram).not.toHaveTextContent(/retention window/i);
   });
 
   it("flags an injection that carried no extract", () => {

@@ -663,6 +663,32 @@ s'ionise qu'en positif ne produit aucun ion quand la source tourne en négatif.
 | Bonnes masses, mauvaise polarité | bruit de fond |
 | Fenêtre de rétention déclarée ratant l'élution réelle | bruit de fond |
 
+### 13.3 bis bis. Le simulateur ne diagnostique pas à la place du technicien
+
+Les traces sont affichées **sans explication**. Betalab *pourrait* écrire « aucune
+molécule ne répond à ce couple Q1/Q3 », puisqu'il détient le catalogue de
+référence — mais aucun instrument réel ne le peut. Les quadripôles surveillent
+les masses qu'on leur donne et comptent ce qui arrive ; ils n'ont aucune notion
+de ce qui existe.
+
+Annoncer la cause reviendrait aussi à donner la réponse avant que la question
+soit posée, alors que le raisonnement *est* l'exercice :
+
+- passer un **calibrant à haut niveau** : on sait que la molécule y est, donc un
+  canal plat accuse la méthode et non l'échantillon ;
+- vérifier que **l'étalon interne sort** : s'il sort, l'injection et la
+  préparation ont fonctionné ;
+- comparer avec la méthode qui fonctionnait auparavant.
+
+Les métadonnées `matched_reference_transition` et `acquired_in_retention_window`
+restent portées par chaque trace pour l'inspecteur de debug : elles ne sont
+simplement pas énoncées au technicien.
+
+L'avertissement de **l'éditeur** au moment d'enregistrer est d'une autre nature
+et reste affiché : les constructeurs livrent des bases de composés MRM, et
+signaler « cette transition n'est pas dans la bibliothèque » est un contrôle
+documentaire plausible, pas de l'omniscience.
+
 ### 13.3 bis. Ce que chaque paramètre éditable change
 
 Aucun champ modifiable n'est décoratif. C'est la règle : un paramètre ne devient
