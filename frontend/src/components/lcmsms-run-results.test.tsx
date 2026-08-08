@@ -75,6 +75,58 @@ function makeRun(overrides: Partial<SequenceRun> = {}): SequenceRun {
   };
 }
 
+describe("LcMsMsRunResults screen and data viewer", () => {
+  it("keeps the results inside a scrollable instrument screen", () => {
+    render(<LcMsMsRunResults runs={[makeRun()]} />);
+
+    // A 25-channel method must not push the whole bench down the page.
+    const scroller = screen.getByTestId("instrument-screen-scroll");
+    expect(scroller).toHaveClass("overflow-y-auto");
+    expect(scroller).toContainElement(screen.getByTestId("run-summary"));
+  });
+
+  it("opens the run in a full-size data viewer and closes it again", () => {
+    render(<LcMsMsRunResults runs={[makeRun()]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open data viewer" }));
+
+    const viewer = screen.getByRole("dialog", { name: "Acquisition data viewer" });
+    expect(within(viewer).getByTestId("run-summary")).toBeInTheDocument();
+    // The content lives in one place only, never rendered twice.
+    expect(screen.queryByTestId("instrument-screen-scroll")).not.toBeInTheDocument();
+
+    fireEvent.click(within(viewer).getByRole("button", { name: "Close data viewer" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Acquisition data viewer" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("instrument-screen-scroll")).toBeInTheDocument();
+  });
+
+  it("closes the data viewer on Escape and on the backdrop", () => {
+    render(<LcMsMsRunResults runs={[makeRun()]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open data viewer" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "Acquisition data viewer" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open data viewer" }));
+    fireEvent.click(screen.getByTestId("data-viewer-backdrop"));
+    expect(
+      screen.queryByRole("dialog", { name: "Acquisition data viewer" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still shows the live progress inside the screen, not only in the viewer", () => {
+    render(<LcMsMsRunResults runs={[makeRun({ elapsedS: 360, totalDurationS: 720 })]} />);
+
+    expect(
+      within(screen.getByTestId("instrument-screen-scroll")).getByTestId("run-progress"),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("LcMsMsRunResults while the instrument is still acquiring", () => {
   it("shows the sequence progress and offers to skip the wait", () => {
     const onSkip = vi.fn();

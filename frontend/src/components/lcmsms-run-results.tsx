@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type {
   InjectionMeasurement,
@@ -219,10 +220,20 @@ function InjectionPanel({
 export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Props) {
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null;
   const [selectedInjectionId, setSelectedInjectionId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     setSelectedInjectionId(null);
   }, [latestRun?.id]);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setIsExpanded(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded]);
 
   if (latestRun === null) {
     return (
@@ -250,7 +261,7 @@ export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Pro
       ? Math.min(100, (latestRun.elapsedS / latestRun.totalDurationS) * 100)
       : 100;
 
-  return (
+  const body = (
     <div className="space-y-2">
       <p
         className="text-[10px] font-semibold uppercase tracking-wide text-slate-400"
@@ -323,5 +334,80 @@ export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Pro
         />
       ) : null}
     </div>
+  );
+
+  return (
+    <>
+      {/* The instrument's own screen: small, always visible, scrolls on its own
+          so a 25-channel method cannot push the whole bench down the page. */}
+      <div
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+        data-testid="instrument-screen"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Acquisition monitor
+          </p>
+          <button
+            className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+            onClick={() => setIsExpanded((current) => !current)}
+            type="button"
+          >
+            {isExpanded ? "Close data viewer" : "Open data viewer"}
+          </button>
+        </div>
+        {isExpanded ? (
+          <p className="px-3 py-4 text-center text-[11px] text-slate-400">
+            Showing this run in the data viewer.
+          </p>
+        ) : (
+          <div
+            className="max-h-[22rem] overflow-y-auto p-3"
+            data-testid="instrument-screen-scroll"
+          >
+            {body}
+          </div>
+        )}
+      </div>
+
+      {isExpanded
+        ? createPortal(
+            <div className="fixed inset-0 z-[9997] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-slate-950/70"
+                data-testid="data-viewer-backdrop"
+                onClick={() => setIsExpanded(false)}
+              />
+              <div
+                aria-label="Acquisition data viewer"
+                aria-modal="true"
+                className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                role="dialog"
+              >
+                <header className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-600">
+                      LC-MS/MS
+                    </p>
+                    <h3 className="mt-0.5 text-sm font-semibold text-slate-800">
+                      Acquisition data viewer
+                    </h3>
+                  </div>
+                  <button
+                    aria-label="Close data viewer"
+                    className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"
+                    onClick={() => setIsExpanded(false)}
+                    type="button"
+                  >
+                    ✕
+                  </button>
+                </header>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">{body}</div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
