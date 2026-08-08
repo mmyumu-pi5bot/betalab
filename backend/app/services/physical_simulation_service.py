@@ -242,6 +242,44 @@ class PhysicalSimulationService:
     matrix_late_center_s = 620.0
     matrix_late_sigma_s = 110.0
 
+    #: Background raised per milligram of foreign matter carried into the tube.
+    #: Grime is chemically diverse junk: a tenth of a milligram cannot compete
+    #: with ten grams of apple for charge, but it produces background across
+    #: every channel. Contamination therefore costs signal-to-noise, not response.
+    dirt_baseline_gain_per_mg = 2.5
+    #: Foreign matter picked up by a fraction left on a dirty bench surface.
+    #: Surface exposure is not a measured container contact, so it is credited a
+    #: nominal mass — a pedagogical placeholder, a few times a clean contact.
+    contaminated_fraction_impurity_mg = 1.0
+
+    @classmethod
+    def local_matrix_factor(cls, retention_time_s: float) -> float:
+        """How much matrix elutes at this moment, relative to a flat baseline of one.
+
+        Polar sugars and acids come off near the void, waxes and lipids at the end
+        of the gradient; the middle of the run is comparatively clean. Both the
+        suppression of analytes and the height of the background follow it.
+        """
+        early = cls.matrix_early_weight * exp(
+            -(retention_time_s**2) / (2.0 * cls.matrix_early_sigma_s**2)
+        )
+        late_offset = retention_time_s - cls.matrix_late_center_s
+        late = cls.matrix_late_weight * exp(
+            -(late_offset**2) / (2.0 * cls.matrix_late_sigma_s**2)
+        )
+        return 1.0 + early + late
+
+    @classmethod
+    def background_scale(cls, foreign_matter_mass_mg: float, retention_time_s: float) -> float:
+        """Multiplier on the detector's background at this point in the run."""
+        if foreign_matter_mass_mg <= 0:
+            return 1.0
+        return 1.0 + (
+            cls.dirt_baseline_gain_per_mg
+            * foreign_matter_mass_mg
+            * cls.local_matrix_factor(retention_time_s)
+        )
+
     @classmethod
     def matrix_load_g_per_ml(cls, sample_mass_g: float, extract_volume_ml: float) -> float:
         """Grams of sample carried by each millilitre of injected extract."""
@@ -277,14 +315,7 @@ class PhysicalSimulationService:
             return round(
                 1.0 / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml), 6
             )
-        early = cls.matrix_early_weight * exp(
-            -(retention_time_s**2) / (2.0 * cls.matrix_early_sigma_s**2)
-        )
-        late_offset = retention_time_s - cls.matrix_late_center_s
-        late = cls.matrix_late_weight * exp(
-            -(late_offset**2) / (2.0 * cls.matrix_late_sigma_s**2)
-        )
-        local_matrix = 1.0 + early + late
+        local_matrix = cls.local_matrix_factor(retention_time_s)
         return round(
             1.0
             / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml * local_matrix),

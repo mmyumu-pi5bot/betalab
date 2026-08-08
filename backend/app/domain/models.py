@@ -137,6 +137,10 @@ class InjectionContext:
     extraction_result: QuechersExtractionResult | None = None
     istd_volume_ml: float | None = None           # mL of ISTD solution added to the tube
     istd_reference_conc_ng_per_ml: float = 100.0  # ng/mL in the ISTD stock (catalog value)
+    # Foreign matter carried into the tube: measured container-contact impurities
+    # plus a nominal credit for fractions left on a dirty bench. It raises the
+    # detector background without competing for charge.
+    foreign_matter_mass_mg: float = 0.0
     extract_true_volume_ml: float | None = None   # hidden true acetonitrile volume; None -> falls back to extract_volume_ml
     istd_true_volume_ml: float | None = None       # hidden true ISTD volume; None -> falls back to istd_volume_ml
 

@@ -552,6 +552,7 @@ def _deserialize_injection_context(context_schema) -> InjectionContext | None:
         sample_mass_g=context_schema.sample_mass_g,
         sample_true_mass_g=context_schema.sample_true_mass_g,
         extract_volume_ml=context_schema.extract_volume_ml,
+        foreign_matter_mass_mg=context_schema.foreign_matter_mass_mg,
         effective_residues_ug_per_kg=dict(context_schema.effective_residues_ug_per_kg),
         extraction_result=extraction_result,
         istd_volume_ml=context_schema.istd_volume_ml,

@@ -851,13 +851,38 @@ propres à chaque analyte, plutôt que d'un seul étalon universel.
 Un composé dont le catalogue ignore le temps d'élution reçoit la matrice moyenne
 du run, jamais celle du volume mort où la suppression est maximale.
 
+#### Contamination et impuretés — ligne de base
+
+Les impuretés de contact (`impurity_mass_mg`) et les fractions posées sur une
+paillasse sale (`is_contaminated`) forment une même grandeur : la **matière
+étrangère** entrée dans le tube. L'aliquote versée en emporte sa part.
+
+Elle n'agit **pas** sur la suppression d'ionisation, et c'est délibéré : un
+dixième de milligramme de crasse ne concurrence pas dix grammes de pomme pour la
+charge. En revanche c'est un mélange chimiquement hétéroclite qui produit du
+fond sur tous les canaux. La contamination coûte donc du **rapport
+signal/bruit**, pas de la réponse — le pic garde sa hauteur au-dessus d'une ligne
+de base montée, et le bruit monte avec elle.
+
+Le fond suit le même profil temporel que la suppression : il se soulève près du
+volume mort et parmi les cires.
+
+| Situation | Matière en fiole | Fond à 402 s | Fond à 30 s |
+|---|---:|---:|---:|
+| Contact conteneur seul | 0,010 mg | ×1,03 | ×1,06 |
+| Une fraction contaminée | 0,110 mg | ×1,32 | ×1,69 |
+| Deux fractions contaminées | 0,220 mg | ×1,64 | ×2,38 |
+
+Une manipulation propre reste donc invisible ; une contamination se voit
+immédiatement à l'œil sur le chromatogramme, ce qui est le comportement voulu.
+
+Un calibrant est préparé en solvant propre : ni matrice, ni crasse.
+
 #### Ce que la préparation ne transmet pas encore
 
-Comme tout passe par une seule concentration, la préparation ne peut rendre les
-pics que plus grands ou plus petits. Elle ne change ni la forme du pic, ni le
-temps de rétention, ni la ligne de base, et ne produit ni effet matrice ni
-contamination croisée. Les indices par lesquels un analyste *repère* une
-mauvaise préparation dans la donnée brute sont donc encore absents.
+La préparation ne change encore ni la **forme du pic** (largeur constante, pas
+de traînée), ni le **temps de rétention** au-delà d'une gigue aléatoire, et il
+n'y a pas de **contamination croisée** entre injections successives.
 
 ### 13.5. Frontière avec l'application de traitement
 

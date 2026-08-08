@@ -212,6 +212,19 @@ def build_extract_injection_context(
             )
         )
 
+    # Grime carried in with the powder: measured container contacts, plus a
+    # nominal credit for anything left on a dirty bench. The poured aliquot takes
+    # its share like everything else in the tube.
+    foreign_matter_mg = sum(
+        fraction.impurity_mass_mg
+        + (
+            PhysicalSimulationService.contaminated_fraction_impurity_mg
+            if fraction.is_contaminated
+            else 0.0
+        )
+        for fraction in tube.produce_fractions
+    )
+
     return InjectionContext(
         source_tube_id=tube.id,
         sample_mass_g=round(
@@ -237,6 +250,7 @@ def build_extract_injection_context(
             else None
         ),
         istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
+        foreign_matter_mass_mg=round(foreign_matter_mg * volume_ratio, 6),
         extract_true_volume_ml=round(
             extract_true_volume_ml
             if extract_true_volume_ml is not None
@@ -447,18 +461,22 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                 if vial.calibration_context is not None:
                     status = "calibration"
                     responses = _compute_calibration_responses(vial.calibration_context)
+                    # A standard is prepared in clean solvent: no grime, no matrix.
+                    foreign_matter_mg = 0.0
                 elif vial.injection_context is None:
                     status = "no_extract_context"
                     responses = {}
+                    foreign_matter_mg = 0.0
                 else:
                     status = "ok"
                     responses = _compute_sample_responses(vial, vial.injection_context)
+                    foreign_matter_mg = vial.injection_context.foreign_matter_mass_mg
 
                 injection_id = new_id("inj")
                 # An empty vial is still injected and still records every channel:
                 # the run produces flat traces rather than no data at all.
                 traces = generate_transition_traces(
-                    injection_id, method, responses, self._rng
+                    injection_id, method, responses, self._rng, foreign_matter_mg
                 )
                 injections.append(
                     InjectionMeasurement(

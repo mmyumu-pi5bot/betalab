@@ -31,6 +31,7 @@ from math import ceil, exp
 from app.domain.acquisition_methods import AcquisitionMethod, MrmTransition
 from app.domain.models import TraceAcquisitionMetadata, TransitionTrace
 from app.domain.mrm_reference import ReferenceTransition, find_reference_transition
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 #: Detector counts produced per unit of extract concentration.
 RESPONSE_COUNTS_PER_CONCENTRATION_UNIT = 1.0e4
@@ -188,6 +189,7 @@ def generate_transition_traces(
     method: AcquisitionMethod,
     compound_responses: dict[str, float],
     rng: random.Random,
+    foreign_matter_mass_mg: float = 0.0,
 ) -> list[TransitionTrace]:
     """Record one trace per transition declared by ``method``.
 
@@ -198,6 +200,9 @@ def generate_transition_traces(
             the vial's physics. A compound absent from this mapping is simply not
             in the vial.
         rng: Seeded generator, so a test can reproduce a run exactly.
+        foreign_matter_mass_mg: Grime injected along with the extract. It raises
+            the background where the matrix elutes, so a dirty preparation costs
+            signal-to-noise rather than response.
     """
     schedule = acquisition_schedule(method)
 
@@ -229,7 +234,14 @@ def generate_transition_traces(
 
         intensities: list[float] = []
         for time_s in times_s:
-            intensity = BASELINE_COUNTS + rng.gauss(0.0, BASELINE_NOISE_SIGMA)
+            # Background follows the matrix: a dirty extract lifts the trace near
+            # the void and again among the waxes, and takes its noise with it.
+            dirt = PhysicalSimulationService.background_scale(
+                foreign_matter_mass_mg, time_s
+            )
+            intensity = BASELINE_COUNTS * dirt + rng.gauss(
+                0.0, BASELINE_NOISE_SIGMA * dirt
+            )
             if peak_height > 0.0:
                 offset = time_s - centre_s
                 gaussian = exp(-(offset * offset) / (2.0 * PEAK_SIGMA_S * PEAK_SIGMA_S))

@@ -89,6 +89,7 @@ class InjectionContextSchema(BaseModel):
     extraction_result: QuechersExtractionResultSchema | None = None
     istd_volume_ml: float | None = None
     istd_reference_conc_ng_per_ml: float = 100.0
+    foreign_matter_mass_mg: float = 0.0
     extract_true_volume_ml: float | None = Field(default=None, exclude=True)
     istd_true_volume_ml: float | None = Field(default=None, exclude=True)
 

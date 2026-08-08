@@ -1,4 +1,4 @@
-"""Grind quality reaching the chromatogram through sampling representativeness."""
+"""How preparation quality reaches the chromatogram: sampling, matrix, dirt."""
 from __future__ import annotations
 
 import random
@@ -9,7 +9,26 @@ from app.domain.models import InjectionContext, QuechersExtractionResult
 from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
 from app.schemas.experiment import QuechersExtractionResultSchema
 from app.services.domain_services.lcmsms import _compute_sample_responses
+from app.services.domain_services.mrm_signal import generate_transition_traces
 from app.services.physical_simulation_service import PhysicalSimulationService
+
+
+def _boscalid_quantifier():
+    from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1
+
+    return next(
+        t
+        for t in APPLE_PESTICIDES_MRM_V1.transitions
+        if t.compound_id == COMPOUND and t.role == "quantifier"
+    )
+
+
+def _method_with(*transitions):
+    from dataclasses import replace
+
+    from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1
+
+    return replace(APPLE_PESTICIDES_MRM_V1, transitions=tuple(transitions))
 
 COMPOUND = "boscalid"
 
@@ -215,3 +234,55 @@ class TestTheStandardOnlyCorrectsWhatCoElutesWithIt:
 
     def test_diluting_shrinks_the_bias_the_standard_cannot_absorb(self) -> None:
         assert self._corrected_ratio(612.0, 0.25) > self._corrected_ratio(612.0, 1.0)
+
+
+class TestDirtRaisesTheBackground:
+    """Grime is diverse junk in tiny mass: it costs signal-to-noise, not response."""
+
+    def test_a_clean_preparation_leaves_the_background_alone(self) -> None:
+        assert PhysicalSimulationService.background_scale(0.0, 402.0) == 1.0
+
+    def test_normal_container_contact_stays_invisible(self) -> None:
+        # A 10 g lot picks up ~0.1 mg, and the poured aliquot a tenth of that.
+        assert PhysicalSimulationService.background_scale(0.01, 402.0) < 1.1
+
+    def test_a_contaminated_fraction_lifts_the_background_visibly(self) -> None:
+        contaminated = (
+            PhysicalSimulationService.contaminated_fraction_impurity_mg * 0.1
+        )
+
+        assert PhysicalSimulationService.background_scale(contaminated, 402.0) > 1.2
+
+    def test_the_background_rises_where_the_matrix_elutes(self) -> None:
+        void = PhysicalSimulationService.background_scale(0.11, 30.0)
+        middle = PhysicalSimulationService.background_scale(0.11, 402.0)
+        waxes = PhysicalSimulationService.background_scale(0.11, 612.0)
+
+        assert middle < waxes < void
+
+
+class TestDirtInTheTrace:
+    def _traces(self, foreign_mg: float):
+        random.seed(4242)
+        return generate_transition_traces(
+            "inj_1",
+            _method_with(_boscalid_quantifier()),
+            {COMPOUND: 2.0},
+            random.Random(4242),
+            foreign_mg,
+        )
+
+    def test_a_dirty_extract_records_a_higher_baseline(self) -> None:
+        clean = self._traces(0.0)[0]
+        dirty = self._traces(0.3)[0]
+
+        assert min(dirty.intensities) > min(clean.intensities)
+
+    def test_the_peak_itself_is_not_shrunk_by_dirt(self) -> None:
+        """Contamination hurts signal-to-noise; it does not compete for charge."""
+        clean = self._traces(0.0)[0]
+        dirty = self._traces(0.3)[0]
+
+        clean_height = max(clean.intensities) - min(clean.intensities)
+        dirty_height = max(dirty.intensities) - min(dirty.intensities)
+        assert dirty_height == pytest.approx(clean_height, rel=0.1)
