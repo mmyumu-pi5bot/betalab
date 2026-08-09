@@ -40,22 +40,32 @@ from app.services.physical_simulation_service import PhysicalSimulationService
 #: Detector counts produced per unit of extract concentration.
 RESPONSE_COUNTS_PER_CONCENTRATION_UNIT = 1.0e4
 
-#: Chromatographic peak half-width.
+#: Chromatographic peak half-width, identical for every compound. A
+#: **pedagogical placeholder**: real peaks differ per compound and broaden
+#: through the run.
 PEAK_SIGMA_S = 9.0
 
 #: A qualifier channel is intentionally weaker than its quantifier. The constant
 #: ratio is what makes the qualifier/quantifier ion ratio a usable identity check.
+#: A **pedagogical placeholder**: a real ratio is a property of each compound.
 QUALIFIER_RESPONSE_RATIO = 0.35
 
 #: How far the collision energy may drift from the tuned value before the
 #: fragment yield collapses. At one sigma the channel keeps ~61 % of its
-#: response, at three sigma ~1 %.
+#: response, at three sigma ~1 %. A **pedagogical placeholder**: real breakdown
+#: curves are compound-specific and not symmetric.
 FRAGMENTATION_CE_SIGMA_V = 8.0
 
-#: Half-width of the flat top of a quadrupole mass peak. Within it the filter
-#: passes everything, which is why MRM survives routine at all: instrument mass
-#: calibration wanders by about this much from day to day, and a method
-#: transferred between instruments must still quantify.
+#: Half-width of the flat top of a quadrupole mass peak.
+#:
+#: The *shape* is established: a quadrupole transmits within a band, unit
+#: resolution puts that band around 0.7 Da wide at half height, and methods
+#: survive being transferred between instruments whose calibration wanders by
+#: about a tenth of a Dalton — which requires a small mis-set to cost little.
+#:
+#: This particular half-width is a **pedagogical placeholder**. A real peak top
+#: is not perfectly flat, and how flat it is depends on how the instrument was
+#: tuned and on a resolution setting Betalab does not model.
 MZ_PLATEAU_DA = 0.15
 
 #: Dead time between two channels while the quadrupoles settle on new masses.

@@ -222,7 +222,9 @@ class PhysicalSimulationService:
     aspiration_heterogeneity_factor_max = 1.5
 
     #: Spread of the sampling error on a completely unground sample. Scales down
-    #: to zero as the grind homogeneity approaches one.
+    #: to zero as the grind homogeneity approaches one. A **pedagogical
+    #: placeholder**: the real spread depends on the residue's distribution in
+    #: the fruit and on the particle size reached.
     sampling_heterogeneity_relative_sigma = 0.22
     sampling_factor_min = 0.35
     sampling_factor_max = 1.65
@@ -235,7 +237,8 @@ class PhysicalSimulationService:
     matrix_suppression_coefficient = 0.33
     #: Matrix does not elute evenly. Polar sugars and acids come off near the
     #: void, waxes and lipids at the end of the gradient, and the middle of the
-    #: run is comparatively clean. Weights add to a flat baseline of one.
+    #: run is comparatively clean — the shape is real, these weights are
+    #: **pedagogical placeholders**.
     matrix_early_weight = 1.6
     matrix_early_sigma_s = 90.0
     matrix_late_weight = 1.2
@@ -243,6 +246,8 @@ class PhysicalSimulationService:
     matrix_late_sigma_s = 110.0
 
     #: Background raised per milligram of foreign matter carried into the tube.
+    #: A **pedagogical placeholder**, calibrated so clean handling stays invisible
+    #: and a contaminated fraction does not.
     #: Grime is chemically diverse junk: a tenth of a milligram cannot compete
     #: with ten grams of apple for charge, but it produces background across
     #: every channel. Contamination therefore costs signal-to-noise, not response.

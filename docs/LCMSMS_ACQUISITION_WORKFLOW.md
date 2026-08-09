@@ -725,6 +725,14 @@ Q3 filtrant en série, leurs transmissions se multiplient.
 La méthode intégrée recopiant les masses de référence, elle est toujours sur le
 plateau.
 
+Attention à ce qui est établi et à ce qui ne l'est pas. **Établi** : un
+quadripôle transmet dans une bande, la résolution unitaire la situe autour de
+0,7 Da à mi-hauteur, et le transfert de méthode entre appareils impose qu'un
+petit écart coûte peu. **Choisi** : la demi-largeur du plateau, la forme en
+cosinus de l'épaule, et le fait que le sommet soit parfaitement plat. Un vrai
+sommet ne l'est pas tout à fait, et sa forme dépend d'un réglage de résolution
+que Betalab ne modélise pas.
+
 **Énergie de collision.** Le rendement suit une gaussienne centrée sur l'énergie
 à laquelle le canal de référence a été optimisé, d'écart-type
 `FRAGMENTATION_CE_SIGMA_V`. Trop bas, le précurseur ne casse pas ; trop haut, le
