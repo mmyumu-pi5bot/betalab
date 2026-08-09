@@ -536,7 +536,12 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                 # An empty vial is still injected and still records every channel:
                 # the run produces flat traces rather than no data at all.
                 traces = generate_transition_traces(
-                    injection_id, method, responses, self._rng, foreign_matter_mg
+                    injection_id,
+                    method,
+                    responses,
+                    self._rng,
+                    foreign_matter_mg,
+                    configured.injection_volume_ul,
                 )
                 injections.append(
                     InjectionMeasurement(

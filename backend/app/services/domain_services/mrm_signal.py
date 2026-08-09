@@ -26,7 +26,7 @@ feeds exactly one of them:
 from __future__ import annotations
 
 import random
-from math import ceil, cos, exp, pi
+from math import ceil, cos, exp, pi, sqrt
 
 from app.domain.acquisition_methods import AcquisitionMethod, MrmTransition
 from app.domain.models import TraceAcquisitionMetadata, TransitionTrace
@@ -39,6 +39,18 @@ from app.services.physical_simulation_service import PhysicalSimulationService
 
 #: Detector counts produced per unit of extract concentration.
 RESPONSE_COUNTS_PER_CONCENTRATION_UNIT = 1.0e4
+
+#: Injection volume the response constants are calibrated against. Everything
+#: scales relative to it, so the nominal injection reproduces the old magnitudes.
+NOMINAL_INJECTION_VOLUME_UL = 5.0
+
+#: How much further than its own plug width a strong-solvent injection spreads.
+#: An extract in acetonitrile does not refocus at the head of a column
+#: equilibrated near 5 % organic: it travels with its own solvent instead of
+#: sticking, so the band spreads more than the plug alone would explain. A
+#: **pedagogical placeholder** — the real factor depends on the solvent pair and
+#: on how strongly the compound retains.
+SOLVENT_MISMATCH_BROADENING = 4.0
 
 #: Chromatographic peak half-width, identical for every compound. A
 #: **pedagogical placeholder**: real peaks differ per compound and broaden
@@ -108,6 +120,22 @@ def _fragmentation_yield(declared: MrmTransition, reference: ReferenceTransition
     """
     drift = declared.collision_energy_v - reference.collision_energy_v
     return exp(-(drift * drift) / (2.0 * FRAGMENTATION_CE_SIGMA_V * FRAGMENTATION_CE_SIGMA_V))
+
+
+def _effective_peak_sigma_s(injection_volume_ul: float, flow_ml_per_min: float) -> float:
+    """Peak width once the injected band is added to the column's own.
+
+    A peak is never narrower than the plug that produced it. Variances add, so a
+    small injection disappears into the column's own band and a large one starts
+    to dominate it — which is the whole trade-off of turning the injection
+    volume up: more analyte on column, but spread over more time.
+    """
+    if flow_ml_per_min <= 0:
+        return PEAK_SIGMA_S
+    flow_ul_per_s = flow_ml_per_min * 1000.0 / 60.0
+    plug_duration_s = max(injection_volume_ul, 0.0) / flow_ul_per_s
+    band_sigma_s = plug_duration_s / sqrt(12.0) * SOLVENT_MISMATCH_BROADENING
+    return sqrt(PEAK_SIGMA_S**2 + band_sigma_s**2)
 
 
 def _filter_transmission(offset_da: float) -> float:
@@ -235,6 +263,7 @@ def generate_transition_traces(
     compound_responses: dict[str, float],
     rng: random.Random,
     foreign_matter_mass_mg: float = 0.0,
+    injection_volume_ul: float = NOMINAL_INJECTION_VOLUME_UL,
 ) -> list[TransitionTrace]:
     """Record one trace per transition declared by ``method``.
 
@@ -248,7 +277,18 @@ def generate_transition_traces(
         foreign_matter_mass_mg: Grime injected along with the extract. It raises
             the background where the matrix elutes, so a dirty preparation costs
             signal-to-noise rather than response.
+        injection_volume_ul: How much extract reached the column. It sets the
+            amount injected, and past a point widens the band it arrives in.
     """
+    # Injecting twice as much puts twice as much on column, so the peak *area*
+    # doubles. Its height does not follow when the band also widens: the same
+    # material is spread over more time. That is the trade-off of turning the
+    # injection volume up.
+    volume_scale = injection_volume_ul / NOMINAL_INJECTION_VOLUME_UL
+    peak_sigma_s = _effective_peak_sigma_s(
+        injection_volume_ul, method.liquid_chromatography.flow_ml_per_min
+    )
+    area_to_height = PEAK_SIGMA_S / peak_sigma_s
     schedule = acquisition_schedule(method)
 
     traces: list[TransitionTrace] = []
@@ -265,6 +305,8 @@ def generate_transition_traces(
             * _role_scale(reference)
             * _fragmentation_yield(transition, reference)
             * _mass_transmission(transition, reference)
+            * volume_scale
+            * area_to_height
             * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT
             if reference is not None
             else 0.0
@@ -290,7 +332,7 @@ def generate_transition_traces(
             )
             if peak_height > 0.0:
                 offset = time_s - centre_s
-                gaussian = exp(-(offset * offset) / (2.0 * PEAK_SIGMA_S * PEAK_SIGMA_S))
+                gaussian = exp(-(offset * offset) / (2.0 * peak_sigma_s * peak_sigma_s))
                 peak = peak_height * gaussian
                 if peak > 0.0:
                     peak += rng.gauss(0.0, peak * PEAK_NOISE_RELATIVE_SIGMA)

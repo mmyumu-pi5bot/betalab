@@ -703,6 +703,8 @@ Aucun champ modifiable n'est décoratif. C'est la règle : un paramètre ne devi
 | Fenêtre de rétention | Durée pendant laquelle le canal est écouté, et charge du cycle |
 | Dwell time | Temps passé par canal et par cycle ⇒ densité de points |
 | Durée du run | Longueur de la chromatographie ; un composé éluant après la fin n'est jamais vu |
+| Volume d'injection | Quantité en colonne — donc l'aire — et, au-delà d'un seuil, largeur du pic |
+| Débit LC | Vitesse de balayage du bouchon injecté, donc son élargissement |
 
 **Masses.** Un quadripôle n'est pas un tamis à seuil : il laisse passer les ions
 dans une bande autour de la masse consignée, et en résolution unitaire ce pic de
@@ -739,6 +741,37 @@ que Betalab ne modélise pas.
 fragment choisi se détruit à son tour. À un sigma il reste ~61 % du signal, à
 quatre sigma il ne reste que du bruit. La méthode intégrée recopiant l'énergie
 de référence, son rendement vaut exactement 1.
+
+### 13.3 quater. Le volume d'injection est un arbitrage
+
+Injecter deux fois plus met deux fois plus de matière en tête de colonne, donc
+double **l'aire** du pic. Sa hauteur ne suit pas forcément : un pic n'est jamais
+plus étroit que le bouchon qui l'a produit, et les variances s'additionnent.
+
+```
+σ_observé² = σ_colonne² + σ_bouchon²
+σ_bouchon  = (volume / débit) / √12 × facteur de mésappariement de solvant
+```
+
+Le facteur de mésappariement traduit un fait réel : un extrait en acétonitrile
+ne se refocalise pas en tête d'une colonne équilibrée vers 5 % d'organique. Il
+migre avec son propre solvant au lieu de s'y fixer, donc la bande s'étale plus
+que la largeur du bouchon ne le laisserait croire.
+
+| Volume | Largeur du pic | Aire | Apex |
+|---:|---:|---:|---:|
+| 5 µL | 100 % | ×1 | ×1,0 |
+| 10 µL | 102 % | ×2 | ×2,0 |
+| 20 µL | 107 % | ×4 | ×3,7 |
+| 50 µL | 139 % | ×10 | ×7,2 |
+| 100 µL | 217 % | ×20 | ×9,2 |
+
+D'où le vrai arbitrage de développement de méthode : monter le volume gagne de
+la sensibilité, jusqu'au point où on n'achète plus que de l'étalement — et un
+pic large est plus difficile à intégrer proprement en aval.
+
+Le débit de la méthode entre ici en jeu pour la première fois : un débit plus
+élevé balaie le bouchon injecté plus vite, donc élargit moins.
 
 ### 13.3 ter. Le temps est un budget
 

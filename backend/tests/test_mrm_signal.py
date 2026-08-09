@@ -19,8 +19,11 @@ from app.services.domain_services.mrm_signal import (
     INTERSCAN_DELAY_MS,
     MAX_POINTS_PER_INJECTION,
     MZ_PLATEAU_DA,
+    NOMINAL_INJECTION_VOLUME_UL,
+    PEAK_SIGMA_S,
     QUALIFIER_RESPONSE_RATIO,
     RESPONSE_COUNTS_PER_CONCENTRATION_UNIT,
+    _effective_peak_sigma_s,
     _filter_transmission,
     _mass_transmission,
     acquisition_schedule,
@@ -491,3 +494,48 @@ class TestMassTransmission:
             )
             assert reference is not None
             assert _mass_transmission(transition, reference) == 1.0
+
+
+class TestInjectionVolume:
+    """More on column means more signal, until the band it arrives in widens."""
+
+    def _trace(self, injection_volume_ul: float):
+        transition = _transition("boscalid")
+        return generate_transition_traces(
+            "inj_1",
+            _method_with(transition),
+            {"boscalid": 2.0},
+            _rng(),
+            0.0,
+            injection_volume_ul,
+        )[0]
+
+    def _area(self, injection_volume_ul: float) -> float:
+        trace = self._trace(injection_volume_ul)
+        interval = trace.acquisition.sampling_interval_s
+        return sum(max(value - BASELINE_COUNTS, 0.0) for value in trace.intensities) * interval
+
+    def test_the_nominal_injection_is_the_reference(self) -> None:
+        assert self._area(NOMINAL_INJECTION_VOLUME_UL) > 0
+
+    def test_doubling_the_volume_doubles_what_reaches_the_column(self) -> None:
+        assert self._area(10.0) == pytest.approx(self._area(5.0) * 2, rel=0.1)
+
+    def test_a_modest_injection_is_not_broadened(self) -> None:
+        assert _effective_peak_sigma_s(5.0, 0.4) == pytest.approx(PEAK_SIGMA_S, rel=0.02)
+
+    def test_a_large_injection_widens_the_band(self) -> None:
+        assert _effective_peak_sigma_s(100.0, 0.4) > PEAK_SIGMA_S * 2
+
+    def test_the_apex_stops_following_the_volume_once_the_peak_spreads(self) -> None:
+        """Ten times the material, nowhere near ten times the height."""
+        gain = _peak_height(self._trace(50.0)) / _peak_height(self._trace(5.0))
+
+        assert 5.0 < gain < 9.0
+
+    def test_the_area_still_follows_the_volume_when_the_peak_spreads(self) -> None:
+        """Broadening spreads the material, it does not destroy it."""
+        assert self._area(50.0) == pytest.approx(self._area(5.0) * 10, rel=0.15)
+
+    def test_a_faster_flow_sweeps_the_injected_band_through_sooner(self) -> None:
+        assert _effective_peak_sigma_s(50.0, 0.8) < _effective_peak_sigma_s(50.0, 0.4)
