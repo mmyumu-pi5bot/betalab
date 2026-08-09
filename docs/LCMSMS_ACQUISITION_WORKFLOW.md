@@ -942,9 +942,14 @@ Un calibrant est préparé en solvant propre : ni matrice, ni crasse.
 
 #### Ce que la préparation ne transmet pas encore
 
-La préparation ne change encore ni la **forme du pic** (largeur constante, pas
-de traînée), ni le **temps de rétention** au-delà d'une gigue aléatoire, et il
-n'y a pas de **contamination croisée** entre injections successives.
+La préparation ne change encore ni la **forme du pic** — le volume d'injection
+l'élargit (§ 13.3 quater) mais rien ne le fait traîner —, ni le **temps de
+rétention** au-delà d'une gigue aléatoire, et il n'y a pas de **contamination
+croisée** entre injections successives.
+
+Ces trois manques ont une cause commune : la colonne n'existe pas en tant
+qu'objet et ne vieillit donc jamais. La conception est décrite dans
+`docs/LCMSMS_COLUMN_STATE_TODO.md`, volontairement non implémentée.
 
 ### 13.5. Frontière avec l'application de traitement
 
