@@ -11,6 +11,8 @@ import type {
 
 const CHART_WIDTH = 320;
 const CHART_HEIGHT = 64;
+/** How far above its own average a channel must reach before it fills the chart. */
+const NOISE_HEADROOM = 8;
 
 type Props = {
   isCommandPending?: boolean;
@@ -53,11 +55,25 @@ function formatMz(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
 }
 
+/**
+ * Full-scale intensity for one channel.
+ *
+ * Scaling a chromatogram to its own maximum is what instrument software does,
+ * but on a channel that recorded nothing it turns a couple of hundred counts of
+ * noise into a full-height mountain range that reads exactly like a peak. The
+ * floor keeps the baseline where it belongs: a channel is only allowed to fill
+ * its chart once it holds something well clear of its own noise.
+ */
+function fullScaleIntensity(intensities: number[]): number {
+  const maxIntensity = Math.max(...intensities);
+  const mean = intensities.reduce((total, value) => total + value, 0) / intensities.length;
+  return Math.max(maxIntensity, mean * NOISE_HEADROOM, 1);
+}
+
 function buildPolylinePoints(trace: TransitionTrace, maxTime: number): string {
   const { intensities, timesS } = trace;
   if (intensities.length === 0) return "";
-  const maxIntensity = Math.max(...intensities);
-  const scale = maxIntensity > 0 ? maxIntensity : 1;
+  const scale = fullScaleIntensity(intensities);
   return intensities
     .map((intensity, index) => {
       const x = (timesS[index] / maxTime) * CHART_WIDTH;

@@ -321,3 +321,40 @@ describe("LcMsMsRunResults", () => {
     expect(text).not.toMatch(/calibration curve/i);
   });
 });
+
+describe("LcMsMsRunResults chart scaling", () => {
+  function polylineOf(peakHeight: number): number[] {
+    const [quantifier] = acquisitionMethodFixture.transitions;
+    const run = makeRun({
+      injections: [makeInjection({ traces: [makeTrace(quantifier, peakHeight)] })],
+    });
+    const { unmount } = render(<LcMsMsRunResults runs={[run]} />);
+    const points = screen
+      .getByTestId("transition-chromatogram")
+      .querySelector("polyline")!
+      .getAttribute("points")!;
+    unmount();
+    return points.split(" ").map((pair) => Number(pair.split(",")[1]));
+  }
+
+  it("keeps a channel that recorded nothing down at the baseline", () => {
+    // Auto-scaling to its own maximum would turn pure noise into a mountain
+    // range indistinguishable from a peak.
+    const ys = polylineOf(0);
+
+    // y is inverted: a trace pinned to the bottom has large y values.
+    expect(Math.min(...ys)).toBeGreaterThan(32);
+  });
+
+  it("still lets a real peak fill its chart", () => {
+    const ys = polylineOf(20000);
+
+    expect(Math.min(...ys)).toBeLessThan(2);
+  });
+
+  it("keeps a small but genuine peak visible", () => {
+    const ys = polylineOf(600);
+
+    expect(Math.min(...ys)).toBeLessThan(32);
+  });
+});
