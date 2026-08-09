@@ -186,6 +186,16 @@ function InjectionPanel({
         </p>
       ) : null}
 
+      {injection.status === "insufficient_volume" ? (
+        <p
+          className="mt-2 rounded-[0.9rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          data-testid="injection-insufficient-volume"
+        >
+          The needle could not reach enough sample: earlier injections drained
+          this vial down to its dead volume. Every channel recorded baseline.
+        </p>
+      ) : null}
+
       {injection.status === "no_extract_context" ? (
         <p className="mt-2 rounded-[0.9rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
           This vial held no injectable content — every channel recorded baseline.

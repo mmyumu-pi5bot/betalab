@@ -43,6 +43,9 @@ APPLE_EXTRACT_ID = "apple_extract"
 ISTD_REFERENCE_CONC_NG_PER_ML = 100.0
 CALIBRATION_STANDARD_VOLUME_ML = 1.0
 ENV_NOISE_SIGMA = 0.005  # 0.5% environmental noise per measurement
+#: Volume the autosampler needle cannot reach at the bottom of a vial. A vial is
+#: never emptied to the last drop, so a sequence must leave this much behind.
+VIAL_DEAD_VOLUME_ML = 0.05
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +117,31 @@ def _effective_residues(
             merged[compound_id] = merged.get(compound_id, 0.0) + weighted / mass
 
     return merged
+
+
+def _vial_total_volume_ml(vial: WorkbenchTool) -> float:
+    return sum(max(liquid.volume_ml, 0.0) for liquid in vial.liquids)
+
+
+def _draw_injection_volume(vial: WorkbenchTool, injection_volume_ul: float) -> None:
+    """Withdraw one injected aliquot from the vial.
+
+    An injection really removes liquid: a few microlitres leave the vial and do
+    not come back, which is why a vial cannot be re-injected forever. The draw is
+    proportional across the vial's liquids, since the autosampler samples a
+    homogeneous solution — the composition is unchanged, only the volume drops.
+    """
+    drawn_ml = injection_volume_ul / 1000.0
+    total_ml = _vial_total_volume_ml(vial)
+    if total_ml <= 0 or drawn_ml <= 0:
+        return
+    remaining_share = max(0.0, 1.0 - drawn_ml / total_ml)
+    for liquid in vial.liquids:
+        liquid.volume_ml = round(max(liquid.volume_ml * remaining_share, 0.0), 6)
+        if liquid.true_volume_ml is not None:
+            liquid.true_volume_ml = round(
+                max(liquid.true_volume_ml * remaining_share, 0.0), 6
+            )
 
 
 def _reference_retention_time_s(compound_id: str) -> float | None:
@@ -458,7 +486,20 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             configured = configured_by_slot[rack_slot.id]
 
             for replicate_index in range(1, configured.repetitions + 1):
-                if vial.calibration_context is not None:
+                # The needle cannot reach the bottom of the vial. A vial drained
+                # by earlier injections is still injected — the autosampler tries
+                # — but draws nothing, so every channel records baseline.
+                held_ml = _vial_total_volume_ml(vial)
+                is_dry = (
+                    held_ml > 0
+                    and held_ml - VIAL_DEAD_VOLUME_ML
+                    < configured.injection_volume_ul / 1000.0
+                )
+                if is_dry:
+                    status = "insufficient_volume"
+                    responses = {}
+                    foreign_matter_mg = 0.0
+                elif vial.calibration_context is not None:
                     status = "calibration"
                     responses = _compute_calibration_responses(vial.calibration_context)
                     # A standard is prepared in clean solvent: no grime, no matrix.
@@ -472,6 +513,8 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                     responses = _compute_sample_responses(vial, vial.injection_context)
                     foreign_matter_mg = vial.injection_context.foreign_matter_mass_mg
 
+                if not is_dry:
+                    _draw_injection_volume(vial, configured.injection_volume_ul)
                 injection_id = new_id("inj")
                 # An empty vial is still injected and still records every channel:
                 # the run produces flat traces rather than no data at all.

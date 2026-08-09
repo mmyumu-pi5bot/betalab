@@ -37,6 +37,7 @@ from app.services.domain_services.lcmsms import (
     _compute_sample_responses,
     _reference_retention_time_s,
 )
+from app.services.domain_services.mrm_signal import BASELINE_COUNTS
 from app.services.domain_services.rack import (
     PlaceToolInRackSlotRequest,
     PlaceToolInRackSlotService,
@@ -1322,3 +1323,80 @@ class TestSampleResponseInvariants:
 
         assert set(responses) == {"boscalid", INTERNAL_STANDARD_COMPOUND_ID}
         assert all(isinstance(value, float) for value in responses.values())
+
+
+class TestInjectionsConsumeTheVial:
+    """An injection really withdraws liquid: a vial cannot be re-run forever."""
+
+    def _vial_volume_ml(self, service: ExperimentRuntimeService, exp_id: str) -> float:
+        exp = service._require_experiment(exp_id)
+        vial = exp.rack.slots[0].tool
+        assert vial is not None
+        return sum(liquid.volume_ml for liquid in vial.liquids)
+
+    def _run(self, service: ExperimentRuntimeService, exp_id: str, volume_ul: float = 5.0) -> None:
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Cal 10",
+                        injection_volume_ul=volume_ul,
+                        repetitions=1,
+                        output_filename="01_cal.mzML",
+                    )
+                ],
+            ),
+        )
+
+    def _prepare(self, service: ExperimentRuntimeService) -> str:
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        vial_id = _place_vial_in_rack(service, exp_id)
+        AddCalibrationToVialService(service).run(
+            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
+        )
+        _load_rack_into_instrument(service, exp_id)
+        return exp_id
+
+    def test_an_injection_removes_its_volume_from_the_vial(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = self._prepare(service)
+        before = self._vial_volume_ml(service, exp_id)
+
+        self._run(service, exp_id, volume_ul=5.0)
+
+        assert self._vial_volume_ml(service, exp_id) == pytest.approx(before - 0.005, abs=1e-6)
+
+    def test_a_drained_vial_is_still_injected_but_records_baseline(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = self._prepare(service)
+        exp = service._require_experiment(exp_id)
+        vial = exp.rack.slots[0].tool
+        assert vial is not None
+        # Leave only the dead volume the needle cannot reach.
+        for liquid in vial.liquids:
+            liquid.volume_ml = 0.04
+
+        self._run(service, exp_id, volume_ul=5.0)
+
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        injection = instrument.sequence_runs[-1].injections[0]
+        assert injection.status == "insufficient_volume"
+        assert injection.traces, "the channels are still recorded, they are simply flat"
+        assert max(max(t.intensities) for t in injection.traces) < BASELINE_COUNTS * 3
+
+    def test_a_dry_vial_is_not_drawn_from_any_further(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = self._prepare(service)
+        exp = service._require_experiment(exp_id)
+        vial = exp.rack.slots[0].tool
+        assert vial is not None
+        for liquid in vial.liquids:
+            liquid.volume_ml = 0.04
+
+        self._run(service, exp_id, volume_ul=5.0)
+
+        assert self._vial_volume_ml(service, exp_id) == pytest.approx(0.04, abs=1e-9)

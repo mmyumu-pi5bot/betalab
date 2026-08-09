@@ -26,6 +26,7 @@ import type {
   ToolbarCategory,
   ToolbarItem,
   TraceAcquisitionMetadata,
+  InjectionMeasurement,
   TransitionTrace,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
@@ -2609,7 +2610,7 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
           vialId: String(inj.vialId ?? inj.vial_id ?? ""),
           vialLabel: String(inj.vialLabel ?? inj.vial_label ?? ""),
           rackSlotId: String(inj.rackSlotId ?? inj.rack_slot_id ?? ""),
-          status: String(inj.status ?? "ok") as "ok" | "no_extract_context" | "calibration",
+          status: String(inj.status ?? "ok") as InjectionMeasurement["status"],
           sampleName: String(inj.sampleName ?? inj.sample_name ?? ""),
           injectionVolumeUl: Number(
             inj.injectionVolumeUl ?? inj.injection_volume_ul ?? 5,

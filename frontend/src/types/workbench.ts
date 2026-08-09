@@ -500,7 +500,7 @@ export type InjectionMeasurement = {
   vialId: string;
   vialLabel: string;
   rackSlotId: string;
-  status: "ok" | "no_extract_context" | "calibration";
+  status: "ok" | "no_extract_context" | "calibration" | "insufficient_volume";
   traces: TransitionTrace[];
   sampleName: string;
   injectionVolumeUl: number;

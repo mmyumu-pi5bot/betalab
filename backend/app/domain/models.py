@@ -194,7 +194,7 @@ class InjectionMeasurement:
     vial_id: str
     vial_label: str
     rack_slot_id: str
-    status: str  # "ok" | "no_extract_context" | "calibration"
+    status: str  # "ok" | "no_extract_context" | "calibration" | "insufficient_volume"
     traces: list[TransitionTrace]
     sample_name: str = ""
     injection_volume_ul: float = 5.0
