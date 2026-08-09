@@ -26,6 +26,7 @@ import { TrashWidget } from "@/components/trash-widget";
 import { VortexWidget } from "@/components/vortex-widget";
 import { WorkbenchPanel } from "@/components/workbench-panel";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
+import type { SequenceRun } from "@/types/workbench";
 import type { AnalyticalBalanceDndApi } from "@/hooks/use-analytical-balance-dnd";
 import type { CentrifugeDndApi } from "@/hooks/use-centrifuge-dnd";
 import type { DropDraft } from "@/hooks/use-drop-draft";
@@ -173,6 +174,24 @@ type LabSceneWorkspaceCanvasProps = {
     onTareAnalyticalBalance: () => void;
   };
 };
+
+/**
+ * The 1-based rack position the instrument is injecting right now, if any.
+ *
+ * Derived from the run clock rather than stored: the backend advances
+ * `elapsedS`, and each injection knows when its own run starts.
+ */
+function injectingRackPosition(runs: SequenceRun[] | undefined): number | null {
+  const run = runs && runs.length > 0 ? runs[runs.length - 1] : null;
+  if (run === null || run.elapsedS >= run.totalDurationS) return null;
+  const injection = run.injections.find((entry) => {
+    const acquired = run.elapsedS - entry.startOffsetS;
+    return acquired > 0 && acquired < (entry.traces[0]?.acquisition.runDurationS ?? 0);
+  });
+  if (injection === undefined) return null;
+  const position = Number(injection.rackSlotId.match(/(\d+)$/)?.[1]);
+  return Number.isFinite(position) ? position : null;
+}
 
 export function LabSceneWorkspaceCanvas({
   balances,
@@ -633,7 +652,11 @@ export function LabSceneWorkspaceCanvas({
                   }
                 >
                   <LcMsMsInstrumentIllustration
+                    activeRackPosition={injectingRackPosition(widget.sequenceRuns)}
                     className="mx-auto max-w-[26rem]"
+                    loadedRackPositions={
+                      rack.instrumentStatus === "idle" ? null : rack.rackOccupiedSlots
+                    }
                     onStartClick={handleRunAcquisition}
                     startDisabled={
                       rack.instrumentStatus !== "ready" ||

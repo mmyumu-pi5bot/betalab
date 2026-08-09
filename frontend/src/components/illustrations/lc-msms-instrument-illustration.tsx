@@ -2,7 +2,15 @@ import { buildEquipmentIllustrationSurface } from "@/components/illustrations/eq
 
 type LcMsMsInstrumentIllustrationProps = {
   activeStage?: "lc" | "transfer" | "msms" | null;
+  /** 1-based rack position currently being injected, if any. */
+  activeRackPosition?: number | null;
   className?: string;
+  /**
+   * 1-based positions holding a vial in the rack loaded into the autosampler,
+   * or null when no rack is loaded. The tray then shows its empty wells.
+   */
+  loadedRackPositions?: number[] | null;
+  rackSlotCount?: number;
   isRunning?: boolean;
   onStartClick?: () => void;
   startDisabled?: boolean;
@@ -39,8 +47,9 @@ const instrumentPalette = {
   },
 } as const;
 
-const autosamplerVials = [82, 120, 158, 196, 234];
-const activeVialIndex = 2;
+const TRAY_INNER_WIDTH = 198;
+const TRAY_PADDING = 6;
+const VIAL_WIDTH = 11;
 const spectrumPeaks = [
   { height: 28, x: 420 },
   { height: 15, x: 438 },
@@ -54,7 +63,10 @@ const spectrumBaseline = 226;
 
 export function LcMsMsInstrumentIllustration({
   activeStage = null,
+  activeRackPosition = null,
   className,
+  loadedRackPositions = null,
+  rackSlotCount = 12,
   isRunning = false,
   onStartClick,
   startDisabled = false,
@@ -64,6 +76,9 @@ export function LcMsMsInstrumentIllustration({
   testId,
 }: LcMsMsInstrumentIllustrationProps) {
   const palette = instrumentPalette[status];
+  const slotCount = Math.max(1, rackSlotCount);
+  const slotPitch = TRAY_INNER_WIDTH / slotCount;
+  const occupiedPositions = new Set(loadedRackPositions ?? []);
   const idp = testId ?? "lc-msms-instrument-illustration";
   const { defs: surfaceDefs, surface } = buildEquipmentIllustrationSurface({
     height: 320,
@@ -171,22 +186,60 @@ export function LcMsMsInstrumentIllustration({
         <circle cx="240" cy="112" fill={metalFill} r="11" stroke="#5a7080" strokeWidth="1.2" />
         <circle cx="268" cy="99" fill={lcPulse ? palette.pulse : "#cbd5e1"} r="5" />
 
-        {/* Autosampler tray */}
+        {/* Autosampler tray — the real rack once one is loaded */}
         <rect fill="#16242d" height="60" rx="12" stroke="#33454f" strokeWidth="1.2" width="210" x="70" y="146" />
-        {autosamplerVials.map((vialX, index) => (
-          <g key={`vial-${vialX}`}>
-            <rect fill={glassFill} height="36" rx="4" stroke="#0f6f86" strokeWidth="1" width="18" x={vialX} y="154" />
-            <rect
-              fill={index === activeVialIndex && lcPulse ? palette.pulse : "#9db2c0"}
-              height="18"
-              rx="3"
-              width="12"
-              x={vialX + 3}
-              y="172"
-            />
-            <rect fill="#ffffff" height="24" opacity="0.35" rx="1" width="2.5" x={vialX + 3} y="158" />
-          </g>
-        ))}
+        {Array.from({ length: slotCount }, (_, index) => {
+          const position = index + 1;
+          const wellX = 70 + TRAY_PADDING + index * slotPitch;
+          const vialX = wellX + (slotPitch - VIAL_WIDTH) / 2 - TRAY_PADDING / slotCount;
+          const isOccupied = occupiedPositions.has(position);
+          const isInjecting = isOccupied && position === activeRackPosition;
+          return (
+            <g key={`rack-slot-${position}`}>
+              <rect
+                fill="#0d181e"
+                height="40"
+                rx="3"
+                stroke="#2a3b45"
+                strokeWidth="0.8"
+                width={VIAL_WIDTH}
+                x={vialX}
+                y="152"
+              />
+              {isOccupied ? (
+                <g data-testid="autosampler-vial">
+                  <rect
+                    fill={glassFill}
+                    height="36"
+                    rx="3"
+                    stroke={isInjecting ? palette.pulse : "#0f6f86"}
+                    strokeWidth={isInjecting ? 1.6 : 1}
+                    width={VIAL_WIDTH}
+                    x={vialX}
+                    y="154"
+                  />
+                  <rect
+                    fill={isInjecting && lcPulse ? palette.pulse : "#9db2c0"}
+                    height="16"
+                    rx="2"
+                    width={VIAL_WIDTH - 4}
+                    x={vialX + 2}
+                    y="174"
+                  />
+                  <rect
+                    fill="#ffffff"
+                    height="22"
+                    opacity="0.35"
+                    rx="1"
+                    width="1.8"
+                    x={vialX + 2}
+                    y="158"
+                  />
+                </g>
+              ) : null}
+            </g>
+          );
+        })}
 
         <text fill="#64748b" fontFamily="ui-sans-serif, system-ui, sans-serif" fontSize="15" fontWeight="800" x="76" y="230">
           LC
