@@ -306,14 +306,18 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
         <p className="mt-2 text-[10px] text-rose-300">{failure}</p>
       ) : null}
 
+      {/* Sticky: a method with two dozen transitions is a long scroll, and the
+          action that commits it must not be buried at the far end of it. */}
+      <div className="sticky bottom-0 z-10 -mx-3 -mb-3 mt-3 rounded-b-xl border-t border-slate-800 bg-slate-900/95 px-3 py-2 backdrop-blur">
       <button
-        className="mt-3 rounded-full bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-full rounded-full bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
         disabled={errors.length > 0 || isBusy}
         onClick={handleSave}
         type="button"
       >
         Save as new version
       </button>
+      </div>
     </section>
   );
 }
