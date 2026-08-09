@@ -94,6 +94,7 @@ type LabSceneViewProps = {
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
+    rackOpenSlots: number[];
     rackSlotCount: number;
   };
   spatula: {

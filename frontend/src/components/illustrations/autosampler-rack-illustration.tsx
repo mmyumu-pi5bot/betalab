@@ -10,6 +10,8 @@ type AutosamplerRackIllustrationProps = {
   className?: string;
   occupiedSlotLiquids?: Partial<Record<number, BenchLiquidPortion[]>>;
   occupiedSlots?: number[];
+  /** Occupied positions whose vial is uncapped. Drawn as an open mouth. */
+  openSlots?: number[];
   slotCount?: number;
   testId?: string;
   tone?: "neutral" | "active";
@@ -40,6 +42,7 @@ export function AutosamplerRackIllustration({
   className,
   occupiedSlotLiquids,
   occupiedSlots = [],
+  openSlots = [],
   slotCount = 12,
   testId,
   tone = "neutral",
@@ -56,6 +59,7 @@ export function AutosamplerRackIllustration({
   const occupiedSet = new Set(
     occupiedSlots.filter((slotNumber) => Number.isInteger(slotNumber) && slotNumber >= 1),
   );
+  const openSet = new Set(openSlots);
   const slots = Array.from({ length: slotCount }, (_, index) => index + 1);
   const columns = Math.min(4, Math.max(slotCount, 1));
   const baseX = 182;
@@ -161,6 +165,7 @@ export function AutosamplerRackIllustration({
                   ? vialPalette.liquid
                   : palette.slot;
           const vialStroke = occupied ? vialPalette.stroke : palette.frame;
+          const isOpen = openSet.has(slotNumber);
 
           return (
             <g key={slotNumber}>
@@ -205,13 +210,18 @@ export function AutosamplerRackIllustration({
                 stroke={palette.slot}
                 strokeWidth="2.5"
               />
+              {/* An uncapped vial shows its open mouth instead of a cap, so a
+                  dozen positions can be read at a glance without any card. */}
               <circle
                 cx={cx}
                 cy={cy}
-                fill={occupied ? "url(#rack-cap)" : "#cbd5e1"}
+                data-testid={
+                  testId && occupied && isOpen ? `${testId}-slot-open-${slotNumber}` : undefined
+                }
+                fill={occupied ? (isOpen ? "#16242d" : "url(#rack-cap)") : "#cbd5e1"}
                 opacity={occupied ? 1 : 0.55}
                 r="12"
-                stroke={occupied ? "#3f4c56" : "#94a3b8"}
+                stroke={occupied ? (isOpen ? "#d97706" : "#3f4c56") : "#94a3b8"}
                 strokeWidth="2.5"
               />
               <circle

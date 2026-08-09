@@ -17,6 +17,7 @@ type RackWidgetProps = {
   loadedCount: number;
   occupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
   occupiedSlots: number[];
+  openSlots: number[];
   onItemDragEnd: () => void;
   onRackDragStart: (dataTransfer: DataTransfer) => void;
   onRackSlotDragOver: (event: DragEvent<HTMLDivElement>, rackSlot: RackSlot) => void;
@@ -40,6 +41,7 @@ export function RackWidget({
   loadedCount,
   occupiedSlotLiquids,
   occupiedSlots,
+  openSlots,
   onItemDragEnd,
   onRackDragStart,
   onRackSlotDragOver,
@@ -60,6 +62,7 @@ export function RackWidget({
             className="w-full"
             occupiedSlotLiquids={occupiedSlotLiquids}
             occupiedSlots={occupiedSlots}
+            openSlots={openSlots}
             slotCount={slotCount}
             testId="autosampler-rack-illustration"
             tone={loadedCount > 0 ? "active" : "neutral"}

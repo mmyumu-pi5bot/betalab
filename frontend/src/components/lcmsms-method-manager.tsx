@@ -97,6 +97,10 @@ export function LcMsMsMethodManager({
       setPreviewMethodId(saved.method.id);
       setCopyName("");
       setTab("edit");
+      // Duplicating is authoring, not browsing: the copy exists to be used, and
+      // leaving the sequence on the source method means editing one method and
+      // running another.
+      onMethodSelected(saved.method.id);
       onLibraryChanged();
     } catch (cause) {
       setFailure(cause instanceof Error ? cause.message : "Failed to duplicate the method.");

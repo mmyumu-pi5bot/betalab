@@ -84,7 +84,16 @@ def _deploy_instrument_and_rack(service: ExperimentRuntimeService, exp_id: str) 
             widget.is_present = True
 
 
+def _cap_rack_vials(service: ExperimentRuntimeService, exp_id: str) -> None:
+    """Cap every vial in the rack, as the technician must before loading it."""
+    exp = service._require_experiment(exp_id)
+    for slot in exp.rack.slots:
+        if slot.tool is not None:
+            slot.tool.is_sealed = True
+
+
 def _load_rack_into_instrument(service: ExperimentRuntimeService, exp_id: str) -> None:
+    _cap_rack_vials(service, exp_id)
     LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
 
 
@@ -341,6 +350,7 @@ class TestLoadRackIntoInstrument:
         _deploy_instrument_and_rack(service, exp_id)
         _place_vial_in_rack(service, exp_id)
 
+        _cap_rack_vials(service, exp_id)
         result = LoadRackIntoInstrumentService(service).run(
             exp_id,
             LoadRackIntoInstrumentRequest(),
@@ -1111,6 +1121,7 @@ def test_load_rack_route_marks_the_rack_as_loaded(monkeypatch) -> None:
     exp_id = _create(service)
     _deploy_instrument_and_rack(service, exp_id)
     _place_vial_in_rack(service, exp_id)
+    _cap_rack_vials(service, exp_id)
 
     response = lcmsms_routes.load_rack_into_instrument(exp_id)
 
@@ -1400,3 +1411,38 @@ class TestInjectionsConsumeTheVial:
         self._run(service, exp_id, volume_ul=5.0)
 
         assert self._vial_volume_ml(service, exp_id) == pytest.approx(0.04, abs=1e-9)
+
+
+class TestOpenVialsBlockLoading:
+    """Placing an uncapped vial is allowed; loading it into the autosampler is not."""
+
+    def _rack_with_open_vial(self, service: ExperimentRuntimeService) -> str:
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_vial_in_rack(service, exp_id)
+        return exp_id
+
+    def test_an_uncapped_vial_may_be_placed_in_the_rack(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = self._rack_with_open_vial(service)
+
+        vial = service._require_experiment(exp_id).rack.slots[0].tool
+        assert vial is not None and vial.is_sealed is False
+
+    def test_loading_names_the_positions_still_open(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = self._rack_with_open_vial(service)
+
+        with pytest.raises(ValueError, match="Position 1 still open"):
+            LoadRackIntoInstrumentService(service).run(
+                exp_id, LoadRackIntoInstrumentRequest()
+            )
+
+    def test_capping_the_vial_makes_the_rack_loadable(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = self._rack_with_open_vial(service)
+
+        _cap_rack_vials(service, exp_id)
+        LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
+
+        assert service._require_experiment(exp_id).rack.state == "loaded"

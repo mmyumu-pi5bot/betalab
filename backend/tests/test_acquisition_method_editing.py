@@ -303,6 +303,9 @@ class TestRunningWithAUserMethod:
             exp_id,
             PlaceToolInRackSlotRequest(rack_slot_id="rack_slot_1", tool_id="sample_vial_lcms"),
         )
+        for slot in service._require_experiment(exp_id).rack.slots:
+            if slot.tool is not None:
+                slot.tool.is_sealed = True
         LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
 
         RunSequenceService(service, method_resolver=methods.get_method).run(

@@ -162,6 +162,17 @@ describe("LcMsMsMethodManager", () => {
     await waitFor(() => expect(within(editor).getByLabelText("Method name")).toBeInTheDocument());
   });
 
+  it("hands the duplicate to the sequence, so the edit is what runs", async () => {
+    const { props } = renderManager();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Duplicate method" }));
+
+    // Editing one method while the sequence still runs another is the trap.
+    await waitFor(() =>
+      expect(props.onMethodSelected).toHaveBeenCalledWith("apple_pesticides_mrm_copy"),
+    );
+  });
+
   it("keeps an edited m/z through the whole duplicate-then-edit flow", async () => {
     renderManager();
 

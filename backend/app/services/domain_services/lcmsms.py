@@ -9,6 +9,7 @@ from app.domain.acquisition_methods import (
     AcquisitionMethod,
     snapshot_acquisition_method,
 )
+from app.domain.dnd_rules import can_tool_seal
 from app.domain.models import (
     CalibrationContext,
     Experiment,
@@ -372,6 +373,22 @@ class LoadRackIntoInstrumentService(WriteDomainService[LoadRackIntoInstrumentReq
             raise ValueError("The autosampler rack contains no vials.")
         if experiment.rack.state != "available":
             raise ValueError("The autosampler rack is already loaded into the LC-MS/MS.")
+
+        # Placing an uncapped vial in the rack is allowed — it is a real mistake a
+        # technician can make, and the rack shows it. The autosampler is where it
+        # stops: the needle pierces a septum, and an open vial would evaporate.
+        open_positions = [
+            slot.label
+            for slot in experiment.rack.slots
+            if slot.tool is not None
+            and can_tool_seal(slot.tool.tool_type)
+            and not slot.tool.is_sealed
+        ]
+        if open_positions:
+            raise ValueError(
+                "Close every vial before loading the rack: "
+                f"{', '.join(open_positions)} still open."
+            )
 
         experiment.rack.state = "loaded"
         experiment.audit_log.append("Autosampler rack loaded into the LC-MS/MS.")

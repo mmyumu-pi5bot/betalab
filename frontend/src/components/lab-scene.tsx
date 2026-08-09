@@ -516,6 +516,11 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
 
   const rackLoadedCount = rackSlots.filter((slot) => slot.tool).length;
   const rackOccupiedSlots = rackSlots.flatMap((slot, index) => (slot.tool ? [index + 1] : []));
+  // An uncapped vial in the autosampler is allowed but must be visible: the
+  // top-down rack shows its open mouth, and the instrument refuses the load.
+  const rackOpenSlots = rackSlots.flatMap((slot, index) =>
+    slot.tool && slot.tool.canSeal && !slot.tool.isSealed ? [index + 1] : [],
+  );
   const rackOccupiedSlotLiquids = Object.fromEntries(
     rackSlots.flatMap((slot, index) => (slot.tool ? [[index + 1, slot.tool.liquids] as const] : [])),
   );
@@ -591,6 +596,7 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         rackLoadedCount,
         rackOccupiedSlotLiquids,
         rackOccupiedSlots,
+    rackOpenSlots,
         rackSlotCount,
       }}
       spatula={{

@@ -100,6 +100,7 @@ type LabSceneWorkspaceCanvasProps = {
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
     rackOccupiedSlots: number[];
+    rackOpenSlots: number[];
     rackSlotCount: number;
   };
   spatula: {
@@ -605,6 +606,7 @@ export function LabSceneWorkspaceCanvas({
                   loadedCount={rack.rackLoadedCount}
                   occupiedSlotLiquids={rack.rackOccupiedSlotLiquids}
                   occupiedSlots={rack.rackOccupiedSlots}
+                  openSlots={rack.rackOpenSlots}
                   onItemDragEnd={dnd.clearDropTargets}
                   onRackDragStart={dnd.rack.handleRackDragStart}
                   onRackSlotDragOver={dnd.rack.handleRackSlotDragOver}
