@@ -26,11 +26,15 @@ feeds exactly one of them:
 from __future__ import annotations
 
 import random
-from math import ceil, exp
+from math import ceil, cos, exp, pi
 
 from app.domain.acquisition_methods import AcquisitionMethod, MrmTransition
 from app.domain.models import TraceAcquisitionMetadata, TransitionTrace
-from app.domain.mrm_reference import ReferenceTransition, find_reference_transition
+from app.domain.mrm_reference import (
+    MZ_MATCH_TOLERANCE,
+    ReferenceTransition,
+    find_reference_transition,
+)
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 #: Detector counts produced per unit of extract concentration.
@@ -47,6 +51,12 @@ QUALIFIER_RESPONSE_RATIO = 0.35
 #: fragment yield collapses. At one sigma the channel keeps ~61 % of its
 #: response, at three sigma ~1 %.
 FRAGMENTATION_CE_SIGMA_V = 8.0
+
+#: Half-width of the flat top of a quadrupole mass peak. Within it the filter
+#: passes everything, which is why MRM survives routine at all: instrument mass
+#: calibration wanders by about this much from day to day, and a method
+#: transferred between instruments must still quantify.
+MZ_PLATEAU_DA = 0.15
 
 #: Dead time between two channels while the quadrupoles settle on new masses.
 #: Real instruments pay a few milliseconds; it is what makes a method crowded
@@ -88,6 +98,31 @@ def _fragmentation_yield(declared: MrmTransition, reference: ReferenceTransition
     """
     drift = declared.collision_energy_v - reference.collision_energy_v
     return exp(-(drift * drift) / (2.0 * FRAGMENTATION_CE_SIGMA_V * FRAGMENTATION_CE_SIGMA_V))
+
+
+def _filter_transmission(offset_da: float) -> float:
+    """Fraction of an ion beam one quadrupole passes when set ``offset_da`` off.
+
+    A quadrupole is not a sieve with a threshold: it passes ions in a band around
+    the mass it is set to. At unit resolution that band is flat-topped rather
+    than pointed, so a small mis-set costs nothing, and the shoulder then falls
+    steeply to nothing by ``MZ_MATCH_TOLERANCE`` — where the addressing gate
+    gives up too, so the two can never disagree.
+    """
+    drift = abs(offset_da)
+    if drift <= MZ_PLATEAU_DA:
+        return 1.0
+    if drift >= MZ_MATCH_TOLERANCE:
+        return 0.0
+    shoulder = (drift - MZ_PLATEAU_DA) / (MZ_MATCH_TOLERANCE - MZ_PLATEAU_DA)
+    return 0.5 * (1.0 + cos(pi * shoulder))
+
+
+def _mass_transmission(declared: MrmTransition, reference: ReferenceTransition) -> float:
+    """Both quadrupoles filter in series, so their transmissions multiply."""
+    return _filter_transmission(
+        declared.q1_mz - reference.q1_mz
+    ) * _filter_transmission(declared.q3_mz - reference.q3_mz)
 
 
 def _is_within_retention_window(
@@ -219,6 +254,7 @@ def generate_transition_traces(
             response
             * _role_scale(reference)
             * _fragmentation_yield(transition, reference)
+            * _mass_transmission(transition, reference)
             * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT
             if reference is not None
             else 0.0

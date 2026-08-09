@@ -696,13 +696,34 @@ Aucun champ modifiable n'est décoratif. C'est la règle : un paramètre ne devi
 
 | Paramètre | Effet simulé |
 |---|---|
-| `Q1` / `Q3` | Adressage : décident du composé vu, ou d'aucun |
+| `Q1` / `Q3` | Adressage : décident du composé vu, ou d'aucun — puis transmission, qui décroît quand on s'écarte de la masse exacte |
 | Polarité | Adressage : mauvais mode d'ionisation ⇒ aucun ion |
 | Énergie de collision | Rendement de fragmentation, en cloche autour de la valeur optimisée |
 | Temps de rétention déclaré | Position de la fenêtre d'acquisition sur l'axe temps |
 | Fenêtre de rétention | Durée pendant laquelle le canal est écouté, et charge du cycle |
 | Dwell time | Temps passé par canal et par cycle ⇒ densité de points |
 | Durée du run | Longueur de la chromatographie ; un composé éluant après la fin n'est jamais vu |
+
+**Masses.** Un quadripôle n'est pas un tamis à seuil : il laisse passer les ions
+dans une bande autour de la masse consignée, et en résolution unitaire ce pic de
+masse est **à sommet plat** plutôt que pointu. Ce plateau n'est pas un détail de
+modélisation — c'est ce qui rend la MRM utilisable en routine, puisque la
+calibration en masse d'un appareil dérive d'environ un dixième de Dalton d'un
+jour à l'autre et qu'une méthode doit se transférer d'un instrument à l'autre.
+
+Au-delà du plateau, l'épaule chute jusqu'à zéro à `MZ_MATCH_TOLERANCE`, là où
+l'adressage renonce aussi : les deux ne peuvent donc jamais se contredire. Q1 et
+Q3 filtrant en série, leurs transmissions se multiplient.
+
+| Écart | Un filtre | Q1 et Q3 décalés |
+|---:|---:|---:|
+| 0,10 Da | 100 % | 100 % |
+| 0,20 Da | 95 % | 90 % |
+| 0,35 Da | 39 % | 15 % |
+| 0,50 Da | 0 % | 0 % |
+
+La méthode intégrée recopiant les masses de référence, elle est toujours sur le
+plateau.
 
 **Énergie de collision.** Le rendement suit une gaussienne centrée sur l'énergie
 à laquelle le canal de référence a été optimisé, d'écart-type

@@ -7,14 +7,22 @@ from dataclasses import replace
 import pytest
 
 from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1, MrmTransition
-from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID, MRM_REFERENCE_CATALOG
+from app.domain.mrm_reference import (
+    INTERNAL_STANDARD_COMPOUND_ID,
+    MRM_REFERENCE_CATALOG,
+    MZ_MATCH_TOLERANCE,
+    find_reference_transition,
+)
 from app.services.domain_services.mrm_signal import (
     BASELINE_COUNTS,
     FRAGMENTATION_CE_SIGMA_V,
     INTERSCAN_DELAY_MS,
     MAX_POINTS_PER_INJECTION,
+    MZ_PLATEAU_DA,
     QUALIFIER_RESPONSE_RATIO,
     RESPONSE_COUNTS_PER_CONCENTRATION_UNIT,
+    _filter_transmission,
+    _mass_transmission,
     acquisition_schedule,
     generate_transition_traces,
 )
@@ -431,3 +439,55 @@ class TestNoQuantificationLeaks:
             "calibration_curve",
         }
         assert forbidden.isdisjoint(vars(trace).keys())
+
+
+class TestMassTransmission:
+    """A quadrupole passes a band around its setting, not a single mass."""
+
+    def _height_at(self, q1_offset: float = 0.0, q3_offset: float = 0.0) -> float:
+        tuned = _transition("boscalid")
+        detuned = replace(
+            tuned,
+            q1_mz=round(tuned.q1_mz + q1_offset, 4),
+            q3_mz=round(tuned.q3_mz + q3_offset, 4),
+        )
+        traces = generate_transition_traces(
+            "inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng()
+        )
+        return _peak_height(traces[0])
+
+    def test_the_tuned_masses_pass_everything(self) -> None:
+        assert self._height_at() == pytest.approx(
+            5.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1
+        )
+
+    def test_a_small_mis_set_costs_nothing(self) -> None:
+        """The flat top is why a method survives calibration drift and transfer."""
+        assert self._height_at(q1_offset=0.1, q3_offset=0.1) == pytest.approx(
+            self._height_at(), rel=0.05
+        )
+
+    def test_response_falls_away_past_the_plateau(self) -> None:
+        full = self._height_at()
+        shoulder = self._height_at(q1_offset=0.35, q3_offset=0.35)
+
+        assert 0.05 * full < shoulder < 0.35 * full
+
+    def test_both_quadrupoles_filter_in_series(self) -> None:
+        one_filter = self._height_at(q1_offset=0.3)
+        both_filters = self._height_at(q1_offset=0.3, q3_offset=0.3)
+
+        assert both_filters < one_filter < self._height_at()
+
+    def test_the_curve_reaches_zero_where_addressing_gives_up(self) -> None:
+        assert _filter_transmission(MZ_MATCH_TOLERANCE) == 0.0
+        assert _filter_transmission(MZ_PLATEAU_DA) == 1.0
+
+    def test_the_built_in_method_is_never_penalised(self) -> None:
+        """It copies the reference masses verbatim, so it sits on the plateau."""
+        for transition in APPLE_PESTICIDES_MRM_V1.transitions:
+            reference = find_reference_transition(
+                transition.q1_mz, transition.q3_mz, transition.polarity
+            )
+            assert reference is not None
+            assert _mass_transmission(transition, reference) == 1.0
