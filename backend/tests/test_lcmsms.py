@@ -23,6 +23,10 @@ from app.domain.models import (
 )
 from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
 from app.main import app
+from app.services.domain_services.debug import (
+    CreateDebugToolPresetRequest,
+    CreateDebugToolPresetService,
+)
 from app.services.domain_services.lcmsms import (
     AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
@@ -1334,6 +1338,48 @@ class TestSampleResponseInvariants:
 
         assert set(responses) == {"boscalid", INTERNAL_STANDARD_COMPOUND_ID}
         assert all(isinstance(value, float) for value in responses.values())
+
+
+class TestDebugPreparedExtractVial:
+    """The debug prepared-extract vial must inject exactly like a hand-made one."""
+
+    def test_a_spawned_prepared_vial_injects_as_a_sample_with_real_peaks(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        CreateDebugToolPresetService(service).run(
+            exp_id,
+            CreateDebugToolPresetRequest(
+                preset_id="apple_extract_vial",
+                destination_kind="rack_slot",
+                destination_id="rack_slot_1",
+            ),
+        )
+        # No capping step: the preset lands in the rack ready to load, which is the
+        # whole point of dropping it there.
+        LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
+
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Debug apple extract",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="debug_apple_extract.mzML",
+                    )
+                ],
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        injection = instrument.sequence_runs[0].injections[0]
+        assert injection.status == "ok"
+        assert max(max(trace.intensities) for trace in injection.traces) > BASELINE_COUNTS * 3
 
 
 class TestInjectionsConsumeTheVial:

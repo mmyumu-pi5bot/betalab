@@ -121,7 +121,8 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
       pendingDropDraft.destinationKind
     ) {
       // Presets carry different draft fields (slurry tubes → mass/temperature, the
-      // calibration vial → level), so only forward the fields the draft actually holds.
+      // calibration vial → level, the prepared extract vial → its preparation
+      // quality), so only forward the fields the draft actually holds.
       const hasField = (fieldId: string) =>
         pendingDropDraft.fields.some((field) => field.id === fieldId);
       const payload: CreateDebugToolPresetPayload = {
@@ -137,6 +138,20 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
       }
       if (hasField("level_ng_per_ml")) {
         payload.level_ng_per_ml = getNumericFieldValue("level_ng_per_ml");
+      }
+      if (hasField("extract_volume_ml")) {
+        payload.extract_volume_ml = getNumericFieldValue("extract_volume_ml");
+      }
+      if (hasField("extraction_recovery_percent")) {
+        payload.extraction_recovery_percent = getNumericFieldValue(
+          "extraction_recovery_percent",
+        );
+      }
+      if (hasField("sampling_accuracy_percent")) {
+        payload.sampling_accuracy_percent = getNumericFieldValue("sampling_accuracy_percent");
+      }
+      if (hasField("istd_volume_ml")) {
+        payload.istd_volume_ml = getNumericFieldValue("istd_volume_ml");
       }
       void experimentApi.createDebugToolPreset(payload);
       setPendingDropDraft(null);

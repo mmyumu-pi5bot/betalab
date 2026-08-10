@@ -64,6 +64,10 @@ def create_debug_tool_preset(
                 produce_mass_g=request.produce_mass_g,
                 temperature_c=request.temperature_c,
                 level_ng_per_ml=request.level_ng_per_ml,
+                extract_volume_ml=request.extract_volume_ml,
+                extraction_recovery_percent=request.extraction_recovery_percent,
+                sampling_accuracy_percent=request.sampling_accuracy_percent,
+                istd_volume_ml=request.istd_volume_ml,
             ),
         )
     )

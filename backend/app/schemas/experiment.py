@@ -935,6 +935,10 @@ class DebugToolPresetSpawnSchema(BaseModel):
     produce_mass_g: float | None = None
     temperature_c: float | None = None
     level_ng_per_ml: float | None = None
+    extract_volume_ml: float | None = None
+    extraction_recovery_percent: float | None = None
+    sampling_accuracy_percent: float | None = None
+    istd_volume_ml: float | None = None
 
 
 class ReceivedBagPlacementSchema(BaseModel):

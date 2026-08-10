@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.dnd_rules import can_tool_seal
 from app.domain.models import (
     Experiment,
     ProduceFraction,
@@ -15,7 +16,10 @@ from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.gross_balance import GrossBalanceProduceLotTarget
-from app.services.domain_services.lcmsms import apply_calibration_standard
+from app.services.domain_services.lcmsms import (
+    apply_calibration_standard,
+    apply_prepared_extract,
+)
 from app.services.helpers.lookups import find_workbench_slot
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
 from app.services.helpers.tool_liquids import ACETONITRILE_ID
@@ -51,6 +55,18 @@ _CALIBRATION_PRESET_TOOL_IDS = {
 }
 _DEFAULT_CALIBRATION_LEVEL_NG_PER_ML = 100.0
 
+# Debug preset that spawns an autosampler vial already holding a finished apple
+# extract — the whole grind/extract/centrifuge/pipette chain skipped in one drop.
+# Its parameters describe the preparation the vial pretends to come from: how much
+# apple in how much solvent, and how well the prep went.
+_EXTRACT_VIAL_PRESET = "apple_extract_vial"
+_EXTRACT_VIAL_TOOL_ID = "sample_vial_lcms"
+_DEFAULT_EXTRACT_APPLE_MASS_G = 10.0
+_DEFAULT_EXTRACT_VOLUME_ML = 10.0
+_DEFAULT_EXTRACTION_RECOVERY_PERCENT = 92.0
+_DEFAULT_SAMPLING_ACCURACY_PERCENT = 100.0
+_DEFAULT_EXTRACT_ISTD_VOLUME_ML = 0.1
+
 
 @dataclass(frozen=True, slots=True)
 class CreateDebugProduceLotOnWorkbenchRequest:
@@ -78,6 +94,10 @@ class CreateDebugToolPresetRequest:
     produce_mass_g: float | None = None
     temperature_c: float | None = None
     level_ng_per_ml: float | None = None
+    extract_volume_ml: float | None = None
+    extraction_recovery_percent: float | None = None
+    sampling_accuracy_percent: float | None = None
+    istd_volume_ml: float | None = None
 
 
 class CreateDebugProduceLotOnWorkbenchService(WriteDomainService[CreateDebugProduceLotOnWorkbenchRequest]):
@@ -139,6 +159,9 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
     def _run(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
         if request.preset_id in _CALIBRATION_PRESETS:
             self._spawn_calibration_standard(experiment, request)
+            return
+        if request.preset_id == _EXTRACT_VIAL_PRESET:
+            self._spawn_prepared_extract_vial(experiment, request)
             return
         if request.preset_id not in _SLURRY_TUBE_PRESETS:
             raise ValueError("Unknown debug tool preset")
@@ -233,6 +256,71 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             DndObjectRef(kind=request.destination_kind, id=request.destination_id),
             source_label="Debug palette",
         )
+        _cap_vial_spawned_into_rack(container, request.destination_kind)
+
+    def _spawn_prepared_extract_vial(
+        self, experiment: Experiment, request: CreateDebugToolPresetRequest
+    ) -> None:
+        apply_kwargs = {
+            "sample_mass_g": _value_or_default(
+                request.produce_mass_g, _DEFAULT_EXTRACT_APPLE_MASS_G
+            ),
+            "extract_volume_ml": _value_or_default(
+                request.extract_volume_ml, _DEFAULT_EXTRACT_VOLUME_ML
+            ),
+            "extraction_recovery": _value_or_default(
+                request.extraction_recovery_percent, _DEFAULT_EXTRACTION_RECOVERY_PERCENT
+            )
+            / 100.0,
+            "sampling_accuracy": _value_or_default(
+                request.sampling_accuracy_percent, _DEFAULT_SAMPLING_ACCURACY_PERCENT
+            )
+            / 100.0,
+            "istd_volume_ml": _value_or_default(
+                request.istd_volume_ml, _DEFAULT_EXTRACT_ISTD_VOLUME_ML
+            ),
+        }
+
+        if request.destination_kind == "workbench_tool":
+            slot = find_workbench_slot(experiment.workbench, request.destination_id)
+            if slot.tool is None or slot.tool.tool_type != "sample_vial":
+                raise ValueError("A prepared extract requires an autosampler vial.")
+            if slot.tool.is_sealed:
+                raise ValueError(f"Open {slot.tool.label} before adding a prepared extract.")
+            vial = slot.tool
+            apply_prepared_extract(experiment, vial, **apply_kwargs)
+            experiment.audit_log.append(
+                f"Debug apple extract added to {vial.label} on {slot.label}."
+            )
+            return
+
+        vial = build_workbench_tool(_EXTRACT_VIAL_TOOL_ID)
+        apply_prepared_extract(experiment, vial, **apply_kwargs)
+        place_new_tool(
+            self._runtime,
+            experiment,
+            vial,
+            DndObjectRef(kind=request.destination_kind, id=request.destination_id),
+            source_label="Debug palette",
+        )
+        _cap_vial_spawned_into_rack(vial, request.destination_kind)
+
+
+def _value_or_default(value: float | None, default: float) -> float:
+    return value if value is not None else default
+
+
+def _cap_vial_spawned_into_rack(tool: WorkbenchTool, destination_kind: str) -> None:
+    """Close a debug vial that was dropped straight into the autosampler rack.
+
+    Capping is a bench action — a vial already in a rack slot has no way to be
+    closed — and the instrument refuses to load a rack holding an open vial. A
+    preset dropped into the rack stands for a finished preparation, so it arrives
+    capped and the rack loads. Anywhere else the vial is still work in progress
+    and keeps its cap off.
+    """
+    if destination_kind == "rack_slot" and can_tool_seal(tool.tool_type):
+        tool.is_sealed = True
 
 
 def _fill_tool_with_debug_slurry(

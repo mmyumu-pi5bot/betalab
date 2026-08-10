@@ -282,6 +282,10 @@ export type CreateDebugToolPresetPayload = {
   produce_mass_g?: number;
   temperature_c?: number;
   level_ng_per_ml?: number;
+  extract_volume_ml?: number;
+  extraction_recovery_percent?: number;
+  sampling_accuracy_percent?: number;
+  istd_volume_ml?: number;
 };
 
 export type PlaceToolOnVortexPayload = {

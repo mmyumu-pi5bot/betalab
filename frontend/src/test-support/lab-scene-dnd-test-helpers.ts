@@ -1053,6 +1053,46 @@ function createCalibrationVialPresetSourceCase(): DndSourceCase {
   };
 }
 
+function createPreparedExtractVialPresetSourceCase(): DndSourceCase {
+  // Spawn-only vial preset holding a finished apple extract. Being an autosampler vial,
+  // it shares the calibration vial's matrix exactly: the rack accepts it, the vortex and
+  // the grinder do not. Every compatible target spawns a prepared vial via the draft.
+  return {
+    id: "debug-palette-apple_extract_vial",
+    label: "debug palette prepared apple extract vial preset",
+    sourceTestId: "debug-palette-preset-apple_extract_vial",
+    openBasket: false,
+    openTrash: false,
+    expectRackWidget: true,
+    availableTargets: [
+      "bench-slot-station_1",
+      "bench-slot-station_2",
+      "grinder-dropzone",
+      "gross-balance-dropzone",
+      "analytical-balance-dropzone",
+      "rack-illustration-slot-1",
+      "vortex-dropzone",
+      "widget-workspace",
+      "trash-dropzone",
+    ],
+    buildExperiment: () =>
+      makeExperiment({
+        slots: makeSlots(),
+      }),
+    targetExpectations: {
+      "bench-slot-station_1": { compatible: true, command: null },
+      "bench-slot-station_2": { compatible: true, command: null },
+      "grinder-dropzone": { compatible: false, command: null },
+      "gross-balance-dropzone": { compatible: true, command: null },
+      "analytical-balance-dropzone": { compatible: true, command: null },
+      "rack-illustration-slot-1": { compatible: true, command: null },
+      "vortex-dropzone": { compatible: false, command: null },
+      "widget-workspace": { compatible: false, command: null },
+      "trash-dropzone": { compatible: true, command: null },
+    },
+  };
+}
+
 function createCalibrationTubePresetSourceCase(): DndSourceCase {
   // Spawn-only calibration stock tube. As a centrifuge tube it shares the slurry tubes'
   // matrix (rack rejects it, vortex accepts it); the user pipettes it into a rack vial
@@ -2303,6 +2343,7 @@ const baseDndSourceCases: DndSourceCase[] = [
   createDebugSlurryTubePresetSourceCase(),
   createVortexedSlurryTubePresetSourceCase(),
   createSeparatedSlurryTubePresetSourceCase(),
+  createPreparedExtractVialPresetSourceCase(),
   createCalibrationVialPresetSourceCase(),
   createCalibrationTubePresetSourceCase(),
   ...toolItems.map(createWorkbenchToolSourceCase),

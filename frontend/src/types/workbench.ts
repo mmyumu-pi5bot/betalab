@@ -97,7 +97,8 @@ export type DebugToolPresetId =
   | "vortexed_slurry_centrifuge_tube"
   | "separated_slurry_centrifuge_tube"
   | "calibration_standard_vial"
-  | "calibration_standard_tube";
+  | "calibration_standard_tube"
+  | "apple_extract_vial";
 
 export type ToolCatalogItem = ToolbarBaseItem & {
   canReceiveLiquids?: boolean;

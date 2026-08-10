@@ -178,10 +178,30 @@ export const debugCalibrationTubePreset: ToolCatalogItem = {
   ],
 };
 
+export const debugPreparedExtractVialPreset: ToolCatalogItem = {
+  id: "apple_extract_vial",
+  name: "Prepared apple vial",
+  subtitle: "Autosampler vial · apple extract",
+  description:
+    "Debug autosampler vial holding a finished apple extract — the whole grind, extraction and pipetting chain skipped. Drop it straight into the rack and inject.",
+  accent: "rose",
+  itemType: "tool",
+  toolType: "sample_vial",
+  capacity_ml: 2,
+  allowedDropTargets: [
+    "workbench_slot",
+    "rack_slot",
+    "trash_bin",
+    "gross_balance_widget",
+    "analytical_balance_widget",
+  ],
+};
+
 export const debugToolPresets: ToolCatalogItem[] = [
   debugSlurryTubePreset,
   debugVortexedSlurryTubePreset,
   debugSeparatedSlurryTubePreset,
+  debugPreparedExtractVialPreset,
   debugCalibrationVialPreset,
   debugCalibrationTubePreset,
 ];
@@ -216,9 +236,19 @@ const debugCalibrationPresetIds = new Set<DebugToolPresetId>([
 ]);
 
 // The debug palette renders each tool preset with a small preview of what it spawns.
-// Slurry tubes show an apple-slurry fill; calibration presets show a clear liquid
-// standard instead of produce.
+// Slurry tubes show an apple-slurry fill; the calibration and prepared-extract presets
+// show a clear liquid instead of produce, since both hold a solution only.
 export function getDebugToolPresetPreview(preset: ToolCatalogItem): DebugToolPresetPreview {
+  if (preset.id === debugPreparedExtractVialPreset.id) {
+    return {
+      accent: preset.accent,
+      containsSlurry: false,
+      detailLabel: "1 mL apple extract",
+      fillRatio: 0.55,
+      iconKind: preset.toolType,
+      produceLots: [],
+    };
+  }
   if (debugCalibrationPresetIds.has(preset.id as DebugToolPresetId)) {
     return {
       accent: preset.accent,
@@ -371,7 +401,75 @@ export function buildDebugCalibrationVialDraftFields(): DropDraftField[] {
   ];
 }
 
+// The prepared vial skips the bench, so the draft carries the preparation it pretends
+// to come from: how much apple went into how much solvent, and how well the prep went.
+// Recovery and sampling accuracy are the two factors a real prep draws at random —
+// pinning them here is what makes a debug vial reproducible.
+export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
+  return [
+    {
+      ariaLabel: "Debug extract apple mass",
+      id: "produce_mass_g",
+      inputStep: 0.1,
+      label: "Apple mass",
+      minValue: 0.1,
+      stepAmount: 1,
+      unitLabel: "g",
+      value: 10,
+      wheelStep: 1,
+    },
+    {
+      ariaLabel: "Debug extract solvent volume",
+      id: "extract_volume_ml",
+      inputStep: 0.1,
+      label: "Extract volume",
+      minValue: 0.1,
+      stepAmount: 1,
+      unitLabel: "mL",
+      value: 10,
+      wheelStep: 1,
+    },
+    {
+      ariaLabel: "Debug extraction recovery",
+      id: "extraction_recovery_percent",
+      inputStep: 1,
+      label: "Recovery",
+      minValue: 1,
+      presets: [60, 80, 92, 100],
+      stepAmount: 5,
+      unitLabel: "%",
+      value: 92,
+      wheelStep: 5,
+    },
+    {
+      ariaLabel: "Debug sampling accuracy",
+      id: "sampling_accuracy_percent",
+      inputStep: 1,
+      label: "Sampling accuracy",
+      minValue: 1,
+      presets: [70, 85, 100],
+      stepAmount: 5,
+      unitLabel: "%",
+      value: 100,
+      wheelStep: 5,
+    },
+    {
+      ariaLabel: "Debug extract ISTD volume",
+      id: "istd_volume_ml",
+      inputStep: 0.01,
+      label: "ISTD volume",
+      stepAmount: 0.05,
+      unitLabel: "mL",
+      value: 0.1,
+      wheelStep: 0.05,
+    },
+  ];
+}
+
 export function buildDebugToolPresetDraftFields(presetId: DebugToolPresetId): DropDraftField[] {
+  if (presetId === debugPreparedExtractVialPreset.id) {
+    return buildDebugPreparedExtractVialDraftFields();
+  }
   if (debugCalibrationPresetIds.has(presetId)) {
     return buildDebugCalibrationVialDraftFields();
   }

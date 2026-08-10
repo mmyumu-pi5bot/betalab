@@ -168,7 +168,11 @@ export function AutosamplerRackIllustration({
           const isOpen = openSet.has(slotNumber);
 
           return (
-            <g key={slotNumber}>
+            <g
+              data-seal-state={occupied ? (isOpen ? "open" : "sealed") : undefined}
+              data-testid={testId ? `${testId}-slot-${slotNumber}` : undefined}
+              key={slotNumber}
+            >
               {occupied && liquidSegments.length > 1 ? (
                 <defs>
                   <linearGradient
@@ -210,40 +214,101 @@ export function AutosamplerRackIllustration({
                 stroke={palette.slot}
                 strokeWidth="2.5"
               />
-              {/* An uncapped vial shows its open mouth instead of a cap, so a
-                  dozen positions can be read at a glance without any card. */}
-              <circle
-                cx={cx}
-                cy={cy}
-                data-testid={
-                  testId && occupied && isOpen ? `${testId}-slot-open-${slotNumber}` : undefined
-                }
-                fill={occupied ? (isOpen ? "#16242d" : "url(#rack-cap)") : "#cbd5e1"}
-                opacity={occupied ? 1 : 0.55}
-                r="12"
-                stroke={occupied ? (isOpen ? "#d97706" : "#3f4c56") : "#94a3b8"}
-                strokeWidth="2.5"
-              />
-              <circle
-                cx={cx}
-                cy={cy}
-                fill={occupied ? "url(#rack-glass)" : "#eef3f7"}
-                opacity={occupied ? 1 : 0.75}
-                r="7.5"
-                stroke={occupied ? vialStroke : "#a8b7c1"}
-                strokeWidth="2"
-              />
-              {occupied ? (
+              {/* Capped and uncapped are opposites, not variants: a cap really hides
+                  what is in the vial, so a closed position is a solid black disc and
+                  the contents survive only as a thin rim of their own colour. Open the
+                  vial and the cap is gone — the product itself fills the mouth. */}
+              {occupied && !isOpen ? (
                 <>
                   <circle
                     cx={cx}
                     cy={cy}
                     data-testid={testId ? `${testId}-slot-liquid-${slotNumber}` : undefined}
                     fill={slotLiquid}
-                    r="3.5"
+                    r="13.5"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    data-testid={testId ? `${testId}-slot-cap-${slotNumber}` : undefined}
+                    fill="#0b1220"
+                    r="11"
+                    stroke="#020617"
+                    strokeWidth="1.5"
+                  />
+                  {/* A sliver of light on the crimp, so the cap reads as a solid
+                      object rather than a hole punched in the rack. */}
+                  <path
+                    d={`M ${cx - 5.6} ${cy - 5.2} A 7.6 7.6 0 0 1 ${cx + 3.4} ${cy - 6.6}`}
+                    fill="none"
+                    opacity="0.5"
+                    stroke="#94a3b8"
+                    strokeLinecap="round"
+                    strokeWidth="1.6"
                   />
                 </>
-              ) : (
+              ) : null}
+              {occupied && isOpen ? (
+                <>
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    fill="#f8fafc"
+                    r="13.5"
+                    stroke={palette.slot}
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    data-testid={testId ? `${testId}-slot-liquid-${slotNumber}` : undefined}
+                    fill={slotLiquid}
+                    r="10"
+                    stroke={vialStroke}
+                    strokeWidth="1.5"
+                  />
+                  {/* Meniscus: the product is seen through the bare mouth, from above. */}
+                  <path
+                    d={`M ${cx - 6.2} ${cy - 3.6} A 8.2 8.2 0 0 1 ${cx + 1.8} ${cy - 7.4}`}
+                    fill="none"
+                    opacity="0.55"
+                    stroke="#ffffff"
+                    strokeLinecap="round"
+                    strokeWidth="1.8"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    data-testid={testId ? `${testId}-slot-open-${slotNumber}` : undefined}
+                    fill="none"
+                    r="14.6"
+                    stroke="#f59e0b"
+                    strokeDasharray="4.2 3.4"
+                    strokeLinecap="round"
+                    strokeWidth="2.4"
+                  />
+                </>
+              ) : null}
+              {occupied ? null : (
+                <>
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    fill="#cbd5e1"
+                    opacity="0.55"
+                    r="12"
+                    stroke="#94a3b8"
+                    strokeWidth="2.5"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    fill="#eef3f7"
+                    opacity="0.75"
+                    r="7.5"
+                    stroke="#a8b7c1"
+                    strokeWidth="2"
+                  />
                   <circle
                     cx={cx}
                     cy={cy}
@@ -252,6 +317,7 @@ export function AutosamplerRackIllustration({
                     opacity="0.6"
                     r="3.5"
                   />
+                </>
               )}
               <text
                 fill={palette.label}

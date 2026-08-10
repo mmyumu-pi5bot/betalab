@@ -107,6 +107,64 @@ describe("workspace equipment illustrations", () => {
     );
   });
 
+  it("hides the product under a black cap when closed and shows it when open", () => {
+    render(
+      <AutosamplerRackIllustration
+        occupiedSlotLiquids={{
+          1: [
+            {
+              accent: "rose",
+              id: "bench_liquid_1",
+              liquidId: "apple_extract",
+              name: "Apple extract",
+              volume_ml: 1,
+            },
+          ],
+          2: [
+            {
+              accent: "rose",
+              id: "bench_liquid_2",
+              liquidId: "apple_extract",
+              name: "Apple extract",
+              volume_ml: 1,
+            },
+          ],
+        }}
+        occupiedSlots={[1, 2]}
+        openSlots={[2]}
+        testId="autosampler-rack-illustration"
+      />,
+    );
+
+    // Position 1 is capped: a solid black disc covers the vial, and the product
+    // only survives as a rim peeking out from behind the cap.
+    expect(screen.getByTestId("autosampler-rack-illustration-slot-1")).toHaveAttribute(
+      "data-seal-state",
+      "sealed",
+    );
+    const cap = screen.getByTestId("autosampler-rack-illustration-slot-cap-1");
+    const cappedProduct = screen.getByTestId("autosampler-rack-illustration-slot-liquid-1");
+    expect(cap).toHaveAttribute("fill", "#0b1220");
+    expect(cappedProduct).toHaveAttribute("fill", "#fb7185");
+    expect(Number(cappedProduct.getAttribute("r"))).toBeGreaterThan(
+      Number(cap.getAttribute("r")),
+    );
+    expect(screen.queryByTestId("autosampler-rack-illustration-slot-open-1")).toBeNull();
+
+    // Position 2 is open: no cap at all, and the product fills the bare mouth.
+    expect(screen.getByTestId("autosampler-rack-illustration-slot-2")).toHaveAttribute(
+      "data-seal-state",
+      "open",
+    );
+    expect(screen.queryByTestId("autosampler-rack-illustration-slot-cap-2")).toBeNull();
+    const openProduct = screen.getByTestId("autosampler-rack-illustration-slot-liquid-2");
+    expect(openProduct).toHaveAttribute("fill", "#fb7185");
+    expect(Number(openProduct.getAttribute("r"))).toBeGreaterThanOrEqual(9);
+    const openMouth = screen.getByTestId("autosampler-rack-illustration-slot-open-2");
+    expect(openMouth).toHaveAttribute("stroke", "#f59e0b");
+    expect(openMouth.getAttribute("stroke-dasharray")).toBeTruthy();
+  });
+
   it("renders instrument state as data attributes", () => {
     render(
       <LcMsMsInstrumentIllustration

@@ -1265,6 +1265,10 @@ export async function createDebugToolPreset(
       ...optionalNumberBody(body, "produce_mass_g"),
       ...optionalNumberBody(body, "temperature_c"),
       ...optionalNumberBody(body, "level_ng_per_ml"),
+      ...optionalNumberBody(body, "extract_volume_ml"),
+      ...optionalNumberBody(body, "extraction_recovery_percent"),
+      ...optionalNumberBody(body, "sampling_accuracy_percent"),
+      ...optionalNumberBody(body, "istd_volume_ml"),
     },
   });
 }

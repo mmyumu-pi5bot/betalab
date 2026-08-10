@@ -267,6 +267,163 @@ def test_debug_calibration_tube_pipettes_into_a_recognized_calibration_vial() ->
     assert updated.pipette.calibration_context is None
 
 
+def test_debug_prepared_extract_vial_defaults_are_ready_to_inject() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="apple_extract_vial",
+            destination_kind="rack_slot",
+            destination_id="rack_slot_1",
+        ),
+    )
+
+    slot = next(slot for slot in updated.rack.slots if slot.id == "rack_slot_1")
+    vial = slot.tool
+    assert vial is not None
+    assert vial.tool_id == "sample_vial_lcms"
+    # The vial holds the 1 mL aliquot a pipetted prep would leave behind: extraction
+    # solvent plus the internal standard's share of the tube.
+    assert [liq.liquid_id for liq in vial.liquids] == ["acetonitrile_extraction", "istd_solution"]
+    assert vial.liquids[0].volume_ml == pytest.approx(1.0)
+    context = vial.injection_context
+    assert context is not None
+    # 10 g of apple in 10 mL of solvent, of which 1 mL reached the vial.
+    assert context.sample_mass_g == pytest.approx(1.0)
+    assert context.extract_volume_ml == pytest.approx(1.0)
+    assert context.istd_volume_ml == pytest.approx(0.01)
+    assert context.effective_residues_ug_per_kg
+    result = context.extraction_result
+    assert result is not None
+    assert result.extraction_manip_factor == pytest.approx(0.92)
+    assert result.istd_manip_factor == pytest.approx(0.92)
+    assert result.sampling_representativeness == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("preset_id", ["apple_extract_vial", "calibration_standard_vial"])
+def test_debug_vial_dropped_straight_into_the_rack_arrives_capped(preset_id: str) -> None:
+    """A vial spawned in the rack is a finished preparation, so it arrives closed.
+
+    Capping is a bench action: a vial already sitting in the rack cannot be closed
+    from there. An open one would therefore block the rack from ever being loaded.
+    """
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id=preset_id,
+            destination_kind="rack_slot",
+            destination_id="rack_slot_1",
+        ),
+    )
+
+    slot = next(slot for slot in updated.rack.slots if slot.id == "rack_slot_1")
+    assert slot.tool is not None
+    assert slot.tool.is_sealed is True
+
+
+@pytest.mark.parametrize("preset_id", ["apple_extract_vial", "calibration_standard_vial"])
+def test_debug_vial_spawned_on_the_bench_stays_open(preset_id: str) -> None:
+    """On the bench the vial is still being worked on, so it keeps its cap off."""
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id=preset_id,
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+        ),
+    )
+
+    vial = updated.workbench.slots[0].tool
+    assert vial is not None
+    assert vial.is_sealed is False
+
+
+def test_debug_prepared_extract_vial_honors_preparation_quality_parameters() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    updated = CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="apple_extract_vial",
+            destination_kind="workbench_slot",
+            destination_id="station_1",
+            produce_mass_g=20.0,
+            extract_volume_ml=5.0,
+            extraction_recovery_percent=60.0,
+            sampling_accuracy_percent=80.0,
+            istd_volume_ml=0.0,
+        ),
+    )
+
+    vial = updated.workbench.slots[0].tool
+    assert vial is not None
+    context = vial.injection_context
+    assert context is not None
+    # 20 g in 5 mL, 1 mL poured: a fifth of the extract reaches the vial.
+    assert context.sample_mass_g == pytest.approx(4.0)
+    assert context.extract_volume_ml == pytest.approx(1.0)
+    result = context.extraction_result
+    assert result is not None
+    assert result.extraction_manip_factor == pytest.approx(0.60)
+    assert result.sampling_representativeness == pytest.approx(0.80)
+    # No internal standard was added, so no ISTD channel can be corrected against.
+    assert context.istd_volume_ml is None
+    assert result.istd_manip_factor is None
+    assert [liq.liquid_id for liq in vial.liquids] == ["acetonitrile_extraction"]
+
+
+def test_debug_prepared_extract_vial_rejects_a_vial_that_already_holds_an_extract() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id="sample_vial_lcms"),
+    )
+    CreateDebugToolPresetService(service).run(
+        experiment.id,
+        CreateDebugToolPresetRequest(
+            preset_id="apple_extract_vial",
+            destination_kind="workbench_tool",
+            destination_id="station_1",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="already contains a sample extract"):
+        CreateDebugToolPresetService(service).run(
+            experiment.id,
+            CreateDebugToolPresetRequest(
+                preset_id="apple_extract_vial",
+                destination_kind="workbench_tool",
+                destination_id="station_1",
+            ),
+        )
+
+
+def test_debug_prepared_extract_vial_rejects_a_non_positive_apple_mass() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    with pytest.raises(ValueError, match="Apple mass must be greater than zero"):
+        CreateDebugToolPresetService(service).run(
+            experiment.id,
+            CreateDebugToolPresetRequest(
+                preset_id="apple_extract_vial",
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+                produce_mass_g=0.0,
+            ),
+        )
+
+
 def test_debug_unknown_tool_preset_is_rejected() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()

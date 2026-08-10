@@ -986,6 +986,45 @@ describe("LabScene", () => {
     );
   });
 
+  it("configures and spawns a prepared apple vial at the chosen preparation quality", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const preset = await screen.findByTestId("debug-palette-preset-apple_extract_vial");
+    expect(preset).toHaveTextContent("Prepared apple vial");
+
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(preset, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+
+    expect(await screen.findByText("Configure Prepared apple vial")).toBeInTheDocument();
+    expect(screen.getByLabelText("Debug extract apple mass")).toHaveValue(10);
+    expect(screen.getByLabelText("Debug extract solvent volume")).toHaveValue(10);
+    expect(screen.getByLabelText("Debug sampling accuracy")).toHaveValue(100);
+    fireEvent.change(screen.getByLabelText("Debug extraction recovery"), {
+      target: { value: "60" },
+    });
+    fireEvent.click(screen.getByText("Spawn"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "create_debug_tool_preset",
+      {
+        destination_id: "station_1",
+        destination_kind: "workbench_slot",
+        preset_id: "apple_extract_vial",
+        produce_mass_g: 10,
+        extract_volume_ml: 10,
+        extraction_recovery_percent: 60,
+        sampling_accuracy_percent: 100,
+        istd_volume_ml: 0.1,
+      },
+    );
+  });
+
   it("configures and spawns a calibration point vial at the chosen level", async () => {
     vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
     vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());

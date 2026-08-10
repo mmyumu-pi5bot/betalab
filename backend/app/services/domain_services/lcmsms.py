@@ -17,6 +17,7 @@ from app.domain.models import (
     InjectionMeasurement,
     ProduceLot,
     ProduceMaterialState,
+    QuechersExtractionResult,
     RackSlot,
     SequenceRun,
     WorkbenchTool,
@@ -26,6 +27,7 @@ from app.domain.mrm_reference import (
     INTERNAL_STANDARD_COMPOUND_ID,
     reference_transitions_for,
 )
+from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.acquisition_method_service import acquisition_method_service
 from app.services.domain_services.acquisition_clock import (
     is_sequence_complete,
@@ -43,6 +45,8 @@ ACETONITRILE_ID = "acetonitrile_extraction"
 APPLE_EXTRACT_ID = "apple_extract"
 ISTD_REFERENCE_CONC_NG_PER_ML = 100.0
 CALIBRATION_STANDARD_VOLUME_ML = 1.0
+#: Aliquot a technician pipettes from a separated extract into an autosampler vial.
+PREPARED_EXTRACT_ALIQUOT_ML = 1.0
 ENV_NOISE_SIGMA = 0.005  # 0.5% environmental noise per measurement
 #: Volume the autosampler needle cannot reach at the bottom of a vial. A vial is
 #: never emptied to the last drop, so a sequence must leave this much behind.
@@ -675,6 +679,77 @@ def apply_calibration_standard(
         vial,
         liquid_id="calibration_solution",
         volume_ml=CALIBRATION_STANDARD_VOLUME_ML,
+    )
+
+
+def apply_prepared_extract(
+    experiment: Experiment,
+    vial: WorkbenchTool,
+    *,
+    sample_mass_g: float,
+    extract_volume_ml: float,
+    extraction_recovery: float,
+    sampling_accuracy: float,
+    istd_volume_ml: float,
+) -> None:
+    """Fill ``vial`` with a finished apple extract, skipping the whole QuEChERS prep.
+
+    Leaves exactly what the manual path leaves behind once a supernatant has been
+    pipetted into a vial: a ``PREPARED_EXTRACT_ALIQUOT_ML`` aliquot of the tube's
+    extract, its share of the internal standard, and the injection context carrying
+    the residues and the extraction variance. ``sample_mass_g`` and
+    ``extract_volume_ml`` describe the *tube* the aliquot was taken from, so the
+    dilution behaves like the real one.
+
+    The factors a real prep draws at random — extraction recovery and how well the
+    weighed aliquot represented the lot — are supplied by the caller instead, so a
+    debug vial injects reproducibly at a chosen preparation quality.
+    """
+    if sample_mass_g <= 0:
+        raise ValueError("Apple mass must be greater than zero.")
+    if extract_volume_ml <= 0:
+        raise ValueError("Extract volume must be greater than zero.")
+    if extraction_recovery <= 0:
+        raise ValueError("Extraction recovery must be greater than zero.")
+    if sampling_accuracy <= 0:
+        raise ValueError("Sampling accuracy must be greater than zero.")
+    if istd_volume_ml < 0:
+        raise ValueError("ISTD volume cannot be negative.")
+    if vial.calibration_context is not None:
+        raise ValueError(f"{vial.label} already contains a calibration standard.")
+    if vial.injection_context is not None:
+        raise ValueError(f"{vial.label} already contains a sample extract.")
+
+    # The aliquot cannot be larger than the extract it is taken from.
+    aliquot_ml = min(PREPARED_EXTRACT_ALIQUOT_ML, extract_volume_ml)
+    volume_ratio = aliquot_ml / extract_volume_ml
+    vial_istd_volume_ml = round(istd_volume_ml * volume_ratio, 6)
+
+    add_liquid_to_tool(experiment, vial, liquid_id=ACETONITRILE_ID, volume_ml=aliquot_ml)
+    if vial_istd_volume_ml > 0:
+        add_liquid_to_tool(
+            experiment, vial, liquid_id=ISTD_SOLUTION_ID, volume_ml=vial_istd_volume_ml
+        )
+
+    recovery = round(extraction_recovery, 4)
+    vial.injection_context = InjectionContext(
+        source_tube_id=new_id("debug_tube"),
+        sample_mass_g=round(sample_mass_g * volume_ratio, 4),
+        sample_true_mass_g=round(sample_mass_g * volume_ratio, 6),
+        extract_volume_ml=round(aliquot_ml, 3),
+        extract_true_volume_ml=round(aliquot_ml, 6),
+        effective_residues_ug_per_kg=generate_pesticide_residues("apple"),
+        extraction_result=QuechersExtractionResult(
+            extraction_manip_factor=recovery,
+            # The standard was added before the solvent, so it shares the tube's
+            # single recovery draw and the ratio can correct against it.
+            istd_manip_factor=recovery if vial_istd_volume_ml > 0 else None,
+            istd_phase="pre_solvent" if vial_istd_volume_ml > 0 else None,
+            sampling_representativeness=round(sampling_accuracy, 4),
+        ),
+        istd_volume_ml=round(vial_istd_volume_ml, 4) if vial_istd_volume_ml > 0 else None,
+        istd_true_volume_ml=vial_istd_volume_ml if vial_istd_volume_ml > 0 else None,
+        istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
     )
 
 
