@@ -5280,11 +5280,11 @@ describe("LabScene", () => {
       "data-status",
       "idle",
     );
-    expect(screen.getByTestId("autosampler-rack-drag-handle")).toHaveAttribute(
+    expect(screen.getByTestId("autosampler-rack-drag-edge-top")).toHaveAttribute(
       "draggable",
       "true",
     );
-    expect(screen.getByText("Drag rack into LC-MS/MS")).toBeInTheDocument();
+    expect(screen.queryByTestId("rack-load-status")).not.toBeInTheDocument();
   });
 
   it("tares the analytical balance from its button", async () => {
@@ -5778,7 +5778,7 @@ describe("LabScene", () => {
       await screen.findByRole("button", { name: "Open acquisition console" }),
     ).toBeDisabled();
     const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId("autosampler-rack-drag-handle"), {
+    fireEvent.dragStart(screen.getByTestId("autosampler-rack-drag-edge-top"), {
       dataTransfer,
     });
     const instrumentDropzone = screen.getByTestId("lcmsms-instrument-dropzone");
@@ -5830,8 +5830,12 @@ describe("LabScene", () => {
       {},
     );
     await waitFor(() => {
-      expect(screen.getByText("Drag rack into LC-MS/MS")).toBeInTheDocument();
+      expect(screen.queryByTestId("rack-load-status")).not.toBeInTheDocument();
     });
+    expect(screen.getByTestId("autosampler-rack-drag-edge-top")).toHaveAttribute(
+      "draggable",
+      "true",
+    );
     expect(screen.getByTestId("rack-illustration-slot-1")).toHaveAttribute(
       "draggable",
       "true",

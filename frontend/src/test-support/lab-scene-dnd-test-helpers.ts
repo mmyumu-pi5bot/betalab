@@ -1273,7 +1273,7 @@ function createAutosamplerRackSourceCase(): DndSourceCase {
   return {
     id: "autosampler-rack",
     label: "autosampler rack",
-    sourceTestId: "autosampler-rack-drag-handle",
+    sourceTestId: "autosampler-rack-drag-edge-top",
     openBasket: false,
     openTrash: false,
     expectRackWidget: true,

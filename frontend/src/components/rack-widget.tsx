@@ -1,10 +1,14 @@
 "use client";
 
-import type { DragEvent, ReactNode } from "react";
+import { useRef, type DragEvent, type ReactNode } from "react";
 
 import { AutosamplerRackIllustration } from "@/components/illustrations/autosampler-rack-illustration";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
+import {
+  getRackIllustrationGrabEdges,
+  getRackIllustrationPlateOutline,
+} from "@/lib/lab-scene-config";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
 
 type RackWidgetProps = {
@@ -50,6 +54,30 @@ export function RackWidget({
   rackSlots,
   slotCount,
 }: RackWidgetProps) {
+  const isRackDraggable = !dndDisabled && !isCommandPending;
+  const rackIllustrationRef = useRef<HTMLDivElement | null>(null);
+
+  function handleRackGrabDragStart(event: DragEvent<HTMLDivElement>) {
+    if (!isRackDraggable) {
+      return;
+    }
+
+    // The grabbed band is a bare hit area, so the browser would drag a sliver of
+    // the rack around. Carry the whole illustration instead, held where it was
+    // grabbed.
+    const rackIllustration = rackIllustrationRef.current;
+    if (rackIllustration && typeof event.dataTransfer.setDragImage === "function") {
+      const bounds = rackIllustration.getBoundingClientRect();
+      event.dataTransfer.setDragImage(
+        rackIllustration,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+      );
+    }
+
+    onRackDragStart(event.dataTransfer);
+  }
+
   return (
     <WorkspaceEquipmentWidget
       bodyClassName="px-4 py-4 xl:px-5 xl:py-5"
@@ -57,7 +85,7 @@ export function RackWidget({
       headerAction={headerAction}
     >
       <div className="space-y-3">
-        <div className="relative mx-auto max-w-[25.75rem]">
+        <div className="relative mx-auto max-w-[25.75rem]" ref={rackIllustrationRef}>
           <AutosamplerRackIllustration
             className="w-full"
             occupiedSlotLiquids={occupiedSlotLiquids}
@@ -67,6 +95,32 @@ export function RackWidget({
             testId="autosampler-rack-illustration"
             tone={loadedCount > 0 ? "active" : "neutral"}
           />
+          {/* The rack is picked up by its own contours rather than by a separate
+              handle: four bands hugging the edges of the plate, laid out to stop
+              short of the slots so grabbing the rack never steals a vial drag. */}
+          <div className="group pointer-events-none absolute inset-0">
+            <div
+              className={`absolute rounded-[1.5rem] opacity-0 ring-2 ring-sky-300/80 transition-opacity ${
+                isRackDraggable ? "group-hover:opacity-100" : ""
+              }`}
+              data-testid="autosampler-rack-drag-outline"
+              style={getRackIllustrationPlateOutline()}
+            />
+            {getRackIllustrationGrabEdges().map((edge) => (
+              <div
+                className={`pointer-events-auto absolute ${
+                  isRackDraggable ? dragAffordanceClassName : ""
+                }`}
+                data-testid={`autosampler-rack-drag-edge-${edge.id}`}
+                draggable={isRackDraggable}
+                key={edge.id}
+                onDragEnd={onItemDragEnd}
+                onDragStart={handleRackGrabDragStart}
+                style={edge.style}
+                title={isRackDraggable ? "Drag the rack into the LC-MS/MS" : undefined}
+              />
+            ))}
+          </div>
           {rackSlots.map((rackSlot, slotIndex) => {
             const position = getSlotPosition(slotIndex);
             const tool = rackSlot.tool;
@@ -143,27 +197,14 @@ export function RackWidget({
             <p className="text-sm text-slate-500">No vial staged yet.</p>
           )}
         </div>
-        <div
-          aria-disabled={dndDisabled || isCommandPending}
-          className={`mx-auto flex w-full max-w-[25.75rem] items-center justify-center rounded-[1rem] border border-dashed px-4 py-2.5 text-xs font-semibold transition-colors ${
-            dndDisabled || isCommandPending
-              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-              : `${dragAffordanceClassName} border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100`
-          }`}
-          data-testid="autosampler-rack-drag-handle"
-          draggable={!dndDisabled && !isCommandPending}
-          onDragEnd={onItemDragEnd}
-          onDragStart={(event) => {
-            if (dndDisabled || isCommandPending) {
-              return;
-            }
-            onRackDragStart(event.dataTransfer);
-          }}
-        >
-          {isLoadedIntoInstrument
-            ? "Rack loaded in LC-MS/MS"
-            : "Drag rack into LC-MS/MS"}
-        </div>
+        {isLoadedIntoInstrument ? (
+          <p
+            className="text-center text-xs font-semibold text-slate-500"
+            data-testid="rack-load-status"
+          >
+            Rack loaded in LC-MS/MS
+          </p>
+        ) : null}
       </div>
     </WorkspaceEquipmentWidget>
   );

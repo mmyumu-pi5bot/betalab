@@ -35,6 +35,9 @@ function normalizeDragSourceTestId(testId: string): string {
   if (testId.startsWith("bench-surface-produce-lot-")) {
     return "workbench-surface-produce-lot";
   }
+  if (testId.startsWith("autosampler-rack-drag-edge-")) {
+    return "autosampler-rack";
+  }
   if (testId.startsWith("rack-illustration-slot-")) {
     return "rack-tool";
   }

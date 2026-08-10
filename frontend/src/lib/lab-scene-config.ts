@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import type { DebugProducePreset } from "@/components/debug-produce-palette";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type { WidgetLayout } from "@/hooks/use-workspace-layout";
@@ -277,6 +279,23 @@ const rackIllustrationViewBox = { height: 290, width: 480 };
 const rackIllustrationBase = { x: 142, y: 91 };
 const rackIllustrationGap = { x: 61, y: 49 };
 const rackIllustrationColumns = Math.min(4, Math.max(rackSlotCount, 1));
+const rackIllustrationRows = Math.ceil(rackSlotCount / rackIllustrationColumns);
+/** The rack plate drawn by the illustration, in view-box units offset to the box origin. */
+const rackIllustrationPlate = { height: 188, width: 328, x: 76, y: 48 };
+/**
+ * Half a slot drop zone (36 px in RackWidget) plus a gap. The bands used to grab the
+ * rack stop this far short of the slots, so grabbing the rack never competes with the
+ * vials dropped into it.
+ */
+const rackIllustrationSlotClearancePx = 22;
+
+function rackIllustrationWidthPercent(viewBoxX: number) {
+  return (viewBoxX / rackIllustrationViewBox.width) * 100;
+}
+
+function rackIllustrationHeightPercent(viewBoxY: number) {
+  return (viewBoxY / rackIllustrationViewBox.height) * 100;
+}
 
 const toolTareMassByType: Record<ToolType, number> = {
   volumetric_flask: 140,
@@ -299,8 +318,47 @@ export function getRackIllustrationSlotPosition(slotIndex: number) {
   const row = Math.floor(slotIndex / rackIllustrationColumns);
 
   return {
-    left: `${(rackIllustrationBase.x + column * rackIllustrationGap.x) / rackIllustrationViewBox.width * 100}%`,
-    top: `${(rackIllustrationBase.y + row * rackIllustrationGap.y) / rackIllustrationViewBox.height * 100}%`,
+    left: `${rackIllustrationWidthPercent(rackIllustrationBase.x + column * rackIllustrationGap.x)}%`,
+    top: `${rackIllustrationHeightPercent(rackIllustrationBase.y + row * rackIllustrationGap.y)}%`,
+  };
+}
+
+export type RackIllustrationGrabEdge = {
+  id: "top" | "bottom" | "left" | "right";
+  style: CSSProperties;
+};
+
+/**
+ * The four bands hugging the rack contours, by which the whole rack is dragged.
+ * They run along the edges of the illustration and stop before the slot grid, so
+ * every band is free of the slot drop zones at any widget width.
+ */
+export function getRackIllustrationGrabEdges(): RackIllustrationGrabEdge[] {
+  const clearance = `${rackIllustrationSlotClearancePx}px`;
+  const firstColumn = rackIllustrationWidthPercent(rackIllustrationBase.x);
+  const lastColumn = rackIllustrationWidthPercent(
+    rackIllustrationBase.x + (rackIllustrationColumns - 1) * rackIllustrationGap.x,
+  );
+  const firstRow = rackIllustrationHeightPercent(rackIllustrationBase.y);
+  const lastRow = rackIllustrationHeightPercent(
+    rackIllustrationBase.y + (rackIllustrationRows - 1) * rackIllustrationGap.y,
+  );
+
+  return [
+    { id: "top", style: { height: `calc(${firstRow}% - ${clearance})`, left: 0, right: 0, top: 0 } },
+    { id: "bottom", style: { bottom: 0, left: 0, right: 0, top: `calc(${lastRow}% + ${clearance})` } },
+    { id: "left", style: { bottom: 0, left: 0, top: 0, width: `calc(${firstColumn}% - ${clearance})` } },
+    { id: "right", style: { bottom: 0, left: `calc(${lastColumn}% + ${clearance})`, right: 0, top: 0 } },
+  ];
+}
+
+/** The rack plate itself, used to outline what the grab bands are about to pick up. */
+export function getRackIllustrationPlateOutline(): CSSProperties {
+  return {
+    height: `${rackIllustrationHeightPercent(rackIllustrationPlate.height)}%`,
+    left: `${rackIllustrationWidthPercent(rackIllustrationPlate.x)}%`,
+    top: `${rackIllustrationHeightPercent(rackIllustrationPlate.y)}%`,
+    width: `${rackIllustrationWidthPercent(rackIllustrationPlate.width)}%`,
   };
 }
 
