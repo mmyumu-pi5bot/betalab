@@ -4,9 +4,14 @@ type ExperimentPageProps = {
   params: Promise<{
     experimentId: string;
   }>;
+  searchParams: Promise<{
+    tutorial?: string | string[];
+  }>;
 };
 
-export default async function ExperimentPage({ params }: ExperimentPageProps) {
+export default async function ExperimentPage({ params, searchParams }: ExperimentPageProps) {
   const { experimentId } = await params;
-  return <LabScene experimentId={experimentId} />;
+  const { tutorial } = await searchParams;
+  const tutorialId = Array.isArray(tutorial) ? tutorial[0] : tutorial;
+  return <LabScene experimentId={experimentId} tutorialId={tutorialId} />;
 }

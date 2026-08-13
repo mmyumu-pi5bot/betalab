@@ -83,6 +83,7 @@ export function FloatingWidget({
   return (
     <div
       className="absolute"
+      data-tutorial-anchor={`widget-${id}`}
       data-workspace-drop-exclude="true"
       data-testid={`widget-${id}`}
       onMouseDown={handleMouseDown}

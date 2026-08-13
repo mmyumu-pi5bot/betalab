@@ -433,6 +433,7 @@ export function LabSceneWorkspaceCanvas({
         }`}
         data-drop-highlighted={dnd.isDropTargetHighlighted("workspace_canvas") ? "true" : "false"}
         data-testid="widget-workspace"
+        data-tutorial-anchor="workspace"
         onDragOverCapture={workspace.handleWorkspaceDragOver}
         onDropCapture={workspace.handleWorkspaceDrop}
         ref={workspace.workspaceRef}

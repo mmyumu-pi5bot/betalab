@@ -4,6 +4,13 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createExperiment, deleteExperiment, listExperiments } from "@/lib/api";
+import { CALIBRATION_SAMPLE_TUTORIAL_ID } from "@/lib/tutorial-engine";
+import {
+  clearTutorialSession,
+  getTutorialSession,
+  saveTutorialSession,
+  type TutorialSession,
+} from "@/lib/tutorial-session-store";
 import type { ExperimentListEntry } from "@/types/experiment";
 
 function formatSessionDate(value: string) {
@@ -28,6 +35,7 @@ export function ExperimentsHome() {
   const [isCreating, startCreateTransition] = useTransition();
   const [deletingExperimentId, setDeletingExperimentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [tutorialSession, setTutorialSession] = useState<TutorialSession | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -42,6 +50,16 @@ export function ExperimentsHome() {
           return;
         }
         setExperiments(savedExperiments);
+        const savedTutorial = getTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID);
+        if (
+          savedTutorial &&
+          savedExperiments.some((experiment) => experiment.id === savedTutorial.experimentId)
+        ) {
+          setTutorialSession(savedTutorial);
+        } else {
+          clearTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID);
+          setTutorialSession(null);
+        }
       } catch (error) {
         if (!isMounted) {
           return;
@@ -76,6 +94,41 @@ export function ExperimentsHome() {
     });
   };
 
+  const handleOpenTutorial = () => {
+    if (tutorialSession) {
+      const activeSession = saveTutorialSession({
+        tutorialId: CALIBRATION_SAMPLE_TUTORIAL_ID,
+        experimentId: tutorialSession.experimentId,
+        status: "active",
+      });
+      setTutorialSession(activeSession);
+      router.push(
+        `/experiments/${activeSession.experimentId}?tutorial=${CALIBRATION_SAMPLE_TUTORIAL_ID}`,
+      );
+      return;
+    }
+
+    startCreateTransition(async () => {
+      setErrorMessage(null);
+      try {
+        const experiment = await createExperiment();
+        const session = saveTutorialSession({
+          tutorialId: CALIBRATION_SAMPLE_TUTORIAL_ID,
+          experimentId: experiment.id,
+          status: "active",
+        });
+        setTutorialSession(session);
+        router.push(
+          `/experiments/${experiment.id}?tutorial=${CALIBRATION_SAMPLE_TUTORIAL_ID}`,
+        );
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to create tutorial experiment",
+        );
+      }
+    });
+  };
+
   const handleDeleteExperiment = async (experimentId: string) => {
     setDeletingExperimentId(experimentId);
     setErrorMessage(null);
@@ -83,6 +136,10 @@ export function ExperimentsHome() {
     try {
       await deleteExperiment(experimentId);
       setExperiments((current) => current.filter((entry) => entry.id !== experimentId));
+      if (tutorialSession?.experimentId === experimentId) {
+        clearTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID);
+        setTutorialSession(null);
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to delete experiment",
@@ -109,14 +166,31 @@ export function ExperimentsHome() {
                 whole setup by hand.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleCreateExperiment}
-              disabled={isCreating}
-              className="rounded-full bg-stone-950 px-5 py-3 text-sm font-medium text-stone-50 transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70"
-            >
-              {isCreating ? "Creating..." : "New experiment"}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCreateExperiment}
+                disabled={isCreating}
+                className="rounded-full bg-stone-950 px-5 py-3 text-sm font-medium text-stone-50 transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70"
+              >
+                {isCreating ? "Creating..." : "New experiment"}
+              </button>
+              <button
+                aria-label={
+                  tutorialSession ? "Continue guided tutorial" : "New tutorial"
+                }
+                className="rounded-full border border-sky-300 bg-sky-50 px-5 py-3 text-sm font-semibold text-sky-800 transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-70"
+                disabled={isCreating}
+                onClick={handleOpenTutorial}
+                type="button"
+              >
+                {isCreating
+                  ? "Creating..."
+                  : tutorialSession
+                    ? "Continue tutorial"
+                    : "New tutorial"}
+              </button>
+            </div>
           </div>
           {errorMessage ? (
             <p className="mt-4 rounded-2xl bg-rose-100 px-4 py-3 text-sm text-rose-800">
@@ -143,11 +217,18 @@ export function ExperimentsHome() {
             </div>
           ) : (
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {experiments.map((experiment) => (
-                <article
-                  key={experiment.id}
-                  className="group rounded-[28px] border border-stone-900/10 bg-[#fffdf7] p-5 text-left shadow-[0_16px_40px_rgba(84,53,20,0.08)] transition hover:-translate-y-0.5 hover:border-stone-900/20 hover:shadow-[0_20px_50px_rgba(84,53,20,0.14)]"
-                >
+              {experiments.map((experiment) => {
+                const isTutorialExperiment =
+                  tutorialSession?.experimentId === experiment.id;
+                return (
+                  <article
+                    key={experiment.id}
+                    className={`group rounded-[28px] border p-5 text-left shadow-[0_16px_40px_rgba(84,53,20,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(84,53,20,0.14)] ${
+                      isTutorialExperiment
+                        ? "border-sky-200 bg-sky-50/80 hover:border-sky-300"
+                        : "border-stone-900/10 bg-[#fffdf7] hover:border-stone-900/20"
+                    }`}
+                  >
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-stone-400">
@@ -157,9 +238,16 @@ export function ExperimentsHome() {
                         {experiment.id}
                       </h3>
                     </div>
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
-                      v{experiment.snapshot_version}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                      {isTutorialExperiment ? (
+                        <span className="rounded-full bg-sky-700 px-3 py-1 text-xs font-semibold text-white">
+                          Tutorial
+                        </span>
+                      ) : null}
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
+                        v{experiment.snapshot_version}
+                      </span>
+                    </div>
                   </div>
                   <dl className="mt-5 flex flex-col gap-2 text-sm text-stone-600">
                     <div className="flex items-center justify-between gap-3">
@@ -180,11 +268,34 @@ export function ExperimentsHome() {
                   </p>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <button
+                      aria-label={
+                        isTutorialExperiment
+                          ? "Open tutorial experiment"
+                          : "Open experiment"
+                      }
                       type="button"
-                      onClick={() => router.push(`/experiments/${experiment.id}`)}
-                      className="text-sm font-medium text-stone-950 transition group-hover:text-amber-900"
+                      onClick={() => {
+                        if (isTutorialExperiment) {
+                          const activeSession = saveTutorialSession({
+                            tutorialId: CALIBRATION_SAMPLE_TUTORIAL_ID,
+                            experimentId: experiment.id,
+                            status: "active",
+                          });
+                          setTutorialSession(activeSession);
+                          router.push(
+                            `/experiments/${experiment.id}?tutorial=${CALIBRATION_SAMPLE_TUTORIAL_ID}`,
+                          );
+                          return;
+                        }
+                        router.push(`/experiments/${experiment.id}`);
+                      }}
+                      className={`text-sm font-medium transition ${
+                        isTutorialExperiment
+                          ? "text-sky-800 group-hover:text-sky-950"
+                          : "text-stone-950 group-hover:text-amber-900"
+                      }`}
                     >
-                      Open experiment
+                      {isTutorialExperiment ? "Open tutorial" : "Open experiment"}
                     </button>
                     <button
                       type="button"
@@ -195,8 +306,9 @@ export function ExperimentsHome() {
                       {deletingExperimentId === experiment.id ? "Deleting..." : "Delete"}
                     </button>
                   </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

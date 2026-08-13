@@ -6,6 +6,7 @@ import { LabSceneView } from "@/components/lab-scene-view";
 import type { FlatExperimentApi } from "@/types/flat-experiment-api";
 import { DebugInspectorPopup } from "@/components/debug-inspector-popup";
 import { DropDraftCard, DropDraftForm } from "@/components/drop-draft-card";
+import { TutorialCoach } from "@/components/tutorial-coach";
 import { useDebugInspector } from "@/hooks/use-debug-inspector";
 import { useAnalyticalBalanceDnd } from "@/hooks/use-analytical-balance-dnd";
 import { useDragState } from "@/hooks/use-drag-state";
@@ -41,7 +42,13 @@ import {
   roundMass,
   type LabSceneWidgetId,
 } from "@/lib/lab-scene-config";
-import { getToolbarCatalog } from "@/lib/api";
+import { createExperiment, deleteExperiment, getToolbarCatalog } from "@/lib/api";
+import { evaluateTutorial, getTutorialDefinition } from "@/lib/tutorial-engine";
+import {
+  clearTutorialSession,
+  getTutorialSession,
+  saveTutorialSession,
+} from "@/lib/tutorial-session-store";
 import type { CreateDebugToolPresetPayload } from "@/types/api-payloads";
 import type { DebugToolPresetId, ToolbarCategory } from "@/types/workbench";
 
@@ -51,15 +58,97 @@ type WidgetId = LabSceneWidgetId;
 
 type LabSceneProps = {
   experimentId?: string;
+  tutorialId?: string;
 };
 
-export function LabScene({ experimentId }: LabSceneProps = {}) {
+export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
+  const tutorialDefinition = getTutorialDefinition(tutorialId);
+  const [tutorialCompletedStepIds, setTutorialCompletedStepIds] = useState<string[]>(() =>
+    tutorialDefinition
+      ? (getTutorialSession(tutorialDefinition.id)?.completedStepIds ?? [])
+      : [],
+  );
+  const [isTutorialActive, setIsTutorialActive] = useState(() =>
+    tutorialDefinition
+      ? getTutorialSession(tutorialDefinition.id)?.status !== "paused"
+      : false,
+  );
   const experimentApi = useLabExperiment({
     defaultErrorMessage,
     defaultStatusMessage,
     experimentId,
   });
   const { state, statusMessage, isCommandPending, loadExperiment } = experimentApi;
+
+  useEffect(() => {
+    if (!tutorialDefinition || state.status !== "ready") {
+      return;
+    }
+    const saved = getTutorialSession(tutorialDefinition.id);
+    if (saved?.experimentId === state.experiment.id) {
+      setTutorialCompletedStepIds(saved.completedStepIds);
+      setIsTutorialActive(saved.status === "active");
+      return;
+    }
+    saveTutorialSession({
+      tutorialId: tutorialDefinition.id,
+      experimentId: state.experiment.id,
+      status: "active",
+    });
+    setTutorialCompletedStepIds([]);
+    setIsTutorialActive(true);
+  }, [state, tutorialDefinition]);
+
+  const handlePauseTutorial = () => {
+    if (!tutorialDefinition || state.status !== "ready") {
+      return;
+    }
+    saveTutorialSession({
+      tutorialId: tutorialDefinition.id,
+      experimentId: state.experiment.id,
+      status: "paused",
+    });
+    setIsTutorialActive(false);
+  };
+
+  const handleResumeTutorial = () => {
+    if (!tutorialDefinition || state.status !== "ready") {
+      return;
+    }
+    saveTutorialSession({
+      tutorialId: tutorialDefinition.id,
+      experimentId: state.experiment.id,
+      status: "active",
+    });
+    setIsTutorialActive(true);
+  };
+
+  const handleRestartTutorial = async () => {
+    if (
+      !tutorialDefinition ||
+      state.status !== "ready" ||
+      !window.confirm("Restart the tutorial and delete this dedicated experiment?")
+    ) {
+      return;
+    }
+
+    const currentExperimentId = state.experiment.id;
+    try {
+      await deleteExperiment(currentExperimentId);
+      clearTutorialSession(tutorialDefinition.id);
+      const replacement = await createExperiment();
+      saveTutorialSession({
+        tutorialId: tutorialDefinition.id,
+        experimentId: replacement.id,
+        status: "active",
+      });
+      window.location.assign(
+        `/experiments/${replacement.id}?tutorial=${tutorialDefinition.id}`,
+      );
+    } catch {
+      window.alert("Unable to restart the tutorial right now.");
+    }
+  };
 
   // Flat adapter — maps grouped API back to the flat shape expected by consumer hooks.
   const flatApi: FlatExperimentApi = {
@@ -393,6 +482,40 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
   });
 
   const readyExperiment = state.status === "ready" ? state.experiment : null;
+  const tutorialEvaluation = tutorialDefinition && readyExperiment
+    ? evaluateTutorial(
+        tutorialDefinition,
+        readyExperiment,
+        tutorialCompletedStepIds,
+      )
+    : null;
+
+  useEffect(() => {
+    if (!tutorialDefinition || !readyExperiment || !tutorialEvaluation) {
+      return;
+    }
+    const completedStepIds = tutorialEvaluation.completedStepIds;
+    const progressChanged =
+      completedStepIds.length !== tutorialCompletedStepIds.length ||
+      completedStepIds.some((stepId, index) => stepId !== tutorialCompletedStepIds[index]);
+    if (!progressChanged) {
+      return;
+    }
+
+    setTutorialCompletedStepIds(completedStepIds);
+    saveTutorialSession({
+      tutorialId: tutorialDefinition.id,
+      experimentId: readyExperiment.id,
+      status: isTutorialActive ? "active" : "paused",
+      completedStepIds,
+    });
+  }, [
+    isTutorialActive,
+    readyExperiment,
+    tutorialCompletedStepIds,
+    tutorialDefinition,
+    tutorialEvaluation,
+  ]);
   const grossBalanceNetMassG =
     readyExperiment?.limsReception.measuredGrossMassG === null || readyExperiment === null
       ? null
@@ -538,7 +661,6 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
     trashedSampleLabels.length === 0 &&
     trashedWidgets.length === 0;
   const debugInventoryEnabled = process.env.NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY === "true";
-
   return (
     <>
       <LabSceneView
@@ -690,6 +812,15 @@ export function LabScene({ experimentId }: LabSceneProps = {}) {
         },
       }}
       />
+      {tutorialEvaluation ? (
+        <TutorialCoach
+          active={isTutorialActive}
+          evaluation={tutorialEvaluation}
+          onPause={handlePauseTutorial}
+          onRestart={handleRestartTutorial}
+          onResume={handleResumeTutorial}
+        />
+      ) : null}
       {debugInspection ? (
         <DebugInspectorPopup inspection={debugInspection} onClose={clearDebugInspection} />
       ) : null}

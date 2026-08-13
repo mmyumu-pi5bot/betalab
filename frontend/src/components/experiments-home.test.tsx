@@ -22,6 +22,7 @@ vi.mock("@/lib/api", () => ({
 
 describe("ExperimentsHome", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     pushMock.mockReset();
     createExperimentMock.mockReset();
     deleteExperimentMock.mockReset();
@@ -66,6 +67,94 @@ describe("ExperimentsHome", () => {
       expect(createExperimentMock).toHaveBeenCalled();
       expect(pushMock).toHaveBeenCalledWith("/experiments/experiment_new");
     });
+  });
+
+  it("starts a dedicated tutorial experiment", async () => {
+    listExperimentsMock.mockResolvedValue([]);
+    createExperimentMock.mockResolvedValue({ id: "experiment_tutorial" });
+
+    render(<ExperimentsHome />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "New tutorial" }));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith(
+        "/experiments/experiment_tutorial?tutorial=calibration-sample-v1",
+      );
+    });
+    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
+      "experiment_tutorial",
+    );
+  });
+
+  it("offers to continue an existing tutorial experiment", async () => {
+    window.localStorage.setItem(
+      "betalab:tutorial-sessions:v1",
+      JSON.stringify({
+        "calibration-sample-v1": {
+          tutorialId: "calibration-sample-v1",
+          experimentId: "experiment_tutorial",
+          status: "paused",
+          version: 1,
+        },
+      }),
+    );
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_tutorial",
+        status: "preparing",
+        last_simulation_at: "2026-08-10T08:00:00Z",
+        snapshot_version: 3,
+        updated_at: "2026-08-10T08:10:00Z",
+        last_audit_entry: "Experiment created",
+      },
+    ]);
+
+    render(<ExperimentsHome />);
+
+    expect(await screen.findByText("experiment_tutorial")).toBeInTheDocument();
+    expect(screen.getByText("Tutorial")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "1 calibration point + 1 sample" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Continue guided tutorial" }));
+
+    expect(pushMock).toHaveBeenCalledWith(
+      "/experiments/experiment_tutorial?tutorial=calibration-sample-v1",
+    );
+  });
+
+  it("opens a tutorial from its regular saved experiment card", async () => {
+    window.localStorage.setItem(
+      "betalab:tutorial-sessions:v1",
+      JSON.stringify({
+        "calibration-sample-v1": {
+          tutorialId: "calibration-sample-v1",
+          experimentId: "experiment_tutorial",
+          status: "paused",
+          completedStepIds: ["weigh-received-sample"],
+          version: 1,
+        },
+      }),
+    );
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_tutorial",
+        status: "preparing",
+        last_simulation_at: "2026-08-10T08:00:00Z",
+        snapshot_version: 3,
+        updated_at: "2026-08-10T08:10:00Z",
+        last_audit_entry: "Experiment created",
+      },
+    ]);
+
+    render(<ExperimentsHome />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open tutorial experiment" }));
+
+    expect(pushMock).toHaveBeenCalledWith(
+      "/experiments/experiment_tutorial?tutorial=calibration-sample-v1",
+    );
   });
 
   it("deletes a saved experiment from the list", async () => {

@@ -67,6 +67,7 @@ export function ToolbarPanel({
           <article
             key={category.id}
             className="rounded-[1.1rem] border border-slate-200 bg-slate-50/80 p-2.5"
+            data-tutorial-category={category.id}
           >
             <div className="flex items-start justify-between gap-2">
               <button
@@ -98,45 +99,46 @@ export function ToolbarPanel({
             >
                 {category.items.map((item) => (
                   item.itemType === "workspace_widget" || (item.itemType === "tool" && item.isStorable) ? (
-                    <InventoryEquipmentItem
-                      dataTestId={`toolbar-item-${item.id}`}
-                      icon={(
-                        item.itemType === "workspace_widget" ? (
-                          <WorkspaceEquipmentIcon
-                            className="h-8 w-10 shrink-0 overflow-hidden rounded-md"
-                            widgetType={item.widgetType}
-                          />
-                        ) : (
-                          <LabAssetIcon
-                            accent={item.accent}
-                            className="h-8 w-10 shrink-0"
-                            fillRatio={0}
-                            isSealed={false}
-                            kind={item.toolType}
-                            tone="neutral"
-                          />
-                        )
-                      )}
-                      key={item.id}
-                      onDragEnd={
-                        dragDisabled
-                          ? undefined
-                          : () => {
-                              onItemDragEnd?.();
-                            }
-                      }
-                      onDragStart={
-                        dragDisabled
-                          ? undefined
-                          : (dataTransfer) => {
-                              const payload = createToolbarDragPayload(item);
-                              onItemDragStart?.(item, payload.allowedDropTargets);
-                              writeToolbarDragPayload(dataTransfer, payload);
-                            }
-                      }
-                      subtitle={item.subtitle}
-                      title={item.name}
-                    />
+                    <div data-tutorial-anchor={`palette-item-${item.id}`} key={item.id}>
+                      <InventoryEquipmentItem
+                        dataTestId={`toolbar-item-${item.id}`}
+                        icon={(
+                          item.itemType === "workspace_widget" ? (
+                            <WorkspaceEquipmentIcon
+                              className="h-8 w-10 shrink-0 overflow-hidden rounded-md"
+                              widgetType={item.widgetType}
+                            />
+                          ) : (
+                            <LabAssetIcon
+                              accent={item.accent}
+                              className="h-8 w-10 shrink-0"
+                              fillRatio={0}
+                              isSealed={false}
+                              kind={item.toolType}
+                              tone="neutral"
+                            />
+                          )
+                        )}
+                        onDragEnd={
+                          dragDisabled
+                            ? undefined
+                            : () => {
+                                onItemDragEnd?.();
+                              }
+                        }
+                        onDragStart={
+                          dragDisabled
+                            ? undefined
+                            : (dataTransfer) => {
+                                const payload = createToolbarDragPayload(item);
+                                onItemDragStart?.(item, payload.allowedDropTargets);
+                                writeToolbarDragPayload(dataTransfer, payload);
+                              }
+                        }
+                        subtitle={item.subtitle}
+                        title={item.name}
+                      />
+                    </div>
                   ) : (
                     <div
                       key={item.id}
@@ -146,6 +148,7 @@ export function ToolbarPanel({
                         item.itemType === "liquid" ? accentClasses[item.accent] : neutralToolClasses
                       }`}
                       data-testid={`toolbar-item-${item.id}`}
+                      data-tutorial-anchor={`palette-item-${item.id}`}
                       draggable={!dragDisabled}
                       onDragEnd={() => {
                         onItemDragEnd?.();

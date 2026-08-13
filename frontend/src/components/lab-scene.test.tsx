@@ -631,6 +631,19 @@ afterEach(() => {
 });
 
 describe("LabScene", () => {
+  it("renders the guided tutorial from the experiment route", async () => {
+    window.localStorage.clear();
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
+
+    expect(await screen.findByRole("complementary", { name: "Guided tutorial" })).toBeInTheDocument();
+    expect(screen.getByText("Weigh the received sample bag")).toBeInTheDocument();
+    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
+      "experiment_pesticides",
+    );
+  });
+
   it("routes a real pipette click on a filled tube to the aspiration API", async () => {
     const tube = makeTool({
       id: "tube_1",
