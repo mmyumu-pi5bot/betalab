@@ -56,6 +56,7 @@ from app.schemas.acquisition_method import AcquisitionMethodSchema
 from app.schemas.experiment import (
     ExperimentListEntrySchema,
     ExperimentSchema,
+    ExperimentSummarySchema,
     TransitionTraceSchema,
 )
 from app.services.helpers.produce_canonical import (
@@ -98,36 +99,52 @@ class SqliteExperimentRepository:
         payload = json.dumps(_serialize_experiment(experiment), sort_keys=True)
         now = datetime.now(UTC).isoformat()
         last_audit_entry = experiment.audit_log[-1] if experiment.audit_log else None
+        summary = _build_experiment_summary(experiment)
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO experiments (
                     id,
+                    name,
                     created_at,
                     updated_at,
                     snapshot_version,
                     status,
                     last_simulation_at,
                     last_audit_entry,
+                    workbench_tool_count,
+                    rack_tool_count,
+                    material_count,
+                    run_count,
                     payload
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
                     updated_at = excluded.updated_at,
                     snapshot_version = excluded.snapshot_version,
                     status = excluded.status,
                     last_simulation_at = excluded.last_simulation_at,
                     last_audit_entry = excluded.last_audit_entry,
+                    workbench_tool_count = excluded.workbench_tool_count,
+                    rack_tool_count = excluded.rack_tool_count,
+                    material_count = excluded.material_count,
+                    run_count = excluded.run_count,
                     payload = excluded.payload
                 """,
                 (
                     experiment.id,
+                    experiment.name,
                     now,
                     now,
                     experiment.snapshot_version,
                     experiment.status.value,
                     experiment.last_simulation_at.isoformat(),
                     last_audit_entry,
+                    summary.workbench_tool_count,
+                    summary.rack_tool_count,
+                    summary.material_count,
+                    summary.run_count,
                     payload,
                 ),
             )
@@ -150,7 +167,10 @@ class SqliteExperimentRepository:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, updated_at, snapshot_version, status, last_simulation_at, last_audit_entry
+                SELECT id, COALESCE(name, 'Untitled experiment'), updated_at,
+                       snapshot_version, status, last_simulation_at, last_audit_entry,
+                       COALESCE(workbench_tool_count, 0), COALESCE(rack_tool_count, 0),
+                       COALESCE(material_count, 0), COALESCE(run_count, 0)
                 FROM experiments
                 ORDER BY updated_at DESC, id DESC
                 """
@@ -159,19 +179,31 @@ class SqliteExperimentRepository:
         return [
             ExperimentListEntrySchema(
                 id=experiment_id,
+                name=name,
                 status=status,
                 last_simulation_at=datetime.fromisoformat(last_simulation_at),
                 snapshot_version=snapshot_version,
                 updated_at=datetime.fromisoformat(updated_at),
                 last_audit_entry=last_audit_entry,
+                summary=ExperimentSummarySchema(
+                    workbench_tool_count=workbench_tool_count,
+                    rack_tool_count=rack_tool_count,
+                    material_count=material_count,
+                    run_count=run_count,
+                ),
             )
             for (
                 experiment_id,
+                name,
                 updated_at,
                 snapshot_version,
                 status,
                 last_simulation_at,
                 last_audit_entry,
+                workbench_tool_count,
+                rack_tool_count,
+                material_count,
+                run_count,
             ) in rows
         ]
 
@@ -203,12 +235,17 @@ class SqliteExperimentRepository:
             """
             CREATE TABLE IF NOT EXISTS experiments (
                 id TEXT PRIMARY KEY,
+                name TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 snapshot_version INTEGER NOT NULL,
                 status TEXT,
                 last_simulation_at TEXT,
                 last_audit_entry TEXT,
+                workbench_tool_count INTEGER,
+                rack_tool_count INTEGER,
+                material_count INTEGER,
+                run_count INTEGER,
                 payload TEXT NOT NULL
             )
             """
@@ -216,7 +253,45 @@ class SqliteExperimentRepository:
         self._ensure_column(connection, "status", "TEXT")
         self._ensure_column(connection, "last_simulation_at", "TEXT")
         self._ensure_column(connection, "last_audit_entry", "TEXT")
+        self._ensure_column(connection, "name", "TEXT")
+        self._ensure_column(connection, "workbench_tool_count", "INTEGER")
+        self._ensure_column(connection, "rack_tool_count", "INTEGER")
+        self._ensure_column(connection, "material_count", "INTEGER")
+        self._ensure_column(connection, "run_count", "INTEGER")
+        self._backfill_summary_metadata(connection)
         connection.commit()
+
+    def _backfill_summary_metadata(self, connection: sqlite3.Connection) -> None:
+        rows = connection.execute(
+            """
+            SELECT id, payload
+            FROM experiments
+            WHERE name IS NULL
+               OR workbench_tool_count IS NULL
+               OR rack_tool_count IS NULL
+               OR material_count IS NULL
+               OR run_count IS NULL
+            """
+        ).fetchall()
+        for experiment_id, serialized_payload in rows:
+            payload = json.loads(serialized_payload)
+            name, summary = _summary_metadata_from_payload(payload)
+            connection.execute(
+                """
+                UPDATE experiments
+                SET name = ?, workbench_tool_count = ?, rack_tool_count = ?,
+                    material_count = ?, run_count = ?
+                WHERE id = ?
+                """,
+                (
+                    name,
+                    summary.workbench_tool_count,
+                    summary.rack_tool_count,
+                    summary.material_count,
+                    summary.run_count,
+                    experiment_id,
+                ),
+            )
 
     def _ensure_column(self, connection: sqlite3.Connection, column_name: str, column_type: str) -> None:
         existing_columns = {row[1] for row in connection.execute("PRAGMA table_info(experiments)").fetchall()}
@@ -229,10 +304,35 @@ def _serialize_experiment(experiment: Experiment) -> dict:
     return to_jsonable_python(asdict(experiment))
 
 
+def _build_experiment_summary(experiment: Experiment) -> ExperimentSummarySchema:
+    return ExperimentSummarySchema(
+        workbench_tool_count=sum(slot.tool is not None for slot in experiment.workbench.slots),
+        rack_tool_count=sum(slot.tool is not None for slot in experiment.rack.slots),
+        material_count=len(experiment.produce_material_states),
+        run_count=sum(len(widget.sequence_runs) for widget in experiment.workspace.widgets),
+    )
+
+
+def _summary_metadata_from_payload(payload: dict) -> tuple[str, ExperimentSummarySchema]:
+    workbench_slots = payload.get("workbench", {}).get("slots", [])
+    rack_slots = payload.get("rack", {}).get("slots", [])
+    widgets = payload.get("workspace", {}).get("widgets", [])
+    return (
+        str(payload.get("name") or "Untitled experiment"),
+        ExperimentSummarySchema(
+            workbench_tool_count=sum(slot.get("tool") is not None for slot in workbench_slots),
+            rack_tool_count=sum(slot.get("tool") is not None for slot in rack_slots),
+            material_count=len(payload.get("produce_material_states", [])),
+            run_count=sum(len(widget.get("sequence_runs", [])) for widget in widgets),
+        ),
+    )
+
+
 def _deserialize_experiment(payload: dict) -> Experiment:
     schema = ExperimentSchema.model_validate(payload)
     experiment = Experiment(
         id=schema.id,
+        name=schema.name,
         status=ExperimentStatus(schema.status),
         workbench=Workbench(
             slots=[

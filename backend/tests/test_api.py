@@ -859,6 +859,46 @@ def test_list_experiments_returns_saved_sessions_over_http() -> None:
     payload = listed.json()
     assert {entry["id"] for entry in payload} >= {first_id, second_id}
     assert payload[0]["last_audit_entry"] is not None
+    assert payload[0]["name"] == "Untitled experiment"
+    assert payload[0]["summary"] == {
+        "workbench_tool_count": 0,
+        "rack_tool_count": 0,
+        "material_count": 1,
+        "run_count": 0,
+    }
+
+
+def test_experiment_can_be_created_with_a_name_renamed_and_duplicated_over_http() -> None:
+    with TestClient(app) as client:
+        created = client.post("/experiments", json={"name": "Apple prep"})
+        experiment_id = created.json()["id"]
+        renamed = client.patch(
+            f"/experiments/{experiment_id}",
+            json={"name": "Apple prep — validated"},
+        )
+        duplicated = client.post(f"/experiments/{experiment_id}/duplicate")
+        listed = client.get("/experiments")
+
+    assert created.status_code == 200
+    assert created.json()["name"] == "Apple prep"
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "Apple prep — validated"
+    assert duplicated.status_code == 200
+    assert duplicated.json()["id"] != experiment_id
+    assert duplicated.json()["name"] == "Apple prep — validated (copy)"
+    assert {entry["name"] for entry in listed.json()} >= {
+        "Apple prep — validated",
+        "Apple prep — validated (copy)",
+    }
+
+
+def test_rename_experiment_returns_400_for_a_blank_name() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        response = client.patch(f"/experiments/{experiment_id}", json={"name": "  "})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Experiment name cannot be blank"
 
 
 def test_delete_experiment_removes_saved_session_over_http() -> None:
@@ -1061,6 +1101,7 @@ def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
     assert lot_state["material_state"] == "slurry"
     assert lot_state["temperature_c"] == 4.0
     assert "homogeneity_score" not in lot_state
+
 def test_open_workbench_tool_route_unseals_a_jar() -> None:
     with TestClient(app) as client:
         experiment_id = _create_experiment(client)

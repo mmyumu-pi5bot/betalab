@@ -203,9 +203,15 @@ async function sendMutationRequest(
   return experiment;
 }
 
-export async function createExperiment(): Promise<Experiment> {
+export async function createExperiment(name?: string): Promise<Experiment> {
   const response = await fetch(`${API_BASE_URL}/experiments`, {
     method: "POST",
+    ...(name
+      ? {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        }
+      : {}),
   });
 
   if (!response.ok) {
@@ -239,13 +245,57 @@ export async function listExperiments(): Promise<ExperimentListEntry[]> {
   const payload = (await response.json()) as ExperimentListEntry[];
   return payload.map((entry) => ({
     ...entry,
+    name: String(entry.name ?? "Untitled experiment"),
     last_simulation_at: String(entry.last_simulation_at),
     updated_at: String(entry.updated_at),
     last_audit_entry:
       entry.last_audit_entry === null || entry.last_audit_entry === undefined
         ? null
         : String(entry.last_audit_entry),
+    summary: {
+      workbenchToolCount: Number(
+        entry.summary?.workbenchToolCount ??
+          (entry.summary as Record<string, unknown> | undefined)?.workbench_tool_count ??
+          0,
+      ),
+      rackToolCount: Number(
+        entry.summary?.rackToolCount ??
+          (entry.summary as Record<string, unknown> | undefined)?.rack_tool_count ??
+          0,
+      ),
+      materialCount: Number(
+        entry.summary?.materialCount ??
+          (entry.summary as Record<string, unknown> | undefined)?.material_count ??
+          0,
+      ),
+      runCount: Number(
+        entry.summary?.runCount ??
+          (entry.summary as Record<string, unknown> | undefined)?.run_count ??
+          0,
+      ),
+    },
   }));
+}
+
+export async function renameExperiment(experimentId: string, name: string): Promise<Experiment> {
+  return sendMutationRequest(experimentId, {
+    method: "PATCH",
+    path: `/experiments/${experimentId}`,
+    body: { name },
+  });
+}
+
+export async function duplicateExperiment(experimentId: string): Promise<Experiment> {
+  const response = await fetch(
+    `${API_BASE_URL}/experiments/${encodeURIComponent(experimentId)}/duplicate`,
+    { method: "POST" },
+  );
+  if (!response.ok) {
+    throw await buildApiError(response, "Failed to duplicate experiment");
+  }
+  const experiment = normalizeExperiment((await response.json()) as Experiment);
+  experimentCache.set(experiment.id, experiment);
+  return experiment;
 }
 
 function normalizeToolbarItem(rawItem: Record<string, unknown>): ToolbarItem {
@@ -1778,6 +1828,9 @@ function normalizeExperiment(experiment: Experiment): Experiment {
 
   return {
     ...experiment,
+    name: String(
+      (experiment as Experiment & Record<string, unknown>).name ?? "Untitled experiment",
+    ),
     last_simulation_at: String(
       (experiment as Experiment & Record<string, unknown>).last_simulation_at ??
       (experiment as Experiment & Record<string, unknown>).lastSimulationAt ??

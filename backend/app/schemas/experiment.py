@@ -745,6 +745,7 @@ class WorkspaceSchema(BaseModel):
 
 class ExperimentSchema(BaseModel):
     id: str
+    name: str = "Untitled experiment"
     status: str
     last_simulation_at: datetime
     snapshot_version: int
@@ -763,13 +764,30 @@ class ExperimentSchema(BaseModel):
     audit_log: list[str]
 
 
+class ExperimentSummarySchema(BaseModel):
+    workbench_tool_count: int = 0
+    rack_tool_count: int = 0
+    material_count: int = 0
+    run_count: int = 0
+
+
 class ExperimentListEntrySchema(BaseModel):
     id: str
+    name: str
     status: str
     last_simulation_at: datetime
     snapshot_version: int
     updated_at: datetime
     last_audit_entry: str | None = None
+    summary: ExperimentSummarySchema = Field(default_factory=ExperimentSummarySchema)
+
+
+class CreateExperimentSchema(BaseModel):
+    name: str = "Untitled experiment"
+
+
+class RenameExperimentSchema(BaseModel):
+    name: str
 
 
 class ToolbarItemSchema(BaseModel):

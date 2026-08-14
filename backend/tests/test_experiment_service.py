@@ -1,4 +1,5 @@
 import re
+import sqlite3
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -4341,6 +4342,75 @@ def test_service_recovers_if_sqlite_file_is_deleted_while_running(tmp_path) -> N
     assert db_path.exists()
     assert created_before_deletion.id != created_after_deletion.id
     assert [entry.id for entry in listed] == [created_after_deletion.id]
+
+
+def test_experiment_can_be_renamed_and_listed_with_its_summary(tmp_path) -> None:
+    repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+    service = ExperimentRuntimeService(repository=repository)
+    created = service.create_experiment()
+
+    renamed = service.rename_experiment(created.id, "  Apple extraction — repeat 2  ")
+    listed = service.list_experiments()
+
+    assert renamed.name == "Apple extraction — repeat 2"
+    assert listed[0].name == "Apple extraction — repeat 2"
+    assert listed[0].summary.workbench_tool_count == 0
+    assert listed[0].summary.rack_tool_count == 0
+    assert listed[0].summary.material_count == 1
+    assert listed[0].summary.run_count == 0
+
+
+def test_duplicate_experiment_copies_state_under_a_new_identity(tmp_path) -> None:
+    repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+    service = ExperimentRuntimeService(repository=repository)
+    source = service.create_experiment()
+    service.rename_experiment(source.id, "Ready for injection")
+    source_domain = service._require_experiment(source.id)
+    source_domain.workbench.slots[0].tool = build_workbench_tool("sample_vial_lcms")
+    saved_source = service._persist_mutation_and_to_schema(source_domain)
+
+    duplicate = service.duplicate_experiment(source.id)
+
+    assert duplicate.id != source.id
+    assert duplicate.name == "Ready for injection (copy)"
+    assert duplicate.snapshot_version == 1
+    assert duplicate.workbench == saved_source.workbench
+    assert duplicate.audit_log[:-1] == saved_source.audit_log
+    assert duplicate.audit_log[-1] == f"Duplicated from {source.id}."
+    assert service.get_experiment(source.id).name == "Ready for injection"
+
+
+def test_repository_backfills_summary_metadata_for_existing_snapshots(tmp_path) -> None:
+    db_path = tmp_path / "experiments.sqlite3"
+    service = ExperimentRuntimeService(repository=SqliteExperimentRepository(str(db_path)))
+    created = service.create_experiment("Legacy state")
+    experiment = service._require_experiment(created.id)
+    experiment.workbench.slots[0].tool = build_workbench_tool("sample_vial_lcms")
+    service._persist_mutation_and_to_schema(experiment)
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            UPDATE experiments
+            SET name = NULL, workbench_tool_count = NULL, rack_tool_count = NULL,
+                material_count = NULL, run_count = NULL
+            WHERE id = ?
+            """,
+            (created.id,),
+        )
+
+    migrated = SqliteExperimentRepository(str(db_path)).list()[0]
+
+    assert migrated.name == "Legacy state"
+    assert migrated.summary.workbench_tool_count == 1
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * 81])
+def test_rename_experiment_rejects_invalid_names(name: str) -> None:
+    service = ExperimentRuntimeService()
+    created = service.create_experiment()
+
+    with pytest.raises(ValueError, match="Experiment name"):
+        service.rename_experiment(created.id, name)
 
 
 def test_discard_grinder_produce_lot_moves_it_to_trash() -> None:

@@ -491,6 +491,7 @@ class Experiment:
     workspace: Workspace
     lims_reception: LimsReception
     last_simulation_at: datetime
+    name: str = "Untitled experiment"
     basket_tools: list[WorkbenchTool] = field(default_factory=list)
     produce_material_states: list[ProduceMaterialState] = field(default_factory=list)
     spatula: SpatulaState = field(default_factory=SpatulaState)

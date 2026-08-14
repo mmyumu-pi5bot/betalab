@@ -39,6 +39,7 @@ export type ExperimentWorkspace = {
 
 export type Experiment = {
   id: string;
+  name: string;
   status: string;
   last_simulation_at: string;
   snapshot_version: number;
@@ -58,9 +59,16 @@ export type Experiment = {
 
 export type ExperimentListEntry = {
   id: string;
+  name: string;
   status: string;
   last_simulation_at: string;
   snapshot_version: number;
   updated_at: string;
   last_audit_entry: string | null;
+  summary: {
+    workbenchToolCount: number;
+    rackToolCount: number;
+    materialCount: number;
+    runCount: number;
+  };
 };

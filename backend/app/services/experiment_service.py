@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, datetime
 
-from app.domain.models import Experiment
+from app.domain.models import Experiment, new_id
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
 from app.services.domain_services.acquisition_clock import advance_sequence_runs
 from app.services.domain_services.workspace import advance_workspace_cryogenics_state
@@ -24,14 +25,30 @@ class ExperimentRuntimeService:
         self._repository = repository or InMemoryExperimentRepository()
         self._now_fn: Callable[[], datetime] = lambda: datetime.now(UTC)
 
-    def create_experiment(self) -> ExperimentSchema:
-        experiment = build_experiment()
+    def create_experiment(self, name: str = "Untitled experiment") -> ExperimentSchema:
+        experiment = build_experiment(self._validate_experiment_name(name))
         experiment.last_simulation_at = self._now_fn()
         self._experiments[experiment.id] = experiment
         return self._persist_mutation_and_to_schema(experiment)
 
     def list_experiments(self) -> list[ExperimentListEntrySchema]:
         return self._repository.list()
+
+    def rename_experiment(self, experiment_id: str, name: str) -> ExperimentSchema:
+        experiment = self._require_experiment(experiment_id)
+        experiment.name = self._validate_experiment_name(name)
+        return self._persist_mutation_and_to_schema(experiment)
+
+    def duplicate_experiment(self, experiment_id: str) -> ExperimentSchema:
+        source = self._require_experiment(experiment_id)
+        duplicate = deepcopy(source)
+        duplicate.id = new_id("experiment")
+        duplicate.name = f"{source.name[:73].rstrip()} (copy)"
+        duplicate.snapshot_version = 0
+        duplicate.last_simulation_at = self._now_fn()
+        duplicate.audit_log.append(f"Duplicated from {source.id}.")
+        self._experiments[duplicate.id] = duplicate
+        return self._persist_mutation_and_to_schema(duplicate)
 
     def delete_experiment(self, experiment_id: str) -> None:
         self._experiments.pop(experiment_id, None)
@@ -89,6 +106,15 @@ class ExperimentRuntimeService:
         experiment.last_simulation_at = now
         return True
 
+    @staticmethod
+    def _validate_experiment_name(name: str) -> str:
+        normalized = name.strip()
+        if not normalized:
+            raise ValueError("Experiment name cannot be blank")
+        if len(normalized) > 80:
+            raise ValueError("Experiment name cannot exceed 80 characters")
+        return normalized
+
     def _to_schema(self, experiment: Experiment) -> ExperimentSchema:
         sync_canonical_produce_model(experiment)
         sync_pesticide_material_states(experiment)
@@ -101,6 +127,7 @@ class ExperimentRuntimeService:
         return ExperimentSchema.model_validate(
             {
                 "id": experiment.id,
+                "name": experiment.name,
                 "status": experiment.status.value,
                 "last_simulation_at": experiment.last_simulation_at,
                 "snapshot_version": experiment.snapshot_version,
@@ -121,5 +148,7 @@ class ExperimentRuntimeService:
 
     def _persist_mutation_and_to_schema(self, experiment: Experiment) -> ExperimentSchema:
         experiment.snapshot_version += 1
+        sync_canonical_produce_model(experiment)
+        sync_pesticide_material_states(experiment)
         self._repository.save(experiment)
         return self._to_schema(experiment)

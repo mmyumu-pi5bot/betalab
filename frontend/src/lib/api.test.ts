@@ -8,6 +8,7 @@ import {
   createDebugToolPreset,
   createExperiment,
   deleteExperiment,
+  duplicateExperiment,
   getAcquisitionMethod,
   getAcquisitionMethodCatalog,
   getDebugInspection,
@@ -19,6 +20,7 @@ import {
   normalizeAcquisitionMethod,
   normalizeAcquisitionMethodSummary,
   openWorkbenchTool,
+  renameExperiment,
   runSequence,
   subscribeToExperimentStream,
   unloadRackFromInstrument,
@@ -27,6 +29,7 @@ import type { Experiment, ExperimentListEntry } from "@/types/experiment";
 
 const makeExperiment = (): Experiment => ({
   id: "experiment_test",
+  name: "Untitled experiment",
   status: "preparing",
   last_simulation_at: "2026-03-28T19:00:00Z",
   snapshot_version: 1,
@@ -390,19 +393,23 @@ describe("api client", () => {
     const experiments: ExperimentListEntry[] = [
       {
         id: "experiment_2",
+        name: "Extraction ready",
         status: "preparing",
         last_simulation_at: "2026-04-01T10:00:00Z",
         snapshot_version: 4,
         updated_at: "2026-04-01T10:03:00Z",
         last_audit_entry: "Wide-neck HDPE jar sealed on Station 1.",
+        summary: { workbenchToolCount: 2, rackToolCount: 3, materialCount: 1, runCount: 4 },
       },
       {
         id: "experiment_1",
+        name: "Untitled experiment",
         status: "preparing",
         last_simulation_at: "2026-04-01T09:00:00Z",
         snapshot_version: 2,
         updated_at: "2026-04-01T09:01:00Z",
         last_audit_entry: null,
+        summary: { workbenchToolCount: 0, rackToolCount: 0, materialCount: 0, runCount: 0 },
       },
     ];
     const fetchMock = vi.fn().mockResolvedValue({
@@ -414,6 +421,30 @@ describe("api client", () => {
 
     await expect(listExperiments()).resolves.toEqual(experiments);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/experiments");
+  });
+
+  it("renames and duplicates an experiment", async () => {
+    const renamed = { ...makeExperiment(), name: "Ready state" };
+    const duplicate = { ...renamed, id: "experiment_copy", name: "Ready state (copy)" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => renamed })
+      .mockResolvedValueOnce({ ok: true, json: async () => duplicate });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(renameExperiment("experiment_test", "Ready state")).resolves.toEqual(renamed);
+    await expect(duplicateExperiment("experiment_test")).resolves.toEqual(duplicate);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:8000/experiments/experiment_test",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ name: "Ready state" }) }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://localhost:8000/experiments/experiment_test/duplicate",
+      { method: "POST" },
+    );
   });
 
   it("fetches and normalizes the toolbar catalog", async () => {

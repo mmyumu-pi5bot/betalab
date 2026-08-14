@@ -21,9 +21,10 @@ from app.domain.models import (
 from app.services.received_sample_generation import build_received_sampling_bag
 
 
-def build_experiment() -> Experiment:
+def build_experiment(name: str = "Untitled experiment") -> Experiment:
     return Experiment(
         id=new_id("experiment"),
+        name=name,
         status=ExperimentStatus.PREPARING,
         workbench=Workbench(
             slots=[
