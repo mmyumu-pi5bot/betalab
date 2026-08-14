@@ -133,6 +133,7 @@ export function ActionBarPanel({
               data-debug-id={action.id === "pipette" ? "pipette" : undefined}
               data-debug-kind={action.id === "pipette" ? "pipette" : undefined}
               data-debug-label={action.id === "pipette" ? "Micropipette" : undefined}
+              data-tutorial-anchor={`action-${action.id}`}
               key={action.id}
               onClick={() => onToggleAction(action.id)}
               title={

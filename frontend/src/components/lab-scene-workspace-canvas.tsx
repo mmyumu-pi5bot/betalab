@@ -276,6 +276,7 @@ export function LabSceneWorkspaceCanvas({
         }`}
         data-no-widget-drag="true"
         data-testid={`store-workspace-widget-${widget.id}`}
+        data-tutorial-anchor={`store-widget-${widget.id}`}
         disabled={isDisabled}
         onClick={() => {
           workspaceActions.onStoreWorkspaceWidget(widget.id);
@@ -674,6 +675,7 @@ export function LabSceneWorkspaceCanvas({
                     <button
                       className="rounded-full bg-sky-600 px-5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 disabled:opacity-40"
                       disabled={rack.instrumentStatus !== "ready" || ui.isCommandPending}
+                      data-tutorial-anchor="instrument-open-console"
                       onClick={() => setIsAcquisitionConsoleOpen((current) => !current)}
                       type="button"
                     >
@@ -686,6 +688,7 @@ export function LabSceneWorkspaceCanvas({
                       <button
                         className="ml-2 rounded-full border border-slate-300 bg-white px-5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-40"
                         disabled={ui.isCommandPending}
+                        data-tutorial-anchor="instrument-unload-rack"
                         onClick={() => {
                           setIsAcquisitionConsoleOpen(false);
                           setAcquisitionSequenceDraft(null);

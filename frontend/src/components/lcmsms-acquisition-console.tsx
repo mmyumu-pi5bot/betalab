@@ -291,6 +291,7 @@ export function LcMsMsAcquisitionConsole({
         <button
           className="shrink-0 rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={validationMessage !== null || isCommandPending}
+          data-tutorial-anchor="instrument-launch"
           onClick={onRun}
           type="button"
         >

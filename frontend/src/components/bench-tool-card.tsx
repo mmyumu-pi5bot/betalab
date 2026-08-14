@@ -153,6 +153,7 @@ export function BenchToolCard({
         <div
           className={draggable ? dragAffordanceClassName : ""}
           data-testid={`bench-tool-card-${tool.id}`}
+          data-tutorial-anchor={`tool-type-${tool.toolType}`}
           draggable={draggable}
           onClick={onClick}
           onDragEnd={onDragEnd}
@@ -171,6 +172,7 @@ export function BenchToolCard({
             {onStore ? (
               <button
                 aria-label={`Store ${tool.label} in inventory`}
+                data-tutorial-anchor={`store-tool-${tool.id}`}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
                 disabled={!canStore}
                 draggable={false}
@@ -193,6 +195,7 @@ export function BenchToolCard({
                 </span>
                 <button
                   aria-label={`${isSealed ? "Open" : "Close"} ${tool.label}`}
+                  data-tutorial-anchor={`seal-tool-${tool.id}`}
                   className="inline-flex min-w-[3.75rem] justify-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                   draggable={false}
                   onClick={() => {

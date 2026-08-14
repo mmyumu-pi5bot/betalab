@@ -94,6 +94,7 @@ export function ProduceLotCard({
               {isDegassing ? <DegassingIndicator progress={degassingProgress} /> : null}
               <TemperatureIndicator
                 temperatureC={produceLot.temperatureC ?? ambientTemperatureC}
+                tutorialAnchor={`temperature-${produceLot.id}`}
               />
             </div>
           </div>
@@ -122,6 +123,7 @@ export function ProduceLotCard({
             {isDegassing ? <DegassingIndicator progress={degassingProgress} /> : null}
             <TemperatureIndicator
               temperatureC={produceLot.temperatureC ?? ambientTemperatureC}
+              tutorialAnchor={`temperature-${produceLot.id}`}
             />
           </div>
         </>

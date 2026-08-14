@@ -9,7 +9,7 @@ test.describe("Guided tutorial", () => {
 
     await expect(page).toHaveURL(/\/experiments\/experiment_[^?]+\?tutorial=calibration-sample-v1$/);
     await expect(page.getByRole("complementary", { name: "Guided tutorial" })).toContainText(
-      "Weigh the received sample bag",
+      "Deploy the Gross balance",
     );
     await expect(page.getByRole("button", { name: /Workspace equipment/i })).toHaveAttribute(
       "aria-expanded",
@@ -27,7 +27,11 @@ test.describe("Guided tutorial", () => {
 
     await expect(page.getByTestId("widget-gross_balance")).toBeVisible();
     await expect(page.getByRole("complementary", { name: "Guided tutorial" })).toContainText(
-      "Weigh the received sample bag",
+      "Open the Produce basket",
+    );
+    await page.getByTestId("basket-open-button").click();
+    await expect(page.getByRole("complementary", { name: "Guided tutorial" })).toContainText(
+      "Place the sample bag on the Gross balance",
     );
 
     await page.getByRole("button", { name: "Pause tutorial" }).click();

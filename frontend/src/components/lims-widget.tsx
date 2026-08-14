@@ -282,6 +282,7 @@ export function LimsWidget({
             <span className="text-xs font-medium text-slate-600">Orchard / producer</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400"
+              data-tutorial-anchor="lims-orchard-name"
               onChange={(event) => setOrchardName(event.target.value)}
               placeholder="Enter orchard or producer"
               type="text"
@@ -292,6 +293,7 @@ export function LimsWidget({
             <span className="text-xs font-medium text-slate-600">Harvest date</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 focus:border-sky-400"
+              data-tutorial-anchor="lims-harvest-date"
               onChange={(event) => setHarvestDate(event.target.value)}
               type="date"
               value={harvestDate}
@@ -301,6 +303,7 @@ export function LimsWidget({
             <span className="text-xs font-medium text-slate-600">Indicative field mass (g)</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400"
+              data-tutorial-anchor="lims-indicative-mass"
               inputMode="decimal"
               min="0"
               onChange={(event) => setIndicativeMassText(event.target.value)}
@@ -314,6 +317,7 @@ export function LimsWidget({
             <span className="text-xs font-medium text-slate-600">Sample mass (g)</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400"
+              data-tutorial-anchor="lims-sample-mass"
               inputMode="decimal"
               min="0"
               onChange={(event) => setMeasuredSampleMassText(event.target.value)}
@@ -328,6 +332,7 @@ export function LimsWidget({
           <button
             className="rounded-full bg-slate-950 px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-40"
             disabled={!canCreateReception}
+            data-tutorial-anchor="lims-create-record"
             onClick={() =>
               onSaveReception({
                 ...(selectedEntry ? { entry_id: selectedEntry.id ?? undefined } : {}),
@@ -344,6 +349,7 @@ export function LimsWidget({
           <button
             className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-medium text-slate-800 disabled:opacity-40"
             disabled={!canPrintLabel}
+            data-tutorial-anchor="lims-print-label"
             onClick={() =>
               onPrintLabel(
                 selectedEntryIdRef.current !== "new" ? selectedEntryIdRef.current : undefined,
@@ -358,6 +364,7 @@ export function LimsWidget({
           <div
             className={`${displayedTicket.isDraggable ?? true ? "cursor-grab" : "cursor-default opacity-70"} rounded-[0.9rem] border border-dashed border-sky-300 bg-sky-50 px-3 py-1.5`.trim()}
             data-testid="lims-printed-ticket"
+            data-tutorial-anchor="lims-printed-ticket"
             draggable={displayedTicket.isDraggable ?? true}
             onDragEnd={onTicketDragEnd}
             onDragStart={(event) => {

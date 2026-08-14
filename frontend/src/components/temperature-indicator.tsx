@@ -2,6 +2,7 @@
 
 type TemperatureIndicatorProps = {
   temperatureC: number;
+  tutorialAnchor?: string;
 };
 
 const ambientTemperatureC = 20;
@@ -31,7 +32,7 @@ function getCryogenicStatus(temperatureC: number) {
   return { label: "Near ambient", toneClassName: "text-slate-600" };
 }
 
-export function TemperatureIndicator({ temperatureC }: TemperatureIndicatorProps) {
+export function TemperatureIndicator({ temperatureC, tutorialAnchor }: TemperatureIndicatorProps) {
   const normalizedFill = clamp(
     (temperatureC - cryogenicTemperatureC) / (ambientTemperatureC - cryogenicTemperatureC),
     0,
@@ -46,6 +47,7 @@ export function TemperatureIndicator({ temperatureC }: TemperatureIndicatorProps
       aria-label={tooltipLabel}
       className="group relative inline-flex items-center gap-0 rounded-[0.75rem] border border-sky-100 bg-sky-50/80 px-1 py-1"
       tabIndex={0}
+      data-tutorial-anchor={tutorialAnchor}
     >
       <div className="relative flex h-8 w-3 items-end rounded-full border border-slate-300 bg-white p-[2px]">
         <div

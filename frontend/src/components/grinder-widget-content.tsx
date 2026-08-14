@@ -85,6 +85,7 @@ export function GrinderWidgetContent({
                     grinderDisplayMode === "warning" ? "bg-amber-700" : "bg-emerald-700"
                   }`}
                   data-testid="grinder-lcd-progress-bar"
+                  data-tutorial-anchor="grinder-progress"
                   style={{ width: `${grinderProgressPercent}%` }}
                 />
               </div>

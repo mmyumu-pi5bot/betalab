@@ -55,6 +55,7 @@ export function CryogenicGrinderIllustration({
           powerButtonDisabled ? "cursor-not-allowed opacity-70" : "active:scale-[0.97]"
         } ${powerButtonToneClassName}`}
         data-testid={powerButtonTestId}
+        data-tutorial-anchor="grinder-power-button"
         disabled={powerButtonDisabled}
         onClick={onPowerClick}
         type="button"

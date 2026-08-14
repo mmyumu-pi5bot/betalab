@@ -22,6 +22,32 @@ export type TutorialStep = {
   prerequisites: string[];
   anchor: (experiment: Experiment) => string | null;
   isSatisfied: (experiment: Experiment) => boolean;
+  presentation?: (experiment: Experiment) => Partial<TutorialStepPresentation>;
+};
+
+export type TutorialStepPresentation = Pick<
+  TutorialStep,
+  "title" | "instruction" | "hint"
+> & {
+  action?: TutorialAction;
+};
+
+export type TutorialAction = {
+  kind: "click" | "drag" | "inspect" | "keyboard" | "type" | "wait";
+  label: string;
+};
+
+export type LimsTutorialField =
+  | "orchard"
+  | "harvest-date"
+  | "indicative-mass"
+  | "create-record";
+
+export type LimsTutorialValues = {
+  orchardName: string;
+  harvestDate: string;
+  indicativeMassG: number;
+  measuredGrossMassG: number | null;
 };
 
 export type TutorialDefinition = {
@@ -47,16 +73,6 @@ function workspaceWidget(experiment: Experiment, id: ExperimentWorkspaceWidget["
   return experiment.workspace.widgets.find((widget) => widget.id === id);
 }
 
-function equipmentAnchor(
-  experiment: Experiment,
-  widgetId: ExperimentWorkspaceWidget["id"],
-  paletteItemId: string,
-) {
-  return workspaceWidget(experiment, widgetId)?.isPresent
-    ? `widget-${widgetId}`
-    : `palette-item-${paletteItemId}`;
-}
-
 function allTools(experiment: Experiment): BenchToolInstance[] {
   return [
     ...experiment.workbench.slots.flatMap((slot) => (slot.tool ? [slot.tool] : [])),
@@ -67,10 +83,95 @@ function allTools(experiment: Experiment): BenchToolInstance[] {
   ];
 }
 
+function toolSourceAnchor(
+  experiment: Experiment,
+  predicate: (tool: BenchToolInstance) => boolean,
+) {
+  const workbenchTool = experiment.workbench.slots.find(
+    (slot) => slot.tool && predicate(slot.tool),
+  )?.tool;
+  if (workbenchTool) {
+    return `bench-tool-card-${workbenchTool.id}`;
+  }
+  const rackIndex = experiment.rack.slots.findIndex(
+    (slot) => slot.tool && predicate(slot.tool),
+  );
+  if (rackIndex >= 0) {
+    return `rack-slot-tool-${rackIndex + 1}`;
+  }
+  const basketTool = experiment.basketTools.find(predicate);
+  if (basketTool) {
+    return basketTool.toolType === "sample_bag" ? "basket-received-bag" : "widget-basket";
+  }
+  const trashTool = experiment.trash.children.find(predicate);
+  if (trashTool) {
+    return `trash-tool-${trashTool.id}`;
+  }
+  const containingWidget = experiment.workspace.widgets.find(
+    (widget) => widget.tool && predicate(widget.tool),
+  );
+  return containingWidget ? `widget-${containingWidget.id}` : "workspace";
+}
+
+function toolIsInWidget(
+  experiment: Experiment,
+  widgetId: ExperimentWorkspaceWidget["id"],
+  tool: BenchToolInstance | undefined,
+) {
+  return Boolean(tool && workspaceWidget(experiment, widgetId)?.tool?.id === tool.id);
+}
+
+function plainSampleVial(experiment: Experiment) {
+  return allTools(experiment).find(
+    (tool) =>
+      tool.toolType === "sample_vial" &&
+      !tool.injectionContext &&
+      !tool.calibrationContext,
+  );
+}
+
+function toolIsInRack(experiment: Experiment, tool: BenchToolInstance | undefined) {
+  return Boolean(
+    tool && experiment.rack.slots.some((slot) => slot.tool?.id === tool.id),
+  );
+}
+
 function hasMaterialState(experiment: Experiment, states: ProduceMaterialKind[]) {
   return (experiment.produceMaterialStates ?? []).some((state) =>
     state.materialState ? states.includes(state.materialState) : false,
   );
+}
+
+function materialStateForLot(experiment: Experiment, lotId: string) {
+  return experiment.produceMaterialStates?.find((state) => state.produceLotId === lotId)
+    ?.materialState;
+}
+
+function produceSourceAnchor(experiment: Experiment, states: ProduceMaterialKind[]) {
+  const matches = (lot: { id: string; materialState?: ProduceMaterialKind }) =>
+    states.includes(lot.materialState ?? materialStateForLot(experiment, lot.id) ?? "whole");
+  for (const slot of experiment.workbench.slots) {
+    const surfaceLot = (slot.surfaceProduceLots ?? []).find(matches);
+    if (surfaceLot) {
+      return `bench-surface-produce-lot-${surfaceLot.id}`;
+    }
+    const containedLot = (slot.tool?.produceLots ?? []).find(matches);
+    if (containedLot) {
+      return `bench-produce-lot-${containedLot.id}`;
+    }
+  }
+  const basketLot = experiment.workspace.produceBasketLots.find(matches);
+  if (basketLot) {
+    return `basket-produce-${basketLot.id}`;
+  }
+  const trashLot = experiment.trash.produceLots.find((entry) => matches(entry.produceLot));
+  if (trashLot) {
+    return `trash-produce-lot-${trashLot.id}`;
+  }
+  const containingWidget = experiment.workspace.widgets.find((widget) =>
+    (widget.produceLots ?? []).some(matches),
+  );
+  return containingWidget ? `widget-${containingWidget.id}` : "widget-workbench";
 }
 
 function extractionTube(experiment: Experiment) {
@@ -107,6 +208,672 @@ function hasAppliedLimsLabel(experiment: Experiment) {
       (label) => label.labelKind === "lims" && label.sampleCode === sampleCode,
     ),
   );
+}
+
+function hasSampleBagOnGrossBalance(experiment: Experiment) {
+  return workspaceWidget(experiment, "gross_balance")?.tool?.toolType === "sample_bag";
+}
+
+function sampleBagSourceAnchor(experiment: Experiment) {
+  const workbenchBag = experiment.workbench.slots.find(
+    (slot) => slot.tool?.toolType === "sample_bag",
+  )?.tool;
+  if (workbenchBag) {
+    return `bench-tool-card-${workbenchBag.id}`;
+  }
+  if (experiment.basketTools.some((tool) => tool.toolType === "sample_bag")) {
+    return "basket-received-bag";
+  }
+  const trashBag = experiment.trash.children.find((tool) => tool.toolType === "sample_bag");
+  if (trashBag) {
+    return `trash-tool-${trashBag.id}`;
+  }
+  return "workspace";
+}
+
+function sampleBagContainingWholeProduce(experiment: Experiment) {
+  return allTools(experiment).find(
+    (tool) =>
+      tool.toolType === "sample_bag" &&
+      (tool.produceLots ?? []).some(
+        (lot) =>
+          (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole",
+      ),
+  );
+}
+
+export function getLimsTutorialValues(experiment: Experiment): LimsTutorialValues {
+  const bag = workspaceWidget(experiment, "gross_balance")?.tool;
+  const labelMatch = bag?.fieldLabelText?.match(
+    /^(.*?) • Harvest (\d{4}-\d{2}-\d{2}) • Approx\. ([\d.]+) kg$/,
+  );
+  if (labelMatch) {
+    return {
+      orchardName: labelMatch[1],
+      harvestDate: labelMatch[2],
+      indicativeMassG: Number(labelMatch[3]) * 1000,
+      measuredGrossMassG: experiment.limsReception.measuredGrossMassG,
+    };
+  }
+
+  const referenceDate = new Date(experiment.last_simulation_at);
+  referenceDate.setUTCDate(referenceDate.getUTCDate() - 1);
+  return {
+    orchardName: "Tutorial Orchard",
+    harvestDate: referenceDate.toISOString().slice(0, 10),
+    indicativeMassG: Math.max(
+      0,
+      Math.round((experiment.limsReception.measuredGrossMassG ?? 2536) - 36),
+    ),
+    measuredGrossMassG: experiment.limsReception.measuredGrossMassG,
+  };
+}
+
+export function getLimsTutorialFieldPresentation(
+  experiment: Experiment,
+  field: LimsTutorialField,
+): TutorialStepPresentation {
+  const values = getLimsTutorialValues(experiment);
+  const grossMass = values.measuredGrossMassG?.toFixed(1) ?? "the current";
+  if (field === "orchard") {
+    return {
+      title: "Enter the orchard / producer",
+      instruction: `Click the highlighted field and enter exactly: ${values.orchardName}. This value comes from the field label on the sample bag.`,
+      hint: `The Gross balance currently reads ${grossMass} g. Keep the bag on it while completing the LIMS record.`,
+      action: { kind: "type", label: `Type ${values.orchardName}` },
+    };
+  }
+  if (field === "harvest-date") {
+    return {
+      title: "Enter the harvest date",
+      instruction: `Click the highlighted date field and enter ${values.harvestDate}, as printed on the sample bag label.`,
+      hint: "Use the field-label date, not today's date or the experiment creation date.",
+      action: { kind: "type", label: `Enter ${values.harvestDate}` },
+    };
+  }
+  if (field === "indicative-mass") {
+    return {
+      title: "Enter the indicative field mass",
+      instruction: `Click the highlighted field and enter ${values.indicativeMassG} g. This is the approximate field mass printed on the bag label.`,
+      hint: `Do not copy the ${grossMass} g balance reading here: that is the measured gross mass, including the bag.`,
+      action: { kind: "type", label: `Type ${values.indicativeMassG}` },
+    };
+  }
+  return {
+    title: "Create the LIMS record",
+    instruction:
+      "Leave Sample mass empty for now, then click the highlighted Create LIMS record button.",
+    hint: `The measured gross mass (${grossMass} g) is taken automatically from the Gross balance when you create the record. Sample mass will be measured later on the Analytical balance.`,
+    action: { kind: "click", label: "Click Create LIMS record" },
+  };
+}
+
+function registerSamplePresentation(experiment: Experiment): TutorialStepPresentation {
+  if (!workspaceWidget(experiment, "lims")?.isPresent) {
+    return {
+      title: "Deploy the LIMS terminal",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the highlighted LIMS terminal and drop it onto the central workspace.",
+      hint: hasSampleBagOnGrossBalance(experiment)
+        ? "Keep the bag on the balance while you deploy and complete the LIMS terminal."
+        : "After deploying the terminal, return the sample bag to the Gross balance before entering the LIMS data.",
+      action: { kind: "drag", label: "Drag to workspace" },
+    };
+  }
+
+  if (!hasSampleBagOnGrossBalance(experiment)) {
+    const bagAnchor = sampleBagSourceAnchor(experiment);
+    const sourceInstruction =
+      bagAnchor === "basket-received-bag"
+        ? "Open the Produce basket, then drag the sample bag and drop it onto the Gross balance."
+        : bagAnchor.startsWith("trash-tool-")
+          ? "Open the Trash, then drag the sample bag and drop it onto the Gross balance."
+          : bagAnchor.startsWith("bench-tool-card-")
+            ? "Drag the sample bag from its workbench station and drop it onto the Gross balance."
+            : "Locate the sample bag, then drag it and drop it onto the Gross balance.";
+    return {
+      title: "Return the sample bag to the Gross balance",
+      instruction: sourceInstruction,
+      hint: "Keep the bag on the balance until the LIMS record is complete and its printed label has been applied.",
+      action: { kind: "drag", label: "Drag onto the balance" },
+    };
+  }
+
+  if (!experiment.limsReception.labSampleCode) {
+    const values = getLimsTutorialValues(experiment);
+    return {
+      title: "Create the LIMS record",
+      instruction:
+        `Enter Orchard / producer: ${values.orchardName}. Enter Harvest date: ${values.harvestDate}. Enter Indicative field mass: ${values.indicativeMassG} g. Leave Sample mass empty for now. Then click Create LIMS record.`,
+      hint: `The measured gross mass (${values.measuredGrossMassG?.toFixed(1) ?? "current"} g) is captured automatically from the Gross balance.`,
+      action: { kind: "type", label: "Enter the values, then click" },
+    };
+  }
+
+  if (!experiment.limsReception.printedLabelTicket) {
+    return {
+      title: "Print the LIMS label",
+      instruction: "In the LIMS terminal, click Print label.",
+      hint: "The printed label will appear in the LIMS terminal and can then be dragged.",
+      action: { kind: "click", label: "Click Print label" },
+    };
+  }
+
+  return {
+    title: "Apply the LIMS label",
+    instruction:
+      "Drag the printed LIMS label from the terminal and drop it directly onto the sample bag on the Gross balance.",
+    hint: "Once the label is attached, you can move the bag away and store the balance.",
+    action: { kind: "drag", label: "Drag label onto bag" },
+  };
+}
+
+function extractionEquipmentAnchor(
+  experiment: Experiment,
+  widgetId: "vortex" | "centrifuge",
+  paletteItemId: string,
+) {
+  if (!workspaceWidget(experiment, widgetId)?.isPresent) {
+    return `palette-item-${paletteItemId}`;
+  }
+  const tube = extractionTube(experiment);
+  if (!toolIsInWidget(experiment, widgetId, tube)) {
+    return toolSourceAnchor(experiment, (tool) => tool.id === tube?.id);
+  }
+  const widget = workspaceWidget(experiment, widgetId);
+  if (widgetId === "vortex") {
+    if ((widget?.vortexRunRemainingMs ?? 0) > 0) {
+      return "vortex-progress-bar";
+    }
+    return tube?.isSealed ? "vortex-start-button" : `seal-tool-${tube?.id}`;
+  }
+  return (widget?.centrifugeRunRemainingMs ?? 0) > 0
+    ? "centrifuge-progress-bar"
+    : "centrifuge-start-button";
+}
+
+function extractionEquipmentPresentation(
+  experiment: Experiment,
+  widgetId: "vortex" | "centrifuge",
+  equipmentName: "Vortex mixer" | "Centrifuge",
+): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, widgetId)?.isPresent) {
+    return {
+      title: `Deploy the ${equipmentName}`,
+      instruction: `In Inventory, open Workspace equipment. Drag the highlighted ${equipmentName} and drop it onto the central workspace.`,
+    };
+  }
+  const tube = extractionTube(experiment);
+  if (!toolIsInWidget(experiment, widgetId, tube)) {
+    return {
+      title: `Return the extraction tube to the ${equipmentName}`,
+      instruction: `Locate the extraction tube at the highlighted location, then drag it and drop it into the ${equipmentName}.`,
+      hint: "Moving a required item away does not reset progress; the tutorial will keep pointing to its current location.",
+    };
+  }
+  const widget = workspaceWidget(experiment, widgetId);
+  if (
+    (widgetId === "vortex" && (widget?.vortexRunRemainingMs ?? 0) > 0) ||
+    (widgetId === "centrifuge" && (widget?.centrifugeRunRemainingMs ?? 0) > 0)
+  ) {
+    return {
+      title: widgetId === "vortex" ? "Wait for vortex mixing" : "Wait for phase separation",
+      instruction: "Watch the highlighted progress bar. Leave the extraction tube inside until it reaches 100%.",
+      action: { kind: "wait", label: "Wait for 100%" },
+    };
+  }
+  return widgetId === "vortex"
+    ? {
+        title: tube?.isSealed ? "Start the vortex cycle" : "Seal the extraction tube",
+        instruction: tube?.isSealed
+          ? "Click the highlighted Start vortex button."
+          : "Click the highlighted Close button on the extraction tube before starting the mixer.",
+        action: tube?.isSealed
+          ? { kind: "click", label: "Click Start vortex" }
+          : { kind: "click", label: "Click Close" },
+      }
+    : {
+        title: "Start the centrifuge cycle",
+        instruction: "Click the highlighted Start the centrifuge button.",
+        action: { kind: "click", label: "Click Start centrifuge" },
+      };
+}
+
+function sampleVialAnchor(experiment: Experiment) {
+  const vial = plainSampleVial(experiment);
+  if (!vial) {
+    return "palette-item-sample_vial_lcms";
+  }
+  return experiment.pipette.volumeMl > 0 ? "tool-type-sample_vial" : "pipette-aspirate";
+}
+
+function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  const vial = plainSampleVial(experiment);
+  return vial
+    ? {
+        title: "Transfer extract into the Autosampler vial",
+        instruction: experiment.pipette.volumeMl > 0
+          ? "The micropipette now contains extract. Click the highlighted empty Autosampler vial to dispense it."
+          : "Click Micropipette in Actions, or press P. Then click the separated extraction tube once to aspirate 1.00 mL.",
+        hint: "The micropipette icon shows whether liquid is currently loaded.",
+        action: experiment.pipette.volumeMl > 0
+          ? { kind: "click", label: "Click vial to dispense" }
+          : { kind: "keyboard", label: "Click pipette or press P" },
+      }
+    : {
+        title: "Deploy an Autosampler vial",
+        instruction:
+          "In Inventory, open Containers. Drag an Autosampler vial and drop it onto an empty workbench station.",
+        hint: "After placing the vial, use the Micropipette to transfer the separated extract into it.",
+      };
+}
+
+function stageVialsAnchor(experiment: Experiment) {
+  if (!workspaceWidget(experiment, "rack")?.isPresent) {
+    return "palette-item-autosampler_rack_widget";
+  }
+  const sampleVial = preparedSampleVial(experiment);
+  if (!toolIsInRack(experiment, sampleVial)) {
+    return sampleVial?.isSealed
+      ? toolSourceAnchor(experiment, (tool) => tool.id === sampleVial.id)
+      : `seal-tool-${sampleVial?.id}`;
+  }
+  const calibrationVial = preparedCalibrationVial(experiment);
+  if (!toolIsInRack(experiment, calibrationVial)) {
+    return calibrationVial?.isSealed
+      ? toolSourceAnchor(experiment, (tool) => tool.id === calibrationVial.id)
+      : `seal-tool-${calibrationVial?.id}`;
+  }
+  const openRackVial = [sampleVial, calibrationVial].find((tool) => !tool?.isSealed);
+  if (openRackVial) {
+    return `seal-tool-${openRackVial.id}`;
+  }
+  return "widget-rack";
+}
+
+function stageVialsPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, "rack")?.isPresent) {
+    return {
+      title: "Deploy the Autosampler rack",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the Autosampler rack and drop it onto the central workspace.",
+    };
+  }
+  const vials = [
+    { tool: preparedSampleVial(experiment), name: "sample vial" },
+    { tool: preparedCalibrationVial(experiment), name: "calibration vial" },
+  ];
+  const missing = vials.find(({ tool }) => !toolIsInRack(experiment, tool));
+  if (missing) {
+    return missing.tool?.isSealed
+      ? {
+          title: `Return the ${missing.name} to the rack`,
+          instruction: `Drag the highlighted ${missing.name} and drop it into an empty rack position.`,
+        }
+      : {
+          title: `Seal and stage the ${missing.name}`,
+          instruction: `At the highlighted location, click Close on the ${missing.name}. Then drag it into an empty rack position.`,
+        };
+  }
+  return {
+    title: "Check both staged vials",
+    instruction: "Make sure both rack vials are sealed. Close any vial that is still open.",
+  };
+}
+
+function weighReceptionAnchor(experiment: Experiment) {
+  if (!workspaceWidget(experiment, "gross_balance")?.isPresent) {
+    return "palette-item-gross_balance_widget";
+  }
+  const sourceAnchor = sampleBagSourceAnchor(experiment);
+  return hasSampleBagOnGrossBalance(experiment) || sourceAnchor === "workspace"
+    ? "widget-gross_balance"
+    : sourceAnchor;
+}
+
+function weighReceptionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, "gross_balance")?.isPresent) {
+    return {
+      title: "Deploy the Gross balance",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the highlighted Gross balance and drop it onto the central workspace.",
+      action: { kind: "drag", label: "Drag to workspace" },
+    };
+  }
+  if (!hasSampleBagOnGrossBalance(experiment)) {
+    return {
+      title: "Place the sample bag on the Gross balance",
+      instruction:
+        "Locate the highlighted sample bag, then drag it and drop it onto the Gross balance.",
+      action: { kind: "drag", label: "Drag bag onto balance" },
+    };
+  }
+  return {
+    title: "Wait for the gross mass",
+    instruction: "Leave the bag on the Gross balance while its mass is recorded.",
+    action: { kind: "wait", label: "Wait for the mass" },
+  };
+}
+
+function grindSampleAnchor(experiment: Experiment) {
+  const grinder = workspaceWidget(experiment, "grinder");
+  if (!grinder?.isPresent) {
+    return "palette-item-cryogenic_grinder_widget";
+  }
+  if (!(grinder.produceLots ?? []).length) {
+    return produceSourceAnchor(experiment, ["cut"]);
+  }
+  if (!(grinder.liquids ?? []).some((liquid) => liquid.liquidId === "dry_ice_pellets")) {
+    return "palette-item-dry_ice_pellets";
+  }
+  const lot = grinder.produceLots?.[0];
+  if ((grinder.grinderRunRemainingMs ?? 0) > 0) {
+    return "grinder-progress";
+  }
+  if ((lot?.temperatureC ?? 20) > -45) {
+    return lot ? `temperature-${lot.id}` : "grinder-lcd-panel";
+  }
+  return "grinder-power-button";
+}
+
+function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  const grinder = workspaceWidget(experiment, "grinder");
+  if (!grinder?.isPresent) {
+    return {
+      title: "Deploy the Cryogenic grinder",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the Cryogenic grinder and drop it onto the central workspace.",
+      action: { kind: "drag", label: "Drag to workspace" },
+    };
+  }
+  if (!(grinder.produceLots ?? []).length) {
+    return {
+      title: "Load the cut apples into the grinder",
+      instruction:
+        "Drag the cut apples from the highlighted location and drop them into the Cryogenic grinder.",
+      action: { kind: "drag", label: "Drag apples into grinder" },
+    };
+  }
+  if (!(grinder.liquids ?? []).some((liquid) => liquid.liquidId === "dry_ice_pellets")) {
+    return {
+      title: "Add Dry ice pellets",
+      instruction:
+        "In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter 1000 g, then confirm.",
+      hint: "The dry ice cools the apples gradually. Do not start the grinder while the temperature is above −45 °C.",
+      action: { kind: "drag", label: "Add 1000 g dry ice" },
+    };
+  }
+  if ((grinder.grinderRunRemainingMs ?? 0) > 0) {
+    return {
+      title: "Wait for grinding to finish",
+      instruction: "Watch the highlighted progress bar. Do not remove the apples while the grinder is running.",
+      hint: "The tutorial will continue automatically when the material becomes ground.",
+      action: { kind: "wait", label: "Wait for 100%" },
+    };
+  }
+  const lot = grinder.produceLots?.[0];
+  if ((lot?.temperatureC ?? 20) > -45) {
+    return {
+      title: "Wait for the apples to become cryogenic",
+      instruction: "Watch the highlighted thermometer. Wait until it reads −45 °C or colder before starting the grinder.",
+      hint: "The temperature falls over simulation ticks after the dry ice is added.",
+      action: { kind: "wait", label: "Wait until −45 °C" },
+    };
+  }
+  return {
+    title: "Start the grinder cycle",
+    instruction: "The apples are cold enough. Click the highlighted red power button on the grinder.",
+    hint: "After clicking, watch the progress indicator and leave the contents inside the grinder.",
+    action: { kind: "click", label: "Click power" },
+  };
+}
+
+function analyticalWeighingAnchor(experiment: Experiment) {
+  const balance = workspaceWidget(experiment, "analytical_balance");
+  if (!balance?.isPresent) {
+    return "palette-item-analytical_balance_widget";
+  }
+  const tube = allTools(experiment).find((tool) => tool.toolType === "centrifuge_tube");
+  if (!tube) {
+    return "palette-item-centrifuge_tube_50ml";
+  }
+  if (!toolIsInWidget(experiment, "analytical_balance", tube)) {
+    return toolSourceAnchor(experiment, (tool) => tool.id === tube.id);
+  }
+  if (experiment.analyticalBalance.taredToolId !== tube.id) {
+    return "analytical-balance-tare";
+  }
+  return experiment.spatula.isLoaded ? "widget-analytical_balance" : "action-spatula";
+}
+
+function analyticalWeighingPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, "analytical_balance")?.isPresent) {
+    return {
+      title: "Deploy the Analytical balance",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the Analytical balance and drop it onto the central workspace.",
+    };
+  }
+  const tube = allTools(experiment).find((tool) => tool.toolType === "centrifuge_tube");
+  if (!tube) {
+    return {
+      title: "Deploy a 50 mL tube",
+      instruction:
+        "In Inventory, open Containers. Drag a 50 mL centrifuge tube and drop it onto the Analytical balance.",
+    };
+  }
+  if (!toolIsInWidget(experiment, "analytical_balance", tube)) {
+    return {
+      title: "Return the tube to the Analytical balance",
+      instruction:
+        "Drag the highlighted 50 mL tube and drop it onto the Analytical balance.",
+    };
+  }
+  if (experiment.analyticalBalance.taredToolId !== tube.id) {
+    return {
+      title: "Tare the tube",
+      instruction: "Click Tare while the empty tube is on the Analytical balance.",
+      action: { kind: "click", label: "Click Tare" },
+    };
+  }
+  return {
+    title: "Add the test portion",
+    instruction: experiment.spatula.isLoaded
+      ? "The spatula contains powder. Click and hold the tube on the Analytical balance until Net reaches about 10.000 g; release before 10.2 g."
+      : "Click the highlighted Powder spatula in Actions, or press S. Then click the powder in the HDPE container to load it.",
+    action: experiment.spatula.isLoaded
+      ? { kind: "click", label: "Hold to dose about 10.000 g" }
+      : { kind: "keyboard", label: "Click spatula or press S" },
+  };
+}
+
+function extractionPreparationAnchor(experiment: Experiment) {
+  const tube = extractionTube(experiment);
+  const liquids = tube?.liquids ?? [];
+  if (!liquids.some((liquid) => liquid.liquidId === "istd_solution")) {
+    return "palette-item-istd_solution";
+  }
+  if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
+    return "palette-item-acetonitrile_extraction";
+  }
+  return tube?.quechersState?.saltsAdded
+    ? toolSourceAnchor(experiment, (tool) => tool.id === tube.id)
+    : "palette-item-quechers_salts";
+}
+
+function extractionPreparationPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  const tube = extractionTube(experiment);
+  const liquids = tube?.liquids ?? [];
+  if (!liquids.some((liquid) => liquid.liquidId === "istd_solution")) {
+    return { title: "Add the ISTD solution", instruction: "Drag the highlighted ISTD solution onto the extraction tube. Keep 0.05 mL in the dialog, then click Confirm.", action: { kind: "drag", label: "Add 0.05 mL ISTD" } };
+  }
+  if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
+    return { title: "Add the extraction solvent", instruction: "Drag the highlighted Acetonitrile onto the same tube. Enter 10 mL in the dialog, then click Confirm.", action: { kind: "drag", label: "Add 10 mL acetonitrile" } };
+  }
+  return { title: "Add the QuEChERS salts", instruction: "Drag the highlighted QuEChERS salts packet onto the extraction tube and confirm the addition.", action: { kind: "drag", label: "Add the salts packet" } };
+}
+
+function calibrationVialAnchor(experiment: Experiment) {
+  const vial = plainSampleVial(experiment);
+  return vial
+    ? "palette-item-calibration_solution"
+    : "palette-item-sample_vial_lcms";
+}
+
+function calibrationVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  return plainSampleVial(experiment)
+    ? {
+        title: "Prepare the calibration vial",
+        instruction:
+          "Drag the highlighted Multi-residue stock solution onto the empty Autosampler vial. Enter 10 ng/mL, then click Confirm.",
+        action: { kind: "drag", label: "Prepare 10 ng/mL" },
+      }
+    : {
+        title: "Deploy a second Autosampler vial",
+        instruction:
+          "In Inventory, open Containers. Drag another Autosampler vial and drop it onto an empty workbench station.",
+      };
+}
+
+function storageContainer(experiment: Experiment) {
+  return allTools(experiment).find((tool) => tool.toolType === "storage_jar");
+}
+
+function storeGrinderAnchor(experiment: Experiment) {
+  const grinder = workspaceWidget(experiment, "grinder");
+  if ((grinder?.produceLots ?? []).length > 0 && !storageContainer(experiment)) {
+    return "palette-item-hdpe_storage_jar_2l";
+  }
+  if ((grinder?.produceLots ?? []).length > 0) {
+    return `grinder-produce-${grinder?.produceLots?.[0]?.id}`;
+  }
+  return "store-widget-grinder";
+}
+
+function storeEquipmentAnchor(
+  experiment: Experiment,
+  widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge",
+) {
+  return workspaceWidget(experiment, widgetId)?.tool
+    ? `widget-${widgetId}`
+    : `store-widget-${widgetId}`;
+}
+
+function storeGrinderPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  const grinder = workspaceWidget(experiment, "grinder");
+  if ((grinder?.produceLots ?? []).length > 0) {
+    return storageContainer(experiment)
+      ? {
+          title: "Transfer the ground powder",
+          instruction:
+            "Drag the ground powder out of the grinder and drop it into the HDPE storage container. Then store the empty grinder.",
+        }
+      : {
+          title: "Deploy an HDPE storage container",
+          instruction:
+            "In Inventory, open Containers. Drag the Wide-neck HDPE jar and drop it onto an empty workbench station.",
+        };
+  }
+  return {
+    title: "Store the empty grinder",
+    instruction: "Click Store in inventory in the Cryogenic grinder header.",
+  };
+}
+
+function storeEquipmentPresentation(
+  experiment: Experiment,
+  widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge",
+  equipmentName: string,
+  itemName: string,
+): Partial<TutorialStepPresentation> {
+  return workspaceWidget(experiment, widgetId)?.tool
+    ? {
+        title: `Remove the ${itemName}`,
+        instruction: `Drag the ${itemName} out of the ${equipmentName} and drop it onto an empty workbench station.`,
+        hint: `The ${equipmentName} can only be stored after it is empty.`,
+        action: { kind: "drag", label: `Drag out the ${itemName}` },
+      }
+    : {
+        title: `Store the ${equipmentName}`,
+        instruction: `Click Store in inventory in the ${equipmentName} header.`,
+        action: { kind: "click", label: "Click Store in inventory" },
+      };
+}
+
+function inferTutorialAction(instruction: string): TutorialAction {
+  const normalized = instruction.toLowerCase();
+  if (normalized.includes("wait") || normalized.includes("watch")) {
+    return { kind: "wait", label: "Wait and watch" };
+  }
+  if (normalized.includes("enter") || normalized.includes("fill")) {
+    return { kind: "type", label: "Enter the requested values" };
+  }
+  if (normalized.includes("press ")) {
+    return { kind: "keyboard", label: "Use the keyboard shortcut" };
+  }
+  if (normalized.includes("drag")) {
+    return { kind: "drag", label: "Drag and drop" };
+  }
+  if (normalized.includes("click") || normalized.includes("select")) {
+    return { kind: "click", label: "Click the highlighted control" };
+  }
+  return { kind: "inspect", label: "Follow the highlighted area" };
+}
+
+function launchSequenceAnchor(experiment: Experiment) {
+  if (!workspaceWidget(experiment, "instrument")?.isPresent) {
+    return "palette-item-lc_msms_instrument_widget";
+  }
+  return experiment.rack.state === "loaded" ? "instrument-console-next" : "widget-rack";
+}
+
+function launchSequencePresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, "instrument")?.isPresent) {
+    return {
+      title: "Deploy the LC-MS/MS",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the LC-MS/MS and drop it onto the central workspace.",
+    };
+  }
+  if (experiment.rack.state !== "loaded") {
+    return {
+      title: "Load the rack into the LC-MS/MS",
+      instruction: "Drag the highlighted loaded rack and drop it into the LC-MS/MS.",
+    };
+  }
+  return {
+    title: "Launch the acquisition",
+    instruction:
+      "Click Open acquisition console. Verify that one row is the calibration vial and one row is the sample vial, then click Launch acquisition.",
+    action: { kind: "click", label: "Open console, then launch" },
+  };
+}
+
+function cleanupAcquisitionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (experiment.rack.state === "loaded") {
+    return {
+      title: "Unload the rack",
+      instruction: "In the LC-MS/MS, click Unload rack.",
+      action: { kind: "click", label: "Click Unload rack" },
+    };
+  }
+  if (experiment.rack.slots.some((slot) => slot.tool)) {
+    return {
+      title: "Empty the Autosampler rack",
+      instruction:
+        "Drag both vials out of the rack and place them on the workbench or in the trash.",
+    };
+  }
+  if (workspaceWidget(experiment, "rack")?.isPresent) {
+    return {
+      title: "Store the empty rack",
+      instruction: "Click Store in inventory in the Autosampler rack header.",
+    };
+  }
+  return {
+    title: "Store the LC-MS/MS",
+    instruction: "Click Store in inventory in the LC-MS/MS header.",
+  };
 }
 
 function sequenceRuns(experiment: Experiment) {
@@ -175,9 +942,9 @@ const steps: TutorialStep[] = [
     instruction:
       "In Inventory, open Workspace equipment. Drag the highlighted Gross balance and drop it onto the central workspace. Then open the Produce basket, drag the sample bag, and drop it onto the balance.",
     hint: "Dropping the bag onto the balance automatically records its gross mass.",
-    anchor: (experiment) =>
-      equipmentAnchor(experiment, "gross_balance", "gross_balance_widget"),
+    anchor: weighReceptionAnchor,
     isSatisfied: (experiment) => (experiment.limsReception.measuredGrossMassG ?? 0) > 0,
+    presentation: weighReceptionPresentation,
   }),
   step({
     id: "register-and-label-sample",
@@ -187,8 +954,18 @@ const steps: TutorialStep[] = [
       "Fill in the LIMS form, click Create LIMS record, and then click Print label.",
     hint: "Drag the printed LIMS label and drop it directly onto the sample bag.",
     prerequisites: ["weigh-received-sample"],
-    anchor: () => "widget-lims",
+    anchor: (experiment) =>
+      !workspaceWidget(experiment, "lims")?.isPresent
+        ? "palette-item-lims_terminal_widget"
+        : !hasSampleBagOnGrossBalance(experiment)
+          ? sampleBagSourceAnchor(experiment)
+          : !experiment.limsReception.labSampleCode
+            ? "lims-form-next-field"
+            : !experiment.limsReception.printedLabelTicket
+              ? "lims-print-label"
+              : "lims-printed-ticket",
     isSatisfied: (experiment) => hasAppliedLimsLabel(experiment),
+    presentation: registerSamplePresentation,
   }),
   step({
     id: "store-gross-balance",
@@ -198,10 +975,30 @@ const steps: TutorialStep[] = [
       "Drag the sample bag off the balance and drop it onto an empty workbench station. Then click Store in inventory in the balance header.",
     hint: "The Store in inventory button becomes available once the weighing pan is empty.",
     prerequisites: ["register-and-label-sample"],
-    anchor: () => "widget-gross_balance",
+    anchor: (experiment) =>
+      workspaceWidget(experiment, "lims")?.isPresent
+        ? "store-widget-lims"
+        : workspaceWidget(experiment, "gross_balance")?.tool
+          ? "widget-gross_balance"
+          : "store-widget-gross_balance",
     isSatisfied: (experiment) =>
       hasAppliedLimsLabel(experiment) &&
+      !workspaceWidget(experiment, "lims")?.isPresent &&
       !workspaceWidget(experiment, "gross_balance")?.isPresent,
+    presentation: (experiment) =>
+      workspaceWidget(experiment, "lims")?.isPresent
+        ? {
+            title: "Store the LIMS terminal",
+            instruction: "Click the highlighted Store in inventory button in the top-right corner of the LIMS terminal.",
+            hint: "The LIMS record and printed label stay saved after the terminal is stored.",
+            action: { kind: "click", label: "Click the top-right button" },
+          }
+        : storeEquipmentPresentation(
+            experiment,
+            "gross_balance",
+            "Gross balance",
+            "sample bag",
+          ),
   }),
   step({
     id: "cut-sample",
@@ -211,8 +1008,58 @@ const steps: TutorialStep[] = [
       "Drag a Cutting board from Inventory and drop it onto an empty workbench station. Drag the apples from the sample bag onto the board, click Stainless steel knife in Actions, and then click the apples.",
     hint: "Clicking the apples while the knife is active changes their material state to cut.",
     prerequisites: ["store-gross-balance"],
-    anchor: () => "widget-workbench",
+    anchor: (experiment) => {
+      const board = allTools(experiment).find((tool) => tool.toolType === "cutting_board");
+      if (!board) {
+        return "palette-item-cutting_board_hdpe";
+      }
+      if (!(board.produceLots ?? []).some((lot) => (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole")) {
+        const bag = sampleBagContainingWholeProduce(experiment);
+        if (bag?.isSealed) {
+          return `seal-tool-${bag.id}`;
+        }
+        return produceSourceAnchor(experiment, ["whole"]);
+      }
+      const wholeLot = board.produceLots?.find(
+        (lot) => (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole",
+      );
+      return wholeLot ? `cut-apples-${wholeLot.id}` : "action-knife";
+    },
     isSatisfied: (experiment) => hasMaterialState(experiment, ["cut", "ground", "slurry"]),
+    presentation: (experiment) => {
+      const board = allTools(experiment).find((tool) => tool.toolType === "cutting_board");
+      if (!board) {
+        return {
+          title: "Deploy a Cutting board",
+          instruction: "In Inventory, open MISC. Drag a Cutting board and drop it onto an empty workbench station.",
+          action: { kind: "drag", label: "Drag board to workbench" },
+        };
+      }
+      if (!(board.produceLots ?? []).some((lot) => (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole")) {
+        const bag = sampleBagContainingWholeProduce(experiment);
+        if (bag?.isSealed) {
+          return {
+            title: "Open the sample bag",
+            instruction:
+              "Click the highlighted Open button on the sample bag. The apples cannot be dragged while the bag is sealed.",
+            hint: "After the bag opens, the tutorial will highlight the apples inside it.",
+            action: { kind: "click", label: "Click Open" },
+          };
+        }
+        return {
+          title: "Place the apples on the Cutting board",
+          instruction: "Drag the highlighted apples themselves—not the bag—and drop them onto the Cutting board.",
+          hint: "The sample bag stays behind. Only the apple lot moves onto the preparation board.",
+          action: { kind: "drag", label: "Drag the apples" },
+        };
+      }
+      return {
+        title: "Select the Stainless steel knife",
+        instruction: "Click the highlighted knife in Actions, or press K on your keyboard. Then click the apples on the Cutting board to cut them.",
+        hint: "The knife button remains active until you click it again or select another action.",
+        action: { kind: "keyboard", label: "Click knife or press K" },
+      };
+    },
   }),
   step({
     id: "grind-sample",
@@ -222,9 +1069,9 @@ const steps: TutorialStep[] = [
       "Drag the highlighted Cryogenic grinder from Inventory and drop it onto the central workspace. Then drag the cut apples and Dry ice pellets into the grinder and click Start grinder.",
     hint: "Wait for the cycle to finish and for the material state to become ground.",
     prerequisites: ["cut-sample"],
-    anchor: (experiment) =>
-      equipmentAnchor(experiment, "grinder", "cryogenic_grinder_widget"),
+    anchor: grindSampleAnchor,
     isSatisfied: (experiment) => hasMaterialState(experiment, ["ground", "slurry"]),
+    presentation: grindSamplePresentation,
   }),
   step({
     id: "store-grinder",
@@ -234,10 +1081,11 @@ const steps: TutorialStep[] = [
       "Drag an HDPE storage container from Inventory onto an empty workbench station. Transfer the ground powder into it, then click Store in inventory in the grinder header.",
     hint: "The grinder must be empty before Store in inventory becomes available.",
     prerequisites: ["grind-sample"],
-    anchor: () => "widget-grinder",
+    anchor: storeGrinderAnchor,
     isSatisfied: (experiment) =>
       hasMaterialState(experiment, ["ground", "slurry"]) &&
       !workspaceWidget(experiment, "grinder")?.isPresent,
+    presentation: storeGrinderPresentation,
   }),
   step({
     id: "weigh-test-portion",
@@ -247,9 +1095,9 @@ const steps: TutorialStep[] = [
       "Drag the highlighted Analytical balance from Inventory and drop it onto the central workspace. Place a 50 mL tube on it, click Tare, then use the Powder spatula action to add approximately 10.000 g of powder.",
     hint: "The total mass shown for the tube must reach at least 9.5 g.",
     prerequisites: ["store-grinder"],
-    anchor: (experiment) =>
-      equipmentAnchor(experiment, "analytical_balance", "analytical_balance_widget"),
+    anchor: analyticalWeighingAnchor,
     isSatisfied: hasTestPortion,
+    presentation: analyticalWeighingPresentation,
   }),
   step({
     id: "store-analytical-balance",
@@ -259,10 +1107,17 @@ const steps: TutorialStep[] = [
       "Drag the weighed tube off the analytical balance and drop it onto an empty workbench station. Then click Store in inventory in the balance header.",
     hint: "The test portion remains in the tube; only the empty balance is stored.",
     prerequisites: ["weigh-test-portion"],
-    anchor: () => "widget-analytical_balance",
+    anchor: (experiment) => storeEquipmentAnchor(experiment, "analytical_balance"),
     isSatisfied: (experiment) =>
       hasTestPortion(experiment) &&
       !workspaceWidget(experiment, "analytical_balance")?.isPresent,
+    presentation: (experiment) =>
+      storeEquipmentPresentation(
+        experiment,
+        "analytical_balance",
+        "Analytical balance",
+        "weighed tube",
+      ),
   }),
   step({
     id: "prepare-extraction",
@@ -272,8 +1127,9 @@ const steps: TutorialStep[] = [
       "Drag the ISTD solution onto the tube and confirm the volume. Repeat with acetonitrile to add 10 mL, then drag the QuEChERS salt packet onto the same tube.",
     hint: "Add the ISTD before the solvent to preserve the correct analytical provenance.",
     prerequisites: ["store-analytical-balance"],
-    anchor: () => "widget-workbench",
+    anchor: extractionPreparationAnchor,
     isSatisfied: hasPreparedExtraction,
+    presentation: extractionPreparationPresentation,
   }),
   step({
     id: "vortex-extract",
@@ -284,8 +1140,10 @@ const steps: TutorialStep[] = [
     hint: "Wait until the vortex cycle is complete before removing the tube.",
     prerequisites: ["prepare-extraction"],
     anchor: (experiment) =>
-      equipmentAnchor(experiment, "vortex", "vortex_mixer_widget"),
+      extractionEquipmentAnchor(experiment, "vortex", "vortex_mixer_widget"),
     isSatisfied: hasVortexedExtraction,
+    presentation: (experiment) =>
+      extractionEquipmentPresentation(experiment, "vortex", "Vortex mixer"),
   }),
   step({
     id: "store-vortex",
@@ -294,9 +1152,16 @@ const steps: TutorialStep[] = [
     instruction: "Drag the mixed tube out of the vortex mixer and drop it onto an empty workbench station. Then click Store in inventory in the mixer header.",
     hint: "The centrifuge takes over in the next step, so the vortex mixer is no longer needed.",
     prerequisites: ["vortex-extract"],
-    anchor: () => "widget-vortex",
+    anchor: (experiment) => storeEquipmentAnchor(experiment, "vortex"),
     isSatisfied: (experiment) =>
       hasVortexedExtraction(experiment) && !workspaceWidget(experiment, "vortex")?.isPresent,
+    presentation: (experiment) =>
+      storeEquipmentPresentation(
+        experiment,
+        "vortex",
+        "Vortex mixer",
+        "mixed extraction tube",
+      ),
   }),
   step({
     id: "separate-extract",
@@ -307,8 +1172,10 @@ const steps: TutorialStep[] = [
     hint: "Wait for the cycle to finish and for the extract phase to become separated.",
     prerequisites: ["store-vortex"],
     anchor: (experiment) =>
-      equipmentAnchor(experiment, "centrifuge", "centrifuge_widget"),
+      extractionEquipmentAnchor(experiment, "centrifuge", "centrifuge_widget"),
     isSatisfied: hasSeparatedExtraction,
+    presentation: (experiment) =>
+      extractionEquipmentPresentation(experiment, "centrifuge", "Centrifuge"),
   }),
   step({
     id: "prepare-sample-vial",
@@ -318,8 +1185,9 @@ const steps: TutorialStep[] = [
       "Drag an Autosampler vial from Inventory onto an empty workbench station. Select Micropipette in Actions, click the separated tube to aspirate, then click the vial to dispense.",
     hint: "The vial becomes a sample vial when it receives extract from the separated tube.",
     prerequisites: ["separate-extract"],
-    anchor: () => "widget-workbench",
+    anchor: sampleVialAnchor,
     isSatisfied: (experiment) => Boolean(preparedSampleVial(experiment)),
+    presentation: sampleVialPresentation,
   }),
   step({
     id: "store-centrifuge",
@@ -329,10 +1197,17 @@ const steps: TutorialStep[] = [
       "Drag the tube out of the centrifuge and drop it onto an empty workbench station. Then click Store in inventory in the centrifuge header.",
     hint: "The prepared sample vial retains the extract needed for the remaining steps.",
     prerequisites: ["prepare-sample-vial"],
-    anchor: () => "widget-centrifuge",
+    anchor: (experiment) => storeEquipmentAnchor(experiment, "centrifuge"),
     isSatisfied: (experiment) =>
       Boolean(preparedSampleVial(experiment)) &&
       !workspaceWidget(experiment, "centrifuge")?.isPresent,
+    presentation: (experiment) =>
+      storeEquipmentPresentation(
+        experiment,
+        "centrifuge",
+        "Centrifuge",
+        "separated extraction tube",
+      ),
   }),
   step({
     id: "prepare-calibration-vial",
@@ -342,8 +1217,9 @@ const steps: TutorialStep[] = [
       "Drag a second Autosampler vial onto the workbench. Then drag the Multi-residue stock solution onto it, enter a concentration greater than zero, and confirm.",
     hint: "You may choose any positive level; this tutorial requires a single calibration point.",
     prerequisites: ["store-centrifuge"],
-    anchor: () => "palette-item-calibration_solution",
+    anchor: calibrationVialAnchor,
     isSatisfied: (experiment) => Boolean(preparedCalibrationVial(experiment)),
+    presentation: calibrationVialPresentation,
   }),
   step({
     id: "stage-vials",
@@ -353,8 +1229,7 @@ const steps: TutorialStep[] = [
       "Drag the highlighted Autosampler rack from Inventory and drop it onto the central workspace. Seal both vials, then drag and drop each vial into an empty rack position.",
     hint: "The physical provenance of each vial allows the system to distinguish the sample from the calibration point.",
     prerequisites: ["prepare-calibration-vial"],
-    anchor: (experiment) =>
-      equipmentAnchor(experiment, "rack", "autosampler_rack_widget"),
+    anchor: stageVialsAnchor,
     isSatisfied: (experiment) => {
       const rackTools = experiment.rack.slots.flatMap((slot) => (slot.tool ? [slot.tool] : []));
       return (
@@ -362,6 +1237,7 @@ const steps: TutorialStep[] = [
         rackTools.some((tool) => Boolean(tool.calibrationContext) && Boolean(tool.isSealed))
       );
     },
+    presentation: stageVialsPresentation,
   }),
   step({
     id: "launch-sequence",
@@ -371,9 +1247,9 @@ const steps: TutorialStep[] = [
       "Drag the highlighted LC-MS/MS from Inventory and drop it onto the central workspace. Drag and drop the loaded rack into the instrument, open the console, check both rows, and click Launch acquisition.",
     hint: "The sequence must contain one calibration injection and one sample injection.",
     prerequisites: ["stage-vials"],
-    anchor: (experiment) =>
-      equipmentAnchor(experiment, "instrument", "lc_msms_instrument_widget"),
+    anchor: launchSequenceAnchor,
     isSatisfied: (experiment) => sequenceRuns(experiment).length > 0,
+    presentation: launchSequencePresentation,
   }),
   step({
     id: "review-results",
@@ -383,8 +1259,20 @@ const steps: TutorialStep[] = [
       "Wait for both injections to finish, then compare the calibration point and sample results.",
     hint: "You can follow the active injection directly on the instrument illustration.",
     prerequisites: ["launch-sequence"],
-    anchor: () => "widget-instrument",
+    anchor: () => "instrument-screen",
     isSatisfied: completedCalibrationAndSampleRun,
+    presentation: (experiment) => {
+      const run = sequenceRuns(experiment).at(-1);
+      const progress = run && run.totalDurationS > 0
+        ? Math.round((run.elapsedS / run.totalDurationS) * 100)
+        : 0;
+      return {
+        title: "Wait for both injections",
+        instruction: `Watch the highlighted instrument screen. Acquisition is ${progress}% complete; wait until both the calibration and sample injections finish.`,
+        hint: "Do not unload the rack during acquisition. Results open automatically as the injections complete.",
+        action: { kind: "wait", label: `Wait — ${progress}% complete` },
+      };
+    },
   }),
   step({
     id: "store-acquisition-equipment",
@@ -395,8 +1283,15 @@ const steps: TutorialStep[] = [
     hint: "The results remain available after the equipment is stored.",
     prerequisites: ["review-results"],
     anchor: (experiment) =>
-      workspaceWidget(experiment, "rack")?.isPresent ? "widget-rack" : "widget-instrument",
+      experiment.rack.state === "loaded"
+        ? "instrument-unload-rack"
+        : experiment.rack.slots.some((slot) => slot.tool)
+          ? "widget-rack"
+          : workspaceWidget(experiment, "rack")?.isPresent
+            ? "store-widget-rack"
+            : "store-widget-instrument",
     isSatisfied: completedRunAndStoredAcquisitionEquipment,
+    presentation: cleanupAcquisitionPresentation,
   }),
 ];
 
@@ -463,6 +1358,21 @@ export function getTutorialDefinition(tutorialId: string | null | undefined) {
   return tutorialId === CALIBRATION_SAMPLE_TUTORIAL_ID
     ? calibrationSampleTutorial
     : null;
+}
+
+export function getTutorialStepPresentation(
+  tutorialStep: TutorialStep,
+  experiment: Experiment,
+): TutorialStepPresentation {
+  const dynamicPresentation = tutorialStep.presentation?.(experiment);
+  const instruction = dynamicPresentation?.instruction ?? tutorialStep.instruction;
+  return {
+    title: tutorialStep.title,
+    instruction,
+    hint: tutorialStep.hint,
+    action: inferTutorialAction(instruction),
+    ...dynamicPresentation,
+  };
 }
 
 export function evaluateTutorial(

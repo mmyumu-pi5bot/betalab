@@ -73,6 +73,7 @@ export function AnalyticalBalanceWidget({
             <button
               className="w-full rounded-full border border-slate-600 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-100 transition hover:border-slate-400"
               onClick={onTare}
+              data-tutorial-anchor="analytical-balance-tare"
               type="button"
             >
               Tare

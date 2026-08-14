@@ -638,7 +638,7 @@ describe("LabScene", () => {
     render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
 
     expect(await screen.findByRole("complementary", { name: "Guided tutorial" })).toBeInTheDocument();
-    expect(screen.getByText("Weigh the received sample bag")).toBeInTheDocument();
+    expect(screen.getByText("Deploy the Gross balance")).toBeInTheDocument();
     expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
       "experiment_pesticides",
     );

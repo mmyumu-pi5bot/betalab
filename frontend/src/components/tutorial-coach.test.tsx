@@ -58,7 +58,10 @@ describe("TutorialCoach", () => {
       />,
     );
 
-    expect(screen.getByText("Weigh the received sample bag")).toBeInTheDocument();
+    expect(screen.getByText("Deploy the Gross balance")).toBeInTheDocument();
+    expect(screen.getByText("Drag to workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-action-icon")).toHaveTextContent("↗");
+    expect(screen.getByTestId("tutorial-spotlight-action-icon")).toHaveTextContent("↗");
     expect(screen.getByTestId("tutorial-spotlight")).toHaveClass("pointer-events-none");
     expect(screen.getByTestId("tutorial-spotlight")).not.toHaveClass("transition-all");
 
@@ -192,6 +195,158 @@ describe("TutorialCoach", () => {
     expect(spotlight).toHaveStyle({ top: "212px" });
 
     target.remove();
+  });
+
+  it("highlights the closed basket before the sample bag inside it", () => {
+    const basketButton = document.createElement("button");
+    basketButton.dataset.testid = "basket-open-button";
+    basketButton.getBoundingClientRect = () =>
+      ({ bottom: 170, height: 100, left: 40, right: 180, top: 70, width: 140 } as DOMRect);
+    document.body.appendChild(basketButton);
+    const state = emptyExperiment();
+    state.workspace.widgets = [{
+      id: "gross_balance",
+      widgetType: "gross_balance",
+      label: "Gross balance",
+      isDraggable: true,
+      allowedDropTargets: [],
+      isStorable: true,
+      canStore: true,
+      anchor: "top-left",
+      offsetX: 0,
+      offsetY: 0,
+      isPresent: true,
+      isTrashed: false,
+    }];
+    state.basketTools = [{
+      id: "bag_1",
+      toolId: "sealed_sampling_bag",
+      label: "Sampling bag",
+      subtitle: "",
+      accent: "emerald",
+      toolType: "sample_bag",
+      capacity_ml: 500,
+      canReceiveLiquids: false,
+      canReceiveProduce: true,
+      canSeal: true,
+      isDraggable: true,
+      allowedDropTargets: [],
+      liquids: [],
+    }];
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, state)}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Open the Produce basket")).toBeInTheDocument();
+    expect(screen.getByText("Click the highlighted basket")).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      left: "32px",
+      top: "62px",
+    });
+
+    basketButton.remove();
+  });
+
+  it("guides each LIMS field with the value from the bag label", () => {
+    const orchardInput = document.createElement("input");
+    orchardInput.dataset.tutorialAnchor = "lims-orchard-name";
+    const harvestInput = document.createElement("input");
+    harvestInput.dataset.tutorialAnchor = "lims-harvest-date";
+    const massInput = document.createElement("input");
+    massInput.dataset.tutorialAnchor = "lims-indicative-mass";
+    const createButton = document.createElement("button");
+    createButton.dataset.tutorialAnchor = "lims-create-record";
+    for (const element of [orchardInput, harvestInput, massInput, createButton]) {
+      element.getBoundingClientRect = () =>
+        ({ bottom: 170, height: 40, left: 40, right: 240, top: 130, width: 200 } as DOMRect);
+      document.body.appendChild(element);
+    }
+
+    const state = emptyExperiment();
+    state.limsReception.measuredGrossMassG = 2987.4;
+    state.workspace.widgets = [
+      {
+        id: "lims",
+        widgetType: "lims_terminal",
+        label: "LIMS",
+        isDraggable: true,
+        allowedDropTargets: [],
+        isStorable: true,
+        canStore: true,
+        anchor: "top-left",
+        offsetX: 0,
+        offsetY: 0,
+        isPresent: true,
+        isTrashed: false,
+      },
+      {
+        id: "gross_balance",
+        widgetType: "gross_balance",
+        label: "Gross balance",
+        isDraggable: true,
+        allowedDropTargets: [],
+        isStorable: true,
+        canStore: true,
+        anchor: "top-left",
+        offsetX: 0,
+        offsetY: 0,
+        isPresent: true,
+        isTrashed: false,
+        tool: {
+          id: "bag_1",
+          toolId: "sealed_sampling_bag",
+          label: "Sampling bag",
+          subtitle: "",
+          accent: "emerald",
+          toolType: "sample_bag",
+          capacity_ml: 500,
+          canReceiveLiquids: false,
+          canReceiveProduce: true,
+          canSeal: true,
+          fieldLabelText:
+            "Golden Ridge Orchard • Harvest 2026-08-07 • Approx. 3.00 kg",
+          isDraggable: true,
+          allowedDropTargets: [],
+          liquids: [],
+        },
+      },
+    ];
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, state, ["weigh-received-sample"])}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Enter the orchard / producer")).toBeInTheDocument();
+    expect(screen.getAllByText(/Golden Ridge Orchard/)).not.toHaveLength(0);
+
+    fireEvent.input(orchardInput, { target: { value: "Golden Ridge Orchard" } });
+    expect(screen.getByText("Enter the harvest date")).toBeInTheDocument();
+    expect(screen.getAllByText(/2026-08-07/)).not.toHaveLength(0);
+
+    fireEvent.input(harvestInput, { target: { value: "2026-08-07" } });
+    expect(screen.getByText("Enter the indicative field mass")).toBeInTheDocument();
+    expect(screen.getAllByText(/3000 g/)).not.toHaveLength(0);
+
+    fireEvent.input(massInput, { target: { value: "3000" } });
+    expect(screen.getByText("Create the LIMS record")).toBeInTheDocument();
+    expect(screen.getByText(/2987.4 g/)).toBeInTheDocument();
+
+    for (const element of [orchardInput, harvestInput, massInput, createButton]) {
+      element.remove();
+    }
   });
 
   it("can be paused and resumed", () => {
