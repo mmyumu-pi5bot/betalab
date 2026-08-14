@@ -48,6 +48,11 @@ type WorkbenchDndOptions = {
   dragState: Pick<DragStateApi, "clearDropTargets" | "setActiveDragItem" | "showDropTargets">;
   experimentApi: WorkbenchDndExperimentApi;
   isKnifeMode: boolean;
+  onBeforeProduceDrop?: (attempt: {
+    payload: ProduceDragPayload;
+    proceed: () => void;
+    targetSlotId: string;
+  }) => boolean;
   setPendingDropDraft: Dispatch<SetStateAction<DropDraft | null>>;
 };
 
@@ -97,6 +102,7 @@ export function useWorkbenchDnd({
   dragState,
   experimentApi,
   isKnifeMode,
+  onBeforeProduceDrop,
   setPendingDropDraft,
 }: WorkbenchDndOptions): WorkbenchDndApi {
   const { clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
@@ -223,10 +229,21 @@ export function useWorkbenchDnd({
       slotId: targetSlotId,
     });
     if (command) {
-      executeWorkbenchProduceDropCommand(command, experimentApi, {
-        buildDebugProduceDraftFields,
-        setPendingDropDraft,
-      });
+      let didProceed = false;
+      const proceed = () => {
+        if (didProceed) {
+          return;
+        }
+        didProceed = true;
+        executeWorkbenchProduceDropCommand(command, experimentApi, {
+          buildDebugProduceDraftFields,
+          setPendingDropDraft,
+        });
+      };
+      const shouldProceed = onBeforeProduceDrop?.({ payload, proceed, targetSlotId }) ?? true;
+      if (shouldProceed) {
+        proceed();
+      }
     }
     clearDropTargets();
   };

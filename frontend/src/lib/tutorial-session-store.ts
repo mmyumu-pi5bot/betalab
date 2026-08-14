@@ -1,6 +1,6 @@
 export const TUTORIAL_SESSION_STORAGE_KEY = "betalab:tutorial-sessions:v1";
 
-export type TutorialSessionStatus = "active" | "paused";
+export type TutorialSessionStatus = "abandoned" | "active" | "paused";
 
 export type TutorialSession = {
   tutorialId: string;
@@ -11,6 +11,34 @@ export type TutorialSession = {
 };
 
 type TutorialSessionMap = Record<string, TutorialSession>;
+
+function tutorialSessionKey(tutorialId: string, experimentId: string) {
+  return `${tutorialId}::${experimentId}`;
+}
+
+function normalizeTutorialSession(value: unknown): TutorialSession | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const session = value as Partial<TutorialSession>;
+  if (
+    session.version !== 1 ||
+    typeof session.tutorialId !== "string" ||
+    typeof session.experimentId !== "string" ||
+    (session.status !== "abandoned" && session.status !== "active" && session.status !== "paused")
+  ) {
+    return null;
+  }
+  return {
+    tutorialId: session.tutorialId,
+    experimentId: session.experimentId,
+    status: session.status,
+    completedStepIds: Array.isArray(session.completedStepIds)
+      ? session.completedStepIds.filter((stepId): stepId is string => typeof stepId === "string")
+      : [],
+    version: 1,
+  };
+}
 
 function readSessions(): TutorialSessionMap {
   if (typeof window === "undefined") {
@@ -23,7 +51,16 @@ function readSessions(): TutorialSessionMap {
       return {};
     }
     const parsed = JSON.parse(raw) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as TutorialSessionMap) : {};
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    return Object.values(parsed).reduce<TutorialSessionMap>((sessions, value) => {
+      const session = normalizeTutorialSession(value);
+      if (session) {
+        sessions[tutorialSessionKey(session.tutorialId, session.experimentId)] = session;
+      }
+      return sessions;
+    }, {});
   } catch {
     return {};
   }
@@ -36,23 +73,17 @@ function writeSessions(sessions: TutorialSessionMap) {
   window.localStorage.setItem(TUTORIAL_SESSION_STORAGE_KEY, JSON.stringify(sessions));
 }
 
-export function getTutorialSession(tutorialId: string): TutorialSession | null {
-  const session = readSessions()[tutorialId];
-  if (
-    !session ||
-    session.version !== 1 ||
-    session.tutorialId !== tutorialId ||
-    typeof session.experimentId !== "string" ||
-    (session.status !== "active" && session.status !== "paused")
-  ) {
-    return null;
-  }
-  return {
-    ...session,
-    completedStepIds: Array.isArray(session.completedStepIds)
-      ? session.completedStepIds.filter((stepId): stepId is string => typeof stepId === "string")
-      : [],
-  };
+export function getTutorialSession(
+  tutorialId: string,
+  experimentId: string,
+): TutorialSession | null {
+  return readSessions()[tutorialSessionKey(tutorialId, experimentId)] ?? null;
+}
+
+export function getTutorialSessions(tutorialId: string): TutorialSession[] {
+  return Object.values(readSessions()).filter(
+    (session) => session.tutorialId === tutorialId,
+  );
 }
 
 export function saveTutorialSession(
@@ -61,22 +92,23 @@ export function saveTutorialSession(
   },
 ): TutorialSession {
   const sessions = readSessions();
-  const previous = sessions[session.tutorialId];
+  const key = tutorialSessionKey(session.tutorialId, session.experimentId);
+  const previous = sessions[key];
   const persisted: TutorialSession = {
     ...session,
     completedStepIds:
       session.completedStepIds ??
-      (previous?.experimentId === session.experimentId && Array.isArray(previous.completedStepIds)
+      (previous && Array.isArray(previous.completedStepIds)
         ? previous.completedStepIds
         : []),
     version: 1,
   };
-  writeSessions({ ...sessions, [session.tutorialId]: persisted });
+  writeSessions({ ...sessions, [key]: persisted });
   return persisted;
 }
 
-export function clearTutorialSession(tutorialId: string) {
+export function clearTutorialSession(tutorialId: string, experimentId: string) {
   const sessions = readSessions();
-  delete sessions[tutorialId];
+  delete sessions[tutorialSessionKey(tutorialId, experimentId)];
   writeSessions(sessions);
 }

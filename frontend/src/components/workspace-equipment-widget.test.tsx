@@ -195,12 +195,15 @@ describe("workspace equipment illustrations", () => {
 
   it("renders cryogenic grinder illustration", () => {
     render(
-      <CryogenicGrinderIllustration
-        powerButtonLabel="Start grinder"
-        powerButtonTestId="grinder-power-button"
-        status="ready"
-        testId="cryogenic-grinder-illustration"
-      />,
+      <>
+        <CryogenicGrinderIllustration />
+        <CryogenicGrinderIllustration
+          powerButtonLabel="Start grinder"
+          powerButtonTestId="grinder-power-button"
+          status="ready"
+          testId="cryogenic-grinder-illustration"
+        />
+      </>,
     );
 
     expect(screen.getByTestId("cryogenic-grinder-illustration")).toBeInTheDocument();
@@ -216,6 +219,9 @@ describe("workspace equipment illustrations", () => {
       "aria-label",
       "Start grinder",
     );
+    expect(
+      document.querySelectorAll('[data-tutorial-anchor="grinder-power-button"]'),
+    ).toHaveLength(1);
   });
 
   it("renders apple illustration", () => {

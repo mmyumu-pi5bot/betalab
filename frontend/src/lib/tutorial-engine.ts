@@ -175,13 +175,18 @@ function produceSourceAnchor(experiment: Experiment, states: ProduceMaterialKind
 }
 
 function extractionTube(experiment: Experiment) {
-  return allTools(experiment).find(
-    (tool) =>
-      tool.toolType === "centrifuge_tube" &&
-      ((tool.produceFractions ?? []).length > 0 ||
-        tool.containsSlurry ||
-        tool.quechersState?.phase !== "idle"),
-  );
+  const isExtractionTube = (tool: BenchToolInstance) =>
+    tool.toolType === "centrifuge_tube" &&
+    ((tool.produceFractions ?? []).length > 0 ||
+      tool.containsSlurry ||
+      tool.quechersState?.phase !== "idle");
+  const tubeOnBalance = workspaceWidget(experiment, "analytical_balance")?.tool;
+  if (tubeOnBalance && isExtractionTube(tubeOnBalance)) {
+    return tubeOnBalance;
+  }
+  const trashedToolIds = new Set(experiment.trash.children.map((tool) => tool.id));
+  const candidates = allTools(experiment).filter(isExtractionTube);
+  return candidates.find((tool) => !trashedToolIds.has(tool.id)) ?? candidates[0];
 }
 
 function preparedCalibrationVial(experiment: Experiment) {
@@ -595,12 +600,20 @@ function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPr
     };
   }
   if (!(grinder.liquids ?? []).some((liquid) => liquid.liquidId === "dry_ice_pellets")) {
+    const appleMassG = (grinder.produceLots ?? []).reduce(
+      (total, produceLot) => total + produceLot.totalMassG,
+      0,
+    );
+    const dryIceMassG = Math.round(appleMassG * 10) / 10;
+    const formattedDryIceMassG = Number.isInteger(dryIceMassG)
+      ? dryIceMassG.toFixed(0)
+      : dryIceMassG.toFixed(1);
     return {
       title: "Add Dry ice pellets",
       instruction:
-        "In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter 1000 g, then confirm.",
-      hint: "The dry ice cools the apples gradually. Do not start the grinder while the temperature is above −45 °C.",
-      action: { kind: "drag", label: "Add 1000 g dry ice" },
+        `In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter ${formattedDryIceMassG} g—the same mass as the apples—then confirm.`,
+      hint: "Using a 1:1 dry-ice-to-apple mass ratio cools the lot gradually. Do not start the grinder while the temperature is above −45 °C.",
+      action: { kind: "drag", label: `Add ${formattedDryIceMassG} g dry ice` },
     };
   }
   if ((grinder.grinderRunRemainingMs ?? 0) > 0) {
@@ -628,22 +641,76 @@ function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPr
   };
 }
 
+const tutorialCentrifugeTubeTareMassG = 12;
+
+function toolPowderMassG(tool: BenchToolInstance) {
+  return tool.powderMassG ??
+    (tool.produceFractions ?? []).reduce((total, fraction) => total + fraction.massG, 0);
+}
+
+function analyticalTubeTareIsValid(experiment: Experiment) {
+  return experiment.analyticalBalance.tareMassG !== null &&
+    Math.abs(
+      experiment.analyticalBalance.tareMassG - tutorialCentrifugeTubeTareMassG,
+    ) < 0.005;
+}
+
+function analyticalBalanceTubeOnPan(experiment: Experiment) {
+  const tool = workspaceWidget(experiment, "analytical_balance")?.tool;
+  return tool?.toolType === "centrifuge_tube" ? tool : null;
+}
+
+function analyticalWeighingTube(experiment: Experiment) {
+  const tubeOnPan = analyticalBalanceTubeOnPan(experiment);
+  if (tubeOnPan) {
+    return tubeOnPan;
+  }
+  return allTools(experiment).find(
+    (tool) =>
+      tool.toolType === "centrifuge_tube" &&
+      (toolPowderMassG(tool) <= 0 || analyticalTubeTareIsValid(experiment)),
+  );
+}
+
+function hasCompromisedAnalyticalTube(experiment: Experiment) {
+  return allTools(experiment).some(
+    (tool) =>
+      tool.toolType === "centrifuge_tube" &&
+      toolPowderMassG(tool) > 0 &&
+      !analyticalTubeTareIsValid(experiment),
+  );
+}
+
 function analyticalWeighingAnchor(experiment: Experiment) {
   const balance = workspaceWidget(experiment, "analytical_balance");
   if (!balance?.isPresent) {
     return "palette-item-analytical_balance_widget";
   }
-  const tube = allTools(experiment).find((tool) => tool.toolType === "centrifuge_tube");
+  const tubeOnPan = analyticalBalanceTubeOnPan(experiment);
+  if (
+    tubeOnPan &&
+    toolPowderMassG(tubeOnPan) > 0 &&
+    !analyticalTubeTareIsValid(experiment)
+  ) {
+    return "widget-analytical_balance";
+  }
+  const tube = analyticalWeighingTube(experiment);
   if (!tube) {
     return "palette-item-centrifuge_tube_50ml";
   }
   if (!toolIsInWidget(experiment, "analytical_balance", tube)) {
     return toolSourceAnchor(experiment, (tool) => tool.id === tube.id);
   }
-  if (experiment.analyticalBalance.taredToolId !== tube.id) {
+  if (!analyticalTubeTareIsValid(experiment)) {
     return "analytical-balance-tare";
   }
-  return experiment.spatula.isLoaded ? "widget-analytical_balance" : "action-spatula";
+  if (experiment.spatula.isLoaded) {
+    return "widget-analytical_balance";
+  }
+  const powderJar = storageContainer(experiment);
+  return powderJar
+    ? `spatula-load-powder:${toolSourceAnchor(experiment, (tool) => tool.id === powderJar.id)}`
+    : "action-spatula";
 }
 
 function analyticalWeighingPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
@@ -654,12 +721,30 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
         "In Inventory, open Workspace equipment. Drag the Analytical balance and drop it onto the central workspace.",
     };
   }
-  const tube = allTools(experiment).find((tool) => tool.toolType === "centrifuge_tube");
-  if (!tube) {
+  const tubeOnPan = analyticalBalanceTubeOnPan(experiment);
+  if (
+    tubeOnPan &&
+    toolPowderMassG(tubeOnPan) > 0 &&
+    !analyticalTubeTareIsValid(experiment)
+  ) {
     return {
-      title: "Deploy a 50 mL tube",
+      title: "Replace the compromised tube",
       instruction:
-        "In Inventory, open Containers. Drag a 50 mL centrifuge tube and drop it onto the Analytical balance.",
+        "This tube was tared after powder had already been added, so its Net reading can no longer teach the weighing correctly. Discard it, then deploy a fresh 50 mL tube from Inventory.",
+      hint: "The tutorial will ignore this compromised tube after it reaches the trash and point to a replacement.",
+      action: { kind: "drag", label: "Discard this tube" },
+    };
+  }
+  const tube = analyticalWeighingTube(experiment);
+  if (!tube) {
+    const isReplacingCompromisedTube = hasCompromisedAnalyticalTube(experiment);
+    return {
+      title: isReplacingCompromisedTube
+        ? "Deploy a replacement 50 mL tube"
+        : "Deploy a 50 mL tube",
+      instruction: isReplacingCompromisedTube
+        ? "In Inventory, open Containers. Drag a fresh 50 mL centrifuge tube and drop it onto the Analytical balance. Do not recover the compromised powdered tube from the trash."
+        : "In Inventory, open Containers. Drag a 50 mL centrifuge tube and drop it onto the Analytical balance.",
     };
   }
   if (!toolIsInWidget(experiment, "analytical_balance", tube)) {
@@ -669,10 +754,13 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
         "Drag the highlighted 50 mL tube and drop it onto the Analytical balance.",
     };
   }
-  if (experiment.analyticalBalance.taredToolId !== tube.id) {
+  if (!analyticalTubeTareIsValid(experiment)) {
     return {
-      title: "Tare the tube",
-      instruction: "Click Tare while the empty tube is on the Analytical balance.",
+      title: hasCompromisedAnalyticalTube(experiment)
+        ? "Tare the replacement tube"
+        : "Tare the tube",
+      instruction:
+        "The replacement tube is empty. Click Tare now so Net returns to 0.000 g before adding any powder.",
       action: { kind: "click", label: "Click Tare" },
     };
   }
@@ -739,9 +827,18 @@ function storageContainer(experiment: Experiment) {
   return allTools(experiment).find((tool) => tool.toolType === "storage_jar");
 }
 
+function hasEmptyWorkbenchStation(experiment: Experiment) {
+  return experiment.workbench.slots.some(
+    (slot) => !slot.tool && (slot.surfaceProduceLots ?? []).length === 0,
+  );
+}
+
 function storeGrinderAnchor(experiment: Experiment) {
   const grinder = workspaceWidget(experiment, "grinder");
   if ((grinder?.produceLots ?? []).length > 0 && !storageContainer(experiment)) {
+    if (!hasEmptyWorkbenchStation(experiment)) {
+      return "add-workbench-slot-button";
+    }
     return "palette-item-hdpe_storage_jar_2l";
   }
   if ((grinder?.produceLots ?? []).length > 0) {
@@ -762,6 +859,15 @@ function storeEquipmentAnchor(
 function storeGrinderPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   const grinder = workspaceWidget(experiment, "grinder");
   if ((grinder?.produceLots ?? []).length > 0) {
+    if (!storageContainer(experiment) && !hasEmptyWorkbenchStation(experiment)) {
+      return {
+        title: "Add a workbench station",
+        instruction:
+          "There is no empty station for the storage jar. Click the highlighted + button in the Workbench header to add one.",
+        hint: "After the new station appears, the tutorial will point to the HDPE storage jar in Inventory.",
+        action: { kind: "click", label: "Click +" },
+      };
+    }
     return storageContainer(experiment)
       ? {
           title: "Transfer the ground powder",
@@ -891,11 +997,11 @@ function completedCalibrationAndSampleRun(experiment: Experiment) {
 }
 
 function hasTestPortion(experiment: Experiment) {
-  const tube = extractionTube(experiment);
+  const tube = analyticalBalanceTubeOnPan(experiment);
   const mass =
     tube?.powderMassG ??
     (tube?.produceFractions ?? []).reduce((total, fraction) => total + fraction.massG, 0);
-  return mass >= 9.5;
+  return analyticalTubeTareIsValid(experiment) && mass >= 9.5;
 }
 
 function hasPreparedExtraction(experiment: Experiment) {

@@ -366,7 +366,7 @@ describe("calibration sample tutorial", () => {
           widget(id, {
             isPresent: id === "grinder",
             produceLots: id === "grinder"
-              ? [{ id: "lot_1", label: "Cut apples", produceType: "apple", totalMassG: 100, unitCount: 1, isDraggable: true, allowedDropTargets: [], materialState: "cut" }]
+              ? [{ id: "lot_1", label: "Cut apples", produceType: "apple", totalMassG: 2375.5, unitCount: 12, isDraggable: true, allowedDropTargets: [], materialState: "cut" }]
               : undefined,
           }),
         ),
@@ -374,7 +374,10 @@ describe("calibration sample tutorial", () => {
     });
     const grinderStep = calibrationSampleTutorial.steps.find((entry) => entry.id === "grind-sample")!;
     expect(grinderStep.anchor(grinderState)).toBe("palette-item-dry_ice_pellets");
-    expect(getTutorialStepPresentation(grinderStep, grinderState).title).toBe("Add Dry ice pellets");
+    const presentation = getTutorialStepPresentation(grinderStep, grinderState);
+    expect(presentation.title).toBe("Add Dry ice pellets");
+    expect(presentation.instruction).toContain("2375.5 g");
+    expect(presentation.action).toEqual({ kind: "drag", label: "Add 2375.5 g dry ice" });
 
     const extractionState = experiment({
       workbench: {
@@ -500,6 +503,75 @@ describe("calibration sample tutorial", () => {
     );
   });
 
+  it("asks for another workbench station before deploying the storage jar", () => {
+    const fullWorkbench = {
+      slots: [
+        { id: "station_1", label: "Station 1", tool: sampleBag() },
+        {
+          id: "station_2",
+          label: "Station 2",
+          tool: labTool("storage_jar", { id: "board_1", toolType: "cutting_board" }),
+        },
+      ],
+    };
+    const state = experiment({
+      workbench: fullWorkbench,
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "grinder",
+            produceLots: id === "grinder"
+              ? [{ id: "lot_1", label: "Ground apples", produceType: "apple", totalMassG: 2500, unitCount: null, isDraggable: true, allowedDropTargets: [], materialState: "ground" }]
+              : undefined,
+          }),
+        ),
+      },
+    });
+    const tutorialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "store-grinder",
+    )!;
+
+    expect(tutorialStep.anchor(state)).toBe("add-workbench-slot-button");
+    expect(getTutorialStepPresentation(tutorialStep, state)).toMatchObject({
+      title: "Add a workbench station",
+      action: { kind: "click", label: "Click +" },
+    });
+
+    state.workbench.slots.push({ id: "station_3", label: "Station 3", tool: null });
+    expect(tutorialStep.anchor(state)).toBe("palette-item-hdpe_storage_jar_2l");
+  });
+
+  it("continues after the analytical balance reports a tare mass", () => {
+    const tube = labTool("centrifuge_tube");
+    const powderJar = labTool("storage_jar", { id: "powder_jar" });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 12, taredToolId: null },
+      workbench: {
+        slots: [{ id: "station_1", label: "Station 1", tool: powderJar }],
+      },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "analytical_balance",
+            tool: id === "analytical_balance" ? tube : undefined,
+          }),
+        ),
+      },
+    });
+    const tutorialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+
+    expect(tutorialStep.anchor(state)).toBe(
+      "spatula-load-powder:bench-tool-card-powder_jar",
+    );
+    expect(getTutorialStepPresentation(tutorialStep, state).title).toBe(
+      "Add the test portion",
+    );
+  });
+
   it("recovers a tube removed during analytical weighing", () => {
     const tube = labTool("centrifuge_tube");
     const state = experiment({
@@ -513,6 +585,110 @@ describe("calibration sample tutorial", () => {
 
     expect(tutorialStep.anchor(state)).toBe("trash-tool-centrifuge_tube_1");
     expect(getTutorialStepPresentation(tutorialStep, state).title).toBe("Return the tube to the Analytical balance");
+  });
+
+  it("ignores a compromised trashed tube and asks for a fresh one", () => {
+    const compromisedTube = labTool("centrifuge_tube", {
+      id: "compromised_tube",
+      produceFractions: [
+        {
+          id: "powder_1",
+          produceLotId: "lot_1",
+          produceMaterialStateId: "ground_1",
+          massG: 2,
+        },
+      ],
+    });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 14, taredToolId: null },
+      trash: { ...experiment().trash, children: [compromisedTube] },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) => widget(id, { isPresent: id === "analytical_balance" })),
+      },
+    });
+    const tutorialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+
+    expect(tutorialStep.anchor(state)).toBe("palette-item-centrifuge_tube_50ml");
+    expect(getTutorialStepPresentation(tutorialStep, state).title).toBe(
+      "Deploy a replacement 50 mL tube",
+    );
+  });
+
+  it("asks to tare a fresh replacement tube instead of recovering the compromised one", () => {
+    const compromisedTube = labTool("centrifuge_tube", {
+      id: "compromised_tube",
+      produceFractions: [
+        {
+          id: "powder_1",
+          produceLotId: "lot_1",
+          produceMaterialStateId: "ground_1",
+          massG: 2,
+        },
+      ],
+    });
+    const replacementTube = labTool("centrifuge_tube", { id: "replacement_tube" });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 14, taredToolId: null },
+      trash: { ...experiment().trash, children: [compromisedTube] },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "analytical_balance",
+            tool: id === "analytical_balance" ? replacementTube : undefined,
+          }),
+        ),
+      },
+    });
+    const tutorialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+
+    expect(tutorialStep.anchor(state)).toBe("analytical-balance-tare");
+    expect(getTutorialStepPresentation(tutorialStep, state).title).toBe(
+      "Tare the replacement tube",
+    );
+  });
+
+  it("does not validate 10 g of powder against a tare taken after dosing", () => {
+    const tube = labTool("centrifuge_tube", {
+      id: "compromised_tube",
+      produceFractions: [
+        {
+          id: "powder_1",
+          produceLotId: "lot_1",
+          produceMaterialStateId: "ground_1",
+          massG: 10,
+        },
+      ],
+    });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 22, taredToolId: null },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "analytical_balance",
+            tool: id === "analytical_balance" ? tube : undefined,
+          }),
+        ),
+      },
+    });
+    const tutorialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+
+    expect(tutorialStep.isSatisfied(state)).toBe(false);
+    expect(tutorialStep.anchor(state)).toBe("widget-analytical_balance");
+    expect(getTutorialStepPresentation(tutorialStep, state).title).toBe(
+      "Replace the compromised tube",
+    );
+
+    state.analyticalBalance.tareMassG = 12;
+    expect(tutorialStep.isSatisfied(state)).toBe(true);
   });
 
   it("guides final cleanup from the instrument while the rack is loaded", () => {

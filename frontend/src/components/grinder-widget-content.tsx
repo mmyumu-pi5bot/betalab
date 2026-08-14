@@ -59,6 +59,7 @@ export function GrinderWidgetContent({
       <div
         className="rounded-[1rem] border border-slate-300 bg-[linear-gradient(180deg,#dce7c7,#b8c89b)] px-4 py-3 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
         data-testid="grinder-lcd-panel"
+        data-tutorial-anchor={isGrinderRunning ? "grinder-progress" : undefined}
       >
         <div className="flex items-center justify-start gap-3">
           <p
@@ -85,7 +86,6 @@ export function GrinderWidgetContent({
                     grinderDisplayMode === "warning" ? "bg-amber-700" : "bg-emerald-700"
                   }`}
                   data-testid="grinder-lcd-progress-bar"
-                  data-tutorial-anchor="grinder-progress"
                   style={{ width: `${grinderProgressPercent}%` }}
                 />
               </div>

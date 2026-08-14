@@ -45,6 +45,11 @@ import {
 import { createExperiment, deleteExperiment, getToolbarCatalog } from "@/lib/api";
 import { evaluateTutorial, getTutorialDefinition } from "@/lib/tutorial-engine";
 import {
+  getTutorialProduceDropIntervention,
+  getTutorialTareIntervention,
+  type TutorialIntervention,
+} from "@/lib/tutorial-action-guard";
+import {
   clearTutorialSession,
   getTutorialSession,
   saveTutorialSession,
@@ -61,18 +66,30 @@ type LabSceneProps = {
   tutorialId?: string;
 };
 
+type PendingTutorialIntervention = TutorialIntervention & {
+  proceed: () => void;
+};
+
 export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
   const tutorialDefinition = getTutorialDefinition(tutorialId);
+  const initialTutorialSession = tutorialDefinition && experimentId
+    ? getTutorialSession(tutorialDefinition.id, experimentId)
+    : null;
   const [tutorialCompletedStepIds, setTutorialCompletedStepIds] = useState<string[]>(() =>
-    tutorialDefinition
-      ? (getTutorialSession(tutorialDefinition.id)?.completedStepIds ?? [])
-      : [],
+    initialTutorialSession?.completedStepIds ?? [],
   );
   const [isTutorialActive, setIsTutorialActive] = useState(() =>
     tutorialDefinition
-      ? getTutorialSession(tutorialDefinition.id)?.status !== "paused"
+      ? !["abandoned", "paused"].includes(
+          initialTutorialSession?.status ?? "active",
+        )
       : false,
   );
+  const [isTutorialAbandoned, setIsTutorialAbandoned] = useState(() =>
+    initialTutorialSession?.status === "abandoned",
+  );
+  const [pendingTutorialIntervention, setPendingTutorialIntervention] =
+    useState<PendingTutorialIntervention | null>(null);
   const experimentApi = useLabExperiment({
     defaultErrorMessage,
     defaultStatusMessage,
@@ -84,10 +101,11 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     if (!tutorialDefinition || state.status !== "ready") {
       return;
     }
-    const saved = getTutorialSession(tutorialDefinition.id);
-    if (saved?.experimentId === state.experiment.id) {
+    const saved = getTutorialSession(tutorialDefinition.id, state.experiment.id);
+    if (saved) {
       setTutorialCompletedStepIds(saved.completedStepIds);
       setIsTutorialActive(saved.status === "active");
+      setIsTutorialAbandoned(saved.status === "abandoned");
       return;
     }
     saveTutorialSession({
@@ -97,6 +115,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     });
     setTutorialCompletedStepIds([]);
     setIsTutorialActive(true);
+    setIsTutorialAbandoned(false);
   }, [state, tutorialDefinition]);
 
   const handlePauseTutorial = () => {
@@ -109,6 +128,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       status: "paused",
     });
     setIsTutorialActive(false);
+    setPendingTutorialIntervention(null);
   };
 
   const handleResumeTutorial = () => {
@@ -121,6 +141,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       status: "active",
     });
     setIsTutorialActive(true);
+    setIsTutorialAbandoned(false);
   };
 
   const handleRestartTutorial = async () => {
@@ -135,7 +156,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     const currentExperimentId = state.experiment.id;
     try {
       await deleteExperiment(currentExperimentId);
-      clearTutorialSession(tutorialDefinition.id);
+      clearTutorialSession(tutorialDefinition.id, currentExperimentId);
       const replacement = await createExperiment();
       saveTutorialSession({
         tutorialId: tutorialDefinition.id,
@@ -455,6 +476,24 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
     experimentApi: dndApi,
     isKnifeMode,
+    onBeforeProduceDrop: ({ payload, proceed, targetSlotId }) => {
+      if (state.status !== "ready") {
+        return true;
+      }
+      const intervention = getTutorialProduceDropIntervention({
+        experiment: state.experiment,
+        isTutorialProtected:
+          Boolean(tutorialDefinition) && isTutorialActive && !isTutorialAbandoned,
+        payload,
+        targetSlotId,
+      });
+      if (!intervention) {
+        setPendingTutorialIntervention(null);
+        return true;
+      }
+      setPendingTutorialIntervention({ ...intervention, proceed });
+      return false;
+    },
     setPendingDropDraft,
   });
 
@@ -491,7 +530,12 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     : null;
 
   useEffect(() => {
-    if (!tutorialDefinition || !readyExperiment || !tutorialEvaluation) {
+    if (
+      !tutorialDefinition ||
+      !readyExperiment ||
+      !tutorialEvaluation ||
+      isTutorialAbandoned
+    ) {
       return;
     }
     const completedStepIds = tutorialEvaluation.completedStepIds;
@@ -511,6 +555,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     });
   }, [
     isTutorialActive,
+    isTutorialAbandoned,
     readyExperiment,
     tutorialCompletedStepIds,
     tutorialDefinition,
@@ -780,6 +825,21 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       }}
       workspaceActions={{
         ...workspaceActions,
+        onTareAnalyticalBalance: () => {
+          const intervention = getTutorialTareIntervention({
+            experiment: state.experiment,
+            isTutorialProtected:
+              Boolean(tutorialDefinition) && isTutorialActive && !isTutorialAbandoned,
+          });
+          if (!intervention) {
+            workspaceActions.onTareAnalyticalBalance();
+            return;
+          }
+          setPendingTutorialIntervention({
+            ...intervention,
+            proceed: workspaceActions.onTareAnalyticalBalance,
+          });
+        },
         onLoadRackIntoInstrument: () => { void experimentApi.lcmsms.loadRack(); },
         onRunSequence: (payload) => { void experimentApi.lcmsms.runSequence(payload); },
         onSkipAcquisition: () => { void experimentApi.lcmsms.skipAcquisition(); },
@@ -812,10 +872,27 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
         },
       }}
       />
-      {tutorialEvaluation ? (
+      {tutorialEvaluation && !isTutorialAbandoned ? (
         <TutorialCoach
           active={isTutorialActive}
           evaluation={tutorialEvaluation}
+          intervention={pendingTutorialIntervention}
+          onContinueTutorial={() => setPendingTutorialIntervention(null)}
+          onLeaveTutorial={() => {
+            if (!pendingTutorialIntervention || !tutorialDefinition || !readyExperiment) {
+              return;
+            }
+            saveTutorialSession({
+              tutorialId: tutorialDefinition.id,
+              experimentId: readyExperiment.id,
+              status: "abandoned",
+              completedStepIds: tutorialCompletedStepIds,
+            });
+            setIsTutorialActive(false);
+            setIsTutorialAbandoned(true);
+            pendingTutorialIntervention.proceed();
+            setPendingTutorialIntervention(null);
+          }}
           onPause={handlePauseTutorial}
           onRestart={handleRestartTutorial}
           onResume={handleResumeTutorial}

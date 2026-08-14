@@ -9,11 +9,15 @@ import {
   type LimsTutorialField,
   type TutorialEvaluation,
 } from "@/lib/tutorial-engine";
+import type { TutorialIntervention } from "@/lib/tutorial-action-guard";
 import type { Experiment } from "@/types/experiment";
 
 type TutorialCoachProps = {
   active: boolean;
   evaluation: TutorialEvaluation;
+  intervention?: TutorialIntervention | null;
+  onContinueTutorial?: () => void;
+  onLeaveTutorial?: () => void;
   onPause: () => void;
   onRestart: () => void | Promise<void>;
   onResume: () => void;
@@ -22,7 +26,7 @@ type TutorialCoachProps = {
 const spotlightPadding = 8;
 const clippingOverflowValues = new Set(["auto", "clip", "hidden", "scroll"]);
 
-function findDirectAnchor(anchor: string) {
+function findDirectAnchor(anchor: string): HTMLElement | null {
   if (anchor.startsWith("cut-apples-")) {
     const lotId = anchor.slice("cut-apples-".length);
     const knife = document.querySelector<HTMLElement>('[data-tutorial-anchor="action-knife"]');
@@ -35,6 +39,13 @@ function findDirectAnchor(anchor: string) {
     return pipette?.getAttribute("aria-pressed") === "true"
       ? document.querySelector<HTMLElement>('[data-tutorial-anchor="tool-type-centrifuge_tube"]')
       : pipette;
+  }
+  if (anchor.startsWith("spatula-load-powder:")) {
+    const powderAnchor = anchor.slice("spatula-load-powder:".length);
+    const spatula = document.querySelector<HTMLElement>('[data-tutorial-anchor="action-spatula"]');
+    return spatula?.getAttribute("aria-pressed") === "true"
+      ? findDirectAnchor(powderAnchor)
+      : spatula;
   }
   if (anchor === "instrument-console-next") {
     return document.querySelector<HTMLElement>(
@@ -161,6 +172,9 @@ function isFullyVisible(target: HTMLElement, bounds: DOMRect) {
 export function TutorialCoach({
   active,
   evaluation,
+  intervention = null,
+  onContinueTutorial,
+  onLeaveTutorial,
   onPause,
   onRestart,
   onResume,
@@ -170,7 +184,9 @@ export function TutorialCoach({
   const spotlightRef = useRef<HTMLDivElement | null>(null);
   const [accessTarget, setAccessTarget] = useState<AccessTarget>(null);
   const [limsField, setLimsField] = useState<LimsTutorialField | null>(null);
-  const anchor = evaluation.currentStep?.anchor(evaluation.experiment) ?? null;
+  const anchor = intervention?.anchor
+    ?? evaluation.currentStep?.anchor(evaluation.experiment)
+    ?? null;
   const currentStepPresentation = evaluation.currentStep
     ? getTutorialStepPresentation(evaluation.currentStep, evaluation.experiment)
     : null;
@@ -273,8 +289,15 @@ export function TutorialCoach({
     };
   }, [active, anchor, evaluation.experiment]);
 
-  const displayedPresentation = accessTarget
+  const displayedPresentation = intervention
     ? {
+        action: { kind: "click" as const, label: intervention.actionLabel },
+        hint: intervention.hint,
+        instruction: intervention.instruction,
+        title: intervention.title,
+      }
+    : accessTarget
+      ? {
         action: {
           kind: "click" as const,
           label: accessTarget === "basket" ? "Click the highlighted basket" : "Click the highlighted trash",
@@ -284,16 +307,16 @@ export function TutorialCoach({
           ? "Click the highlighted Produce basket to open it. The sample bag or apples will then appear inside."
           : "Click the highlighted Trash to open it. The item to recover will then appear inside.",
         title: accessTarget === "basket" ? "Open the Produce basket" : "Open the Trash",
-      }
-    : limsField
-      ? getLimsTutorialFieldPresentation(evaluation.experiment, limsField)
-      : currentStepPresentation;
+        }
+      : limsField
+        ? getLimsTutorialFieldPresentation(evaluation.experiment, limsField)
+        : currentStepPresentation;
 
   if (!active) {
     return (
       <button
         aria-label="Resume tutorial"
-        className="fixed bottom-5 right-5 z-[70] rounded-full border border-sky-200 bg-white px-5 py-3 text-sm font-semibold text-sky-800 shadow-xl transition hover:border-sky-300 hover:bg-sky-50"
+        className="fixed bottom-5 right-5 z-[70] rounded-full border-2 border-amber-400 bg-white px-5 py-3 text-sm font-semibold text-sky-800 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_18px_42px_rgba(15,23,42,0.2)] transition hover:border-amber-500 hover:bg-amber-50"
         onClick={onResume}
         type="button"
       >
@@ -306,7 +329,7 @@ export function TutorialCoach({
     <>
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed z-[60] rounded-[1.4rem] border-2 border-sky-400 bg-sky-200/10 shadow-[0_0_0_5px_rgba(125,211,252,0.28),0_0_38px_rgba(14,165,233,0.38)]"
+        className="pointer-events-none fixed z-[60] rounded-[1.4rem] border-2 border-amber-400 bg-amber-200/10 shadow-[0_0_0_5px_rgba(251,191,36,0.28),0_0_38px_rgba(245,158,11,0.38)]"
         data-testid="tutorial-spotlight"
         ref={spotlightRef}
         style={{ display: "none" }}
@@ -316,7 +339,7 @@ export function TutorialCoach({
             className={`absolute -right-4 -top-4 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-lg font-bold text-white shadow-lg ${
               displayedPresentation.action.kind === "wait"
                 ? "animate-pulse bg-amber-500"
-                : "bg-sky-600"
+                : "bg-amber-500"
             }`}
             data-testid="tutorial-spotlight-action-icon"
           >
@@ -328,7 +351,7 @@ export function TutorialCoach({
       <aside
         aria-label="Guided tutorial"
         aria-live="polite"
-        className="fixed inset-x-3 bottom-3 z-[70] max-h-[min(70vh,34rem)] overflow-y-auto rounded-[1.6rem] border border-sky-200 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.28)] backdrop-blur md:inset-x-auto md:bottom-5 md:right-5 md:w-[24rem]"
+        className="fixed inset-x-3 bottom-3 z-[70] max-h-[min(70vh,34rem)] overflow-y-auto rounded-[1.6rem] border-2 border-amber-400 bg-white/95 p-5 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_24px_80px_rgba(15,23,42,0.28)] backdrop-blur md:inset-x-auto md:bottom-5 md:right-5 md:w-[24rem]"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -379,6 +402,24 @@ export function TutorialCoach({
             <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2.5 text-xs leading-5 text-sky-900">
               {displayedPresentation.hint}
             </p>
+            {intervention ? (
+              <div className="mt-4 grid gap-2">
+                <button
+                  className="rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                  onClick={onContinueTutorial}
+                  type="button"
+                >
+                  {intervention.continueLabel}
+                </button>
+                <button
+                  className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                  onClick={onLeaveTutorial}
+                  type="button"
+                >
+                  {intervention.leaveLabel}
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="mt-5">

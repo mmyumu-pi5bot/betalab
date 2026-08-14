@@ -7,7 +7,7 @@ import { createExperiment, deleteExperiment, listExperiments } from "@/lib/api";
 import { CALIBRATION_SAMPLE_TUTORIAL_ID } from "@/lib/tutorial-engine";
 import {
   clearTutorialSession,
-  getTutorialSession,
+  getTutorialSessions,
   saveTutorialSession,
   type TutorialSession,
 } from "@/lib/tutorial-session-store";
@@ -35,7 +35,9 @@ export function ExperimentsHome() {
   const [isCreating, startCreateTransition] = useTransition();
   const [deletingExperimentId, setDeletingExperimentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [tutorialSession, setTutorialSession] = useState<TutorialSession | null>(null);
+  const [tutorialSessionsByExperiment, setTutorialSessionsByExperiment] = useState<
+    Record<string, TutorialSession>
+  >({});
 
   useEffect(() => {
     let isMounted = true;
@@ -50,16 +52,20 @@ export function ExperimentsHome() {
           return;
         }
         setExperiments(savedExperiments);
-        const savedTutorial = getTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID);
-        if (
-          savedTutorial &&
-          savedExperiments.some((experiment) => experiment.id === savedTutorial.experimentId)
-        ) {
-          setTutorialSession(savedTutorial);
-        } else {
-          clearTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID);
-          setTutorialSession(null);
+        const savedExperimentIds = new Set(savedExperiments.map((experiment) => experiment.id));
+        const savedTutorials = getTutorialSessions(CALIBRATION_SAMPLE_TUTORIAL_ID);
+        const validTutorials = savedTutorials.filter(
+          (session) =>
+            session.status !== "abandoned" && savedExperimentIds.has(session.experimentId),
+        );
+        for (const session of savedTutorials) {
+          if (!savedExperimentIds.has(session.experimentId)) {
+            clearTutorialSession(session.tutorialId, session.experimentId);
+          }
         }
+        setTutorialSessionsByExperiment(
+          Object.fromEntries(validTutorials.map((session) => [session.experimentId, session])),
+        );
       } catch (error) {
         if (!isMounted) {
           return;
@@ -95,19 +101,6 @@ export function ExperimentsHome() {
   };
 
   const handleOpenTutorial = () => {
-    if (tutorialSession) {
-      const activeSession = saveTutorialSession({
-        tutorialId: CALIBRATION_SAMPLE_TUTORIAL_ID,
-        experimentId: tutorialSession.experimentId,
-        status: "active",
-      });
-      setTutorialSession(activeSession);
-      router.push(
-        `/experiments/${activeSession.experimentId}?tutorial=${CALIBRATION_SAMPLE_TUTORIAL_ID}`,
-      );
-      return;
-    }
-
     startCreateTransition(async () => {
       setErrorMessage(null);
       try {
@@ -117,7 +110,10 @@ export function ExperimentsHome() {
           experimentId: experiment.id,
           status: "active",
         });
-        setTutorialSession(session);
+        setTutorialSessionsByExperiment((current) => ({
+          ...current,
+          [session.experimentId]: session,
+        }));
         router.push(
           `/experiments/${experiment.id}?tutorial=${CALIBRATION_SAMPLE_TUTORIAL_ID}`,
         );
@@ -136,9 +132,13 @@ export function ExperimentsHome() {
     try {
       await deleteExperiment(experimentId);
       setExperiments((current) => current.filter((entry) => entry.id !== experimentId));
-      if (tutorialSession?.experimentId === experimentId) {
-        clearTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID);
-        setTutorialSession(null);
+      clearTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID, experimentId);
+      if (tutorialSessionsByExperiment[experimentId]) {
+        setTutorialSessionsByExperiment((current) => {
+          const next = { ...current };
+          delete next[experimentId];
+          return next;
+        });
       }
     } catch (error) {
       setErrorMessage(
@@ -176,19 +176,13 @@ export function ExperimentsHome() {
                 {isCreating ? "Creating..." : "New experiment"}
               </button>
               <button
-                aria-label={
-                  tutorialSession ? "Continue guided tutorial" : "New tutorial"
-                }
+                aria-label="New tutorial"
                 className="rounded-full border border-sky-300 bg-sky-50 px-5 py-3 text-sm font-semibold text-sky-800 transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-70"
                 disabled={isCreating}
                 onClick={handleOpenTutorial}
                 type="button"
               >
-                {isCreating
-                  ? "Creating..."
-                  : tutorialSession
-                    ? "Continue tutorial"
-                    : "New tutorial"}
+                {isCreating ? "Creating..." : "New tutorial"}
               </button>
             </div>
           </div>
@@ -219,7 +213,7 @@ export function ExperimentsHome() {
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {experiments.map((experiment) => {
                 const isTutorialExperiment =
-                  tutorialSession?.experimentId === experiment.id;
+                  Boolean(tutorialSessionsByExperiment[experiment.id]);
                 return (
                   <article
                     key={experiment.id}
@@ -281,7 +275,10 @@ export function ExperimentsHome() {
                             experimentId: experiment.id,
                             status: "active",
                           });
-                          setTutorialSession(activeSession);
+                          setTutorialSessionsByExperiment((current) => ({
+                            ...current,
+                            [experiment.id]: activeSession,
+                          }));
                           router.push(
                             `/experiments/${experiment.id}?tutorial=${CALIBRATION_SAMPLE_TUTORIAL_ID}`,
                           );

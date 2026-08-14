@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TutorialCoach } from "@/components/tutorial-coach";
@@ -64,6 +64,12 @@ describe("TutorialCoach", () => {
     expect(screen.getByTestId("tutorial-spotlight-action-icon")).toHaveTextContent("↗");
     expect(screen.getByTestId("tutorial-spotlight")).toHaveClass("pointer-events-none");
     expect(screen.getByTestId("tutorial-spotlight")).not.toHaveClass("transition-all");
+    expect(screen.getByRole("complementary", { name: "Guided tutorial" })).toHaveClass(
+      "border-amber-400",
+    );
+    expect(screen.getByRole("complementary", { name: "Guided tutorial" })).not.toHaveClass(
+      "border-sky-200",
+    );
 
     target.remove();
   });
@@ -187,6 +193,8 @@ describe("TutorialCoach", () => {
       />,
     );
     const spotlight = screen.getByTestId("tutorial-spotlight");
+    expect(spotlight).toHaveClass("border-amber-400");
+    expect(spotlight).not.toHaveClass("border-sky-400");
     expect(spotlight).toHaveStyle({ top: "112px" });
 
     targetTop = 220;
@@ -377,5 +385,99 @@ describe("TutorialCoach", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Resume tutorial" }));
     expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains a prevented contamination and offers safe or explicit exit actions", () => {
+    const board = document.createElement("div");
+    board.dataset.testid = "bench-tool-card-board_1";
+    board.getBoundingClientRect = () =>
+      ({ bottom: 170, height: 80, left: 40, right: 240, top: 90, width: 200 } as DOMRect);
+    document.body.appendChild(board);
+    const onContinueTutorial = vi.fn();
+    const onLeaveTutorial = vi.fn();
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        intervention={{
+          actionLabel: "Use the highlighted Cutting board",
+          anchor: "bench-tool-card-board_1",
+          continueLabel: "Continue tutorial",
+          title: "Contamination prevented",
+          instruction: "Do not place the apples directly on the workbench.",
+          hint: "The attempted drop was cancelled.",
+          leaveLabel: "Leave tutorial and place anyway",
+        }}
+        onContinueTutorial={onContinueTutorial}
+        onLeaveTutorial={onLeaveTutorial}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Contamination prevented")).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      left: "32px",
+      top: "82px",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue tutorial" }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave tutorial and place anyway" }));
+    expect(onContinueTutorial).toHaveBeenCalledOnce();
+    expect(onLeaveTutorial).toHaveBeenCalledOnce();
+    board.remove();
+  });
+
+  it("moves the spotlight from the selected spatula to the powder jar", async () => {
+    const spatula = document.createElement("button");
+    spatula.dataset.tutorialAnchor = "action-spatula";
+    spatula.setAttribute("aria-pressed", "false");
+    spatula.getBoundingClientRect = () =>
+      ({ bottom: 100, height: 40, left: 20, right: 100, top: 60, width: 80 } as DOMRect);
+    const powderJar = document.createElement("div");
+    powderJar.dataset.testid = "bench-tool-card-powder_jar";
+    powderJar.getBoundingClientRect = () =>
+      ({ bottom: 240, height: 100, left: 300, right: 440, top: 140, width: 140 } as DOMRect);
+    document.body.append(spatula, powderJar);
+
+    const state = emptyExperiment();
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: {
+            ...step,
+            anchor: () => "spatula-load-powder:bench-tool-card-powder_jar",
+          },
+          experiment: state,
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "12px", top: "52px" });
+
+    spatula.setAttribute("aria-pressed", "true");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+        left: "292px",
+        top: "132px",
+      });
+    });
+
+    spatula.remove();
+    powderJar.remove();
   });
 });

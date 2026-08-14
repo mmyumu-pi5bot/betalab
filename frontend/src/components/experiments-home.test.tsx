@@ -87,7 +87,7 @@ describe("ExperimentsHome", () => {
     );
   });
 
-  it("offers to continue an existing tutorial experiment", async () => {
+  it("keeps New tutorial available and creates another tutorial experiment", async () => {
     window.localStorage.setItem(
       "betalab:tutorial-sessions:v1",
       JSON.stringify({
@@ -109,6 +109,7 @@ describe("ExperimentsHome", () => {
         last_audit_entry: "Experiment created",
       },
     ]);
+    createExperimentMock.mockResolvedValue({ id: "experiment_tutorial_2" });
 
     render(<ExperimentsHome />);
 
@@ -117,10 +118,19 @@ describe("ExperimentsHome", () => {
     expect(
       screen.queryByRole("heading", { name: "1 calibration point + 1 sample" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Continue guided tutorial" }));
+    fireEvent.click(await screen.findByRole("button", { name: "New tutorial" }));
 
-    expect(pushMock).toHaveBeenCalledWith(
-      "/experiments/experiment_tutorial?tutorial=calibration-sample-v1",
+    await waitFor(() => {
+      expect(createExperimentMock).toHaveBeenCalledTimes(1);
+      expect(pushMock).toHaveBeenCalledWith(
+        "/experiments/experiment_tutorial_2?tutorial=calibration-sample-v1",
+      );
+    });
+    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
+      "experiment_tutorial",
+    );
+    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
+      "experiment_tutorial_2",
     );
   });
 
@@ -155,6 +165,39 @@ describe("ExperimentsHome", () => {
     expect(pushMock).toHaveBeenCalledWith(
       "/experiments/experiment_tutorial?tutorial=calibration-sample-v1",
     );
+  });
+
+  it("treats an abandoned tutorial as a normal experiment on the home page", async () => {
+    window.localStorage.setItem(
+      "betalab:tutorial-sessions:v1",
+      JSON.stringify({
+        "calibration-sample-v1::experiment_abandoned": {
+          tutorialId: "calibration-sample-v1",
+          experimentId: "experiment_abandoned",
+          status: "abandoned",
+          completedStepIds: ["weigh-received-sample"],
+          version: 1,
+        },
+      }),
+    );
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_abandoned",
+        status: "preparing",
+        last_simulation_at: "2026-08-10T08:00:00Z",
+        snapshot_version: 4,
+        updated_at: "2026-08-10T08:15:00Z",
+        last_audit_entry: "Tutorial left after contamination.",
+      },
+    ]);
+
+    render(<ExperimentsHome />);
+
+    expect(await screen.findByText("experiment_abandoned")).toBeInTheDocument();
+    expect(screen.queryByText("Tutorial")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open experiment" }));
+
+    expect(pushMock).toHaveBeenCalledWith("/experiments/experiment_abandoned");
   });
 
   it("deletes a saved experiment from the list", async () => {

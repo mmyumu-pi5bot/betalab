@@ -644,6 +644,99 @@ describe("LabScene", () => {
     );
   });
 
+  it("prevents irreversible produce contamination in the tutorial unless the learner leaves", async () => {
+    window.localStorage.clear();
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        slots: makeSlots([
+          {
+            tool: makeSampleBagTool({
+              id: "bag_1",
+              isSealed: false,
+              produceLots: [makeProduceLot({ id: "produce_1" })],
+            }),
+          },
+          {},
+        ]),
+      }),
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
+
+    const apples = await screen.findByTestId("bench-produce-lot-produce_1");
+    const bareStation = screen.getByTestId("bench-slot-station_2");
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(apples, { dataTransfer: transfer });
+    fireEvent.drop(bareStation, { dataTransfer: transfer });
+
+    expect(await screen.findByText("Contamination prevented")).toBeInTheDocument();
+    expect(sendExperimentCommand).not.toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "move_object",
+      expect.anything(),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Leave tutorial and place anyway" }),
+    );
+
+    await waitFor(() => {
+      expect(sendExperimentCommand).toHaveBeenCalledWith(
+        "experiment_pesticides",
+        "move_object",
+        {
+          destination: { kind: "workbench_tool", id: "station_2" },
+          entity: { kind: "produce_lot", id: "produce_1" },
+          source: { kind: "workbench", id: "station_1" },
+        },
+      );
+    });
+    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
+      '"status":"abandoned"',
+    );
+    expect(screen.queryByRole("complementary", { name: "Guided tutorial" })).not.toBeInTheDocument();
+  });
+
+  it("prevents a second tare after powder is added during the tutorial", async () => {
+    window.localStorage.clear();
+    const analyticalTube = makeTool({
+      id: "analytical_tube_1",
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL centrifuge tube",
+      toolType: "centrifuge_tube",
+      produceFractions: [
+        {
+          id: "powder_1",
+          produceLotId: "lot_1",
+          produceMaterialStateId: "ground_1",
+          massG: 1.25,
+        },
+      ],
+    });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: null },
+        workspaceWidgets: makeWorkspaceWithAnalyticalBalanceVisible({ tool: analyticalTube }),
+      }),
+    );
+
+    render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Tare" }));
+
+    expect(await screen.findByText("Tare protected")).toBeInTheDocument();
+    expect(screen.getByText(/The tube already contains powder/)).toBeInTheDocument();
+    expect(sendExperimentCommand).not.toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "tare_analytical_balance",
+      {},
+    );
+    expect(
+      screen.getByRole("button", { name: "Keep the empty-tube tare" }),
+    ).toBeInTheDocument();
+  });
+
   it("routes a real pipette click on a filled tube to the aspiration API", async () => {
     const tube = makeTool({
       id: "tube_1",
@@ -2525,6 +2618,13 @@ describe("LabScene", () => {
     await waitFor(() => {
       expect(screen.getByTestId("grinder-lcd-status")).toHaveTextContent("RUNNING");
       expect(screen.getByTestId("grinder-lcd-progress-bar")).toBeInTheDocument();
+      expect(screen.getByTestId("grinder-lcd-panel")).toHaveAttribute(
+        "data-tutorial-anchor",
+        "grinder-progress",
+      );
+      expect(screen.getByTestId("grinder-lcd-progress-bar")).not.toHaveAttribute(
+        "data-tutorial-anchor",
+      );
       expect(screen.getByTestId("grinder-lcd-rpm")).toHaveTextContent("RPM 10000");
       expect(screen.getByTestId("grinder-lcd-load")).toHaveTextContent("Cryo mode");
       expect(screen.getByTestId("grinder-power-button")).toBeDisabled();
