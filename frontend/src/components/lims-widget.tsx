@@ -155,13 +155,13 @@ export function LimsWidget({
 
   return (
     <WorkspaceEquipmentWidget
-      bodyClassName="px-3 py-4"
+      bodyClassName="px-3 py-3"
       eyebrow="LIMS"
       headerAction={headerAction}
     >
       <div className="space-y-2.5">
         <div className="overflow-hidden rounded-[1.4rem] border border-slate-300 bg-[linear-gradient(180deg,#d8dee5,#c2ccd6)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
-          <div className="rounded-t-[1.4rem] border-b border-slate-300 bg-[linear-gradient(180deg,#f8fafc,#e2e8f0)] px-4 py-3">
+          <div className="rounded-t-[1.4rem] border-b border-slate-300 bg-[linear-gradient(180deg,#f8fafc,#e2e8f0)] px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
                 LIMS terminal
@@ -172,10 +172,10 @@ export function LimsWidget({
               </div>
             </div>
           </div>
-          <div className="bg-[linear-gradient(180deg,#0f172a,#16233a)] px-3 py-3">
+          <div className="bg-[linear-gradient(180deg,#0f172a,#16233a)] px-3 py-2.5">
             <svg
               aria-label="LIMS terminal screen"
-              className="h-[14.25rem] w-full rounded-[1rem] border border-sky-400/25 bg-[#07111f] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.06)]"
+              className="h-[12.5rem] w-full rounded-[1rem] border border-sky-400/25 bg-[#07111f] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.06)]"
               viewBox="0 0 360 228"
             >
               <rect x="0" y="0" width="360" height="228" rx="18" fill="#07111f" />

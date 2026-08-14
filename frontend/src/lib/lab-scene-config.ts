@@ -45,17 +45,17 @@ export const labSceneWidgetStorability: Record<LabSceneWidgetId, boolean> = {
 };
 
 export const labSceneWidgetFrameSpecs: Record<LabSceneWidgetId, WidgetLayout> = {
-  lims: { x: 24, y: 886, width: 500, fallbackHeight: 320 },
-  workbench: { x: 24, y: 24, width: 1105, fallbackHeight: 860 },
+  lims: { x: 24, y: 886, width: 440, fallbackHeight: 300 },
+  workbench: { x: 24, y: 24, width: 980, fallbackHeight: 800 },
   trash: { x: 1276, y: 24, width: 164, fallbackHeight: 214 },
-  rack: { x: 234, y: 886, width: 500, fallbackHeight: 392 },
-  instrument: { x: 812, y: 886, width: 520, fallbackHeight: 392 },
+  rack: { x: 234, y: 886, width: 440, fallbackHeight: 360 },
+  instrument: { x: 812, y: 886, width: 460, fallbackHeight: 360 },
   basket: { x: 1276, y: 262, width: 198, fallbackHeight: 236 },
-  grinder: { x: 980, y: 886, width: 430, fallbackHeight: 340 },
-  gross_balance: { x: 364, y: 886, width: 300, fallbackHeight: 280 },
-  analytical_balance: { x: 688, y: 886, width: 300, fallbackHeight: 308 },
-  vortex: { x: 1444, y: 886, width: 280, fallbackHeight: 280 },
-  centrifuge: { x: 1740, y: 886, width: 320, fallbackHeight: 340 },
+  grinder: { x: 980, y: 886, width: 390, fallbackHeight: 315 },
+  gross_balance: { x: 364, y: 886, width: 276, fallbackHeight: 260 },
+  analytical_balance: { x: 688, y: 886, width: 276, fallbackHeight: 285 },
+  vortex: { x: 1444, y: 886, width: 260, fallbackHeight: 260 },
+  centrifuge: { x: 1740, y: 886, width: 292, fallbackHeight: 315 },
 };
 
 export const rackSlotCount = 12;

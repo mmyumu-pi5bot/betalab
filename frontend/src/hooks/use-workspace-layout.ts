@@ -50,6 +50,10 @@ type WorkspaceSize = {
   width: number;
 };
 
+const MIN_WORKSPACE_HEIGHT = 1100;
+const WORKSPACE_BOTTOM_PADDING = 240;
+const WORKSPACE_GROWTH_STEP = 320;
+
 // A widget whose width has not been measured yet resolves to a NaN coordinate.
 // Falling back to the first finite candidate keeps positions out of the DOM as
 // `left: NaN` and, combined with the Object.is guard below, lets the anchoring
@@ -205,6 +209,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
   const widgetNodesRef = useRef<Partial<Record<WidgetId, HTMLDivElement>>>({});
   const widgetsRef = useRef(widgets);
   const [workspaceSize, setWorkspaceSize] = useState<WorkspaceSize | null>(null);
+  const [dragWorkspaceHeight, setDragWorkspaceHeight] = useState<number | null>(null);
   const dragStateRef = useRef<{
     pointerOffsetX: number;
     pointerOffsetY: number;
@@ -461,6 +466,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
     }
     pendingDragPositionRef.current = null;
     latestDragPositionRef.current = null;
+    setDragWorkspaceHeight(null);
 
     const workspaceRect = workspaceRef.current?.getBoundingClientRect();
     const workspaceLeft = workspaceRect?.left ?? 0;
@@ -552,12 +558,16 @@ export function useWorkspaceLayout<WidgetId extends string>({
         nextWorkspaceRect.width > 0
           ? Math.max(nextWorkspaceRect.width - nextLayout.width, 0)
           : Number.POSITIVE_INFINITY;
-      const maxY =
-        nextWorkspaceRect.height > 0
-          ? Math.max(nextWorkspaceRect.height - widgetHeight, 0)
-          : Number.POSITIVE_INFINITY;
       const nextX = Math.min(Math.max(unclampedX, 0), maxX);
-      const nextY = Math.min(Math.max(unclampedY, 0), maxY);
+      const nextY = Math.max(unclampedY, 0);
+      const requiredWorkspaceHeight = nextY + widgetHeight + WORKSPACE_BOTTOM_PADDING;
+      if (requiredWorkspaceHeight > nextWorkspaceRect.height) {
+        const extendedWorkspaceHeight =
+          Math.ceil(requiredWorkspaceHeight / WORKSPACE_GROWTH_STEP) * WORKSPACE_GROWTH_STEP;
+        setDragWorkspaceHeight((current) =>
+          Math.max(current ?? MIN_WORKSPACE_HEIGHT, extendedWorkspaceHeight),
+        );
+      }
       const currentPendingPosition = pendingDragPositionRef.current;
       const isOverInventoryDropZone =
         getIsWidgetStorable(dragState.widgetId) &&
@@ -616,6 +626,7 @@ export function useWorkspaceLayout<WidgetId extends string>({
       dragStateRef.current = null;
       pendingDragPositionRef.current = null;
       latestDragPositionRef.current = null;
+      setDragWorkspaceHeight(null);
       setActiveWidgetId(null);
       onWidgetDragStateChange?.(null, null);
       window.removeEventListener("mousemove", handleMouseMove);
@@ -729,9 +740,10 @@ export function useWorkspaceLayout<WidgetId extends string>({
     ...presentWidgetIds.map((widgetId) => {
       const layout = widgetLayout[widgetId];
       const measuredHeight = widgetHeights[widgetId] ?? layout.fallbackHeight;
-      return layout.y + measuredHeight + 48;
+      return layout.y + measuredHeight + WORKSPACE_BOTTOM_PADDING;
     }),
-    1100,
+    dragWorkspaceHeight ?? 0,
+    MIN_WORKSPACE_HEIGHT,
   );
 
   return {

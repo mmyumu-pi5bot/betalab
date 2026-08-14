@@ -11,6 +11,22 @@ import { ProduceBasketIllustration } from "@/components/illustrations/produce-ba
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 
 describe("workspace equipment illustrations", () => {
+  it("uses the compact workspace equipment frame", () => {
+    render(
+      <WorkspaceEquipmentWidget eyebrow="LIMS" title="Sample reception">
+        <div>Terminal</div>
+      </WorkspaceEquipmentWidget>,
+    );
+
+    const widget = screen.getByText("Terminal").closest("section");
+    const dragHandle = widget?.querySelector('[data-widget-drag-handle="true"]');
+    const dropFrame = screen.getByText("Terminal").parentElement;
+
+    expect(dragHandle).toHaveClass("px-3.5", "py-2");
+    expect(dropFrame).toHaveClass("p-3");
+    expect(screen.getByText("Sample reception")).toHaveClass("text-base");
+  });
+
   it("renders powder above the liquid surface inside a sample vial", () => {
     render(
       <LabAssetIcon

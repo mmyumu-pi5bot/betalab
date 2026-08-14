@@ -44,16 +44,16 @@ export function EquipmentCardHeader({
   }
 
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex items-start justify-between gap-2.5">
       <div>
         {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">
             {eyebrow}
           </p>
         ) : null}
-        {title ? <div className="mt-1 text-xl font-semibold text-slate-950 xl:text-2xl">{title}</div> : null}
+        {title ? <div className="mt-0.5 text-base font-semibold text-slate-950 xl:text-lg">{title}</div> : null}
         {description ? (
-          <div className="mt-2 max-w-lg text-sm text-slate-600">{description}</div>
+          <div className="mt-1 max-w-lg text-xs text-slate-600">{description}</div>
         ) : null}
       </div>
       {action ?? badge ?? null}

@@ -214,7 +214,7 @@ export function WorkbenchPanel({
     <section className="overflow-hidden rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(180deg,#fffdf8_0%,#fff4dc_100%)] shadow-sm">
       <div
         aria-expanded={!isCollapsed}
-        className={`${dragAffordanceClassName} bg-white/70 px-5 py-5 backdrop-blur xl:px-6 xl:py-6 ${
+        className={`${dragAffordanceClassName} bg-white/70 px-4 py-3 backdrop-blur xl:px-5 xl:py-3.5 ${
           isCollapsed ? "" : "border-b border-amber-200/80"
         }`}
         data-widget-drag-handle="true"
@@ -227,9 +227,9 @@ export function WorkbenchPanel({
           headerPressStartRef.current = { x: event.clientX, y: event.clientY };
         }}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
               Workbench
             </p>
             <span
@@ -245,7 +245,7 @@ export function WorkbenchPanel({
           <div className="flex items-center gap-2">
             <button
               aria-label="Add workbench station"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white/85 text-lg font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-white"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white/85 text-base font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-white"
               data-testid="add-workbench-slot-button"
               onClick={() => {
                 onAddWorkbenchSlot?.();

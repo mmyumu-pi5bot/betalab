@@ -86,6 +86,77 @@ describe("resolveAnchoredPosition", () => {
 });
 
 describe("useWorkspaceLayout", () => {
+  it("extends the canvas while a widget is dragged beyond its current bottom edge", () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const widgetNode = document.createElement("div");
+    const workspaceRef = {
+      current: {
+        getBoundingClientRect: () => ({
+          left: 0,
+          top: 0,
+          width: 1600,
+          height: 1100,
+        }),
+      } as HTMLDivElement,
+    };
+    const initialLayout: Record<"lims", WidgetLayout> = {
+      lims: {
+        anchor: "top-left",
+        fallbackHeight: 320,
+        offsetX: 24,
+        offsetY: 700,
+        width: 500,
+        x: 24,
+        y: 700,
+      },
+    };
+
+    const { result } = renderHook(() =>
+      useWorkspaceLayout({
+        fixedWidgetIds: [],
+        getIsWidgetStorable: () => false,
+        initialLayout,
+        initialOrder: ["lims"],
+        onMoveWidget: vi.fn(),
+        onStoreWidget: vi.fn(),
+        presentWidgetIds: ["lims"],
+        syncKey: null,
+        widgets: [],
+        workspaceRef,
+      }),
+    );
+
+    act(() => {
+      result.current.registerWidgetNode("lims", widgetNode);
+      result.current.handleWidgetDragStart("lims", {
+        button: 0,
+        clientX: 80,
+        clientY: 740,
+        preventDefault: vi.fn(),
+      } as unknown as ReactMouseEvent<HTMLDivElement>);
+    });
+
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 80, clientY: 1340 }));
+    });
+
+    expect(widgetNode.style.transform).toBe("translate3d(0px, 600px, 0)");
+    expect(result.current.workspaceHeight).toBe(1920);
+
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mouseup", { clientX: 80, clientY: 1340 }));
+    });
+
+    expect(result.current.widgetLayout.lims.y).toBe(1300);
+    expect(result.current.workspaceHeight).toBe(1860);
+    vi.unstubAllGlobals();
+  });
+
   it("does not snap a dragged widget back to its anchor while the workspace grows", () => {
     let workspaceRect = {
       left: 0,
@@ -168,7 +239,7 @@ describe("useWorkspaceLayout", () => {
       window.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 980 }));
     });
 
-    expect(result.current.widgetLayout.rack.y).toBe(708);
+    expect(result.current.widgetLayout.rack.y).toBe(936);
 
     workspaceRect = {
       ...workspaceRect,
@@ -179,7 +250,7 @@ describe("useWorkspaceLayout", () => {
       ResizeObserverMock.callback?.([], {} as ResizeObserver);
     });
 
-    expect(result.current.widgetLayout.rack.y).toBe(708);
+    expect(result.current.widgetLayout.rack.y).toBe(936);
 
     act(() => {
       window.dispatchEvent(new MouseEvent("mouseup", { clientX: 300, clientY: 980 }));
@@ -279,7 +350,7 @@ describe("useWorkspaceLayout", () => {
       window.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 980 }));
     });
 
-    expect(result.current.widgetLayout.rack.y).toBe(708);
+    expect(result.current.widgetLayout.rack.y).toBe(936);
 
     act(() => {
       window.dispatchEvent(new MouseEvent("mouseup", { clientX: 300, clientY: 980 }));
@@ -288,7 +359,7 @@ describe("useWorkspaceLayout", () => {
     expect(onMoveWidget).toHaveBeenCalledWith("rack", {
       anchor: "top-left",
       offsetX: 234,
-      offsetY: 708,
+      offsetY: 936,
     });
 
     act(() => {
@@ -301,19 +372,19 @@ describe("useWorkspaceLayout", () => {
       });
     });
 
-    expect(result.current.widgetLayout.rack.y).toBe(708);
+    expect(result.current.widgetLayout.rack.y).toBe(936);
 
     act(() => {
       rerender({
         syncKey: "confirmed-server-position",
         widgets: [
-          { id: "rack", anchor: "top-left", offsetX: 234, offsetY: 708 },
+          { id: "rack", anchor: "top-left", offsetX: 234, offsetY: 936 },
           { id: "trash", anchor: "top-right", offsetX: 0, offsetY: 126 },
         ],
       });
     });
 
-    expect(result.current.widgetLayout.rack.y).toBe(708);
+    expect(result.current.widgetLayout.rack.y).toBe(936);
     vi.unstubAllGlobals();
   });
 
@@ -474,7 +545,7 @@ describe("useWorkspaceLayout", () => {
       window.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 980 }));
     });
 
-    expect(widgetNode.style.transform).toBe("translate3d(0px, -178px, 0)");
+    expect(widgetNode.style.transform).toBe("translate3d(0px, 50px, 0)");
     expect(result.current.widgetLayout.rack.y).toBe(886);
 
     act(() => {
@@ -483,11 +554,11 @@ describe("useWorkspaceLayout", () => {
 
     expect(widgetNode.style.transform).toBe("");
     expect(widgetNode.style.willChange).toBe("");
-    expect(result.current.widgetLayout.rack.y).toBe(708);
+    expect(result.current.widgetLayout.rack.y).toBe(936);
     expect(onMoveWidget).toHaveBeenCalledWith("rack", {
       anchor: "top-left",
       offsetX: 234,
-      offsetY: 708,
+      offsetY: 936,
     });
     vi.unstubAllGlobals();
   });
