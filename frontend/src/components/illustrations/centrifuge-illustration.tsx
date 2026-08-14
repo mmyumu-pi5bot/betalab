@@ -53,7 +53,7 @@ export function CentrifugeIllustration({
     height: 272,
     idPrefix: "centrifuge-illustration",
     radius: 30,
-    width: 520,
+    width: 495,
   });
 
   // Sample-tube phase columns (only meaningful once a tube is loaded).
@@ -69,7 +69,7 @@ export function CentrifugeIllustration({
       data-testid="centrifuge-illustration"
       role="group"
     >
-      <svg className="h-full w-full" fill="none" viewBox="0 0 520 272" xmlns="http://www.w3.org/2000/svg">
+      <svg className="h-full w-full" fill="none" viewBox="0 0 495 272" xmlns="http://www.w3.org/2000/svg">
         <defs>
           {surfaceDefs}
 
@@ -107,7 +107,7 @@ export function CentrifugeIllustration({
 
         {surface}
 
-        <g transform="translate(0 -66)">
+        <g transform="translate(-12 -66)">
         {/* ── Drum body (cylinder wall + base) ─────────────── */}
         <g className="drop-shadow-[0_14px_30px_rgba(15,23,42,0.2)]">
           <path

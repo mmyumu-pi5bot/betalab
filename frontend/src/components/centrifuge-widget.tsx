@@ -33,7 +33,7 @@ export function CentrifugeWidget(props: CentrifugeWidgetProps) {
       onDrop={props.onDrop}
     >
       <CentrifugeIllustration
-        className="h-[190px] w-full"
+        className="w-full"
         hasTube={hasTube}
         isRunning={props.isRunning}
         onStartClick={props.onStart}

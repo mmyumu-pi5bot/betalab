@@ -44,7 +44,7 @@ export function VortexWidget({
       <div className="space-y-2">
         {/* Illustration — cup is the drop target, start button is overlaid on the device */}
         <VortexMixerIllustration
-          className="h-[180px] w-full"
+          className="w-full"
           dropHighlighted={isDropHighlighted}
           hasTool={hasTool}
           isRunning={isRunning}

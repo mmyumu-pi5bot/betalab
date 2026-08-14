@@ -22,7 +22,7 @@ describe("workspace equipment illustrations", () => {
     const dragHandle = widget?.querySelector('[data-widget-drag-handle="true"]');
     const dropFrame = screen.getByText("Terminal").parentElement;
 
-    expect(dragHandle).toHaveClass("px-3.5", "py-2");
+    expect(dragHandle).toHaveClass("px-3.5", "py-1.5");
     expect(dropFrame).toHaveClass("p-3");
     expect(screen.getByText("Sample reception")).toHaveClass("text-base");
   });

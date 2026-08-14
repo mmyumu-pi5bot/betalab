@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { LimsLabelPrinterIllustration } from "@/components/illustrations/lims-label-printer-illustration";
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 import type { LimsReception, PrintedLabelTicket } from "@/types/workbench";
@@ -239,18 +240,12 @@ export function LimsWidget({
               )}
             </svg>
           </div>
-          <div className="border-t border-slate-300 bg-[linear-gradient(180deg,#c9d2dc,#b6c2cd)] px-4 py-3">
-            <div className="flex items-end justify-between gap-4">
-              <div className="h-5 w-20 rounded-t-[0.7rem] border border-slate-400/80 border-b-0 bg-[linear-gradient(180deg,#e2e8f0,#cbd5e1)] px-2 pt-1">
-                {displayedTicket ? (
-                  <div
-                    className="h-6 w-14 rounded-[0.35rem] border border-slate-300 bg-white shadow-[0_2px_4px_rgba(15,23,42,0.12)]"
-                    data-testid="lims-printer-ticket"
-                  />
-                ) : null}
-              </div>
-              <div className="h-3.5 w-28 rounded-full border border-slate-400/80 bg-[linear-gradient(180deg,#94a3b8,#64748b)]" />
-            </div>
+          <div className="border-t border-slate-300 bg-[linear-gradient(180deg,#c9d2dc,#b6c2cd)] px-3 pb-2 pt-1.5">
+            <LimsLabelPrinterIllustration
+              className="h-[4.4rem] w-full"
+              hasTicket={displayedTicket !== null}
+              ticketTestId="lims-printer-ticket"
+            />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">

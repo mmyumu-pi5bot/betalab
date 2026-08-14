@@ -3,6 +3,7 @@
 import type { DragEvent } from "react";
 
 import { DraggableInventoryItem } from "@/components/draggable-inventory-item";
+import { LabWasteBinIllustration } from "@/components/illustrations/lab-waste-bin-illustration";
 import { InventoryWidget } from "@/components/inventory-widget";
 import { getProduceLotDisplayName } from "@/lib/produce-lot-display";
 import type {
@@ -43,31 +44,6 @@ type TrashWidgetProps = {
   trashedWidgets: ExperimentWorkspaceWidget[];
 };
 
-function TrashIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-[4.5rem] w-[4.5rem] text-slate-500"
-      fill="none"
-      viewBox="0 0 96 96"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M28 30H68" stroke="currentColor" strokeLinecap="round" strokeWidth="6" />
-      <path d="M38 20H58" stroke="currentColor" strokeLinecap="round" strokeWidth="6" />
-      <path
-        d="M34 30V67C34 73 37 76 43 76H53C59 76 62 73 62 67V30"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="6"
-      />
-      <path d="M44 40V63" stroke="currentColor" strokeLinecap="round" strokeWidth="6" />
-      <path d="M52 40V63" stroke="currentColor" strokeLinecap="round" strokeWidth="6" />
-      <path d="M24 30H72" stroke="currentColor" strokeLinecap="round" strokeWidth="4" />
-    </svg>
-  );
-}
-
 export function TrashWidget({
   dndDisabled = false,
   discardedFrom,
@@ -104,7 +80,7 @@ export function TrashWidget({
       countBadgeClassName="-right-2 -top-2 absolute"
       countTestId="trash-count-badge"
       dataDropHighlighted={isDropHighlighted ? "true" : "false"}
-      icon={<TrashIcon />}
+      icon={<LabWasteBinIllustration className="block h-[5.4rem] w-auto" hasItems={trashItemCount > 0} isOpen={isOpen} />}
       isDropHighlighted={isDropHighlighted}
       isOpen={isOpen}
       onDragOver={dndDisabled ? undefined : onDragOver}

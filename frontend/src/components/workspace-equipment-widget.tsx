@@ -37,7 +37,7 @@ export function WorkspaceEquipmentWidget({
   return (
     <section className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(241,245,249,0.95))] shadow-[0_18px_40px_rgba(15,23,42,0.1)]">
       <div
-        className={`${dragAffordanceClassName} border-b border-slate-200/80 bg-white/85 px-3.5 py-2 backdrop-blur xl:px-4 xl:py-2.5`}
+        className={`${dragAffordanceClassName} border-b border-slate-200/80 bg-white/85 px-3.5 py-1.5 backdrop-blur xl:px-4 xl:py-1.5`}
         data-widget-drag-handle="true"
       >
         <EquipmentCardHeader

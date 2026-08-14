@@ -51,10 +51,10 @@ export function InventoryWidget({
     <section className="relative overflow-visible">
       <div className="overflow-hidden rounded-[1.7rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(241,245,249,0.95))] shadow-[0_18px_40px_rgba(15,23,42,0.1)]">
         <div
-          className={`${dragAffordanceClassName} border-b border-slate-200/80 bg-white/85 px-4 py-3 backdrop-blur`}
+          className={`${dragAffordanceClassName} border-b border-slate-200/80 bg-white/85 px-4 py-2 backdrop-blur`}
           data-widget-drag-handle="true"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-sky-700">
             {title}
           </p>
         </div>

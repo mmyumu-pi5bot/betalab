@@ -44,10 +44,10 @@ export function EquipmentCardHeader({
   }
 
   return (
-    <div className="flex items-start justify-between gap-2.5">
+    <div className="flex items-center justify-between gap-2.5">
       <div>
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-sky-700">
             {eyebrow}
           </p>
         ) : null}

@@ -232,7 +232,7 @@ describe("WorkbenchPanel", () => {
     const header = screen.getByTestId("workbench-header");
     expect(header).toHaveAttribute("data-widget-drag-handle", "true");
     expect(header).toHaveAttribute("aria-expanded", "true");
-    expect(header).toHaveClass("px-4", "py-3");
+    expect(header).toHaveClass("px-4", "py-1.5");
     expect(screen.getByTestId("add-workbench-slot-button")).toHaveClass("h-9", "w-9");
 
     fireEvent.click(screen.getByTestId("add-workbench-slot-button"));

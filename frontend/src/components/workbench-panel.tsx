@@ -214,7 +214,7 @@ export function WorkbenchPanel({
     <section className="overflow-hidden rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(180deg,#fffdf8_0%,#fff4dc_100%)] shadow-sm">
       <div
         aria-expanded={!isCollapsed}
-        className={`${dragAffordanceClassName} bg-white/70 px-4 py-3 backdrop-blur xl:px-5 xl:py-3.5 ${
+        className={`${dragAffordanceClassName} bg-white/70 px-4 py-1.5 backdrop-blur xl:px-5 xl:py-2 ${
           isCollapsed ? "" : "border-b border-amber-200/80"
         }`}
         data-widget-drag-handle="true"
@@ -229,7 +229,7 @@ export function WorkbenchPanel({
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-amber-700">
               Workbench
             </p>
             <span
