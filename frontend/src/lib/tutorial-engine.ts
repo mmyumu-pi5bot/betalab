@@ -643,6 +643,14 @@ function weighReceptionPresentation(experiment: Experiment): Partial<TutorialSte
   };
 }
 
+// Grind quality is scored on the average temperature held across the 30 s
+// cycle, and friction adds back about 10 °C over that cycle. Starting at
+// −70 °C lands the average around −65 °C, inside the fine-powder band, which
+// is what makes a 10 g test portion representative of the lot: the sampling
+// spread it leaves is roughly ±5 %, against ±20 % when the cycle is started at
+// −45 °C. Waiting costs about 40 s of simulated time at a 1:1 dry-ice ratio.
+const grinderReadyTemperatureC = -70;
+
 function grindSampleAnchor(experiment: Experiment) {
   const grinder = workspaceWidget(experiment, "grinder");
   if (!grinder?.isPresent) {
@@ -658,7 +666,7 @@ function grindSampleAnchor(experiment: Experiment) {
   if ((grinder.grinderRunRemainingMs ?? 0) > 0) {
     return "grinder-progress";
   }
-  if ((lot?.temperatureC ?? 20) > -45) {
+  if ((lot?.temperatureC ?? 20) > grinderReadyTemperatureC) {
     return lot ? `temperature-${lot.id}` : "grinder-lcd-panel";
   }
   return "grinder-power-button";
@@ -695,7 +703,8 @@ function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPr
       title: "Add Dry ice pellets",
       instruction:
         `In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter ${formattedDryIceMassG} g—roughly the mass of the apples—then confirm.`,
-      hint: "Using a 1:1 dry-ice-to-apple mass ratio cools the lot gradually. Do not start the grinder while the temperature is above −45 °C.",
+      hint:
+        `Using a 1:1 dry-ice-to-apple mass ratio cools the lot gradually. Do not start the grinder while the temperature is above −${Math.abs(grinderReadyTemperatureC)} °C — a warmer start grinds the apples granular instead of fine.`,
       action: { kind: "drag", label: `Add ${formattedDryIceMassG} g dry ice` },
     };
   }
@@ -708,12 +717,12 @@ function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPr
     };
   }
   const lot = grinder.produceLots?.[0];
-  if ((lot?.temperatureC ?? 20) > -45) {
+  if ((lot?.temperatureC ?? 20) > grinderReadyTemperatureC) {
     return {
       title: "Wait for the apples to become cryogenic",
-      instruction: "Watch the highlighted thermometer. Wait until it reads −45 °C or colder before starting the grinder.",
-      hint: "The temperature falls over simulation ticks after the dry ice is added.",
-      action: { kind: "wait", label: "Wait until −45 °C" },
+      instruction: `Watch the highlighted thermometer. Wait until it reads −${Math.abs(grinderReadyTemperatureC)} °C or colder before starting the grinder.`,
+      hint: "The temperature falls over simulation ticks after the dry ice is added. Grinding a warmer lot leaves it granular, and a granular lot makes the weighed test portion unrepresentative.",
+      action: { kind: "wait", label: `Wait until −${Math.abs(grinderReadyTemperatureC)} °C` },
     };
   }
   return {

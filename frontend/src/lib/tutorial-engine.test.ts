@@ -462,13 +462,22 @@ describe("calibration sample tutorial", () => {
 
     const cooling = grinderState(-20);
     expect(tutorialStep.anchor(cooling)).toBe("temperature-lot_1");
-    expect(getTutorialStepPresentation(tutorialStep, cooling).action).toEqual({ kind: "wait", label: "Wait until −45 °C" });
+    expect(getTutorialStepPresentation(tutorialStep, cooling).action).toEqual({ kind: "wait", label: "Wait until −70 °C" });
 
-    const ready = grinderState(-50);
+    // −50 °C used to be "cold enough" and produced a granular grind. The step
+    // must keep waiting there now, and only release inside the fine-powder band.
+    const stillTooWarm = grinderState(-50);
+    expect(tutorialStep.anchor(stillTooWarm)).toBe("temperature-lot_1");
+    expect(getTutorialStepPresentation(tutorialStep, stillTooWarm).action).toEqual({
+      kind: "wait",
+      label: "Wait until −70 °C",
+    });
+
+    const ready = grinderState(-72);
     expect(tutorialStep.anchor(ready)).toBe("grinder-power-button");
     expect(getTutorialStepPresentation(tutorialStep, ready).action).toEqual({ kind: "click", label: "Click power" });
 
-    const running = grinderState(-50, 3000);
+    const running = grinderState(-72, 3000);
     expect(tutorialStep.anchor(running)).toBe("grinder-progress");
     expect(getTutorialStepPresentation(tutorialStep, running).action?.kind).toBe("wait");
   });
