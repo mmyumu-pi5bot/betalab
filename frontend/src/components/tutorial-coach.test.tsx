@@ -61,8 +61,14 @@ describe("TutorialCoach", () => {
 
     expect(screen.getByText("Deploy the Gross balance")).toBeInTheDocument();
     expect(screen.getByText("Drag to workspace")).toBeInTheDocument();
-    expect(screen.getByTestId("tutorial-action-icon")).toHaveTextContent("↗");
-    expect(screen.getByTestId("tutorial-spotlight-action-icon")).toHaveTextContent("↗");
+    // The drag gesture is drawn, not spelled with a glyph.
+    const actionIcon = screen.getByTestId("tutorial-action-icon");
+    const spotlightActionIcon = screen.getByTestId("tutorial-spotlight-action-icon");
+    expect(actionIcon).toHaveAttribute("data-action-kind", "drag");
+    expect(actionIcon.querySelector("svg")).not.toBeNull();
+    expect(actionIcon).toHaveTextContent("");
+    expect(spotlightActionIcon).toHaveAttribute("data-action-kind", "drag");
+    expect(spotlightActionIcon.querySelector("svg")).not.toBeNull();
     expect(screen.getByTestId("tutorial-spotlight")).toHaveClass("pointer-events-none");
     expect(screen.getByTestId("tutorial-spotlight")).not.toHaveClass("transition-all");
     expect(screen.getByRole("complementary", { name: "Guided tutorial" })).toHaveClass(
@@ -795,5 +801,164 @@ describe("TutorialCoach", () => {
 
     spatula.remove();
     powderJar.remove();
+  });
+
+  it("highlights the expected drop destination only while an item is dragged", async () => {
+    const source = document.createElement("div");
+    source.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    source.getBoundingClientRect = () =>
+      ({ left: 20, top: 40, width: 100, height: 50, right: 120, bottom: 90 }) as DOMRect;
+    document.body.appendChild(source);
+    const destination = document.createElement("div");
+    destination.dataset.tutorialAnchor = "workspace";
+    destination.getBoundingClientRect = () =>
+      ({ left: 200, top: 120, width: 300, height: 200, right: 500, bottom: 320 }) as DOMRect;
+    document.body.appendChild(destination);
+
+    const evaluation = evaluateTutorial(calibrationSampleTutorial, emptyExperiment());
+    const { rerender } = render(
+      <TutorialCoach
+        active
+        evaluation={evaluation}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("tutorial-drop-spotlight")).not.toBeInTheDocument();
+
+    rerender(
+      <TutorialCoach
+        active
+        evaluation={evaluation}
+        isDragging
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    const dropSpotlight = screen.getByTestId("tutorial-drop-spotlight");
+    await waitFor(() => {
+      expect(dropSpotlight).toHaveStyle({ display: "block", left: "192px", top: "112px" });
+    });
+    expect(dropSpotlight).toHaveClass("border-yellow-400");
+    expect(dropSpotlight).toHaveClass("pointer-events-none");
+    // The source stays highlighted so the learner keeps seeing what is in hand.
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "12px", top: "32px" });
+
+    source.remove();
+    destination.remove();
+  });
+
+  it("clamps the drop destination to the visible area when the target overflows it", async () => {
+    const source = document.createElement("div");
+    source.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    source.getBoundingClientRect = () =>
+      ({ left: 20, top: 40, width: 100, height: 50, right: 120, bottom: 90 }) as DOMRect;
+    document.body.appendChild(source);
+    // The workspace canvas is taller than the viewport and lives inside clipping
+    // ancestors: it is never fully visible, but it is still the drop target.
+    const destination = document.createElement("div");
+    destination.dataset.tutorialAnchor = "workspace";
+    destination.getBoundingClientRect = () =>
+      ({ left: 40, top: 60, width: 900, height: 1200, right: 940, bottom: 1260 }) as DOMRect;
+    document.body.appendChild(destination);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        isDragging
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    const dropSpotlight = screen.getByTestId("tutorial-drop-spotlight");
+    await waitFor(() => {
+      expect(dropSpotlight).toHaveStyle({
+        display: "block",
+        left: "32px",
+        top: "52px",
+        width: `${Math.min(948, window.innerWidth) - 32}px`,
+        height: `${Math.min(1268, window.innerHeight) - 52}px`,
+      });
+    });
+
+    source.remove();
+    destination.remove();
+  });
+
+  it("hides the drop destination once the target is scrolled out of the visible area", async () => {
+    const source = document.createElement("div");
+    source.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    source.getBoundingClientRect = () =>
+      ({ left: 20, top: 40, width: 100, height: 50, right: 120, bottom: 90 }) as DOMRect;
+    document.body.appendChild(source);
+    const destination = document.createElement("div");
+    destination.dataset.tutorialAnchor = "workspace";
+    destination.getBoundingClientRect = () =>
+      ({
+        left: 40,
+        top: window.innerHeight + 200,
+        width: 300,
+        height: 200,
+        right: 340,
+        bottom: window.innerHeight + 400,
+      }) as DOMRect;
+    document.body.appendChild(destination);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        isDragging
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-drop-spotlight")).toHaveStyle({ display: "none" });
+
+    source.remove();
+    destination.remove();
+  });
+
+  it("keeps the drop destination hidden while an intervention is displayed", () => {
+    const destination = document.createElement("div");
+    destination.dataset.tutorialAnchor = "workspace";
+    destination.getBoundingClientRect = () =>
+      ({ left: 200, top: 120, width: 300, height: 200, right: 500, bottom: 320 }) as DOMRect;
+    document.body.appendChild(destination);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        intervention={{
+          actionLabel: "Use the highlighted Cutting board",
+          anchor: "palette-item-cutting_board_hdpe",
+          continueLabel: "Continue tutorial",
+          hint: "The attempted drop was cancelled.",
+          instruction: "Drop them onto the highlighted Cutting board instead.",
+          leaveLabel: "Leave tutorial and place anyway",
+          title: "Contamination prevented",
+        }}
+        isDragging
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("tutorial-drop-spotlight")).not.toBeInTheDocument();
+    // Non-drag actions keep their glyph.
+    expect(screen.getByTestId("tutorial-action-icon")).toHaveTextContent("●");
+
+    destination.remove();
   });
 });

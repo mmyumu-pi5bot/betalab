@@ -648,6 +648,63 @@ describe("LabScene", () => {
     });
   });
 
+  it("marks the tutorial drop destination while an item is being dragged", async () => {
+    window.localStorage.clear();
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        slots: makeSlots([
+          {
+            tool: makeSampleBagTool({
+              id: "bag_1",
+              isSealed: false,
+              produceLots: [makeProduceLot({ id: "produce_1" })],
+            }),
+          },
+          {},
+        ]),
+      }),
+    );
+
+    render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
+
+    const apples = await screen.findByTestId("bench-produce-lot-produce_1");
+    // The first objective is to deploy the gross balance, so the workspace canvas is
+    // the expected destination. jsdom reports zero-sized rects, so give it a real one.
+    Object.defineProperty(screen.getByTestId("widget-workspace"), "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        bottom: 620,
+        height: 500,
+        left: 260,
+        right: 960,
+        top: 120,
+        width: 700,
+        x: 260,
+        y: 120,
+        toJSON: () => {},
+      }),
+    });
+    expect(screen.queryByTestId("tutorial-drop-spotlight")).not.toBeInTheDocument();
+
+    fireEvent.dragStart(apples, { dataTransfer: createDataTransfer() });
+
+    const dropSpotlight = await screen.findByTestId("tutorial-drop-spotlight");
+    expect(dropSpotlight).toHaveClass("border-yellow-400");
+    await waitFor(() => {
+      expect(dropSpotlight).toHaveStyle({
+        display: "block",
+        left: "252px",
+        top: "112px",
+      });
+    });
+
+    fireEvent.dragEnd(apples);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("tutorial-drop-spotlight")).not.toBeInTheDocument();
+    });
+  });
+
   it("stays in free mode when the tutorial was finished", async () => {
     window.localStorage.clear();
     window.localStorage.setItem(

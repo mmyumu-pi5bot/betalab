@@ -1074,4 +1074,162 @@ describe("calibration sample tutorial", () => {
     expect(result.currentStep).toBeNull();
     expect(result.completedStepIds).toHaveLength(calibrationSampleTutorial.steps.length);
   });
+  describe("drop destinations", () => {
+    const stepById = (stepId: string) =>
+      calibrationSampleTutorial.steps.find((entry) => entry.id === stepId)!;
+
+    it("points a palette deployment at the workspace canvas", () => {
+      const tutorialStep = stepById("weigh-received-sample");
+      const state = experiment();
+
+      expect(tutorialStep.anchor(state)).toBe("palette-item-gross_balance_widget");
+      expect(tutorialStep.dropAnchor?.(state)).toBe("workspace");
+    });
+
+    it("points the sample bag at the deployed gross balance, then stops once it is weighed", () => {
+      const tutorialStep = stepById("weigh-received-sample");
+      const withBalance = {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) => widget(id, { isPresent: id === "gross_balance" })),
+      };
+      const bagInBasket = experiment({
+        basketTools: [sampleBag()],
+        workspace: withBalance,
+      });
+
+      expect(tutorialStep.anchor(bagInBasket)).toBe("basket-received-bag");
+      expect(tutorialStep.dropAnchor?.(bagInBasket)).toBe("widget-gross_balance");
+
+      const bagOnBalance = experiment({
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, {
+              isPresent: id === "gross_balance",
+              tool: id === "gross_balance" ? sampleBag() : undefined,
+            }),
+          ),
+        },
+      });
+
+      expect(tutorialStep.anchor(bagOnBalance)).toBe("widget-gross_balance");
+      expect(tutorialStep.dropAnchor?.(bagOnBalance)).toBeNull();
+    });
+
+    it("points a bench placement at the first free station, and nowhere when there is none", () => {
+      const tutorialStep = stepById("cut-sample");
+      const occupiedStation = {
+        id: "station_1",
+        label: "Station 1",
+        tool: labTool("storage_jar", { id: "powder_jar" }),
+      };
+      const freeBench = experiment({
+        workbench: {
+          slots: [occupiedStation, { id: "station_2", label: "Station 2", tool: null }],
+        },
+      });
+
+      expect(tutorialStep.anchor(freeBench)).toBe("palette-item-cutting_board_hdpe");
+      expect(tutorialStep.dropAnchor?.(freeBench)).toBe("bench-slot-station_2");
+
+      const fullBench = experiment({ workbench: { slots: [occupiedStation] } });
+
+      expect(tutorialStep.anchor(fullBench)).toBe("add-workbench-slot-button");
+      expect(tutorialStep.dropAnchor?.(fullBench)).toBeNull();
+    });
+
+    it("points the apples at the cutting board wherever the board stands", () => {
+      const bag = labTool("storage_jar", {
+        id: "bag_1",
+        toolType: "sample_bag",
+        isSealed: false,
+        produceLots: [
+          {
+            id: "lot_1",
+            produceId: "apple",
+            label: "Apples",
+            totalMassG: 2000,
+            unitCount: 12,
+            isDraggable: true,
+            allowedDropTargets: [],
+            materialState: "whole",
+          },
+        ],
+      });
+      const board = labTool("storage_jar", {
+        id: "board_1",
+        toolType: "cutting_board",
+        produceLots: [],
+      });
+      const state = experiment({
+        workbench: {
+          slots: [
+            { id: "station_1", label: "Station 1", tool: bag },
+            { id: "station_2", label: "Station 2", tool: board },
+          ],
+        },
+      });
+      const tutorialStep = stepById("cut-sample");
+
+      expect(tutorialStep.anchor(state)).toBe("bench-produce-lot-lot_1");
+      expect(tutorialStep.dropAnchor?.(state)).toBe("bench-tool-card-board_1");
+    });
+
+    it("sends a compromised analytical tube to the trash", () => {
+      const compromisedTube = labTool("centrifuge_tube", {
+        id: "compromised_tube",
+        powderMassG: 2,
+      });
+      const state = experiment({
+        analyticalBalance: { tareMassG: 14, taredToolId: null },
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, {
+              isPresent: id === "analytical_balance",
+              tool: id === "analytical_balance" ? compromisedTube : undefined,
+            }),
+          ),
+        },
+      });
+      const tutorialStep = stepById("weigh-test-portion");
+
+      expect(tutorialStep.anchor(state)).toBe("widget-analytical_balance");
+      expect(tutorialStep.dropAnchor?.(state)).toBe("trash-dropzone");
+    });
+
+    it("points the loaded rack at the instrument, and nothing once it is loaded", () => {
+      const tutorialStep = stepById("launch-sequence");
+      const deployed = {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, { isPresent: id === "instrument" || id === "rack" }),
+        ),
+      };
+      const state = experiment({ workspace: deployed });
+
+      expect(tutorialStep.anchor(state)).toBe("widget-rack");
+      expect(tutorialStep.dropAnchor?.(state)).toBe("widget-instrument");
+
+      const loaded = experiment({
+        rack: { ...experiment().rack, state: "loaded" },
+        workspace: deployed,
+      });
+
+      expect(tutorialStep.anchor(loaded)).toBe("instrument-console-next");
+      expect(tutorialStep.dropAnchor?.(loaded)).toBeNull();
+    });
+
+    it("never points a click-only sub-step at a drop destination", () => {
+      const state = experiment();
+
+      for (const tutorialStep of calibrationSampleTutorial.steps) {
+        const dropAnchor = tutorialStep.dropAnchor?.(state) ?? null;
+        if (dropAnchor === null) {
+          continue;
+        }
+        expect(dropAnchor, tutorialStep.id).not.toBe(tutorialStep.anchor(state));
+      }
+    });
+  });
 });

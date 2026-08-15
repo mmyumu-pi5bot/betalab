@@ -9,6 +9,7 @@ import {
   getTutorialStepPresentation,
   isTutorialActionTool,
   type LimsTutorialField,
+  type TutorialAction,
   type TutorialActionTool,
   type TutorialEvaluation,
 } from "@/lib/tutorial-engine";
@@ -19,6 +20,7 @@ type TutorialCoachProps = {
   active: boolean;
   evaluation: TutorialEvaluation;
   intervention?: TutorialIntervention | null;
+  isDragging?: boolean;
   onContinueTutorial?: () => void;
   onFinish?: () => void;
   onLeaveTutorial?: () => void;
@@ -189,14 +191,51 @@ function resolveAnchor(
   return { accessTarget: null, actionTool: null, limsField: null, target: null };
 }
 
-const tutorialActionIcons = {
+type TutorialActionKind = TutorialAction["kind"];
+
+const tutorialActionGlyphs: Record<Exclude<TutorialActionKind, "drag">, string> = {
   click: "●",
-  drag: "↗",
   inspect: "◎",
   keyboard: "⌨",
   type: "▣",
   wait: "◷",
-} as const;
+};
+
+// Dragging is the one gesture the learner performs with the mouse rather than on a
+// single control, and a bare arrow glyph read as "open elsewhere". This draws the
+// gesture instead: a pointer holding an item by its corner.
+function TutorialActionIcon({
+  className,
+  kind,
+}: {
+  className: string;
+  kind: TutorialActionKind;
+}) {
+  if (kind !== "drag") {
+    return <>{tutorialActionGlyphs[kind]}</>;
+  }
+
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24">
+      <rect
+        height="9.6"
+        rx="2.2"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        width="9.6"
+        x="2.2"
+        y="2.2"
+      />
+      <path
+        d="M13.4 13.4 17.5 23.3 19 19 23.3 17.5Z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
 
 function isClippingElement(element: HTMLElement) {
   const style = window.getComputedStyle(element);
@@ -205,22 +244,30 @@ function isClippingElement(element: HTMLElement) {
   );
 }
 
-function isFullyVisible(target: HTMLElement, bounds: DOMRect) {
-  let clipLeft = 0;
-  let clipTop = 0;
-  let clipRight = window.innerWidth;
-  let clipBottom = window.innerHeight;
+type ClipBounds = { bottom: number; left: number; right: number; top: number };
+
+function clipBoundsFor(target: HTMLElement): ClipBounds {
+  let left = 0;
+  let top = 0;
+  let right = window.innerWidth;
+  let bottom = window.innerHeight;
 
   for (let parent = target.parentElement; parent; parent = parent.parentElement) {
     if (!isClippingElement(parent)) {
       continue;
     }
     const parentBounds = parent.getBoundingClientRect();
-    clipLeft = Math.max(clipLeft, parentBounds.left);
-    clipTop = Math.max(clipTop, parentBounds.top);
-    clipRight = Math.min(clipRight, parentBounds.right);
-    clipBottom = Math.min(clipBottom, parentBounds.bottom);
+    left = Math.max(left, parentBounds.left);
+    top = Math.max(top, parentBounds.top);
+    right = Math.min(right, parentBounds.right);
+    bottom = Math.min(bottom, parentBounds.bottom);
   }
+
+  return { bottom, left, right, top };
+}
+
+function isFullyVisible(target: HTMLElement, bounds: DOMRect) {
+  const clip = clipBoundsFor(target);
 
   // Only the target itself has to be visible. The spotlight halo is drawn in a fixed
   // overlay that no ancestor clips, so counting its padding here would drop the
@@ -228,10 +275,91 @@ function isFullyVisible(target: HTMLElement, bounds: DOMRect) {
   return (
     bounds.width > 0 &&
     bounds.height > 0 &&
-    bounds.left >= clipLeft &&
-    bounds.top >= clipTop &&
-    bounds.right <= clipRight &&
-    bounds.bottom <= clipBottom
+    bounds.left >= clip.left &&
+    bounds.top >= clip.top &&
+    bounds.right <= clip.right &&
+    bounds.bottom <= clip.bottom
+  );
+}
+
+// A drop destination is regularly larger than the viewport — the workspace canvas
+// is taller than the screen and sits inside clipping ancestors — so demanding full
+// visibility would hide the halo exactly where it is needed most. The halo is drawn
+// on the visible part instead, and only disappears when nothing of the target is left.
+const minimumVisibleDropSpan = 24;
+
+function visibleSpotlightBounds(target: HTMLElement, bounds: DOMRect) {
+  const clip = clipBoundsFor(target);
+  const left = Math.max(bounds.left - spotlightPadding, clip.left);
+  const top = Math.max(bounds.top - spotlightPadding, clip.top);
+  const right = Math.min(bounds.right + spotlightPadding, clip.right);
+  const bottom = Math.min(bounds.bottom + spotlightPadding, clip.bottom);
+
+  return right - left >= minimumVisibleDropSpan && bottom - top >= minimumVisibleDropSpan
+    ? { height: bottom - top, left, top, width: right - left }
+    : null;
+}
+
+// While an item is being dragged, the destination the tutorial expects is marked
+// on top of the regular drop-target affordance, so the learner can tell the one
+// correct target apart from every target that would merely accept the item.
+function TutorialDropSpotlight({ anchor }: { anchor: string }) {
+  const spotlightRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let observedTarget: HTMLElement | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const update = () => {
+      const spotlight = spotlightRef.current;
+      if (!spotlight) {
+        return;
+      }
+      const target = findDirectAnchor(anchor);
+      const bounds = target?.getBoundingClientRect();
+      const visible = target && bounds ? visibleSpotlightBounds(target, bounds) : null;
+      if (!target || !visible) {
+        spotlight.style.display = "none";
+        return;
+      }
+
+      spotlight.style.display = "block";
+      spotlight.style.height = `${visible.height}px`;
+      spotlight.style.left = `${visible.left}px`;
+      spotlight.style.top = `${visible.top}px`;
+      spotlight.style.width = `${visible.width}px`;
+
+      if (observedTarget !== target && typeof ResizeObserver !== "undefined") {
+        resizeObserver?.disconnect();
+        observedTarget = target;
+        resizeObserver = new ResizeObserver(() => update());
+        resizeObserver.observe(target);
+      }
+    };
+
+    update();
+
+    const mutationObserver = new MutationObserver(() => update());
+    mutationObserver.observe(document.body, { attributes: true, childList: true, subtree: true });
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+
+    return () => {
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchor]);
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed z-[59] rounded-[1.4rem] border-[3px] border-dashed border-yellow-400 bg-yellow-300/25 shadow-[0_0_0_5px_rgba(250,204,21,0.32),0_0_38px_rgba(234,179,8,0.45)]"
+      data-testid="tutorial-drop-spotlight"
+      ref={spotlightRef}
+      style={{ display: "none" }}
+    />
   );
 }
 
@@ -239,6 +367,7 @@ export function TutorialCoach({
   active,
   evaluation,
   intervention = null,
+  isDragging = false,
   onContinueTutorial,
   onFinish,
   onLeaveTutorial,
@@ -259,6 +388,9 @@ export function TutorialCoach({
     ? getTutorialStepPresentation(evaluation.currentStep, evaluation.experiment)
     : null;
   const guideActionTool = !intervention;
+  const dropAnchor = intervention
+    ? null
+    : evaluation.currentStep?.dropAnchor?.(evaluation.experiment) ?? null;
   useEffect(() => {
     if (!active || !anchor) {
       categoryRevealAnchorRef.current = null;
@@ -401,6 +533,7 @@ export function TutorialCoach({
 
   return (
     <>
+      {isDragging && dropAnchor ? <TutorialDropSpotlight anchor={dropAnchor} /> : null}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed z-[60] rounded-[1.4rem] border-2 border-amber-400 bg-amber-200/10 shadow-[0_0_0_5px_rgba(251,191,36,0.28),0_0_38px_rgba(245,158,11,0.38)]"
@@ -408,16 +541,24 @@ export function TutorialCoach({
         ref={spotlightRef}
         style={{ display: "none" }}
       >
+        {/* 22px = badge size (28) − halo padding (8) + halo border (2): absolute
+            offsets are measured from the halo's padding box, so this lands the badge
+            exactly past the target's corner instead of over it. Small controls such
+            as a machine power button were being masked by it. */}
         {displayedPresentation?.action ? (
           <span
-            className={`absolute -right-4 -top-4 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-lg font-bold text-white shadow-lg ${
+            className={`absolute -right-[22px] -top-[22px] flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-base font-bold text-white shadow-lg ${
               displayedPresentation.action.kind === "wait"
                 ? "animate-pulse bg-amber-500"
                 : "bg-amber-500"
             }`}
+            data-action-kind={displayedPresentation.action.kind}
             data-testid="tutorial-spotlight-action-icon"
           >
-            {tutorialActionIcons[displayedPresentation.action.kind]}
+            <TutorialActionIcon
+              className="h-4 w-4"
+              kind={displayedPresentation.action.kind}
+            />
           </span>
         ) : null}
       </div>
@@ -467,10 +608,14 @@ export function TutorialCoach({
               <div className="mt-3 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-950">
                 <span
                   aria-hidden="true"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-base text-white"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-600 text-base text-white"
+                  data-action-kind={displayedPresentation.action.kind}
                   data-testid="tutorial-action-icon"
                 >
-                  {tutorialActionIcons[displayedPresentation.action.kind]}
+                  <TutorialActionIcon
+                    className="h-[18px] w-[18px]"
+                    kind={displayedPresentation.action.kind}
+                  />
                 </span>
                 <span>{displayedPresentation.action.label}</span>
               </div>

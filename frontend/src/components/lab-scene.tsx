@@ -898,6 +898,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
           active={isTutorialActive}
           evaluation={tutorialEvaluation}
           intervention={pendingTutorialIntervention}
+          isDragging={Boolean(activeDragItem)}
           onContinueTutorial={() => setPendingTutorialIntervention(null)}
           onLeaveTutorial={() => {
             if (!pendingTutorialIntervention || !tutorialDefinition || !readyExperiment) {
