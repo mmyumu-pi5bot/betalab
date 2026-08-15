@@ -15,6 +15,7 @@ from app.domain.acquisition_methods import (
 from app.domain.rules import can_workspace_widget_store_now
 
 T = TypeVar("T")
+SAMPLE_BAG_TARE_MASS_G = 36.0
 
 
 @dataclass
@@ -64,6 +65,7 @@ class LimsReception:
     indicative_mass_g: float
     id: str | None = None
     measured_gross_mass_g: float | None = None
+    packaging_tare_mass_g: float = SAMPLE_BAG_TARE_MASS_G
     gross_mass_offset_g: int = 0
     measured_sample_mass_g: float | None = None
     lab_sample_code: str | None = None

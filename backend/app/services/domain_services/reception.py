@@ -273,7 +273,7 @@ def _resolve_measured_gross_mass_g(
     if measured_gross_mass_g is not None:
         return float(measured_gross_mass_g)
     if experiment.lims_reception.measured_gross_mass_g is not None:
-        return float(experiment.lims_reception.measured_gross_mass_g) + float(experiment.lims_reception.gross_mass_offset_g)
+        return float(experiment.lims_reception.measured_gross_mass_g)
     return None
 
 
@@ -320,6 +320,7 @@ def _clone_lims_entry(
         harvest_date=entry.harvest_date,
         indicative_mass_g=entry.indicative_mass_g,
         measured_gross_mass_g=entry.measured_gross_mass_g,
+        packaging_tare_mass_g=entry.packaging_tare_mass_g,
         gross_mass_offset_g=entry.gross_mass_offset_g,
         measured_sample_mass_g=entry.measured_sample_mass_g,
         lab_sample_code=entry.lab_sample_code,
@@ -344,6 +345,7 @@ def _build_lims_reception_entry(
         harvest_date=request.harvest_date.strip(),
         indicative_mass_g=float(request.indicative_mass_g),
         measured_gross_mass_g=measured_gross_mass_g,
+        packaging_tare_mass_g=experiment.lims_reception.packaging_tare_mass_g,
         gross_mass_offset_g=experiment.lims_reception.gross_mass_offset_g,
         measured_sample_mass_g=(float(request.measured_sample_mass_g) if request.measured_sample_mass_g is not None else None),
         lab_sample_code=lab_sample_code,
@@ -363,6 +365,7 @@ def _update_lims_reception_entry(
     entry.harvest_date = request.harvest_date.strip()
     entry.indicative_mass_g = float(request.indicative_mass_g)
     entry.measured_gross_mass_g = measured_gross_mass_g
+    entry.packaging_tare_mass_g = experiment.lims_reception.packaging_tare_mass_g
     entry.gross_mass_offset_g = experiment.lims_reception.gross_mass_offset_g
     entry.measured_sample_mass_g = float(request.measured_sample_mass_g) if request.measured_sample_mass_g is not None else None
 

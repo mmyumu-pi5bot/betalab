@@ -23,7 +23,7 @@ type UseWorkspaceActionsOptions = {
   analyticalBalanceTool: BenchToolInstance | null;
   experimentApi: WorkspaceActionsExperimentApi;
   grossBalanceTool: BenchToolInstance | null;
-  grossBalanceNetMassG: number | null;
+  measuredGrossMassG: number | null;
   measuredSampleMassG: number | null;
 };
 
@@ -47,7 +47,7 @@ export function useWorkspaceActions({
   analyticalBalanceTool,
   experimentApi,
   grossBalanceTool,
-  grossBalanceNetMassG,
+  measuredGrossMassG,
 }: UseWorkspaceActionsOptions): WorkspaceActions {
   const handleBalanceToolSealToggle = () => {
     if (!grossBalanceTool) {
@@ -83,7 +83,7 @@ export function useWorkspaceActions({
       orchard_name: payload.orchard_name,
       harvest_date: payload.harvest_date,
       indicative_mass_g: payload.indicative_mass_g,
-      measured_gross_mass_g: grossBalanceNetMassG,
+      measured_gross_mass_g: measuredGrossMassG,
       measured_sample_mass_g: payload.measured_sample_mass_g,
     });
   };

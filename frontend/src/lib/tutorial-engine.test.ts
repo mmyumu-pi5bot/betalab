@@ -4,6 +4,8 @@ import {
   CALIBRATION_SAMPLE_TUTORIAL_ID,
   calibrationSampleTutorial,
   evaluateTutorial,
+  getLimsTutorialFieldPresentation,
+  getLimsTutorialValues,
   getTutorialStepPresentation,
 } from "@/lib/tutorial-engine";
 import type { Experiment } from "@/types/experiment";
@@ -100,6 +102,7 @@ function experiment(overrides: Partial<Experiment> = {}): Experiment {
       harvestDate: "",
       indicativeMassG: 0,
       measuredGrossMassG: null,
+      packagingTareMassG: 36,
       grossMassOffsetG: 0,
       measuredSampleMassG: null,
       labSampleCode: null,
@@ -247,6 +250,29 @@ describe("calibration sample tutorial", () => {
     expect(presentation.action).toEqual({ kind: "type", label: "Enter the values, then click" });
   });
 
+  it("explains how gross mass, packaging tare, and received net mass relate", () => {
+    const state = experiment({
+      limsReception: {
+        ...experiment().limsReception,
+        measuredGrossMassG: 2536,
+        packagingTareMassG: 36,
+      },
+    });
+
+    expect(getLimsTutorialValues(state)).toMatchObject({
+      measuredGrossMassG: 2536,
+      packagingTareMassG: 36,
+      measuredNetMassG: 2500,
+    });
+    expect(getLimsTutorialFieldPresentation(state, "mass-summary")).toMatchObject({
+      title: "Review the reception weighing",
+      action: { kind: "click", label: "Review the mass calculation" },
+    });
+    expect(
+      getLimsTutorialFieldPresentation(state, "mass-summary").instruction,
+    ).toContain("2536.0 g − 36.0 g = 2500.0 g");
+  });
+
   it("asks to return the bag to the balance before continuing in LIMS", () => {
     const state = experiment({
       limsReception: {
@@ -314,7 +340,9 @@ describe("calibration sample tutorial", () => {
   });
 
   it("asks for a new autosampler vial when none exists for the sample", () => {
-    const state = experiment();
+    const state = experiment({
+      workbench: { slots: [{ id: "station_1", label: "Station 1", tool: null }] },
+    });
     const completed = calibrationSampleTutorial.steps
       .map((entry) => entry.id)
       .slice(0, calibrationSampleTutorial.steps.findIndex((entry) => entry.id === "prepare-sample-vial"));
@@ -376,8 +404,10 @@ describe("calibration sample tutorial", () => {
     expect(grinderStep.anchor(grinderState)).toBe("palette-item-dry_ice_pellets");
     const presentation = getTutorialStepPresentation(grinderStep, grinderState);
     expect(presentation.title).toBe("Add Dry ice pellets");
-    expect(presentation.instruction).toContain("2375.5 g");
-    expect(presentation.action).toEqual({ kind: "drag", label: "Add 2375.5 g dry ice" });
+    // Dosing dry ice to the tenth of a gram is busywork: the tutorial rounds the
+    // 1:1 target to the nearest 100 g so the learner types a round number.
+    expect(presentation.instruction).toContain("2400 g");
+    expect(presentation.action).toEqual({ kind: "drag", label: "Add 2400 g dry ice" });
 
     const extractionState = experiment({
       workbench: {
@@ -569,6 +599,169 @@ describe("calibration sample tutorial", () => {
     );
     expect(getTutorialStepPresentation(tutorialStep, state).title).toBe(
       "Add the test portion",
+    );
+  });
+
+  it("validates the stored analytical balance once the weighed tube sits on the workbench", () => {
+    // Storing the balance requires taking the tube off the pan first, so the test
+    // portion has to be recognised wherever the tube now stands.
+    const weighedTube = labTool("centrifuge_tube", { powderMassG: 10.002 });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 12, taredToolId: "centrifuge_tube_1" },
+      workbench: { slots: [{ id: "station_1", label: "Station 1", tool: weighedTube }] },
+    });
+    const completed = calibrationSampleTutorial.steps
+      .map((entry) => entry.id)
+      .slice(
+        0,
+        calibrationSampleTutorial.steps.findIndex(
+          (entry) => entry.id === "weigh-test-portion",
+        ),
+      );
+
+    const result = evaluateTutorial(calibrationSampleTutorial, state, completed);
+
+    expect(result.completedStepIds).toContain("weigh-test-portion");
+    expect(result.completedStepIds).toContain("store-analytical-balance");
+    expect(result.currentStep?.id).toBe("prepare-extraction");
+  });
+
+  it("asks for a workbench station whenever the next item has nowhere to land", () => {
+    const fullWorkbench = {
+      slots: [{
+        id: "station_1",
+        label: "Station 1",
+        tool: labTool("storage_jar", { id: "powder_jar" }),
+      }],
+    };
+
+    const weighedTube = labTool("centrifuge_tube", { powderMassG: 10.002 });
+    const storeBalanceState = experiment({
+      analyticalBalance: { tareMassG: 12, taredToolId: "centrifuge_tube_1" },
+      workbench: fullWorkbench,
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "analytical_balance",
+            tool: id === "analytical_balance" ? weighedTube : undefined,
+          }),
+        ),
+      },
+    });
+    const storeBalanceStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "store-analytical-balance",
+    )!;
+    expect(storeBalanceStep.anchor(storeBalanceState)).toBe("add-workbench-slot-button");
+    expect(getTutorialStepPresentation(storeBalanceStep, storeBalanceState)).toMatchObject({
+      title: "Add a workbench station",
+      action: { kind: "click", label: "Click +" },
+    });
+
+    const cutState = experiment({ workbench: fullWorkbench });
+    const cutStep = calibrationSampleTutorial.steps.find((entry) => entry.id === "cut-sample")!;
+    expect(cutStep.anchor(cutState)).toBe("add-workbench-slot-button");
+    expect(getTutorialStepPresentation(cutStep, cutState).title).toBe("Add a workbench station");
+
+    const vialState = experiment({ workbench: fullWorkbench });
+    const vialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "prepare-sample-vial",
+    )!;
+    expect(vialStep.anchor(vialState)).toBe("add-workbench-slot-button");
+    expect(getTutorialStepPresentation(vialStep, vialState).title).toBe(
+      "Add a workbench station",
+    );
+
+    const freeWorkbench = {
+      slots: [...fullWorkbench.slots, { id: "station_2", label: "Station 2", tool: null }],
+    };
+    expect(cutStep.anchor(experiment({ workbench: freeWorkbench }))).toBe(
+      "palette-item-cutting_board_hdpe",
+    );
+    expect(vialStep.anchor(experiment({ workbench: freeWorkbench }))).toBe(
+      "palette-item-sample_vial_lcms",
+    );
+    expect(
+      storeBalanceStep.anchor({ ...storeBalanceState, workbench: freeWorkbench }),
+    ).toBe("widget-analytical_balance");
+  });
+
+  it("brings the separated tube to the bench and opens it before pipetting", () => {
+    const separatedTube = (overrides: Record<string, unknown> = {}) =>
+      labTool("centrifuge_tube", {
+        isSealed: true,
+        quechersState: { saltsAdded: true, phase: "separated", faults: [], isUsable: true },
+        ...overrides,
+      });
+    const vialSlot = {
+      id: "station_1",
+      label: "Station 1",
+      tool: labTool("sample_vial", { id: "vial_1" }),
+    };
+    const freeSlot = { id: "station_2", label: "Station 2", tool: null };
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "prepare-sample-vial",
+    )!;
+
+    const inCentrifuge = experiment({
+      workbench: { slots: [vialSlot, freeSlot] },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "centrifuge",
+            tool: id === "centrifuge" ? separatedTube() : undefined,
+          }),
+        ),
+      },
+    });
+    expect(step.anchor(inCentrifuge)).toBe("widget-centrifuge");
+    expect(getTutorialStepPresentation(step, inCentrifuge).title).toBe(
+      "Take the tube out of the centrifuge",
+    );
+
+    const sealedOnBench = experiment({
+      workbench: {
+        slots: [vialSlot, { ...freeSlot, tool: separatedTube() }],
+      },
+    });
+    expect(step.anchor(sealedOnBench)).toBe("seal-tool-centrifuge_tube_1");
+    expect(getTutorialStepPresentation(step, sealedOnBench).title).toBe(
+      "Open the extraction tube",
+    );
+
+    const openOnBench = experiment({
+      workbench: {
+        slots: [vialSlot, { ...freeSlot, tool: separatedTube({ isSealed: false }) }],
+      },
+    });
+    expect(step.anchor(openOnBench)).toBe("pipette-aspirate");
+  });
+
+  it("unloads the rack from the LC-MS/MS before emptying it", () => {
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "store-acquisition-equipment",
+    )!;
+    const rackWithVials = (state: "loaded" | "locked" | "completed" | "available") => ({
+      allowedDropTargets: [],
+      isDraggable: true,
+      state,
+      slots: [{ id: "rack_1", label: "A1", tool: labTool("sample_vial", { id: "vial_1" }) }],
+    });
+
+    // A finished run leaves the rack "completed", still sitting in the instrument.
+    for (const state of ["loaded", "completed"] as const) {
+      const inInstrument = experiment({ rack: rackWithVials(state) });
+      expect(step.anchor(inInstrument), state).toBe("instrument-unload-rack");
+      expect(getTutorialStepPresentation(step, inInstrument).title, state).toBe(
+        "Unload the rack",
+      );
+    }
+
+    const onWorkspace = experiment({ rack: rackWithVials("available") });
+    expect(step.anchor(onWorkspace)).toBe("widget-rack");
+    expect(getTutorialStepPresentation(step, onWorkspace).title).toBe(
+      "Empty the Autosampler rack",
     );
   });
 

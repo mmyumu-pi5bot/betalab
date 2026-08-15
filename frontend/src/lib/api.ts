@@ -2391,6 +2391,9 @@ function normalizeLimsReception(
       : reception?.measured_gross_mass_g !== undefined && reception.measured_gross_mass_g !== null
           ? Number(reception.measured_gross_mass_g)
           : null,
+    packagingTareMassG: Number(
+      reception?.packagingTareMassG ?? reception?.packaging_tare_mass_g ?? 36,
+    ),
     grossMassOffsetG:
       reception?.grossMassOffsetG !== undefined && reception.grossMassOffsetG !== null
         ? Number(reception.grossMassOffsetG)

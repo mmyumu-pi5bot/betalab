@@ -1,6 +1,15 @@
 export const TUTORIAL_SESSION_STORAGE_KEY = "betalab:tutorial-sessions:v1";
 
-export type TutorialSessionStatus = "abandoned" | "active" | "paused";
+// "completed" is a deliberate exit: the learner finished the tutorial and switched
+// the experiment to free mode, so the coach must not come back on its own.
+export type TutorialSessionStatus = "abandoned" | "active" | "completed" | "paused";
+
+const tutorialSessionStatuses: readonly TutorialSessionStatus[] = [
+  "abandoned",
+  "active",
+  "completed",
+  "paused",
+];
 
 export type TutorialSession = {
   tutorialId: string;
@@ -25,7 +34,8 @@ function normalizeTutorialSession(value: unknown): TutorialSession | null {
     session.version !== 1 ||
     typeof session.tutorialId !== "string" ||
     typeof session.experimentId !== "string" ||
-    (session.status !== "abandoned" && session.status !== "active" && session.status !== "paused")
+    !session.status ||
+    !tutorialSessionStatuses.includes(session.status)
   ) {
     return null;
   }
@@ -78,6 +88,12 @@ export function getTutorialSession(
   experimentId: string,
 ): TutorialSession | null {
   return readSessions()[tutorialSessionKey(tutorialId, experimentId)] ?? null;
+}
+
+// Ongoing sessions are the ones the coach still owns: abandoned and completed
+// sessions both hand the experiment back to free mode.
+export function isTutorialSessionOngoing(session: TutorialSession) {
+  return session.status === "active" || session.status === "paused";
 }
 
 export function getTutorialSessions(tutorialId: string): TutorialSession[] {

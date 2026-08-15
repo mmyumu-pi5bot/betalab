@@ -58,6 +58,7 @@ const makeExperiment = (): Experiment => ({
     harvestDate: "",
     indicativeMassG: 0,
     measuredGrossMassG: null,
+    packagingTareMassG: 36,
     grossMassOffsetG: 0,
     measuredSampleMassG: null,
     labSampleCode: null,
@@ -93,6 +94,29 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("normalizes the LIMS packaging tare used to calculate received net mass", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...makeExperiment(),
+        limsReception: undefined,
+        lims_reception: {
+          ...makeExperiment().limsReception,
+          measuredGrossMassG: undefined,
+          measured_gross_mass_g: 2536,
+          packagingTareMassG: undefined,
+          packaging_tare_mass_g: 36,
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getExperiment("experiment_test");
+
+    expect(result.limsReception.measuredGrossMassG).toBe(2536);
+    expect(result.limsReception.packagingTareMassG).toBe(36);
+  });
+
   it("loads the autosampler rack into the LC-MS/MS", async () => {
     const experiment = makeExperiment();
     const fetchMock = vi.fn().mockResolvedValue({

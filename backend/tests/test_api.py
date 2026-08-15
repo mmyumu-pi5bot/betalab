@@ -223,6 +223,15 @@ def test_reception_routes_register_and_label_received_bag_over_http() -> None:
     assert applied.json()["lims_reception"]["status"] == "received"
 
 
+def test_lims_reception_exposes_the_known_sample_bag_packaging_tare() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+        response = client.get(f"/experiments/{experiment_id}")
+
+    assert response.status_code == 200
+    assert response.json()["lims_reception"]["packaging_tare_mass_g"] == pytest.approx(36.0)
+
+
 def test_snapshot_exposes_dnd_contract_fields_over_http() -> None:
     with TestClient(app) as client:
         experiment_id = _create_experiment(client)

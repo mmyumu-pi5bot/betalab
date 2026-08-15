@@ -511,6 +511,7 @@ function makeLimsReception(overrides: Partial<LimsReception> = {}): LimsReceptio
     harvestDate: "",
     indicativeMassG: 0,
     measuredGrossMassG: null,
+    packagingTareMassG: 36,
     grossMassOffsetG: 0,
     measuredSampleMassG: null,
     labSampleCode: null,
@@ -639,9 +640,37 @@ describe("LabScene", () => {
 
     expect(await screen.findByRole("complementary", { name: "Guided tutorial" })).toBeInTheDocument();
     expect(screen.getByText("Deploy the Gross balance")).toBeInTheDocument();
-    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
-      "experiment_pesticides",
+    // The session is written by an effect, which the coach being on screen does not guarantee.
+    await waitFor(() => {
+      expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toContain(
+        "experiment_pesticides",
+      );
+    });
+  });
+
+  it("stays in free mode when the tutorial was finished", async () => {
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      "betalab:tutorial-sessions:v1",
+      JSON.stringify({
+        "calibration-sample-v1::experiment_pesticides": {
+          tutorialId: "calibration-sample-v1",
+          experimentId: "experiment_pesticides",
+          status: "completed",
+          completedStepIds: [],
+          version: 1,
+        },
+      }),
     );
+    vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
+
+    expect(await screen.findByTestId("workbench-header")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("complementary", { name: "Guided tutorial" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resume tutorial" })).not.toBeInTheDocument();
   });
 
   it("prevents irreversible produce contamination in the tutorial unless the learner leaves", async () => {
@@ -3209,7 +3238,7 @@ describe("LabScene", () => {
     });
     expect(screen.getByTestId("gross-balance-staged-item")).toBeInTheDocument();
     expect(screen.queryByTestId("bench-tool-card-bench_tool_1")).not.toBeInTheDocument();
-    expect(screen.getAllByText("2486.0 g")).toHaveLength(2);
+    expect(screen.getAllByText("2486.0 g")).toHaveLength(3);
   });
 
   it("adjusts the gross balance container offset with +/- buttons and updates the net display", async () => {
@@ -3234,7 +3263,7 @@ describe("LabScene", () => {
 
     render(<PesticideWorkbench />);
 
-    expect(await screen.findByText("2486.0 g")).toBeInTheDocument();
+    expect(await screen.findAllByText("2486.0 g")).toHaveLength(2);
     expect(screen.getByText("-35 g")).toBeInTheDocument();
     expect(screen.getByText("2451.0 g")).toBeInTheDocument();
 
@@ -3249,7 +3278,7 @@ describe("LabScene", () => {
     });
 
     expect(await screen.findByText("-36 g")).toBeInTheDocument();
-    expect(screen.getByText("2450.0 g")).toBeInTheDocument();
+    expect(screen.getAllByText("2450.0 g")).toHaveLength(2);
   });
 
   it("allows creating a LIMS record from manual entry without a gross weight", async () => {
@@ -3275,7 +3304,7 @@ describe("LabScene", () => {
     fireEvent.change(screen.getByLabelText("Harvest date"), {
       target: { value: "2026-03-29" },
     });
-    fireEvent.change(screen.getByLabelText("Indicative field mass (g)"), {
+    fireEvent.change(screen.getByLabelText("Declared mass from bag label (g)"), {
       target: { value: "2041.1" },
     });
 
@@ -3322,7 +3351,7 @@ describe("LabScene", () => {
     fireEvent.change(screen.getByLabelText("Harvest date"), {
       target: { value: "2026-03-29" },
     });
-    fireEvent.change(screen.getByLabelText("Indicative field mass (g)"), {
+    fireEvent.change(screen.getByLabelText("Declared mass from bag label (g)"), {
       target: { value: "2041.1" },
     });
     fireEvent.change(screen.getByLabelText("Sample mass (g)"), {
@@ -3457,7 +3486,7 @@ describe("LabScene", () => {
     fireEvent.change(screen.getByLabelText("Harvest date"), {
       target: { value: "2026-03-30" },
     });
-    fireEvent.change(screen.getByLabelText("Indicative field mass (g)"), {
+    fireEvent.change(screen.getByLabelText("Declared mass from bag label (g)"), {
       target: { value: "1998.4" },
     });
 

@@ -106,6 +106,20 @@ describe("tutorial session store", () => {
     });
   });
 
+  it("persists a completed tutorial the learner left for free mode", () => {
+    saveTutorialSession({
+      tutorialId: "calibration-sample-v1",
+      experimentId: "experiment_1",
+      status: "completed",
+      completedStepIds: ["weigh-received-sample"],
+    });
+
+    expect(getTutorialSession("calibration-sample-v1", "experiment_1")).toMatchObject({
+      status: "completed",
+      completedStepIds: ["weigh-received-sample"],
+    });
+  });
+
   it("reads the legacy single-session format without losing progress", () => {
     window.localStorage.setItem(
       "betalab:tutorial-sessions:v1",

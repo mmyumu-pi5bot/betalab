@@ -61,6 +61,7 @@ function experiment(): Experiment {
       harvestDate: "",
       indicativeMassG: 0,
       measuredGrossMassG: null,
+      packagingTareMassG: 36,
       grossMassOffsetG: 0,
       measuredSampleMassG: null,
       labSampleCode: null,

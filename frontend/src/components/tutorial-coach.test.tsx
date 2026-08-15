@@ -24,6 +24,7 @@ function emptyExperiment(): Experiment {
       harvestDate: "",
       indicativeMassG: 0,
       measuredGrossMassG: null,
+      packagingTareMassG: 36,
       grossMassOffsetG: 0,
       measuredSampleMassG: null,
       labSampleCode: null,
@@ -119,6 +120,36 @@ describe("TutorialCoach", () => {
     target.remove();
   });
 
+  it("offers free mode instead of pausing once the tutorial is complete", () => {
+    const onFinish = vi.fn();
+    const onPause = vi.fn();
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: calibrationSampleTutorial.steps.map((entry) => entry.id),
+          currentChapter: calibrationSampleTutorial.chapters.at(-1)!,
+          currentStep: null,
+          experiment: emptyExperiment(),
+          isComplete: true,
+          progressPercent: 100,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onFinish={onFinish}
+        onPause={onPause}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Tutorial complete")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pause tutorial" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch to free mode" }));
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
   it("hides the spotlight when the target is outside the viewport", () => {
     const target = document.createElement("div");
     target.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
@@ -166,6 +197,83 @@ describe("TutorialCoach", () => {
     expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ display: "none" });
 
     paletteViewport.remove();
+  });
+
+  it("still spotlights the LIMS store button flush against the widget card edge", () => {
+    // The widget card clips its content, and the store button sits 7 px below that
+    // edge — closer than the spotlight halo, which must not hide the highlight.
+    const widgetCard = document.createElement("section");
+    widgetCard.style.overflow = "hidden";
+    widgetCard.getBoundingClientRect = () =>
+      ({ bottom: 620, height: 520, left: 200, right: 580, top: 100, width: 380 } as DOMRect);
+    const storeButton = document.createElement("button");
+    storeButton.dataset.tutorialAnchor = "store-widget-lims";
+    storeButton.getBoundingClientRect = () =>
+      ({ bottom: 147, height: 40, left: 528, right: 560, top: 107, width: 32 } as DOMRect);
+    widgetCard.appendChild(storeButton);
+    document.body.appendChild(widgetCard);
+
+    const state = emptyExperiment();
+    state.limsReception.labSampleCode = "APP-1";
+    state.workspace.widgets = [{
+      id: "lims",
+      widgetType: "lims_terminal",
+      label: "LIMS",
+      isDraggable: true,
+      allowedDropTargets: [],
+      isStorable: true,
+      canStore: true,
+      anchor: "top-left",
+      offsetX: 0,
+      offsetY: 0,
+      isPresent: true,
+      isTrashed: false,
+    }];
+    state.basketTools = [{
+      id: "bag_1",
+      toolId: "sealed_sampling_bag",
+      label: "Sampling bag",
+      subtitle: "",
+      accent: "emerald",
+      toolType: "sample_bag",
+      capacity_ml: 500,
+      canReceiveLiquids: false,
+      canReceiveProduce: true,
+      canSeal: true,
+      isDraggable: true,
+      allowedDropTargets: [],
+      liquids: [],
+      labels: [{
+        id: "label_1",
+        labelKind: "lims",
+        text: "APP-1",
+        sampleCode: "APP-1",
+        isDraggable: true,
+        allowedDropTargets: [],
+      }],
+    }];
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, state, [
+          "weigh-received-sample",
+          "register-and-label-sample",
+        ])}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Store the LIMS terminal")).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      display: "block",
+      left: "520px",
+      top: "99px",
+    });
+
+    widgetCard.remove();
   });
 
   it("moves the spotlight synchronously with a scroll event", () => {
@@ -262,7 +370,13 @@ describe("TutorialCoach", () => {
     basketButton.remove();
   });
 
-  it("guides each LIMS field with the value from the bag label", () => {
+  it("guides the reception calculation before each LIMS field", async () => {
+    const massSummary = document.createElement("button");
+    massSummary.dataset.tutorialAnchor = "lims-mass-summary";
+    massSummary.setAttribute("aria-pressed", "false");
+    massSummary.addEventListener("click", () => {
+      massSummary.setAttribute("aria-pressed", "true");
+    });
     const orchardInput = document.createElement("input");
     orchardInput.dataset.tutorialAnchor = "lims-orchard-name";
     const harvestInput = document.createElement("input");
@@ -271,7 +385,7 @@ describe("TutorialCoach", () => {
     massInput.dataset.tutorialAnchor = "lims-indicative-mass";
     const createButton = document.createElement("button");
     createButton.dataset.tutorialAnchor = "lims-create-record";
-    for (const element of [orchardInput, harvestInput, massInput, createButton]) {
+    for (const element of [massSummary, orchardInput, harvestInput, massInput, createButton]) {
       element.getBoundingClientRect = () =>
         ({ bottom: 170, height: 40, left: 40, right: 240, top: 130, width: 200 } as DOMRect);
       document.body.appendChild(element);
@@ -279,6 +393,7 @@ describe("TutorialCoach", () => {
 
     const state = emptyExperiment();
     state.limsReception.measuredGrossMassG = 2987.4;
+    state.limsReception.packagingTareMassG = 36;
     state.workspace.widgets = [
       {
         id: "lims",
@@ -337,7 +452,11 @@ describe("TutorialCoach", () => {
       />,
     );
 
-    expect(screen.getByText("Enter the orchard / producer")).toBeInTheDocument();
+    expect(screen.getByText("Review the reception weighing")).toBeInTheDocument();
+    expect(screen.getByText(/2987.4 g − 36.0 g = 2951.4 g/)).toBeInTheDocument();
+
+    fireEvent.click(massSummary);
+    expect(await screen.findByText("Enter the orchard / producer")).toBeInTheDocument();
     expect(screen.getAllByText(/Golden Ridge Orchard/)).not.toHaveLength(0);
 
     fireEvent.input(orchardInput, { target: { value: "Golden Ridge Orchard" } });
@@ -345,14 +464,14 @@ describe("TutorialCoach", () => {
     expect(screen.getAllByText(/2026-08-07/)).not.toHaveLength(0);
 
     fireEvent.input(harvestInput, { target: { value: "2026-08-07" } });
-    expect(screen.getByText("Enter the indicative field mass")).toBeInTheDocument();
+    expect(screen.getByText("Enter the declared mass")).toBeInTheDocument();
     expect(screen.getAllByText(/3000 g/)).not.toHaveLength(0);
 
     fireEvent.input(massInput, { target: { value: "3000" } });
     expect(screen.getByText("Create the LIMS record")).toBeInTheDocument();
     expect(screen.getByText(/2987.4 g/)).toBeInTheDocument();
 
-    for (const element of [orchardInput, harvestInput, massInput, createButton]) {
+    for (const element of [massSummary, orchardInput, harvestInput, massInput, createButton]) {
       element.remove();
     }
   });
@@ -427,6 +546,203 @@ describe("TutorialCoach", () => {
     expect(onContinueTutorial).toHaveBeenCalledOnce();
     expect(onLeaveTutorial).toHaveBeenCalledOnce();
     board.remove();
+  });
+
+  it("asks to put the knife away before the step that needs a drag", async () => {
+    const knife = document.createElement("button");
+    knife.dataset.tutorialAnchor = "action-knife";
+    knife.setAttribute("aria-pressed", "true");
+    knife.getBoundingClientRect = () =>
+      ({ bottom: 250, height: 48, left: 24, right: 72, top: 202, width: 48 } as DOMRect);
+    const cutApples = document.createElement("div");
+    cutApples.dataset.testid = "bench-produce-lot-lot_1";
+    cutApples.getBoundingClientRect = () =>
+      ({ bottom: 400, height: 90, left: 300, right: 440, top: 310, width: 140 } as DOMRect);
+    document.body.append(knife, cutApples);
+
+    const state = emptyExperiment();
+    state.produceMaterialStates = [
+      { id: "state_1", produceLotId: "lot_1", materialState: "cut" },
+    ];
+    state.workbench.slots = [{
+      id: "station_1",
+      label: "Station 1",
+      tool: {
+        id: "board_1",
+        toolId: "cutting_board_hdpe",
+        label: "Cutting board",
+        subtitle: "",
+        accent: "sky",
+        toolType: "cutting_board",
+        capacity_ml: 0,
+        canReceiveLiquids: false,
+        canReceiveProduce: true,
+        canSeal: false,
+        isDraggable: true,
+        allowedDropTargets: [],
+        liquids: [],
+        produceLots: [{
+          id: "lot_1",
+          label: "Cut apples",
+          produceType: "apple",
+          totalMassG: 2500,
+          unitCount: 12,
+          isDraggable: true,
+          allowedDropTargets: [],
+          materialState: "cut",
+        }],
+      },
+    }];
+    state.workspace.widgets = [{
+      id: "grinder",
+      widgetType: "grinder",
+      label: "Cryogenic grinder",
+      isDraggable: true,
+      allowedDropTargets: [],
+      isStorable: true,
+      canStore: true,
+      anchor: "top-left",
+      offsetX: 0,
+      offsetY: 0,
+      isPresent: true,
+      isTrashed: false,
+    }];
+    const completed = calibrationSampleTutorial.steps
+      .map((entry) => entry.id)
+      .slice(
+        0,
+        calibrationSampleTutorial.steps.findIndex((entry) => entry.id === "grind-sample"),
+      );
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, state, completed)}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Put the Stainless steel knife away")).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      left: "16px",
+      top: "194px",
+    });
+
+    knife.setAttribute("aria-pressed", "false");
+
+    await waitFor(() => {
+      expect(screen.getByText("Load the cut apples into the grinder")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      left: "292px",
+      top: "302px",
+    });
+
+    knife.remove();
+    cutApples.remove();
+  });
+
+  it("asks to put the pipette away once it is empty, and not while it carries extract", () => {
+    const pipette = document.createElement("button");
+    pipette.dataset.tutorialAnchor = "action-pipette";
+    pipette.setAttribute("aria-pressed", "true");
+    pipette.getBoundingClientRect = () =>
+      ({ bottom: 310, height: 48, left: 24, right: 72, top: 262, width: 48 } as DOMRect);
+    const vial = document.createElement("div");
+    vial.dataset.tutorialAnchor = "tool-type-sample_vial";
+    vial.getBoundingClientRect = () =>
+      ({ bottom: 220, height: 80, left: 300, right: 440, top: 140, width: 140 } as DOMRect);
+    document.body.append(pipette, vial);
+
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "prepare-sample-vial",
+    )!;
+    const evaluationFor = (volumeMl: number) => {
+      const state = emptyExperiment();
+      state.pipette = { capacityMl: 1, volumeMl, sourceToolId: null };
+      return {
+        completedStepIds: [],
+        currentChapter: calibrationSampleTutorial.chapters[0],
+        currentStep: { ...step, anchor: () => "tool-type-sample_vial" },
+        experiment: state,
+        isComplete: false,
+        progressPercent: 70,
+        totalStepCount: calibrationSampleTutorial.steps.length,
+      };
+    };
+
+    const { rerender } = render(
+      <TutorialCoach
+        active
+        evaluation={evaluationFor(1)}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Put the Micropipette away")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "292px", top: "132px" });
+
+    rerender(
+      <TutorialCoach
+        active
+        evaluation={evaluationFor(0)}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Put the Micropipette away")).toBeInTheDocument();
+    expect(screen.getByText("Click it again or press P")).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "16px", top: "254px" });
+
+    pipette.remove();
+    vial.remove();
+  });
+
+  it("leaves the knife selected while the step is the cutting itself", () => {
+    const knife = document.createElement("button");
+    knife.dataset.tutorialAnchor = "action-knife";
+    knife.setAttribute("aria-pressed", "true");
+    knife.getBoundingClientRect = () =>
+      ({ bottom: 250, height: 48, left: 24, right: 72, top: 202, width: 48 } as DOMRect);
+    const wholeApples = document.createElement("div");
+    wholeApples.dataset.testid = "bench-produce-lot-lot_1";
+    wholeApples.getBoundingClientRect = () =>
+      ({ bottom: 400, height: 90, left: 300, right: 440, top: 310, width: 140 } as DOMRect);
+    document.body.append(knife, wholeApples);
+
+    const step = calibrationSampleTutorial.steps.find((entry) => entry.id === "cut-sample")!;
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: { ...step, anchor: () => "cut-apples-lot_1" },
+          experiment: emptyExperiment(),
+          isComplete: false,
+          progressPercent: 30,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Put the Stainless steel knife away")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      left: "292px",
+      top: "302px",
+    });
+
+    knife.remove();
+    wholeApples.remove();
   });
 
   it("moves the spotlight from the selected spatula to the powder jar", async () => {

@@ -5,8 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
+  getTutorialActionToolPresentation,
   getTutorialStepPresentation,
+  isTutorialActionTool,
   type LimsTutorialField,
+  type TutorialActionTool,
   type TutorialEvaluation,
 } from "@/lib/tutorial-engine";
 import type { TutorialIntervention } from "@/lib/tutorial-action-guard";
@@ -17,6 +20,7 @@ type TutorialCoachProps = {
   evaluation: TutorialEvaluation;
   intervention?: TutorialIntervention | null;
   onContinueTutorial?: () => void;
+  onFinish?: () => void;
   onLeaveTutorial?: () => void;
   onPause: () => void;
   onRestart: () => void | Promise<void>;
@@ -61,13 +65,69 @@ type AccessTarget = "basket" | "trash" | null;
 
 type AnchorResolution = {
   accessTarget: AccessTarget;
+  actionTool: TutorialActionTool | null;
   limsField: LimsTutorialField | null;
   target: HTMLElement | null;
 };
 
-function resolveAnchor(anchor: string, experiment: Experiment): AnchorResolution {
+// Anchors that already account for the selected tool: the step itself is the tool
+// being used, so a pressed action button is expected there.
+function isActionDrivenAnchor(anchor: string) {
+  return (
+    anchor === "pipette-aspirate" ||
+    anchor.startsWith("action-") ||
+    anchor.startsWith("cut-apples-") ||
+    anchor.startsWith("spatula-load-powder:")
+  );
+}
+
+function findSelectedActionTool(): { target: HTMLElement; tool: TutorialActionTool } | null {
+  const pressed = document.querySelector<HTMLElement>(
+    '[data-tutorial-anchor^="action-"][aria-pressed="true"]',
+  );
+  const tool = pressed?.dataset.tutorialAnchor?.slice("action-".length);
+  return pressed && tool && isTutorialActionTool(tool) ? { target: pressed, tool } : null;
+}
+
+// A pipette holding liquid or a loaded spatula is mid-transfer: the tool is still
+// doing the current step's work even when the anchor points elsewhere.
+function isActionToolInUse(experiment: Experiment, tool: TutorialActionTool) {
+  return (
+    (tool === "pipette" && experiment.pipette.volumeMl > 0) ||
+    (tool === "spatula" && experiment.spatula.isLoaded)
+  );
+}
+
+function resolveAnchor(
+  anchor: string,
+  experiment: Experiment,
+  guideActionTool: boolean,
+): AnchorResolution {
+  if (guideActionTool && !isActionDrivenAnchor(anchor)) {
+    // A tool stays in hand until it is put away, and blocks drag and drop meanwhile.
+    const selectedAction = findSelectedActionTool();
+    if (selectedAction && !isActionToolInUse(experiment, selectedAction.tool)) {
+      return {
+        accessTarget: null,
+        actionTool: selectedAction.tool,
+        limsField: null,
+        target: selectedAction.target,
+      };
+    }
+  }
   if (anchor === "lims-form-next-field") {
     const values = getLimsTutorialValues(experiment);
+    const massSummary = document.querySelector<HTMLButtonElement>(
+      '[data-tutorial-anchor="lims-mass-summary"]',
+    );
+    if (!massSummary || massSummary.getAttribute("aria-pressed") !== "true") {
+      return {
+        accessTarget: null,
+        actionTool: null,
+        limsField: "mass-summary",
+        target: massSummary,
+      };
+    }
     const fields: Array<{
       anchor: string;
       field: LimsTutorialField;
@@ -94,11 +154,12 @@ function resolveAnchor(anchor: string, experiment: Experiment): AnchorResolution
         `[data-tutorial-anchor="${field.anchor}"]`,
       );
       if (!input || !field.matches(input.value)) {
-        return { accessTarget: null, limsField: field.field, target: input };
+        return { accessTarget: null, actionTool: null, limsField: field.field, target: input };
       }
     }
     return {
       accessTarget: null,
+      actionTool: null,
       limsField: "create-record",
       target: document.querySelector<HTMLElement>(
         '[data-tutorial-anchor="lims-create-record"]',
@@ -107,11 +168,12 @@ function resolveAnchor(anchor: string, experiment: Experiment): AnchorResolution
   }
   const directTarget = findDirectAnchor(anchor);
   if (directTarget) {
-    return { accessTarget: null, limsField: null, target: directTarget };
+    return { accessTarget: null, actionTool: null, limsField: null, target: directTarget };
   }
   if (anchor === "basket-received-bag" || anchor.startsWith("basket-produce-")) {
     return {
       accessTarget: "basket",
+      actionTool: null,
       limsField: null,
       target: document.querySelector<HTMLElement>('[data-testid="basket-open-button"]'),
     };
@@ -119,11 +181,12 @@ function resolveAnchor(anchor: string, experiment: Experiment): AnchorResolution
   if (anchor.startsWith("trash-tool-") || anchor.startsWith("trash-produce-lot-")) {
     return {
       accessTarget: "trash",
+      actionTool: null,
       limsField: null,
       target: document.querySelector<HTMLElement>('[data-testid="trash-dropzone"]'),
     };
   }
-  return { accessTarget: null, limsField: null, target: null };
+  return { accessTarget: null, actionTool: null, limsField: null, target: null };
 }
 
 const tutorialActionIcons = {
@@ -159,13 +222,16 @@ function isFullyVisible(target: HTMLElement, bounds: DOMRect) {
     clipBottom = Math.min(clipBottom, parentBounds.bottom);
   }
 
+  // Only the target itself has to be visible. The spotlight halo is drawn in a fixed
+  // overlay that no ancestor clips, so counting its padding here would drop the
+  // highlight on controls sitting flush against a card edge (widget store buttons).
   return (
     bounds.width > 0 &&
     bounds.height > 0 &&
-    bounds.left - spotlightPadding >= clipLeft &&
-    bounds.top - spotlightPadding >= clipTop &&
-    bounds.right + spotlightPadding <= clipRight &&
-    bounds.bottom + spotlightPadding <= clipBottom
+    bounds.left >= clipLeft &&
+    bounds.top >= clipTop &&
+    bounds.right <= clipRight &&
+    bounds.bottom <= clipBottom
   );
 }
 
@@ -174,6 +240,7 @@ export function TutorialCoach({
   evaluation,
   intervention = null,
   onContinueTutorial,
+  onFinish,
   onLeaveTutorial,
   onPause,
   onRestart,
@@ -183,6 +250,7 @@ export function TutorialCoach({
   const revealedAnchorRef = useRef<string | null>(null);
   const spotlightRef = useRef<HTMLDivElement | null>(null);
   const [accessTarget, setAccessTarget] = useState<AccessTarget>(null);
+  const [actionTool, setActionTool] = useState<TutorialActionTool | null>(null);
   const [limsField, setLimsField] = useState<LimsTutorialField | null>(null);
   const anchor = intervention?.anchor
     ?? evaluation.currentStep?.anchor(evaluation.experiment)
@@ -190,6 +258,7 @@ export function TutorialCoach({
   const currentStepPresentation = evaluation.currentStep
     ? getTutorialStepPresentation(evaluation.currentStep, evaluation.experiment)
     : null;
+  const guideActionTool = !intervention;
   useEffect(() => {
     if (!active || !anchor) {
       categoryRevealAnchorRef.current = null;
@@ -206,10 +275,13 @@ export function TutorialCoach({
 
     const update = (allowReveal = false) => {
       const spotlight = spotlightRef.current;
-      const resolution = resolveAnchor(anchor, evaluation.experiment);
+      const resolution = resolveAnchor(anchor, evaluation.experiment, guideActionTool);
       const target = resolution.target;
       setAccessTarget((current) =>
         current === resolution.accessTarget ? current : resolution.accessTarget,
+      );
+      setActionTool((current) =>
+        current === resolution.actionTool ? current : resolution.actionTool,
       );
       setLimsField((current) => current === resolution.limsField ? current : resolution.limsField);
       if (!spotlight || !target) {
@@ -255,7 +327,7 @@ export function TutorialCoach({
         return;
       }
 
-      const target = resolveAnchor(anchor, evaluation.experiment).target;
+      const target = resolveAnchor(anchor, evaluation.experiment, guideActionTool).target;
       if (!target) {
         return;
       }
@@ -287,7 +359,7 @@ export function TutorialCoach({
       window.removeEventListener("scroll", handleViewportChange, true);
       document.removeEventListener("input", handleFormInput, true);
     };
-  }, [active, anchor, evaluation.experiment]);
+  }, [active, anchor, evaluation.experiment, guideActionTool]);
 
   const displayedPresentation = intervention
     ? {
@@ -296,21 +368,23 @@ export function TutorialCoach({
         instruction: intervention.instruction,
         title: intervention.title,
       }
-    : accessTarget
-      ? {
-        action: {
-          kind: "click" as const,
-          label: accessTarget === "basket" ? "Click the highlighted basket" : "Click the highlighted trash",
-        },
-        hint: "The tutorial will highlight the required item as soon as the container is open.",
-        instruction: accessTarget === "basket"
-          ? "Click the highlighted Produce basket to open it. The sample bag or apples will then appear inside."
-          : "Click the highlighted Trash to open it. The item to recover will then appear inside.",
-        title: accessTarget === "basket" ? "Open the Produce basket" : "Open the Trash",
-        }
-      : limsField
-        ? getLimsTutorialFieldPresentation(evaluation.experiment, limsField)
-        : currentStepPresentation;
+    : actionTool
+      ? getTutorialActionToolPresentation(actionTool)
+      : accessTarget
+        ? {
+          action: {
+            kind: "click" as const,
+            label: accessTarget === "basket" ? "Click the highlighted basket" : "Click the highlighted trash",
+          },
+          hint: "The tutorial will highlight the required item as soon as the container is open.",
+          instruction: accessTarget === "basket"
+            ? "Click the highlighted Produce basket to open it. The sample bag or apples will then appear inside."
+            : "Click the highlighted Trash to open it. The item to recover will then appear inside.",
+          title: accessTarget === "basket" ? "Open the Produce basket" : "Open the Trash",
+          }
+        : limsField
+          ? getLimsTutorialFieldPresentation(evaluation.experiment, limsField)
+          : currentStepPresentation;
 
   if (!active) {
     return (
@@ -362,14 +436,16 @@ export function TutorialCoach({
               {evaluation.currentChapter.title} · {evaluation.progressPercent}%
             </p>
           </div>
-          <button
-            aria-label="Pause tutorial"
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-            onClick={onPause}
-            type="button"
-          >
-            Pause
-          </button>
+          {evaluation.isComplete ? null : (
+            <button
+              aria-label="Pause tutorial"
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+              onClick={onPause}
+              type="button"
+            >
+              Pause
+            </button>
+          )}
         </div>
 
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -425,9 +501,16 @@ export function TutorialCoach({
           <div className="mt-5">
             <h2 className="text-lg font-semibold text-emerald-800">Tutorial complete</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              The calibration point and sample have been acquired. You can now explore the
-              results freely or restart the tutorial.
+              The calibration point and sample have been acquired. Switch this experiment to
+              free mode to keep working without the coach, or restart the tutorial.
             </p>
+            <button
+              className="mt-4 w-full rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              onClick={onFinish}
+              type="button"
+            >
+              Switch to free mode
+            </button>
           </div>
         )}
 

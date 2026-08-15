@@ -38,16 +38,45 @@ export type TutorialAction = {
 };
 
 export type LimsTutorialField =
+  | "mass-summary"
   | "orchard"
   | "harvest-date"
   | "indicative-mass"
   | "create-record";
+
+export type TutorialActionTool = "knife" | "pipette" | "spatula";
+
+const tutorialActionTools: Record<TutorialActionTool, { key: string; name: string }> = {
+  knife: { key: "K", name: "Stainless steel knife" },
+  pipette: { key: "P", name: "Micropipette" },
+  spatula: { key: "S", name: "Powder spatula" },
+};
+
+export function isTutorialActionTool(value: string): value is TutorialActionTool {
+  return Object.hasOwn(tutorialActionTools, value);
+}
+
+export function getTutorialActionToolPresentation(
+  tool: TutorialActionTool,
+): TutorialStepPresentation {
+  const { key, name } = tutorialActionTools[tool];
+  return {
+    title: `Put the ${name} away`,
+    instruction:
+      `The ${name} is still in hand, and drag and drop stays disabled while a tool is selected. ` +
+      `Click the highlighted ${name} in Actions, or press ${key}, to put it away.`,
+    hint: "As soon as no tool is selected, the tutorial highlights what to drag for this step.",
+    action: { kind: "click", label: `Click it again or press ${key}` },
+  };
+}
 
 export type LimsTutorialValues = {
   orchardName: string;
   harvestDate: string;
   indicativeMassG: number;
   measuredGrossMassG: number | null;
+  measuredNetMassG: number | null;
+  packagingTareMassG: number;
 };
 
 export type TutorialDefinition = {
@@ -249,6 +278,12 @@ function sampleBagContainingWholeProduce(experiment: Experiment) {
 
 export function getLimsTutorialValues(experiment: Experiment): LimsTutorialValues {
   const bag = workspaceWidget(experiment, "gross_balance")?.tool;
+  const measuredGrossMassG = experiment.limsReception.measuredGrossMassG;
+  const packagingTareMassG = experiment.limsReception.packagingTareMassG;
+  const measuredNetMassG =
+    measuredGrossMassG === null
+      ? null
+      : Math.max(0, measuredGrossMassG - packagingTareMassG);
   const labelMatch = bag?.fieldLabelText?.match(
     /^(.*?) • Harvest (\d{4}-\d{2}-\d{2}) • Approx\. ([\d.]+) kg$/,
   );
@@ -257,7 +292,9 @@ export function getLimsTutorialValues(experiment: Experiment): LimsTutorialValue
       orchardName: labelMatch[1],
       harvestDate: labelMatch[2],
       indicativeMassG: Number(labelMatch[3]) * 1000,
-      measuredGrossMassG: experiment.limsReception.measuredGrossMassG,
+      measuredGrossMassG,
+      measuredNetMassG,
+      packagingTareMassG,
     };
   }
 
@@ -268,9 +305,11 @@ export function getLimsTutorialValues(experiment: Experiment): LimsTutorialValue
     harvestDate: referenceDate.toISOString().slice(0, 10),
     indicativeMassG: Math.max(
       0,
-      Math.round((experiment.limsReception.measuredGrossMassG ?? 2536) - 36),
+      Math.round(measuredNetMassG ?? 2500),
     ),
-    measuredGrossMassG: experiment.limsReception.measuredGrossMassG,
+    measuredGrossMassG,
+    measuredNetMassG,
+    packagingTareMassG,
   };
 }
 
@@ -280,6 +319,18 @@ export function getLimsTutorialFieldPresentation(
 ): TutorialStepPresentation {
   const values = getLimsTutorialValues(experiment);
   const grossMass = values.measuredGrossMassG?.toFixed(1) ?? "the current";
+  const packagingTareMass = values.packagingTareMassG.toFixed(1);
+  const netMass = values.measuredNetMassG?.toFixed(1) ?? "the calculated";
+  if (field === "mass-summary") {
+    return {
+      title: "Review the reception weighing",
+      instruction:
+        `Click the highlighted mass summary and review the calculation: ${grossMass} g − ${packagingTareMass} g = ${netMass} g. ` +
+        "The balance measured the sealed bag; subtracting the known bag tare gives the actual mass received.",
+      hint: `The declared mass on the field label is ${values.indicativeMassG} g. It is a reference value and may differ slightly from the measured net mass of ${netMass} g.`,
+      action: { kind: "click", label: "Review the mass calculation" },
+    };
+  }
   if (field === "orchard") {
     return {
       title: "Enter the orchard / producer",
@@ -298,9 +349,9 @@ export function getLimsTutorialFieldPresentation(
   }
   if (field === "indicative-mass") {
     return {
-      title: "Enter the indicative field mass",
-      instruction: `Click the highlighted field and enter ${values.indicativeMassG} g. This is the approximate field mass printed on the bag label.`,
-      hint: `Do not copy the ${grossMass} g balance reading here: that is the measured gross mass, including the bag.`,
+      title: "Enter the declared mass",
+      instruction: `Click the highlighted field and enter ${values.indicativeMassG} g. This is the approximate net mass declared on the bag label.`,
+      hint: `Do not copy the ${grossMass} g gross reading or the ${netMass} g calculated net mass here. This field preserves what the sender declared.`,
       action: { kind: "type", label: `Type ${values.indicativeMassG}` },
     };
   }
@@ -308,7 +359,7 @@ export function getLimsTutorialFieldPresentation(
     title: "Create the LIMS record",
     instruction:
       "Leave Sample mass empty for now, then click the highlighted Create LIMS record button.",
-    hint: `The measured gross mass (${grossMass} g) is taken automatically from the Gross balance when you create the record. Sample mass will be measured later on the Analytical balance.`,
+    hint: `The LIMS keeps the ${grossMass} g measured gross mass, the ${packagingTareMass} g bag tare, and the ${netMass} g calculated received net mass. Sample mass will be measured later on the Analytical balance.`,
     action: { kind: "click", label: "Click Create LIMS record" },
   };
 }
@@ -349,8 +400,8 @@ function registerSamplePresentation(experiment: Experiment): TutorialStepPresent
     return {
       title: "Create the LIMS record",
       instruction:
-        `Enter Orchard / producer: ${values.orchardName}. Enter Harvest date: ${values.harvestDate}. Enter Indicative field mass: ${values.indicativeMassG} g. Leave Sample mass empty for now. Then click Create LIMS record.`,
-      hint: `The measured gross mass (${values.measuredGrossMassG?.toFixed(1) ?? "current"} g) is captured automatically from the Gross balance.`,
+        `Review the reception mass calculation. Then enter Orchard / producer: ${values.orchardName}. Enter Harvest date: ${values.harvestDate}. Enter Declared mass from bag label: ${values.indicativeMassG} g. Leave Sample mass empty for now. Then click Create LIMS record.`,
+      hint: `The LIMS automatically keeps the ${values.measuredGrossMassG?.toFixed(1) ?? "current"} g gross reading and calculates ${values.measuredNetMassG?.toFixed(1) ?? "the net mass"} g after subtracting the ${values.packagingTareMassG.toFixed(1)} g bag tare.`,
       action: { kind: "type", label: "Enter the values, then click" },
     };
   }
@@ -447,13 +498,45 @@ function extractionEquipmentPresentation(
 function sampleVialAnchor(experiment: Experiment) {
   const vial = plainSampleVial(experiment);
   if (!vial) {
-    return "palette-item-sample_vial_lcms";
+    return workbenchPlacementAnchor(experiment, "palette-item-sample_vial_lcms");
   }
-  return experiment.pipette.volumeMl > 0 ? "tool-type-sample_vial" : "pipette-aspirate";
+  if (experiment.pipette.volumeMl > 0) {
+    return "tool-type-sample_vial";
+  }
+  // Aspirating happens at the bench, and never through a sealed cap.
+  const tube = extractionTube(experiment);
+  if (toolIsInWidget(experiment, "centrifuge", tube)) {
+    return workbenchPlacementAnchor(experiment, "widget-centrifuge");
+  }
+  if (tube?.isSealed) {
+    return `seal-tool-${tube.id}`;
+  }
+  return "pipette-aspirate";
 }
 
 function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   const vial = plainSampleVial(experiment);
+  if (vial && experiment.pipette.volumeMl <= 0) {
+    const tube = extractionTube(experiment);
+    if (toolIsInWidget(experiment, "centrifuge", tube)) {
+      return workbenchPlacementPresentation(experiment, "extraction tube", {
+        title: "Take the tube out of the centrifuge",
+        instruction:
+          "Drag the separated extraction tube out of the Centrifuge and drop it onto an empty workbench station. Pipetting is done at the bench, not inside the instrument.",
+        hint: "The separated phases stay in place as long as the tube is moved gently.",
+        action: { kind: "drag", label: "Drag the tube to the bench" },
+      });
+    }
+    if (tube?.isSealed) {
+      return {
+        title: "Open the extraction tube",
+        instruction:
+          "Click the highlighted Open button on the extraction tube. The micropipette cannot aspirate through a sealed cap.",
+        hint: "Only the supernatant is drawn; the settled pellet stays at the bottom of the tube.",
+        action: { kind: "click", label: "Click Open" },
+      };
+    }
+  }
   return vial
     ? {
         title: "Transfer extract into the Autosampler vial",
@@ -465,12 +548,12 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
           ? { kind: "click", label: "Click vial to dispense" }
           : { kind: "keyboard", label: "Click pipette or press P" },
       }
-    : {
+    : workbenchPlacementPresentation(experiment, "Autosampler vial", {
         title: "Deploy an Autosampler vial",
         instruction:
           "In Inventory, open Containers. Drag an Autosampler vial and drop it onto an empty workbench station.",
         hint: "After placing the vial, use the Micropipette to transfer the separated extract into it.",
-      };
+      });
 }
 
 function stageVialsAnchor(experiment: Experiment) {
@@ -604,14 +687,14 @@ function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPr
       (total, produceLot) => total + produceLot.totalMassG,
       0,
     );
-    const dryIceMassG = Math.round(appleMassG * 10) / 10;
-    const formattedDryIceMassG = Number.isInteger(dryIceMassG)
-      ? dryIceMassG.toFixed(0)
-      : dryIceMassG.toFixed(1);
+    // A 1:1 ratio is a target, not a specification: rounding to the nearest 100 g
+    // keeps the value the learner has to type readable.
+    const dryIceMassG = Math.max(100, Math.round(appleMassG / 100) * 100);
+    const formattedDryIceMassG = dryIceMassG.toFixed(0);
     return {
       title: "Add Dry ice pellets",
       instruction:
-        `In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter ${formattedDryIceMassG} g—the same mass as the apples—then confirm.`,
+        `In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter ${formattedDryIceMassG} g—roughly the mass of the apples—then confirm.`,
       hint: "Using a 1:1 dry-ice-to-apple mass ratio cools the lot gradually. Do not start the grinder while the temperature is above −45 °C.",
       action: { kind: "drag", label: `Add ${formattedDryIceMassG} g dry ice` },
     };
@@ -805,7 +888,7 @@ function calibrationVialAnchor(experiment: Experiment) {
   const vial = plainSampleVial(experiment);
   return vial
     ? "palette-item-calibration_solution"
-    : "palette-item-sample_vial_lcms";
+    : workbenchPlacementAnchor(experiment, "palette-item-sample_vial_lcms");
 }
 
 function calibrationVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
@@ -816,11 +899,11 @@ function calibrationVialPresentation(experiment: Experiment): Partial<TutorialSt
           "Drag the highlighted Multi-residue stock solution onto the empty Autosampler vial. Enter 10 ng/mL, then click Confirm.",
         action: { kind: "drag", label: "Prepare 10 ng/mL" },
       }
-    : {
+    : workbenchPlacementPresentation(experiment, "Autosampler vial", {
         title: "Deploy a second Autosampler vial",
         instruction:
           "In Inventory, open Containers. Drag another Autosampler vial and drop it onto an empty workbench station.",
-      };
+      });
 }
 
 function storageContainer(experiment: Experiment) {
@@ -833,13 +916,39 @@ function hasEmptyWorkbenchStation(experiment: Experiment) {
   );
 }
 
+const addWorkbenchStationAnchor = "add-workbench-slot-button";
+
+// Every step that ends with an item on the bench needs a free station first,
+// otherwise the learner is told to drop something with nowhere to drop it.
+function workbenchPlacementAnchor(experiment: Experiment, anchor: string) {
+  return hasEmptyWorkbenchStation(experiment) ? anchor : addWorkbenchStationAnchor;
+}
+
+function addWorkbenchStationPresentation(itemName: string): Partial<TutorialStepPresentation> {
+  return {
+    title: "Add a workbench station",
+    instruction:
+      `There is no empty station for the ${itemName}. ` +
+      "Click the highlighted + button in the Workbench header to add one.",
+    hint: "Once the new station appears, the tutorial points back to the item to place.",
+    action: { kind: "click", label: "Click +" },
+  };
+}
+
+function workbenchPlacementPresentation(
+  experiment: Experiment,
+  itemName: string,
+  presentation: Partial<TutorialStepPresentation>,
+): Partial<TutorialStepPresentation> {
+  return hasEmptyWorkbenchStation(experiment)
+    ? presentation
+    : addWorkbenchStationPresentation(itemName);
+}
+
 function storeGrinderAnchor(experiment: Experiment) {
   const grinder = workspaceWidget(experiment, "grinder");
   if ((grinder?.produceLots ?? []).length > 0 && !storageContainer(experiment)) {
-    if (!hasEmptyWorkbenchStation(experiment)) {
-      return "add-workbench-slot-button";
-    }
-    return "palette-item-hdpe_storage_jar_2l";
+    return workbenchPlacementAnchor(experiment, "palette-item-hdpe_storage_jar_2l");
   }
   if ((grinder?.produceLots ?? []).length > 0) {
     return `grinder-produce-${grinder?.produceLots?.[0]?.id}`;
@@ -852,7 +961,7 @@ function storeEquipmentAnchor(
   widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge",
 ) {
   return workspaceWidget(experiment, widgetId)?.tool
-    ? `widget-${widgetId}`
+    ? workbenchPlacementAnchor(experiment, `widget-${widgetId}`)
     : `store-widget-${widgetId}`;
 }
 
@@ -860,13 +969,7 @@ function storeGrinderPresentation(experiment: Experiment): Partial<TutorialStepP
   const grinder = workspaceWidget(experiment, "grinder");
   if ((grinder?.produceLots ?? []).length > 0) {
     if (!storageContainer(experiment) && !hasEmptyWorkbenchStation(experiment)) {
-      return {
-        title: "Add a workbench station",
-        instruction:
-          "There is no empty station for the storage jar. Click the highlighted + button in the Workbench header to add one.",
-        hint: "After the new station appears, the tutorial will point to the HDPE storage jar in Inventory.",
-        action: { kind: "click", label: "Click +" },
-      };
+      return addWorkbenchStationPresentation("storage jar");
     }
     return storageContainer(experiment)
       ? {
@@ -893,12 +996,12 @@ function storeEquipmentPresentation(
   itemName: string,
 ): Partial<TutorialStepPresentation> {
   return workspaceWidget(experiment, widgetId)?.tool
-    ? {
+    ? workbenchPlacementPresentation(experiment, itemName, {
         title: `Remove the ${itemName}`,
         instruction: `Drag the ${itemName} out of the ${equipmentName} and drop it onto an empty workbench station.`,
         hint: `The ${equipmentName} can only be stored after it is empty.`,
         action: { kind: "drag", label: `Drag out the ${itemName}` },
-      }
+      })
     : {
         title: `Store the ${equipmentName}`,
         instruction: `Click Store in inventory in the ${equipmentName} header.`,
@@ -955,8 +1058,14 @@ function launchSequencePresentation(experiment: Experiment): Partial<TutorialSte
   };
 }
 
+// A run leaves the rack "completed", still inside the instrument: anything other
+// than "available" means it has to be unloaded before its vials can be taken out.
+function rackIsInInstrument(experiment: Experiment) {
+  return experiment.rack.state !== "available";
+}
+
 function cleanupAcquisitionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
-  if (experiment.rack.state === "loaded") {
+  if (rackIsInInstrument(experiment)) {
     return {
       title: "Unload the rack",
       instruction: "In the LC-MS/MS, click Unload rack.",
@@ -997,11 +1106,14 @@ function completedCalibrationAndSampleRun(experiment: Experiment) {
 }
 
 function hasTestPortion(experiment: Experiment) {
-  const tube = analyticalBalanceTubeOnPan(experiment);
-  const mass =
-    tube?.powderMassG ??
-    (tube?.produceFractions ?? []).reduce((total, fraction) => total + fraction.massG, 0);
-  return analyticalTubeTareIsValid(experiment) && mass >= 9.5;
+  // The weighed tube leaves the pan before the balance can be stored, so the test
+  // portion counts wherever the tube stands afterwards.
+  return (
+    analyticalTubeTareIsValid(experiment) &&
+    allTools(experiment).some(
+      (tool) => tool.toolType === "centrifuge_tube" && toolPowderMassG(tool) >= 9.5,
+    )
+  );
 }
 
 function hasPreparedExtraction(experiment: Experiment) {
@@ -1117,7 +1229,7 @@ const steps: TutorialStep[] = [
     anchor: (experiment) => {
       const board = allTools(experiment).find((tool) => tool.toolType === "cutting_board");
       if (!board) {
-        return "palette-item-cutting_board_hdpe";
+        return workbenchPlacementAnchor(experiment, "palette-item-cutting_board_hdpe");
       }
       if (!(board.produceLots ?? []).some((lot) => (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole")) {
         const bag = sampleBagContainingWholeProduce(experiment);
@@ -1135,11 +1247,11 @@ const steps: TutorialStep[] = [
     presentation: (experiment) => {
       const board = allTools(experiment).find((tool) => tool.toolType === "cutting_board");
       if (!board) {
-        return {
+        return workbenchPlacementPresentation(experiment, "Cutting board", {
           title: "Deploy a Cutting board",
           instruction: "In Inventory, open MISC. Drag a Cutting board and drop it onto an empty workbench station.",
           action: { kind: "drag", label: "Drag board to workbench" },
-        };
+        });
       }
       if (!(board.produceLots ?? []).some((lot) => (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole")) {
         const bag = sampleBagContainingWholeProduce(experiment);
@@ -1389,7 +1501,7 @@ const steps: TutorialStep[] = [
     hint: "The results remain available after the equipment is stored.",
     prerequisites: ["review-results"],
     anchor: (experiment) =>
-      experiment.rack.state === "loaded"
+      rackIsInInstrument(experiment)
         ? "instrument-unload-rack"
         : experiment.rack.slots.some((slot) => slot.tool)
           ? "widget-rack"

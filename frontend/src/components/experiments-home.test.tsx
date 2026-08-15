@@ -61,6 +61,7 @@ describe("ExperimentsHome", () => {
     expect(screen.getByText("3 rack vials")).toBeInTheDocument();
     expect(screen.getByText("1 material")).toBeInTheDocument();
     expect(screen.getByText("4 runs")).toBeInTheDocument();
+    expect(screen.queryByText("v4")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open experiment" }));
 
     expect(pushMock).toHaveBeenCalledWith("/experiments/experiment_2");
@@ -296,6 +297,115 @@ describe("ExperimentsHome", () => {
       expect(duplicateExperimentMock).toHaveBeenCalledWith("experiment_2");
       expect(screen.getByText("Ready state (copy)")).toBeInTheDocument();
     });
+  });
+
+  it("treats a completed tutorial as a free-mode experiment on the home page", async () => {
+    window.localStorage.setItem(
+      "betalab:tutorial-sessions:v1",
+      JSON.stringify({
+        "calibration-sample-v1::experiment_tutorial": {
+          tutorialId: "calibration-sample-v1",
+          experimentId: "experiment_tutorial",
+          status: "completed",
+          completedStepIds: [],
+          version: 1,
+        },
+      }),
+    );
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_tutorial",
+        name: "Finished tutorial",
+        status: "preparing",
+        last_simulation_at: "2026-08-10T08:00:00Z",
+        snapshot_version: 3,
+        updated_at: "2026-08-10T08:10:00Z",
+        last_audit_entry: null,
+        summary: { workbenchToolCount: 0, rackToolCount: 0, materialCount: 1, runCount: 0 },
+      },
+    ]);
+
+    render(<ExperimentsHome />);
+
+    expect(await screen.findByText("Finished tutorial")).toBeInTheDocument();
+    expect(screen.queryByText("Tutorial")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open experiment" }));
+    expect(pushMock).toHaveBeenCalledWith("/experiments/experiment_tutorial");
+  });
+
+  it("carries the tutorial progress over to a duplicated tutorial experiment", async () => {
+    window.localStorage.setItem(
+      "betalab:tutorial-sessions:v1",
+      JSON.stringify({
+        "calibration-sample-v1::experiment_tutorial": {
+          tutorialId: "calibration-sample-v1",
+          experimentId: "experiment_tutorial",
+          status: "paused",
+          completedStepIds: ["place-flask", "weigh-sample"],
+          version: 1,
+        },
+      }),
+    );
+    const source = {
+      id: "experiment_tutorial",
+      name: "Calibration tutorial",
+      status: "preparing",
+      last_simulation_at: "2026-08-10T08:00:00Z",
+      snapshot_version: 3,
+      updated_at: "2026-08-10T08:10:00Z",
+      last_audit_entry: null,
+      summary: { workbenchToolCount: 0, rackToolCount: 0, materialCount: 1, runCount: 0 },
+    };
+    duplicateExperimentMock.mockResolvedValue({ id: "experiment_tutorial_copy" });
+    listExperimentsMock.mockResolvedValueOnce([source]).mockResolvedValueOnce([
+      { ...source, id: "experiment_tutorial_copy", name: "Calibration tutorial (copy)" },
+      source,
+    ]);
+
+    render(<ExperimentsHome />);
+    fireEvent.click(await screen.findByRole("button", { name: "Manage Calibration tutorial" }));
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate Calibration tutorial" }));
+
+    expect(await screen.findByText("Calibration tutorial (copy)")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Tutorial")).toHaveLength(2));
+    expect(
+      JSON.parse(window.localStorage.getItem("betalab:tutorial-sessions:v1") ?? "{}"),
+    ).toMatchObject({
+      "calibration-sample-v1::experiment_tutorial_copy": {
+        tutorialId: "calibration-sample-v1",
+        experimentId: "experiment_tutorial_copy",
+        status: "paused",
+        completedStepIds: ["place-flask", "weigh-sample"],
+        version: 1,
+      },
+    });
+  });
+
+  it("leaves a plain experiment copy free of tutorial state", async () => {
+    const source = {
+      id: "experiment_2",
+      name: "Ready state",
+      status: "preparing",
+      last_simulation_at: "2026-04-01T10:00:00Z",
+      snapshot_version: 4,
+      updated_at: "2026-04-01T10:03:00Z",
+      last_audit_entry: null,
+      summary: { workbenchToolCount: 1, rackToolCount: 2, materialCount: 1, runCount: 0 },
+    };
+    duplicateExperimentMock.mockResolvedValue({ id: "experiment_copy" });
+    listExperimentsMock.mockResolvedValueOnce([source]).mockResolvedValueOnce([
+      { ...source, id: "experiment_copy", name: "Ready state (copy)" },
+      source,
+    ]);
+
+    render(<ExperimentsHome />);
+    fireEvent.click(await screen.findByRole("button", { name: "Manage Ready state" }));
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate Ready state" }));
+
+    expect(await screen.findByText("Ready state (copy)")).toBeInTheDocument();
+    expect(screen.queryByText("Tutorial")).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("betalab:tutorial-sessions:v1")).toBeNull();
   });
 
   it("keeps card actions visually hierarchical", async () => {

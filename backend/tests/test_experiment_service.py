@@ -997,6 +997,37 @@ def test_set_gross_mass_offset_updates_reception_state() -> None:
     assert updated.audit_log[-1] == "Gross balance container offset set to -35 g."
 
 
+def test_lims_keeps_the_physical_gross_reading_when_balance_offset_is_set() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    apply_command(
+        service,
+        experiment.id,
+        "record_gross_weight",
+        {"measured_gross_mass_g": 2536.0},
+    )
+    apply_command(
+        service,
+        experiment.id,
+        "set_gross_mass_offset",
+        {"gross_mass_offset_g": -36},
+    )
+    updated = apply_command(
+        service,
+        experiment.id,
+        "create_lims_reception",
+        {
+            "orchard_name": "Tutorial Orchard",
+            "harvest_date": "2026-08-13",
+            "indicative_mass_g": 2500.0,
+        },
+    )
+
+    assert updated.lims_reception.measured_gross_mass_g == pytest.approx(2536.0)
+    assert updated.lims_reception.packaging_tare_mass_g == pytest.approx(36.0)
+
+
 def test_print_lims_label_requires_reception_entry() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()

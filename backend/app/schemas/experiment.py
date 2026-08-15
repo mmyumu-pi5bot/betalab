@@ -28,6 +28,7 @@ from app.domain.grinder_rules import (
     get_grinder_display_mode,
     get_grinder_start_block_reason,
 )
+from app.domain.models import SAMPLE_BAG_TARE_MASS_G
 from app.domain.rules import can_workspace_widget_be_stored, can_workspace_widget_store_now
 from app.domain.spatula_rules import (
     SPATULA_CLICK_INCREMENT_MU_G,
@@ -339,6 +340,7 @@ class LimsReceptionSchema(BaseModel):
     indicative_mass_g: float
     id: str | None = None
     measured_gross_mass_g: float | None = None
+    packaging_tare_mass_g: float = SAMPLE_BAG_TARE_MASS_G
     gross_mass_offset_g: int = 0
     measured_sample_mass_g: float | None = None
     lab_sample_code: str | None = None
@@ -353,6 +355,7 @@ def build_default_lims_reception_schema() -> LimsReceptionSchema:
         indicative_mass_g=0.0,
         id=None,
         measured_gross_mass_g=None,
+        packaging_tare_mass_g=SAMPLE_BAG_TARE_MASS_G,
         gross_mass_offset_g=0,
         measured_sample_mass_g=None,
         lab_sample_code=None,

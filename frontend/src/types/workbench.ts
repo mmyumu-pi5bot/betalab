@@ -712,6 +712,7 @@ export type LimsReception = {
   harvestDate: string;
   indicativeMassG: number;
   measuredGrossMassG: number | null;
+  packagingTareMassG: number;
   grossMassOffsetG: number;
   measuredSampleMassG: number | null;
   labSampleCode: string | null;

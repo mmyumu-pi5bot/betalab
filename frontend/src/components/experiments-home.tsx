@@ -13,7 +13,9 @@ import {
 import { CALIBRATION_SAMPLE_TUTORIAL_ID } from "@/lib/tutorial-engine";
 import {
   clearTutorialSession,
+  getTutorialSession,
   getTutorialSessions,
+  isTutorialSessionOngoing,
   saveTutorialSession,
   type TutorialSession,
 } from "@/lib/tutorial-session-store";
@@ -133,7 +135,7 @@ export function ExperimentsHome() {
         const savedTutorials = getTutorialSessions(CALIBRATION_SAMPLE_TUTORIAL_ID);
         const validTutorials = savedTutorials.filter(
           (session) =>
-            session.status !== "abandoned" && savedExperimentIds.has(session.experimentId),
+            isTutorialSessionOngoing(session) && savedExperimentIds.has(session.experimentId),
         );
         for (const session of savedTutorials) {
           if (!savedExperimentIds.has(session.experimentId)) {
@@ -250,7 +252,24 @@ export function ExperimentsHome() {
     setDuplicatingExperimentId(experimentId);
     setErrorMessage(null);
     try {
-      await duplicateExperiment(experimentId);
+      const duplicate = await duplicateExperiment(experimentId);
+      // The backend copies the lab state but knows nothing about tutorials, so the
+      // guided progress has to be carried over on this side, status included.
+      const sourceSession = getTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID, experimentId);
+      if (sourceSession) {
+        const copiedSession = saveTutorialSession({
+          tutorialId: sourceSession.tutorialId,
+          experimentId: duplicate.id,
+          status: sourceSession.status,
+          completedStepIds: [...sourceSession.completedStepIds],
+        });
+        if (isTutorialSessionOngoing(copiedSession)) {
+          setTutorialSessionsByExperiment((current) => ({
+            ...current,
+            [copiedSession.experimentId]: copiedSession,
+          }));
+        }
+      }
       setExperiments(await listExperiments());
       setManagingExperimentId(null);
     } catch (error) {
@@ -409,16 +428,13 @@ export function ExperimentsHome() {
                         </>
                       )}
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {isTutorialExperiment ? (
+                    {isTutorialExperiment ? (
+                      <div className="flex flex-col items-end gap-2">
                         <span className="rounded-full bg-sky-700 px-3 py-1 text-xs font-semibold text-white">
                           Tutorial
                         </span>
-                      ) : null}
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
-                        v{experiment.snapshot_version}
-                      </span>
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-stone-700">
                     <span className="rounded-full bg-stone-100 px-3 py-1.5">

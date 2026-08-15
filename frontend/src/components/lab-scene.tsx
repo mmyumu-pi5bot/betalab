@@ -88,6 +88,10 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
   const [isTutorialAbandoned, setIsTutorialAbandoned] = useState(() =>
     initialTutorialSession?.status === "abandoned",
   );
+  // A finished tutorial hands the experiment over to free mode: no coach, no badge.
+  const [isTutorialFinished, setIsTutorialFinished] = useState(() =>
+    initialTutorialSession?.status === "completed",
+  );
   const [pendingTutorialIntervention, setPendingTutorialIntervention] =
     useState<PendingTutorialIntervention | null>(null);
   const experimentApi = useLabExperiment({
@@ -106,6 +110,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       setTutorialCompletedStepIds(saved.completedStepIds);
       setIsTutorialActive(saved.status === "active");
       setIsTutorialAbandoned(saved.status === "abandoned");
+      setIsTutorialFinished(saved.status === "completed");
       return;
     }
     saveTutorialSession({
@@ -116,6 +121,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     setTutorialCompletedStepIds([]);
     setIsTutorialActive(true);
     setIsTutorialAbandoned(false);
+    setIsTutorialFinished(false);
   }, [state, tutorialDefinition]);
 
   const handlePauseTutorial = () => {
@@ -128,6 +134,21 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       status: "paused",
     });
     setIsTutorialActive(false);
+    setPendingTutorialIntervention(null);
+  };
+
+  const handleFinishTutorial = () => {
+    if (!tutorialDefinition || state.status !== "ready") {
+      return;
+    }
+    saveTutorialSession({
+      tutorialId: tutorialDefinition.id,
+      experimentId: state.experiment.id,
+      status: "completed",
+      completedStepIds: tutorialCompletedStepIds,
+    });
+    setIsTutorialActive(false);
+    setIsTutorialFinished(true);
     setPendingTutorialIntervention(null);
   };
 
@@ -582,7 +603,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     analyticalBalanceTool,
     experimentApi: dndApi,
     grossBalanceTool,
-    grossBalanceNetMassG,
+    measuredGrossMassG: readyExperiment?.limsReception.measuredGrossMassG ?? null,
     measuredSampleMassG: readyExperiment?.limsReception.measuredSampleMassG ?? null,
   });
 
@@ -872,7 +893,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
         },
       }}
       />
-      {tutorialEvaluation && !isTutorialAbandoned ? (
+      {tutorialEvaluation && !isTutorialAbandoned && !isTutorialFinished ? (
         <TutorialCoach
           active={isTutorialActive}
           evaluation={tutorialEvaluation}
@@ -893,6 +914,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
             pendingTutorialIntervention.proceed();
             setPendingTutorialIntervention(null);
           }}
+          onFinish={handleFinishTutorial}
           onPause={handlePauseTutorial}
           onRestart={handleRestartTutorial}
           onResume={handleResumeTutorial}

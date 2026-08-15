@@ -4,12 +4,11 @@ import random
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from app.domain.models import ProduceLot, WorkbenchTool, new_id
+from app.domain.models import SAMPLE_BAG_TARE_MASS_G, ProduceLot, WorkbenchTool, new_id
 from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.helpers.produce_canonical import get_tool_total_produce_mass_g
 from app.services.helpers.workbench import sample_tool_contact_impurity_mg_per_g
 
-SAMPLE_BAG_TARE_MASS_G = 36.0
 _ORCHARD_NAME_WEIGHTS: tuple[tuple[str, float], ...] = (
     ("Martin Orchard", 0.24),
     ("North Field Orchard", 0.18),
