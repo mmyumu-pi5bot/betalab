@@ -27,7 +27,7 @@ GROUND_POWDER_APPARENT_DENSITY_G_PER_ML = 0.5
 
 
 def sync_canonical_produce_model(experiment: Experiment) -> None:
-    produce_lots_by_id = _collect_produce_lots(experiment)
+    produce_lots_by_id = collect_produce_lots(experiment)
     state_ids_by_signature: dict[tuple[object, ...], str] = {}
     material_states: list[ProduceMaterialState] = []
     existing_states_by_id = {state.id: state for state in experiment.produce_material_states}
@@ -284,7 +284,7 @@ def sync_pesticide_material_states(experiment: Experiment) -> None:
     """
     from app.services.helpers.produce_material_states import ensure_material_state
 
-    for lot in _collect_produce_lots(experiment).values():
+    for lot in collect_produce_lots(experiment).values():
         if not lot.pesticide_residues:
             continue
         state = ensure_material_state(experiment.produce_material_states, lot.id)
@@ -298,7 +298,7 @@ def _generate_residues_if_missing(lot: ProduceLot) -> None:
         lot.pesticide_residues = generate_pesticide_residues(lot.produce_type)
 
 
-def _collect_produce_lots(experiment: Experiment) -> dict[str, ProduceLot]:
+def collect_produce_lots(experiment: Experiment) -> dict[str, ProduceLot]:
     produce_lots: dict[str, ProduceLot] = {}
 
     def add(entries: Iterable[ProduceLot]) -> None:

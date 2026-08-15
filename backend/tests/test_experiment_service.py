@@ -943,6 +943,38 @@ def test_create_lims_reception_records_precise_sample_mass() -> None:
     assert updated.lims_reception.measured_sample_mass_g == pytest.approx(10.0)
 
 
+def test_editing_a_lims_entry_keeps_the_gross_mass_it_already_recorded() -> None:
+    # experiment.lims_reception is the reception desk's scratchpad, cleared as
+    # soon as the bag leaves the gross balance. Editing a registered entry later
+    # must fall back to what that entry already holds, not to the empty pad.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    created = create_lims_reception(
+        service,
+        experiment.id,
+        orchard_name="Martin Orchard",
+        harvest_date="2026-03-29",
+        indicative_mass_g=2500.0,
+        measured_gross_mass_g=4102.2,
+    )
+    entry_id = created.lims_entries[0].id
+    service._require_experiment(experiment.id).lims_reception.measured_gross_mass_g = None
+
+    updated = create_lims_reception(
+        service,
+        experiment.id,
+        orchard_name="North Field Orchard",
+        harvest_date="2026-03-29",
+        indicative_mass_g=2500.0,
+        measured_gross_mass_g=None,
+        entry_id=entry_id,
+    )
+
+    assert updated.lims_entries[0].measured_gross_mass_g == pytest.approx(4102.2)
+    assert updated.lims_reception.measured_gross_mass_g == pytest.approx(4102.2)
+
+
 def test_printed_lims_label_can_be_applied_to_basket_bag() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()

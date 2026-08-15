@@ -451,6 +451,11 @@ def _clone_material_state(state: ProduceMaterialState) -> ProduceMaterialState:
         residual_co2_mass_g=state.residual_co2_mass_g,
         grinding_elapsed_seconds=state.grinding_elapsed_seconds,
         grinding_temperature_integral=state.grinding_temperature_integral,
+        # Same physical material, split in two only so the untouched stock can
+        # stay "ground": the clone inherits the degradation already booked
+        # against it. Copied, not shared — the two halves degrade separately
+        # from here on.
+        pesticide_degradation_factors=dict(state.pesticide_degradation_factors),
     )
 
 

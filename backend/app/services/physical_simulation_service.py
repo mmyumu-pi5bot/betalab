@@ -152,13 +152,24 @@ class PhysicalSimulationService:
         quechers_temp = tool.quechers_state.temperature_c
         if quechers_temp <= self.pesticide_degradation_threshold_c:
             return
-        lot_ids = list(dict.fromkeys(
-            [lot.id for lot in tool.produce_lots]
-            + [f.produce_lot_id for f in tool.produce_fractions]
-        ))
-        for lot_id in lot_ids:
-            state = find_material_state(material_states, lot_id)
-            if state is None or not state.pesticide_degradation_factors:
+        # Resolve each fraction's own material state. Once a test portion is
+        # wetted it gets a state of its own, distinct from the one describing the
+        # stock it was scooped from, and both carry the same lot id: looking up
+        # by lot id alone would book this tube's exotherm against whichever state
+        # happens to come first — usually the powder still sitting in the jar.
+        states_by_id = {state.id: state for state in material_states}
+        degraded_states: dict[str, ProduceMaterialState] = {}
+        for fraction in tool.produce_fractions:
+            state = states_by_id.get(fraction.produce_material_state_id)
+            if state is not None:
+                degraded_states.setdefault(state.id, state)
+        for lot in tool.produce_lots:
+            state = find_material_state(material_states, lot.id)
+            if state is not None:
+                degraded_states.setdefault(state.id, state)
+
+        for state in degraded_states.values():
+            if not state.pesticide_degradation_factors:
                 continue
             state.pesticide_degradation_factors = apply_degradation_step(
                 state.pesticide_degradation_factors,

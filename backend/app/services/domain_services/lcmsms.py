@@ -36,6 +36,7 @@ from app.services.domain_services.acquisition_clock import (
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.mrm_signal import generate_transition_traces
 from app.services.helpers.lookups import find_workspace_widget
+from app.services.helpers.produce_canonical import collect_produce_lots
 from app.services.helpers.produce_material_states import find_material_state
 from app.services.helpers.tool_liquids import add_liquid_to_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
@@ -196,14 +197,21 @@ def build_extract_injection_context(
     istd_volume_ml: float | None = None,
     istd_true_volume_ml: float | None = None,
 ) -> InjectionContext:
+    # A weighed test portion is a fraction: the spatula moves powder into the
+    # tube while the ProduceLot carrying the residue concentrations stays in the
+    # jar it was scooped from. So the lot behind a fraction has to be looked up
+    # experiment-wide — restricting the search to the tube or to bench surfaces
+    # silently yields no residues, and the sample injects as a blank.
     all_lots: list[ProduceLot] = list(tube.produce_lots)
-    referenced_lot_ids = {fraction.produce_lot_id for fraction in tube.produce_fractions}
-    for lot_id in referenced_lot_ids:
-        if not any(lot.id == lot_id for lot in all_lots):
-            for slot in experiment.workbench.slots:
-                for lot in slot.surface_produce_lots or []:
-                    if lot.id == lot_id:
-                        all_lots.append(lot)
+    known_lot_ids = {lot.id for lot in all_lots}
+    experiment_lots = collect_produce_lots(experiment)
+    for fraction in tube.produce_fractions:
+        if fraction.produce_lot_id in known_lot_ids:
+            continue
+        lot = experiment_lots.get(fraction.produce_lot_id)
+        if lot is not None:
+            all_lots.append(lot)
+            known_lot_ids.add(lot.id)
 
     total_sample_mass_g = sum(fraction.mass_g for fraction in tube.produce_fractions)
     total_sample_true_mass_g = sum(

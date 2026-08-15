@@ -120,8 +120,13 @@ class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest])
         if request.measured_sample_mass_g is not None and request.measured_sample_mass_g <= 0:
             raise ValueError("Sample mass must be greater than zero.")
 
-        measured_gross_mass_g = _resolve_measured_gross_mass_g(experiment, request.measured_gross_mass_g)
-        if request.entry_id is None:
+        existing_entry = (
+            _find_lims_entry(experiment, request.entry_id) if request.entry_id is not None else None
+        )
+        measured_gross_mass_g = _resolve_measured_gross_mass_g(
+            experiment, request.measured_gross_mass_g, entry=existing_entry
+        )
+        if existing_entry is None:
             entry = _build_lims_reception_entry(
                 experiment,
                 request,
@@ -134,7 +139,7 @@ class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest])
             experiment.lims_entries.append(entry)
             experiment.audit_log.append(f"LIMS reception created for {entry.lab_sample_code}.")
         else:
-            entry = _find_lims_entry(experiment, request.entry_id)
+            entry = existing_entry
             _update_lims_reception_entry(
                 entry,
                 experiment,
@@ -269,9 +274,21 @@ def _build_sample_code(experiment: Experiment) -> str:
 def _resolve_measured_gross_mass_g(
     experiment: Experiment,
     measured_gross_mass_g: float | None,
+    *,
+    entry: LimsReception | None = None,
 ) -> float | None:
+    """Gross mass to record, when the request does not carry one.
+
+    ``experiment.lims_reception`` is the reception desk's scratchpad: the gross
+    balance writes the reading there, and it is cleared again as soon as the bag
+    is moved off. That makes it a fallback for a brand-new entry only — an entry
+    already registered keeps its own reading, otherwise re-editing it after the
+    bag left the balance would silently erase the weighing.
+    """
     if measured_gross_mass_g is not None:
         return float(measured_gross_mass_g)
+    if entry is not None and entry.measured_gross_mass_g is not None:
+        return float(entry.measured_gross_mass_g)
     if experiment.lims_reception.measured_gross_mass_g is not None:
         return float(experiment.lims_reception.measured_gross_mass_g)
     return None
