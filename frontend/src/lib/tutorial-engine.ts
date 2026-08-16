@@ -1088,9 +1088,19 @@ function extractionPreparationTarget(experiment: Experiment): TutorialTarget {
   if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
     return { anchor: "palette-item-acetonitrile_extraction", dropAnchor: tubeAnchor };
   }
-  return tube?.quechersState?.saltsAdded
-    ? { anchor: tubeAnchor }
-    : { anchor: "palette-item-quechers_salts", dropAnchor: tubeAnchor };
+  if (tube?.quechersState?.saltsAdded) {
+    return { anchor: tubeAnchor };
+  }
+  // The salts start a 15 s countdown to cementation, so the mixer has to be standing
+  // on the workspace before they go in. Fetching it from the Inventory afterwards
+  // costs more than the whole window.
+  if (!workspaceWidget(experiment, "vortex")?.isPresent) {
+    return {
+      anchor: "palette-item-vortex_mixer_widget",
+      dropAnchor: workspaceCanvasAnchor,
+    };
+  }
+  return { anchor: "palette-item-quechers_salts", dropAnchor: tubeAnchor };
 }
 
 function extractionPreparationPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
@@ -1102,7 +1112,27 @@ function extractionPreparationPresentation(experiment: Experiment): Partial<Tuto
   if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
     return { title: "Add the extraction solvent", instruction: "Drag the highlighted Acetonitrile onto the same tube. Enter 10 mL in the dialog, then click Confirm.", action: { kind: "drag", label: "Add 10 mL acetonitrile" } };
   }
-  return { title: "Add the QuEChERS salts", instruction: "Drag the highlighted QuEChERS salts packet onto the extraction tube and confirm the addition.", action: { kind: "drag", label: "Add the salts packet" } };
+  if (!workspaceWidget(experiment, "vortex")?.isPresent) {
+    return {
+      title: "Deploy the Vortex mixer before the salts",
+      instruction:
+        "The salts come last, and they start an exothermic reaction the moment they " +
+        "touch the solvent: from then on you have 15 seconds to seal the tube and start " +
+        "the mixer. Deploy the Vortex mixer now so it is waiting. In Inventory, open " +
+        "Workspace equipment, then drag it onto the central workspace.",
+      hint: "Miss that window and the salts cake solid, taking the extraction with them.",
+      action: { kind: "drag", label: "Drag to workspace" },
+    };
+  }
+  return {
+    title: "Add the QuEChERS salts",
+    instruction:
+      "Drag the highlighted QuEChERS salts packet onto the extraction tube and confirm " +
+      "the addition. The countdown starts on confirmation: you then have 15 seconds to " +
+      "seal the tube, drop it into the Vortex mixer and start the cycle.",
+    hint: "Know where you are going before you confirm: seal the tube, drag it into the mixer, click Start vortex.",
+    action: { kind: "drag", label: "Add the salts packet" },
+  };
 }
 
 function calibrationVialTarget(experiment: Experiment): TutorialTarget {
@@ -1601,8 +1631,8 @@ const steps: TutorialStep[] = [
     chapterId: "extraction",
     title: "Prepare the QuEChERS extraction",
     instruction:
-      "Drag the ISTD solution onto the tube and confirm the volume. Repeat with acetonitrile to add 10 mL, then drag the QuEChERS salt packet onto the same tube.",
-    hint: "Add the ISTD before the solvent to preserve the correct analytical provenance.",
+      "Drag the ISTD solution onto the tube and confirm the volume. Repeat with acetonitrile to add 10 mL. Deploy the Vortex mixer onto the workspace, and only then drag the QuEChERS salt packet onto the same tube.",
+    hint: "Add the ISTD before the solvent to preserve the correct analytical provenance. The salts come last: they leave 15 seconds to reach the mixer.",
     prerequisites: ["store-analytical-balance"],
     ...fromTarget(extractionPreparationTarget),
     isSatisfied: hasPreparedExtraction,
@@ -1614,7 +1644,7 @@ const steps: TutorialStep[] = [
     chapterId: "extraction",
     title: "Vortex the extraction",
     instruction:
-      "Drag the highlighted Vortex mixer from Inventory and drop it onto the central workspace. Seal the extraction tube, drag it into the mixer, and click Start vortex.",
+      "Drag and drop the sealed extraction tube into the Vortex mixer waiting on the workspace, then click Start vortex. The salts are already reacting, so do it now.",
     hint: "Wait until the vortex cycle is complete before removing the tube.",
     prerequisites: ["prepare-extraction"],
     ...fromTarget((experiment) =>

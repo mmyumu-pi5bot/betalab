@@ -1407,4 +1407,91 @@ describe("calibration sample tutorial", () => {
       expect(result.currentStep?.anchor(state)).toBe("bench-tool-card-spilled_tube");
     });
   });
+  describe("warning before the QuEChERS salts are added", () => {
+    // Adding the salts starts a 15 s countdown to cementation. Sending the learner
+    // to fetch the mixer from the Inventory afterwards makes that window unwinnable,
+    // so the mixer is deployed first and the deadline is announced before it starts.
+    const beforeSalts = [
+      "weigh-received-sample",
+      "register-and-label-sample",
+      "store-gross-balance",
+      "cut-sample",
+      "grind-sample",
+      "store-grinder",
+      "weigh-test-portion",
+      "store-analytical-balance",
+    ];
+
+    function wettedTube() {
+      return labTool("centrifuge_tube", {
+        id: "extraction_tube",
+        powderMassG: 10.002,
+        liquids: [
+          { liquidId: "istd_solution", label: "ISTD", volume_ml: 0.05 },
+          { liquidId: "acetonitrile_extraction", label: "MeCN", volume_ml: 10 },
+        ],
+      });
+    }
+
+    function stateWith(vortexIsPresent: boolean) {
+      return experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "extraction_tube" },
+        workbench: {
+          slots: [{ id: "station_1", label: "Station 1", tool: wettedTube() }],
+        },
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, { isPresent: vortexIsPresent && id === "vortex" }),
+          ),
+        },
+      });
+    }
+
+    it("asks for the vortex mixer before the salts rather than after them", () => {
+      const state = stateWith(false);
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeSalts);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.id).toBe("prepare-extraction");
+      expect(result.currentStep?.anchor(state)).toBe("palette-item-vortex_mixer_widget");
+      expect(result.currentStep?.dropAnchor?.(state)).toBe("workspace");
+      expect(presentation.title).toBe("Deploy the Vortex mixer before the salts");
+      expect(presentation.instruction).toContain("15 seconds");
+    });
+
+    it("announces the deadline on the salts themselves once the mixer is ready", () => {
+      const state = stateWith(true);
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeSalts);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.id).toBe("prepare-extraction");
+      expect(result.currentStep?.anchor(state)).toBe("palette-item-quechers_salts");
+      expect(result.currentStep?.dropAnchor?.(state)).toBe(
+        "bench-tool-card-extraction_tube",
+      );
+      expect(presentation.title).toBe("Add the QuEChERS salts");
+      expect(presentation.instruction).toContain("15 seconds");
+      expect(presentation.hint).toContain("seal");
+    });
+
+    it("keeps the earlier liquid sub-steps clear of the deadline warning", () => {
+      const dryTube = labTool("centrifuge_tube", {
+        id: "extraction_tube",
+        powderMassG: 10.002,
+      });
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "extraction_tube" },
+        workbench: { slots: [{ id: "station_1", label: "Station 1", tool: dryTube }] },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeSalts);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.anchor(state)).toBe("palette-item-istd_solution");
+      expect(presentation.instruction).not.toContain("15 seconds");
+    });
+  });
 });
