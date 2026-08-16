@@ -1232,4 +1232,179 @@ describe("calibration sample tutorial", () => {
       }
     });
   });
+  describe("recovery from a cemented extraction tube", () => {
+    // The QuEChERS salts set hard 15 s after touching the solvent. The tube is then
+    // unusable for good, and the vortex refuses to start on it, so the tutorial has
+    // to drop that tube and walk the learner back to a fresh test portion.
+    const beforeExtraction = [
+      "weigh-received-sample",
+      "register-and-label-sample",
+      "store-gross-balance",
+      "cut-sample",
+      "grind-sample",
+      "store-grinder",
+      "weigh-test-portion",
+      "store-analytical-balance",
+      "prepare-extraction",
+    ];
+
+    function cementedTube(overrides: Record<string, unknown> = {}) {
+      return labTool("centrifuge_tube", {
+        id: "cemented_tube",
+        powderMassG: 10.002,
+        liquids: [
+          { liquidId: "istd_solution", label: "ISTD", volume_ml: 0.05 },
+          { liquidId: "acetonitrile_extraction", label: "MeCN", volume_ml: 10 },
+        ],
+        quechersState: {
+          saltsAdded: true,
+          phase: "cemented",
+          faults: ["cemented"],
+          isUsable: false,
+        },
+        ...overrides,
+      });
+    }
+
+    function powderJar() {
+      return labTool("storage_jar", { id: "powder_jar", powderMassG: 900 });
+    }
+
+    it("rewinds to the test portion instead of leaving the learner on the vortex", () => {
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "cemented_tube" },
+        workbench: {
+          slots: [
+            { id: "station_1", label: "Station 1", tool: cementedTube() },
+            { id: "station_2", label: "Station 2", tool: powderJar() },
+          ],
+        },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeExtraction);
+
+      expect(result.currentStep?.id).toBe("weigh-test-portion");
+      expect(result.completedStepIds).not.toContain("weigh-test-portion");
+      expect(result.completedStepIds).not.toContain("prepare-extraction");
+    });
+
+    it("explains what went wrong and sends the dead tube to the trash", () => {
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "cemented_tube" },
+        workbench: {
+          slots: [
+            { id: "station_1", label: "Station 1", tool: cementedTube() },
+            { id: "station_2", label: "Station 2", tool: powderJar() },
+          ],
+        },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeExtraction);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(presentation.title).toBe("The QuEChERS salts set hard");
+      expect(presentation.instruction).toContain("15 seconds");
+      expect(presentation.instruction).toContain("vortex");
+      expect(presentation.instruction).toContain("Discard");
+      expect(presentation.hint).toContain("ground sample");
+      expect(result.currentStep?.anchor(state)).toBe("bench-tool-card-cemented_tube");
+      expect(result.currentStep?.dropAnchor?.(state)).toBe("trash-dropzone");
+    });
+
+    it("reaches a tube cemented inside the vortex mixer", () => {
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "cemented_tube" },
+        workbench: { slots: [{ id: "station_1", label: "Station 1", tool: powderJar() }] },
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, {
+              isPresent: id === "vortex",
+              tool: id === "vortex" ? cementedTube() : undefined,
+            }),
+          ),
+        },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeExtraction);
+
+      expect(result.currentStep?.id).toBe("weigh-test-portion");
+      expect(result.currentStep?.anchor(state)).toBe("widget-vortex");
+      expect(result.currentStep?.dropAnchor?.(state)).toBe("trash-dropzone");
+    });
+
+    it("stops counting the discarded tube as the tube being prepared", () => {
+      // Trash retains what it is given, so the dead tube stays reachable forever. It
+      // must not keep answering for "the extraction tube" once it is in there.
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "cemented_tube" },
+        trash: { ...experiment().trash, children: [cementedTube()] },
+        workbench: { slots: [{ id: "station_1", label: "Station 1", tool: powderJar() }] },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeExtraction);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.id).toBe("weigh-test-portion");
+      expect(presentation.title).toBe("Deploy the Analytical balance");
+      expect(result.currentStep?.anchor(state)).toBe(
+        "palette-item-analytical_balance_widget",
+      );
+    });
+
+    it("lets the tutorial run to the end again once a fresh portion is weighed", () => {
+      // The retained tube must not invalidate the chapter for good: a replacement
+      // portion has to carry the learner forward exactly as the first one did.
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "fresh_tube" },
+        trash: { ...experiment().trash, children: [cementedTube()] },
+        workbench: {
+          slots: [
+            {
+              id: "station_1",
+              label: "Station 1",
+              tool: labTool("centrifuge_tube", { id: "fresh_tube", powderMassG: 10.001 }),
+            },
+          ],
+        },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeExtraction);
+
+      expect(result.completedStepIds).toContain("weigh-test-portion");
+      expect(result.completedStepIds).toContain("store-analytical-balance");
+      expect(result.currentStep?.id).toBe("prepare-extraction");
+      expect(result.currentStep?.anchor(state)).toBe("palette-item-istd_solution");
+      expect(result.currentStep?.dropAnchor?.(state)).toBe("bench-tool-card-fresh_tube");
+    });
+
+    it("recovers the same way from a tube vortexed without being sealed", () => {
+      const contaminated = cementedTube({
+        id: "spilled_tube",
+        quechersState: {
+          saltsAdded: true,
+          phase: "contaminated",
+          faults: ["vortexed_open"],
+          isUsable: false,
+        },
+      });
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "spilled_tube" },
+        workbench: {
+          slots: [
+            { id: "station_1", label: "Station 1", tool: contaminated },
+            { id: "station_2", label: "Station 2", tool: powderJar() },
+          ],
+        },
+      });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeExtraction);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.id).toBe("weigh-test-portion");
+      expect(presentation.title).toBe("The extraction tube is lost");
+      expect(presentation.instruction).toContain("Discard");
+      expect(result.currentStep?.anchor(state)).toBe("bench-tool-card-spilled_tube");
+    });
+  });
 });

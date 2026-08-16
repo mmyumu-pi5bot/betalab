@@ -23,6 +23,11 @@ export type TutorialStep = {
   anchor: (experiment: Experiment) => string | null;
   dropAnchor?: (experiment: Experiment) => string | null;
   isSatisfied: (experiment: Experiment) => boolean;
+  // A step the learner may have to redo. Completion is otherwise permanent — it is
+  // persisted across reloads, and several steps stop being satisfied by design once
+  // the learner moves on — so a step that can be undone by an accident has to say so
+  // itself, or the tutorial strands on a step nothing can satisfy any more.
+  isInvalidated?: (experiment: Experiment) => boolean;
   presentation?: (experiment: Experiment) => Partial<TutorialStepPresentation>;
 };
 
@@ -236,9 +241,35 @@ function produceSourceAnchor(experiment: Experiment, states: ProduceMaterialKind
   return containingWidget ? `widget-${containingWidget.id}` : "widget-workbench";
 }
 
+// A tube the simulation will never let the learner finish: the QuEChERS salts have
+// set hard, or the contents spilled during an unsealed vortex cycle. The backend
+// refuses every remaining operation on it, so the tutorial drops it from its working
+// set — the only thing left to do with it is to throw it away.
+function isSpentExtractionTube(tool: BenchToolInstance) {
+  const phase = tool.quechersState?.phase;
+  return (
+    tool.toolType === "centrifuge_tube" &&
+    (phase === "cemented" || phase === "contaminated")
+  );
+}
+
+function hasSpentExtractionTube(experiment: Experiment) {
+  return allTools(experiment).some(isSpentExtractionTube);
+}
+
+// The tube still has to be reachable while it awaits the trash, so the coach can
+// point at it. Once discarded it drops out of sight for good.
+function spentExtractionTubeToDiscard(experiment: Experiment) {
+  const trashedToolIds = new Set(experiment.trash.children.map((tool) => tool.id));
+  return allTools(experiment).find(
+    (tool) => isSpentExtractionTube(tool) && !trashedToolIds.has(tool.id),
+  );
+}
+
 function extractionTube(experiment: Experiment) {
   const isExtractionTube = (tool: BenchToolInstance) =>
     tool.toolType === "centrifuge_tube" &&
+    !isSpentExtractionTube(tool) &&
     ((tool.produceFractions ?? []).length > 0 ||
       tool.containsSlurry ||
       tool.quechersState?.phase !== "idle");
@@ -858,6 +889,7 @@ function analyticalWeighingTube(experiment: Experiment) {
   return allTools(experiment).find(
     (tool) =>
       tool.toolType === "centrifuge_tube" &&
+      !isSpentExtractionTube(tool) &&
       (toolPowderMassG(tool) <= 0 || analyticalTubeTareIsValid(experiment)),
   );
 }
@@ -871,7 +903,73 @@ function hasCompromisedAnalyticalTube(experiment: Experiment) {
   );
 }
 
+// The learner reaches this branch straight after the vortex refused to start, with
+// nothing on screen accounting for it: a tube turning grey states that something is
+// wrong now, never what happened to it. The coach names the mechanism before it asks
+// for anything, then walks the chapter back to a fresh test portion.
+function spentExtractionTubePresentation(
+  tube: BenchToolInstance,
+): Partial<TutorialStepPresentation> {
+  const faults = tube.quechersState?.faults ?? [];
+  const hint =
+    "Only this tube is lost. The ground sample is still in the storage jar, so a new " +
+    "10 g test portion is all it takes to start the extraction over.";
+  const action: TutorialAction = { kind: "drag", label: "Discard the tube" };
+
+  if (faults.includes("vortexed_open")) {
+    return {
+      title: "The extraction tube is lost",
+      instruction:
+        "This tube was vortexed before being sealed, so its contents sprayed out and its " +
+        "walls are contaminated. Nothing can be extracted from it now. Discard it in the " +
+        "trash, then weigh a fresh test portion.",
+      hint,
+      action,
+    };
+  }
+  if (faults.includes("vortexed_without_salts")) {
+    return {
+      title: "The extraction tube is lost",
+      instruction:
+        "This tube was vortexed before the QuEChERS salts were added, so the sample bound " +
+        "to its walls instead of partitioning into the solvent. Discard it in the trash, " +
+        "then weigh a fresh test portion.",
+      hint,
+      action,
+    };
+  }
+  if (faults.includes("dry_salts_wetted")) {
+    return {
+      title: "The QuEChERS salts set hard",
+      instruction:
+        "The QuEChERS salts were already sitting in this dry tube when the solvent arrived, " +
+        "so they caked on contact instead of dissolving with the sample. Add the solvent " +
+        "first and the salts last. Discard this tube in the trash, then weigh a fresh test " +
+        "portion.",
+      hint,
+      action,
+    };
+  }
+  return {
+    title: "The QuEChERS salts set hard",
+    instruction:
+      "Adding the QuEChERS salts starts an exothermic reaction, and the tube has to be " +
+      "sealed and vortexed within 15 seconds. Past that the salts cake solid around the " +
+      "sample and no extract can be recovered. Discard this tube in the trash, then weigh " +
+      "a fresh test portion — and this time deploy the Vortex mixer before adding the salts.",
+    hint,
+    action,
+  };
+}
+
 function analyticalWeighingTarget(experiment: Experiment): TutorialTarget {
+  const spentTube = spentExtractionTubeToDiscard(experiment);
+  if (spentTube) {
+    return {
+      anchor: toolSourceAnchor(experiment, (tool) => tool.id === spentTube.id),
+      dropAnchor: trashAnchor,
+    };
+  }
   const balance = workspaceWidget(experiment, "analytical_balance");
   if (!balance?.isPresent) {
     return {
@@ -915,6 +1013,10 @@ function analyticalWeighingTarget(experiment: Experiment): TutorialTarget {
 }
 
 function analyticalWeighingPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  const spentTube = spentExtractionTubeToDiscard(experiment);
+  if (spentTube) {
+    return spentExtractionTubePresentation(spentTube);
+  }
   if (!workspaceWidget(experiment, "analytical_balance")?.isPresent) {
     return {
       title: "Deploy the Analytical balance",
@@ -1254,7 +1356,10 @@ function hasTestPortion(experiment: Experiment) {
   return (
     analyticalTubeTareIsValid(experiment) &&
     allTools(experiment).some(
-      (tool) => tool.toolType === "centrifuge_tube" && toolPowderMassG(tool) >= 9.5,
+      (tool) =>
+        tool.toolType === "centrifuge_tube" &&
+        !isSpentExtractionTube(tool) &&
+        toolPowderMassG(tool) >= 9.5,
     )
   );
 }
@@ -1467,6 +1572,7 @@ const steps: TutorialStep[] = [
     prerequisites: ["store-grinder"],
     ...fromTarget(analyticalWeighingTarget),
     isSatisfied: hasTestPortion,
+    isInvalidated: hasSpentExtractionTube,
     presentation: analyticalWeighingPresentation,
   }),
   step({
@@ -1481,6 +1587,7 @@ const steps: TutorialStep[] = [
     isSatisfied: (experiment) =>
       hasTestPortion(experiment) &&
       !workspaceWidget(experiment, "analytical_balance")?.isPresent,
+    isInvalidated: hasSpentExtractionTube,
     presentation: (experiment) =>
       storeEquipmentPresentation(
         experiment,
@@ -1499,6 +1606,7 @@ const steps: TutorialStep[] = [
     prerequisites: ["store-analytical-balance"],
     ...fromTarget(extractionPreparationTarget),
     isSatisfied: hasPreparedExtraction,
+    isInvalidated: hasSpentExtractionTube,
     presentation: extractionPreparationPresentation,
   }),
   step({
@@ -1750,6 +1858,15 @@ export function evaluateTutorial(
   for (const entry of definition.steps) {
     if (entry.isSatisfied(experiment)) {
       completed.add(entry.id);
+    }
+  }
+  // Only a step that is currently unsatisfied can be walked back. The trash retains
+  // everything it is given, so the ruined tube that triggered the rewind stays in the
+  // experiment for good; without this guard it would invalidate its chapter forever
+  // and turn the recovery into the very dead end it exists to undo.
+  for (const entry of definition.steps) {
+    if (entry.isInvalidated?.(experiment) && !entry.isSatisfied(experiment)) {
+      completed.delete(entry.id);
     }
   }
   if (definition.isComplete(experiment)) {

@@ -3,6 +3,11 @@ from pathlib import Path
 
 import pytest
 
+from app.services.dnd_move_service import (
+    DndMoveObjectRequest,
+    DndMoveObjectService,
+    DndObjectRef,
+)
 from app.services.domain_services.tool_contents import (
     AddLiquidToToolRequest,
     AddLiquidToToolService,
@@ -357,3 +362,39 @@ def test_hidden_container_homogeneity_round_trips_through_sqlite(tmp_path: Path)
     second_service = ExperimentRuntimeService(repository=repository)
 
     assert _vortex_tool(second_service, experiment.id).contents_homogeneity == expected
+
+
+def test_cemented_tube_can_still_be_discarded_from_the_vortex() -> None:
+    """The tutorial recovers from cementation by having the learner throw the tube
+    away, so the ruined tube has to remain movable even though every operation that
+    would advance the extraction is refused."""
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _add(service, experiment.id, "quechers_salts")
+    CloseWorkbenchToolService(service).run(experiment.id, WorkbenchSlotRequest(slot_id="station_1"))
+    MoveWorkbenchToolToVortexService(service).run(
+        experiment.id,
+        MoveWorkbenchToolToVortexRequest(source_slot_id="station_1"),
+    )
+    _advance(service, experiment.id, 15000)
+
+    tube = _vortex_tool(service, experiment.id)
+    assert tube.quechers_state.phase == "cemented"
+    with pytest.raises(ValueError, match="cannot be vortexed"):
+        StartVortexCycleService(service).run(experiment.id, EmptyRequest())
+
+    DndMoveObjectService(service).run(
+        experiment.id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="tool", id=tube.id),
+            source=DndObjectRef(kind="vortex", id="vortex"),
+            destination=DndObjectRef(kind="trash_bin", id="trash_bin"),
+        ),
+    )
+
+    reloaded = service._require_experiment(experiment.id)
+    vortex = next(widget for widget in reloaded.workspace.widgets if widget.id == "vortex")
+    assert vortex.tool is None
+    assert [tool.id for tool in reloaded.trash.children] == [tube.id]
