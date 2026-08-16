@@ -363,10 +363,42 @@ function preparedCalibrationVial(experiment: Experiment) {
   );
 }
 
+// The autosampler needle cannot reach the last 0.05 mL of a vial, so an aliquot at or
+// below that draws nothing and every channel records baseline. The floor sits well
+// clear of it rather than at the exact millilitre: the aspiration is a press-and-hold
+// counting up in 0.05 mL steps, and demanding a precise volume would fail honest runs.
+const vialDeadVolumeMl = 0.05;
+const minimumInjectableAliquotMl = vialDeadVolumeMl * 4;
+
+function toolLiquidVolumeMl(tool: BenchToolInstance) {
+  return (tool.liquids ?? []).reduce((total, liquid) => total + liquid.volume_ml, 0);
+}
+
+// Identity, not readiness: this stays the sample vial for the rest of the run. Every
+// injection draws a few microlitres out of it, so a vial that has already been through
+// the sequence can sit below the workable floor and must still answer here.
 function preparedSampleVial(experiment: Experiment) {
   return allTools(experiment).find(
-    (tool) => tool.toolType === "sample_vial" && tool.injectionContext !== null && tool.injectionContext !== undefined,
+    (tool) =>
+      tool.toolType === "sample_vial" &&
+      tool.injectionContext !== null &&
+      tool.injectionContext !== undefined,
   );
+}
+
+// A vial that received extract but not enough of it to survive an injection. It is
+// not a fresh vial and not a finished one, and the tutorial has to name that state:
+// left alone it produces a run of flat traces with nothing explaining them.
+function underfilledSampleVial(experiment: Experiment) {
+  const vial = preparedSampleVial(experiment);
+  return vial !== undefined && toolLiquidVolumeMl(vial) < minimumInjectableAliquotMl
+    ? vial
+    : undefined;
+}
+
+function hasInjectableSampleVial(experiment: Experiment) {
+  const vial = preparedSampleVial(experiment);
+  return vial !== undefined && toolLiquidVolumeMl(vial) >= minimumInjectableAliquotMl;
 }
 
 function hasAppliedLimsLabel(experiment: Experiment) {
@@ -643,7 +675,9 @@ function extractionEquipmentPresentation(
 }
 
 function sampleVialTarget(experiment: Experiment): TutorialTarget {
-  const vial = plainSampleVial(experiment);
+  // A vial short of a workable aliquot is topped up rather than replaced, so it takes
+  // the place a fresh vial would have held for the rest of this step.
+  const vial = plainSampleVial(experiment) ?? underfilledSampleVial(experiment);
   if (!vial) {
     return workbenchPlacementTarget(experiment, "palette-item-sample_vial_lcms");
   }
@@ -662,7 +696,8 @@ function sampleVialTarget(experiment: Experiment): TutorialTarget {
 }
 
 function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
-  const vial = plainSampleVial(experiment);
+  const shortVial = underfilledSampleVial(experiment);
+  const vial = plainSampleVial(experiment) ?? shortVial;
   if (vial && experiment.pipette.volumeMl <= 0) {
     const tube = extractionTube(experiment);
     if (toolIsInWidget(experiment, "centrifuge", tube)) {
@@ -684,23 +719,41 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
       };
     }
   }
-  return vial
-    ? {
-        title: "Transfer extract into the Autosampler vial",
-        instruction: experiment.pipette.volumeMl > 0
-          ? "The micropipette now contains extract. Click the highlighted empty Autosampler vial to dispense it."
-          : "Click Micropipette in Actions, or press P. Then click the separated extraction tube once to aspirate 1.00 mL.",
-        hint: "The micropipette icon shows whether liquid is currently loaded.",
-        action: experiment.pipette.volumeMl > 0
-          ? { kind: "click", label: "Click vial to dispense" }
-          : { kind: "keyboard", label: "Click pipette or press P" },
-      }
-    : workbenchPlacementPresentation(experiment, "Autosampler vial", {
-        title: "Deploy an Autosampler vial",
+  if (vial) {
+    // Aspirating and dispensing are both press-and-hold, counting up in 0.05 mL steps.
+    // A quick click commits a single step, which is why the volume has to be spelled
+    // out as a target rather than implied by the gesture.
+    if (experiment.pipette.volumeMl > 0) {
+      return {
+        title: shortVial ? "Add more extract to the vial" : "Transfer extract into the Autosampler vial",
         instruction:
-          "In Inventory, open Containers. Drag an Autosampler vial and drop it onto an empty workbench station.",
-        hint: "After placing the vial, use the Micropipette to transfer the separated extract into it.",
-      });
+          "The micropipette now contains extract. Press and hold on the highlighted " +
+          "Autosampler vial to dispense it, and release once the pipette is empty.",
+        hint: "The micropipette icon shows how much liquid is currently loaded.",
+        action: { kind: "click", label: "Hold on the vial to dispense" },
+      };
+    }
+    return {
+      title: shortVial ? "Add more extract to the vial" : "Transfer extract into the Autosampler vial",
+      instruction: shortVial
+        ? "The vial holds too little to be injected: the autosampler needle cannot reach " +
+          "the last 0.05 mL, so the run would record a flat baseline. Select the " +
+          "Micropipette again, then press and hold on the extraction tube to draw about " +
+          "1.00 mL, and dispense it into the same vial."
+        : "Click Micropipette in Actions, or press P. Then press and hold on the separated " +
+          "extraction tube until the pipette reads about 1.00 mL, and release.",
+      hint: "A quick click only draws 0.05 mL — hold until the volume gets there. How much you take does not change the measured concentration, but it must be enough to inject.",
+      action: shortVial
+        ? { kind: "click", label: "Hold on the tube to draw 1.00 mL" }
+        : { kind: "keyboard", label: "Click pipette or press P" },
+    };
+  }
+  return workbenchPlacementPresentation(experiment, "Autosampler vial", {
+    title: "Deploy an Autosampler vial",
+    instruction:
+      "In Inventory, open Containers. Drag an Autosampler vial and drop it onto an empty workbench station.",
+    hint: "After placing the vial, use the Micropipette to transfer the separated extract into it.",
+  });
 }
 
 function stageVialsTarget(experiment: Experiment): TutorialTarget {
@@ -1769,7 +1822,7 @@ const steps: TutorialStep[] = [
     hint: "The vial becomes a sample vial when it receives extract from the separated tube.",
     prerequisites: ["separate-extract"],
     ...fromTarget(sampleVialTarget),
-    isSatisfied: (experiment) => Boolean(preparedSampleVial(experiment)),
+    isSatisfied: hasInjectableSampleVial,
     presentation: sampleVialPresentation,
   }),
   step({

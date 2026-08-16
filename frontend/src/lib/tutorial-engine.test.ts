@@ -1595,4 +1595,102 @@ describe("calibration sample tutorial", () => {
       expect(result.completedStepIds).not.toContain("weigh-test-portion");
     });
   });
+  describe("transferring enough extract into the sample vial", () => {
+    // A quick click on the pipette commits one 0.05 mL step, which is exactly the
+    // vial dead volume: the autosampler would draw nothing and every channel would
+    // record baseline. The step has to hold until the vial can actually be injected.
+    const separated = {
+      saltsAdded: true,
+      phase: "separated",
+      faults: [],
+      isUsable: true,
+    };
+
+    function stateWithVial(vialLiquidMl: number) {
+      const vial = labTool("sample_vial", {
+        id: "sample_vial_1",
+        liquids: vialLiquidMl > 0
+          ? [{ liquidId: "acetonitrile_extraction", label: "Extract", volume_ml: vialLiquidMl }]
+          : [],
+        injectionContext: vialLiquidMl > 0 ? { sourceTubeId: "extraction_tube" } : null,
+      });
+      return experiment({
+        workbench: {
+          slots: [
+            {
+              id: "station_1",
+              label: "Station 1",
+              tool: labTool("centrifuge_tube", {
+                id: "extraction_tube",
+                quechersState: separated,
+                liquids: [
+                  { liquidId: "acetonitrile_extraction", label: "MeCN", volume_ml: 9 },
+                ],
+              }),
+            },
+            { id: "station_2", label: "Station 2", tool: vial },
+          ],
+        },
+      });
+    }
+
+    const completed = calibrationSampleTutorial.steps
+      .map((entry) => entry.id)
+      .slice(
+        0,
+        calibrationSampleTutorial.steps.findIndex(
+          (entry) => entry.id === "prepare-sample-vial",
+        ),
+      );
+
+    it("tells the learner to hold rather than to click once", () => {
+      const state = stateWithVial(0);
+      const tutorialStep = calibrationSampleTutorial.steps.find(
+        (entry) => entry.id === "prepare-sample-vial",
+      )!;
+      const presentation = getTutorialStepPresentation(tutorialStep, state);
+
+      expect(presentation.instruction).toContain("hold");
+      expect(presentation.instruction).not.toContain("once to aspirate");
+      expect(presentation.instruction).toContain("1.00 mL");
+    });
+
+    it("does not accept a vial holding only the dead volume", () => {
+      const state = stateWithVial(0.05);
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, completed);
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.id).toBe("prepare-sample-vial");
+      expect(result.completedStepIds).not.toContain("prepare-sample-vial");
+      expect(presentation.title).toBe("Add more extract to the vial");
+      expect(presentation.instruction).toContain("hold");
+    });
+
+    it("keeps the vial identified once the run has drawn it down", () => {
+      // Each injection takes a few microlitres out of the vial, so a finished vial can
+      // sit below the workable floor. That must not reopen the transfer step and send
+      // the learner back to pipetting at the end of the run.
+      const state = stateWithVial(0.04);
+      const stagingCompleted = calibrationSampleTutorial.steps
+        .map((entry) => entry.id)
+        .slice(
+          0,
+          calibrationSampleTutorial.steps.findIndex((entry) => entry.id === "stage-vials"),
+        );
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, stagingCompleted);
+
+      expect(result.completedStepIds).toContain("prepare-sample-vial");
+      expect(result.currentStep?.id).not.toBe("prepare-sample-vial");
+    });
+
+    it("accepts a workable aliquot", () => {
+      const state = stateWithVial(1);
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, completed);
+
+      expect(result.completedStepIds).toContain("prepare-sample-vial");
+    });
+  });
 });
