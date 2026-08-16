@@ -1356,4 +1356,107 @@ describe("TutorialCoach", () => {
 
     expect(screen.queryByTestId("tutorial-countdown")).not.toBeInTheDocument();
   });
+
+  // Both halos measure their target with a synchronous getBoundingClientRect, and both
+  // watch the whole body. Re-measuring once per mutation record pinned the main thread
+  // during a drag, which mutates drop targets continuously.
+  it("coalesces a burst of unrelated DOM mutations into a single measurement", async () => {
+    let measurements = 0;
+    const target = document.createElement("div");
+    target.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    target.getBoundingClientRect = () => {
+      measurements += 1;
+      return { left: 20, top: 40, width: 100, height: 50, right: 120, bottom: 90 } as DOMRect;
+    };
+    document.body.appendChild(target);
+    const noise: HTMLElement[] = [];
+
+    try {
+      render(
+        <TutorialCoach
+          active
+          evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+          onPause={vi.fn()}
+          onRestart={vi.fn()}
+          onResume={vi.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ display: "block" });
+      });
+
+      const settled = measurements;
+      // Each mutation is delivered in its own observer callback, the way a dragover
+      // toggling drop-target classes frame after frame does.
+      for (let index = 0; index < 25; index += 1) {
+        const node = document.createElement("span");
+        node.dataset.noise = `${index}`;
+        document.body.appendChild(node);
+        noise.push(node);
+        await Promise.resolve();
+      }
+
+      // Nothing is measured while the mutations are still being delivered.
+      expect(measurements).toBe(settled);
+
+      await waitFor(() => {
+        expect(measurements).toBeGreaterThan(settled);
+      });
+      // 25 mutation batches inside one frame must cost one measurement, not 25.
+      expect(measurements - settled).toBeLessThanOrEqual(2);
+    } finally {
+      noise.forEach((node) => node.remove());
+      target.remove();
+    }
+  });
+
+  it("ignores its own halo style writes so the two spotlights cannot feed each other", async () => {
+    let measurements = 0;
+    const source = document.createElement("div");
+    source.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    source.getBoundingClientRect = () => {
+      measurements += 1;
+      return { left: 20, top: 40, width: 100, height: 50, right: 120, bottom: 90 } as DOMRect;
+    };
+    document.body.appendChild(source);
+    const destination = document.createElement("div");
+    destination.dataset.tutorialAnchor = "workspace";
+    destination.getBoundingClientRect = () =>
+      ({ left: 200, top: 120, width: 300, height: 200, right: 500, bottom: 320 }) as DOMRect;
+    document.body.appendChild(destination);
+
+    try {
+      render(
+        <TutorialCoach
+          active
+          evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+          isDragging
+          onPause={vi.fn()}
+          onRestart={vi.fn()}
+          onResume={vi.fn()}
+        />,
+      );
+      const dropSpotlight = await screen.findByTestId("tutorial-drop-spotlight");
+      await waitFor(() => {
+        expect(dropSpotlight).toHaveStyle({ display: "block" });
+      });
+
+      await new Promise((resolve) => {
+        window.requestAnimationFrame(() => resolve(null));
+      });
+      const settled = measurements;
+
+      // A halo repositioning itself must not wake the other halo's observer.
+      dropSpotlight.style.left = "999px";
+      screen.getByTestId("tutorial-spotlight").style.top = "888px";
+      await new Promise((resolve) => {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve(null)));
+      });
+
+      expect(measurements).toBe(settled);
+    } finally {
+      source.remove();
+      destination.remove();
+    }
+  });
 });

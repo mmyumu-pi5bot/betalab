@@ -36,6 +36,60 @@ type TutorialCoachProps = {
 const spotlightPadding = 8;
 const clippingOverflowValues = new Set(["auto", "clip", "hidden", "scroll"]);
 
+// Both halos write their own inline styles while both watch the whole body, so every
+// write wakes both observers, which measure and write again. Both overlays carry
+// data-tutorial-spotlight-overlay so a mutation coming from a halo is never mistaken
+// for a change in the lab.
+const spotlightOverlaySelector = "[data-tutorial-spotlight-overlay]";
+
+function isHaloMutation(record: MutationRecord) {
+  const node = record.target;
+  const element = node instanceof Element ? node : node.parentElement;
+  return element?.closest(spotlightOverlaySelector) != null;
+}
+
+// One measurement per frame: update() forces a synchronous layout, and running it once
+// per mutation batch made a dragover — which mutates drop targets continuously — pin the
+// main thread. Viewport events stay synchronous, where the halo has to keep up with the
+// pointer without a frame of lag.
+function createFrameScheduler(run: () => void) {
+  let frame = 0;
+  let pending = false;
+
+  return {
+    cancel: () => {
+      if (pending) {
+        window.cancelAnimationFrame(frame);
+        pending = false;
+      }
+    },
+    schedule: () => {
+      if (pending) {
+        return;
+      }
+      pending = true;
+      frame = window.requestAnimationFrame(() => {
+        pending = false;
+        run();
+      });
+    },
+  };
+}
+
+type SpotlightStyleProperty = "display" | "height" | "left" | "right" | "top" | "width";
+
+// Writing an inline style that already holds the value still queues a mutation record,
+// so an unchanged halo would keep waking both observers for nothing.
+function applySpotlightStyle(
+  element: HTMLElement,
+  property: SpotlightStyleProperty,
+  value: string,
+) {
+  if (element.style[property] !== value) {
+    element.style[property] = value;
+  }
+}
+
 function findDirectAnchor(anchor: string): HTMLElement | null {
   if (anchor.startsWith("cut-apples-")) {
     const lotId = anchor.slice("cut-apples-".length);
@@ -438,8 +492,16 @@ function placeSpotlightBadge(
   const overflowsTop = visible.top < spotlightBadgeOffset;
   const overflowsRight =
     visible.left + visible.width + spotlightBadgeOffset > window.innerWidth;
-  badge.style.top = overflowsTop ? `${spotlightBadgeInset}px` : `-${spotlightBadgeOffset}px`;
-  badge.style.right = overflowsRight ? `${spotlightBadgeInset}px` : `-${spotlightBadgeOffset}px`;
+  applySpotlightStyle(
+    badge,
+    "top",
+    overflowsTop ? `${spotlightBadgeInset}px` : `-${spotlightBadgeOffset}px`,
+  );
+  applySpotlightStyle(
+    badge,
+    "right",
+    overflowsRight ? `${spotlightBadgeInset}px` : `-${spotlightBadgeOffset}px`,
+  );
 }
 
 // While an item is being dragged, the destination the tutorial expects is marked
@@ -461,15 +523,15 @@ function TutorialDropSpotlight({ anchor }: { anchor: string }) {
       const bounds = target?.getBoundingClientRect();
       const visible = target && bounds ? visibleSpotlightBounds(target, bounds) : null;
       if (!target || !visible) {
-        spotlight.style.display = "none";
+        applySpotlightStyle(spotlight, "display", "none");
         return;
       }
 
-      spotlight.style.display = "block";
-      spotlight.style.height = `${visible.height}px`;
-      spotlight.style.left = `${visible.left}px`;
-      spotlight.style.top = `${visible.top}px`;
-      spotlight.style.width = `${visible.width}px`;
+      applySpotlightStyle(spotlight, "display", "block");
+      applySpotlightStyle(spotlight, "height", `${visible.height}px`);
+      applySpotlightStyle(spotlight, "left", `${visible.left}px`);
+      applySpotlightStyle(spotlight, "top", `${visible.top}px`);
+      applySpotlightStyle(spotlight, "width", `${visible.width}px`);
 
       if (observedTarget !== target && typeof ResizeObserver !== "undefined") {
         resizeObserver?.disconnect();
@@ -481,12 +543,19 @@ function TutorialDropSpotlight({ anchor }: { anchor: string }) {
 
     update();
 
-    const mutationObserver = new MutationObserver(() => update());
+    const scheduler = createFrameScheduler(update);
+    const mutationObserver = new MutationObserver((records) => {
+      if (records.every(isHaloMutation)) {
+        return;
+      }
+      scheduler.schedule();
+    });
     mutationObserver.observe(document.body, { attributes: true, childList: true, subtree: true });
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
 
     return () => {
+      scheduler.cancel();
       mutationObserver.disconnect();
       resizeObserver?.disconnect();
       window.removeEventListener("resize", update);
@@ -499,6 +568,7 @@ function TutorialDropSpotlight({ anchor }: { anchor: string }) {
       aria-hidden="true"
       className="pointer-events-none fixed z-[59] rounded-[1.4rem] border-[3px] border-dashed border-yellow-400 bg-yellow-300/25 shadow-[0_0_0_5px_rgba(250,204,21,0.32),0_0_38px_rgba(234,179,8,0.45)]"
       data-testid="tutorial-drop-spotlight"
+      data-tutorial-spotlight-overlay="true"
       ref={spotlightRef}
       style={{ display: "none" }}
     />
@@ -627,7 +697,7 @@ export function TutorialCoach({
       setLimsField((current) => current === resolution.limsField ? current : resolution.limsField);
       if (!spotlight || !target) {
         if (spotlight) {
-          spotlight.style.display = "none";
+          applySpotlightStyle(spotlight, "display", "none");
         }
         return;
       }
@@ -635,15 +705,15 @@ export function TutorialCoach({
       const bounds = target.getBoundingClientRect();
       const visible = visibleSpotlightBounds(target, bounds);
       if (!visible) {
-        spotlight.style.display = "none";
+        applySpotlightStyle(spotlight, "display", "none");
         return;
       }
 
-      spotlight.style.display = "block";
-      spotlight.style.height = `${visible.height}px`;
-      spotlight.style.left = `${visible.left}px`;
-      spotlight.style.top = `${visible.top}px`;
-      spotlight.style.width = `${visible.width}px`;
+      applySpotlightStyle(spotlight, "display", "block");
+      applySpotlightStyle(spotlight, "height", `${visible.height}px`);
+      applySpotlightStyle(spotlight, "left", `${visible.left}px`);
+      applySpotlightStyle(spotlight, "top", `${visible.top}px`);
+      applySpotlightStyle(spotlight, "width", `${visible.width}px`);
       placeSpotlightBadge(badgeRef.current, visible);
 
       if (observedTarget !== target && typeof ResizeObserver !== "undefined") {
@@ -668,9 +738,15 @@ export function TutorialCoach({
     update();
     animationFrame = window.requestAnimationFrame(revealTargetOnce);
 
-    const mutationObserver = new MutationObserver(() => {
+    const scheduler = createFrameScheduler(() => {
       update();
       revealTargetOnce();
+    });
+    const mutationObserver = new MutationObserver((records) => {
+      if (records.every(isHaloMutation)) {
+        return;
+      }
+      scheduler.schedule();
     });
     const handleViewportChange = () => update();
     const handleFormInput = () => update();
@@ -681,6 +757,7 @@ export function TutorialCoach({
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
+      scheduler.cancel();
       mutationObserver.disconnect();
       resizeObserver?.disconnect();
       window.removeEventListener("resize", handleViewportChange);
@@ -723,6 +800,7 @@ export function TutorialCoach({
         aria-hidden="true"
         className="pointer-events-none fixed z-[60] rounded-[1.4rem] border-2 border-amber-400 bg-amber-200/10 shadow-[0_0_0_5px_rgba(251,191,36,0.28),0_0_38px_rgba(245,158,11,0.38)]"
         data-testid="tutorial-spotlight"
+        data-tutorial-spotlight-overlay="true"
         ref={spotlightRef}
         style={{ display: "none" }}
       >
