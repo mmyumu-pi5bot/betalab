@@ -205,9 +205,190 @@ describe("TutorialCoach", () => {
     paletteViewport.remove();
   });
 
+  it("spotlights the visible part of a target taller than the viewport", () => {
+    // Tall widgets (the acquisition console, a rack column) regularly overflow the
+    // bottom of the screen: the halo must stay on what the learner can see.
+    const target = document.createElement("div");
+    target.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    target.getBoundingClientRect = () =>
+      ({
+        bottom: window.innerHeight + 600,
+        height: window.innerHeight + 400,
+        left: 20,
+        right: 320,
+        top: 200,
+        width: 300,
+      }) as DOMRect;
+    document.body.appendChild(target);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      display: "block",
+      height: `${window.innerHeight - 192}px`,
+      left: "12px",
+      top: "192px",
+      width: "316px",
+    });
+    expect(screen.getByTestId("tutorial-spotlight-action-icon")).toBeInTheDocument();
+
+    target.remove();
+  });
+
+  it("spotlights a control whose ancestor hugs it, such as a button inside a foreignObject", () => {
+    // The centrifuge start button lives in a 36 px <foreignObject> that scales down
+    // to ~17 px on screen. Clipping the halo to that box left nothing to draw, so
+    // the padding is allowed to spill over an ancestor that merely hugs the target.
+    const foreignObject = document.createElement("div");
+    foreignObject.style.overflow = "hidden";
+    foreignObject.getBoundingClientRect = () =>
+      ({ bottom: 462, height: 17, left: 469, right: 486, top: 445, width: 17 } as DOMRect);
+    const startButton = document.createElement("button");
+    startButton.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    startButton.getBoundingClientRect = () =>
+      ({ bottom: 462, height: 17, left: 469, right: 486, top: 445, width: 17 } as DOMRect);
+    foreignObject.appendChild(startButton);
+    document.body.appendChild(foreignObject);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      display: "block",
+      height: "33px",
+      left: "461px",
+      top: "437px",
+      width: "33px",
+    });
+
+    foreignObject.remove();
+  });
+
+  it("prefers a tutorial anchor over an element carrying the same test id", () => {
+    // A progress track and the bar filling it share the same name: the track is the
+    // one to highlight, since the bar is zero-wide when the run starts.
+    const track = document.createElement("div");
+    track.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    track.getBoundingClientRect = () =>
+      ({ bottom: 210, height: 10, left: 100, right: 300, top: 200, width: 200 } as DOMRect);
+    const fill = document.createElement("div");
+    fill.dataset.testid = "palette-item-gross_balance_widget";
+    fill.getBoundingClientRect = () =>
+      ({ bottom: 210, height: 10, left: 100, right: 100, top: 200, width: 0 } as DOMRect);
+    track.appendChild(fill);
+    document.body.appendChild(track);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      display: "block",
+      height: "26px",
+      left: "92px",
+      top: "192px",
+      width: "216px",
+    });
+
+    track.remove();
+  });
+
+  it("moves the spotlight to the launch button once the acquisition console is open", async () => {
+    const openConsole = document.createElement("button");
+    openConsole.dataset.tutorialAnchor = "instrument-open-console";
+    openConsole.getBoundingClientRect = () =>
+      ({ bottom: 140, height: 40, left: 100, right: 260, top: 100, width: 160 } as DOMRect);
+    document.body.appendChild(openConsole);
+
+    const step = calibrationSampleTutorial.steps.find((entry) => entry.id === "launch-sequence")!;
+    const state = emptyExperiment();
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: { ...step, anchor: () => "instrument-console-next" },
+          experiment: state,
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "92px", top: "92px" });
+
+    // The button that opened the console stays in the DOM, and comes first in
+    // document order: the launch button still has to win.
+    const launch = document.createElement("button");
+    launch.dataset.tutorialAnchor = "instrument-launch";
+    launch.getBoundingClientRect = () =>
+      ({ bottom: 540, height: 36, left: 400, right: 560, top: 504, width: 160 } as DOMRect);
+    document.body.appendChild(launch);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+        left: "392px",
+        top: "496px",
+      });
+    });
+
+    openConsole.remove();
+    launch.remove();
+  });
+
+  it("keeps the action badge inside the halo when the target overflows the top edge", () => {
+    const target = document.createElement("div");
+    target.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    target.getBoundingClientRect = () =>
+      ({ bottom: 500, height: 800, left: 20, right: 320, top: -300, width: 300 }) as DOMRect;
+    document.body.appendChild(target);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ display: "block", top: "0px" });
+    expect(screen.getByTestId("tutorial-spotlight-action-icon")).toHaveStyle({ top: "2px" });
+
+    target.remove();
+  });
+
   it("still spotlights the LIMS store button flush against the widget card edge", () => {
     // The widget card clips its content, and the store button sits 7 px below that
-    // edge — closer than the spotlight halo, which must not hide the highlight.
+    // edge — closer than the spotlight halo, whose margin spills 1 px over the card
+    // edge rather than dropping the highlight.
     const widgetCard = document.createElement("section");
     widgetCard.style.overflow = "hidden";
     widgetCard.getBoundingClientRect = () =>
@@ -374,6 +555,51 @@ describe("TutorialCoach", () => {
     });
 
     basketButton.remove();
+  });
+
+  it("asks to open the collapsed inventory section before the item inside it", async () => {
+    const category = document.createElement("article");
+    category.dataset.tutorialCategory = "workspace_equipment";
+    category.dataset.tutorialCategoryLabel = "Workspace equipment";
+    const toggle = document.createElement("button");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.getBoundingClientRect = () =>
+      ({ bottom: 90, height: 30, left: 30, right: 230, top: 60, width: 200 } as DOMRect);
+    const panel = document.createElement("div");
+    const item = document.createElement("div");
+    item.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    item.getBoundingClientRect = () =>
+      ({ bottom: 220, height: 60, left: 40, right: 220, top: 160, width: 180 } as DOMRect);
+    panel.appendChild(item);
+    category.append(toggle, panel);
+    document.body.appendChild(category);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Open the Workspace equipment section")).toBeInTheDocument();
+    // The learner opens the section: the coach never clicks it for them.
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "22px", top: "52px" });
+
+    toggle.setAttribute("aria-expanded", "true");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+        left: "32px",
+        top: "152px",
+      });
+    });
+    expect(screen.getByText("Deploy the Gross balance")).toBeInTheDocument();
+
+    category.remove();
   });
 
   it("guides the reception calculation before each LIMS field", async () => {

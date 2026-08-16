@@ -1,6 +1,7 @@
 "use client";
 
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
+import { getCryogenicStatus, type CryogenicTone } from "@/lib/cryogenic-temperature";
 
 type CryogenicGrinderIllustrationProps = {
   className?: string;
@@ -9,10 +10,22 @@ type CryogenicGrinderIllustrationProps = {
   powerButtonLabel?: string;
   powerButtonTestId?: string;
   status?: "idle" | "ready" | "running";
+  /** Temperature of the lot sitting in the chamber; omitted when the chamber is empty. */
+  temperatureC?: number;
   testId?: string;
 };
 
 const DIAL_CENTER = { x: 182, y: 242 };
+
+// Readout hues, picked to stay legible on the dark fascia inlay.
+const READOUT_TONE_FILLS: Record<CryogenicTone, string> = {
+  ambient: "#a8c0cd",
+  cooling: "#67e8f9",
+  cryogenic: "#8ee6ff",
+  hot: "#fda4af",
+  warm: "#fbbf24",
+};
+const READOUT_EMPTY_FILL = "#5b7683";
 
 export function CryogenicGrinderIllustration({
   className,
@@ -21,6 +34,7 @@ export function CryogenicGrinderIllustration({
   powerButtonLabel = "Start grinder",
   powerButtonTestId,
   status = "idle",
+  temperatureC,
   testId,
 }: CryogenicGrinderIllustrationProps) {
   const isRunning = status === "running";
@@ -52,6 +66,13 @@ export function CryogenicGrinderIllustration({
       : "border-red-300 bg-red-100 text-red-700 shadow-[0_10px_24px_rgba(239,68,68,0.2)] hover:border-red-400 hover:bg-red-200 hover:text-red-800";
   // Needle sweeps clockwise as the mill goes idle → loaded → grinding.
   const dialAngle = isRunning ? 58 : isReady ? 0 : -58;
+
+  // The readout mirrors the simulated lot temperature, not the machine status:
+  // a lot loaded but still too warm to grind must be readable while it cools.
+  const hasTemperatureReading = temperatureC !== undefined;
+  const readoutTone = hasTemperatureReading ? getCryogenicStatus(temperatureC).tone : null;
+  const readoutFill = readoutTone ? READOUT_TONE_FILLS[readoutTone] : READOUT_EMPTY_FILL;
+  const readoutLabel = hasTemperatureReading ? `${Math.round(temperatureC)}°C` : "--°C";
 
   return (
     <div
@@ -155,7 +176,9 @@ export function CryogenicGrinderIllustration({
           {/* Cryogenic temperature readout */}
           <rect fill="#16242d" height="30" rx="8" stroke="#33454f" strokeWidth="1.5" width="72" x="218" y="224" />
           <text
-            fill={isLoaded ? "#8ee6ff" : "#5b7683"}
+            data-testid={testId ? "grinder-temperature-readout" : undefined}
+            data-tone={readoutTone ?? "none"}
+            fill={readoutFill}
             fontFamily="monospace"
             fontSize="14"
             fontWeight="700"
@@ -163,7 +186,7 @@ export function CryogenicGrinderIllustration({
             x="254"
             y="244"
           >
-            {isLoaded ? "-196°C" : "--°C"}
+            {readoutLabel}
           </text>
 
           {/* Status lamps */}
@@ -267,7 +290,7 @@ export function CryogenicGrinderIllustration({
           <ellipse cx="260" cy="112" fill="#eef4f8" rx="58" ry="15" stroke="#7a909e" strokeWidth="2" />
         </g>
 
-        {/* ── Nitrogen vapour escaping the lid port ───────── */}
+        {/* ── Cryogenic vapour escaping the lid port ──────── */}
         {isLoaded ? (
           <g opacity="0.6" stroke="#bae6fd" strokeLinecap="round" strokeWidth="2.2">
             <path d="M214 78 Q220 70 215 62" />

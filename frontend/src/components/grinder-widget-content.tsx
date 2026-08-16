@@ -34,6 +34,7 @@ export function GrinderWidgetContent({
     grinderInfoLine2,
     grinderInfoLine2Right,
     grinderLiquids,
+    grinderLoadedLotTemperatureC,
     grinderLotIsWaste,
     grinderProgressPercent,
     grinderProduceLots,
@@ -54,6 +55,7 @@ export function GrinderWidgetContent({
         powerButtonLabel={isGrinderRunning ? "Grinder running" : "Start grinder"}
         powerButtonTestId="grinder-power-button"
         status={grinderStatus}
+        temperatureC={grinderLoadedLotTemperatureC}
         testId="cryogenic-grinder-illustration"
       />
       <div

@@ -86,6 +86,23 @@ export function getTutorialActionToolPresentation(
   };
 }
 
+// Inventory sections start collapsed, so the item a step asks for is regularly out
+// of reach. Rather than opening the section behind the learner's back, the coach
+// inserts this sub-step: the learner opens it themselves and learns where the
+// equipment lives.
+export function getTutorialInventoryCategoryPresentation(
+  label: string,
+): TutorialStepPresentation {
+  return {
+    title: `Open the ${label} section`,
+    instruction:
+      `The item for this step is in the ${label} section of the Inventory, and that section ` +
+      "is collapsed. Click the highlighted header to expand it.",
+    hint: "The tutorial will highlight the item to use as soon as the section is open.",
+    action: { kind: "click", label: `Click the highlighted ${label} header` },
+  };
+}
+
 export type LimsTutorialValues = {
   orchardName: string;
   harvestDate: string;

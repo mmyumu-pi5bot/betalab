@@ -1,6 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { dragAndDrop } from "./support/drag-and-drop";
+
+// The inventory sections start collapsed and the coach never opens them itself: it
+// asks the learner to, so every objective reaching into the inventory starts here.
+async function openWorkspaceEquipment(page: Page) {
+  const toggle = page.getByRole("button", { name: /Workspace equipment/i });
+  await expect(page.getByRole("complementary", { name: "Guided tutorial" })).toContainText(
+    "Open the Workspace equipment section",
+  );
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
 
 test.describe("Guided tutorial", () => {
   test("creates a dedicated session and follows the first durable objective", async ({ page }) => {
@@ -8,12 +20,9 @@ test.describe("Guided tutorial", () => {
     await page.getByRole("button", { name: "New tutorial" }).click();
 
     await expect(page).toHaveURL(/\/experiments\/experiment_[^?]+\?tutorial=calibration-sample-v1$/);
+    await openWorkspaceEquipment(page);
     await expect(page.getByRole("complementary", { name: "Guided tutorial" })).toContainText(
       "Deploy the Gross balance",
-    );
-    await expect(page.getByRole("button", { name: /Workspace equipment/i })).toHaveAttribute(
-      "aria-expanded",
-      "true",
     );
 
     const grossBalance = page.locator(
@@ -41,6 +50,7 @@ test.describe("Guided tutorial", () => {
   test("keeps the action badge clear of the highlighted control", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "New tutorial" }).click();
+    await openWorkspaceEquipment(page);
     await expect(page.getByTestId("tutorial-spotlight-action-icon")).toBeVisible();
     // The coach smooth-scrolls the spotlight into view, so let the layout settle.
     await page.waitForTimeout(600);
@@ -69,6 +79,7 @@ test.describe("Guided tutorial", () => {
   }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "New tutorial" }).click();
+    await openWorkspaceEquipment(page);
     await expect(page.getByRole("complementary", { name: "Guided tutorial" })).toContainText(
       "Deploy the Gross balance",
     );

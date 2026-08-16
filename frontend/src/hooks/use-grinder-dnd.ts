@@ -8,6 +8,7 @@ import {
   writeProduceDragPayload,
   writeWorkspaceLiquidDragPayload,
 } from "@/lib/workbench-dnd";
+import { ambientTemperatureC } from "@/lib/cryogenic-temperature";
 import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
 import { executeGrinderProduceDropCommand } from "@/lib/produce-drop-command-executor";
 import { resolveProduceDropCommand } from "@/lib/produce-drop-command-resolver";
@@ -51,6 +52,7 @@ export type GrinderDndApi = {
   grinderInfoLine2: string;
   grinderInfoLine2Right: string;
   grinderLiquids: NonNullable<ExperimentWorkspaceWidget["liquids"]>;
+  grinderLoadedLotTemperatureC: number | undefined;
   grinderProduceLots: ExperimentProduceLot[];
   grinderProgressPercent: number;
   grinderStatus: "running" | "ready" | "idle";
@@ -97,6 +99,9 @@ export function useGrinderDnd({
   const grinderLoadedLot = grinderProduceLots[0] ?? null;
   const grinderHasProduceLot = grinderProduceLots.length > 0;
   const grinderLotIsWaste = (grinderLoadedLot?.materialState ?? "whole") === "waste";
+  const grinderLoadedLotTemperatureC = grinderLoadedLot
+    ? (grinderLoadedLot.temperatureC ?? ambientTemperatureC)
+    : undefined;
   const grinderFault = grinderWidget?.grinderFault ?? null;
   const grinderRunRemainingMs = grinderWidget?.grinderRunRemainingMs ?? 0;
   const grinderRunDurationMs = grinderWidget?.grinderRunDurationMs ?? 0;
@@ -325,6 +330,7 @@ export function useGrinderDnd({
     grinderInfoLine2,
     grinderInfoLine2Right,
     grinderLiquids,
+    grinderLoadedLotTemperatureC,
     grinderProduceLots,
     grinderProgressPercent,
     grinderStatus,

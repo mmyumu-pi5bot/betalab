@@ -57,7 +57,12 @@ export function CentrifugeWidget(props: CentrifugeWidgetProps) {
           <p className="font-mono text-xs font-bold text-slate-800">{props.progressPercent}%</p>
         </div>
         <div className="mt-3 min-h-[2rem]">
-          <div className="h-3 overflow-hidden rounded-full border border-slate-500/30 bg-slate-900/10">
+          {/* The track carries the anchor: the bar filling it is zero-wide when the
+              run starts, leaving nothing to highlight. */}
+          <div
+            className="h-3 overflow-hidden rounded-full border border-slate-500/30 bg-slate-900/10"
+            data-tutorial-anchor="centrifuge-progress-bar"
+          >
             <div
               className="h-full rounded-full bg-emerald-700 transition-[width]"
               data-testid="centrifuge-progress-bar"

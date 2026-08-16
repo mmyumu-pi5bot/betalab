@@ -22,7 +22,13 @@ describe("CentrifugeWidget", () => {
     );
 
     expect(screen.getByTestId("centrifuge-visible-phases")).toBeInTheDocument();
-    expect(screen.getByTestId("centrifuge-progress-bar")).toHaveStyle({ width: "65%" });
+    const progressBar = screen.getByTestId("centrifuge-progress-bar");
+    expect(progressBar).toHaveStyle({ width: "65%" });
+    // The tutorial highlights the track, which keeps its box at 0%.
+    expect(progressBar.parentElement).toHaveAttribute(
+      "data-tutorial-anchor",
+      "centrifuge-progress-bar",
+    );
     const illustration = screen.getByTestId("centrifuge-illustration");
     const powerButton = within(illustration).getByTestId("centrifuge-start-button");
     fireEvent.click(powerButton);

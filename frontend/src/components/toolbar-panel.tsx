@@ -68,6 +68,7 @@ export function ToolbarPanel({
             key={category.id}
             className="rounded-[1.1rem] border border-slate-200 bg-slate-50/80 p-2.5"
             data-tutorial-category={category.id}
+            data-tutorial-category-label={category.label}
           >
             <div className="flex items-start justify-between gap-2">
               <button

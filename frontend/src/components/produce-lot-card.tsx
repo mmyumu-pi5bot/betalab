@@ -5,6 +5,7 @@ import type { DragEvent, ReactNode } from "react";
 import { DegassingIndicator } from "@/components/degassing-indicator";
 import { AppleIllustration } from "@/components/illustrations/apple-illustration";
 import { TemperatureIndicator } from "@/components/temperature-indicator";
+import { ambientTemperatureC } from "@/lib/cryogenic-temperature";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
 import {
   getProduceLotDegassingIntensity,
@@ -25,8 +26,6 @@ type ProduceLotCardProps = {
   produceLot: ExperimentProduceLot;
   variant: "compact" | "expanded";
 };
-
-const ambientTemperatureC = 20;
 
 function getProduceIllustrationVariant(produceLot: ExperimentProduceLot) {
   if (produceLot.materialState === "ground") {

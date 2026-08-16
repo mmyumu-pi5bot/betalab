@@ -1,35 +1,27 @@
 "use client";
 
+import {
+  ambientTemperatureC,
+  cryogenicTemperatureC,
+  getCryogenicStatus,
+  type CryogenicTone,
+} from "@/lib/cryogenic-temperature";
+
 type TemperatureIndicatorProps = {
   temperatureC: number;
   tutorialAnchor?: string;
 };
 
-const ambientTemperatureC = 20;
-const cryogenicTemperatureC = -78.5;
+const toneClassNames: Record<CryogenicTone, string> = {
+  ambient: "text-slate-600",
+  cooling: "text-cyan-700",
+  cryogenic: "text-sky-700",
+  hot: "text-rose-700",
+  warm: "text-amber-700",
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function getCryogenicStatus(temperatureC: number) {
-  if (temperatureC >= 55) {
-    return { label: "Hot", toneClassName: "text-rose-700" };
-  }
-
-  if (temperatureC >= 30) {
-    return { label: "Warm", toneClassName: "text-amber-700" };
-  }
-
-  if (temperatureC <= -45) {
-    return { label: "Cryogenic", toneClassName: "text-sky-700" };
-  }
-
-  if (temperatureC <= -5) {
-    return { label: "Cooling fast", toneClassName: "text-cyan-700" };
-  }
-
-  return { label: "Near ambient", toneClassName: "text-slate-600" };
 }
 
 export function TemperatureIndicator({ temperatureC, tutorialAnchor }: TemperatureIndicatorProps) {
@@ -38,7 +30,8 @@ export function TemperatureIndicator({ temperatureC, tutorialAnchor }: Temperatu
     0,
     1,
   );
-  const { label, toneClassName } = getCryogenicStatus(temperatureC);
+  const { label, tone } = getCryogenicStatus(temperatureC);
+  const toneClassName = toneClassNames[tone];
   const formattedTemperature = `${temperatureC.toFixed(1)}°C`;
   const tooltipLabel = `${label} • ${temperatureC.toFixed(1)} C`;
 

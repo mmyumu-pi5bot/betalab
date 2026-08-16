@@ -66,9 +66,14 @@ export function VortexWidget({
           >
             {isRunning ? "Mixing" : hasTool ? "Ready" : "Idle"}
           </p>
+          {/* The track carries the tutorial anchor: the bar filling it is zero-wide
+              when the run starts, leaving nothing to highlight. */}
           <div className="mt-3 min-h-[2rem]">
             {isRunning ? (
-              <div className="h-3 overflow-hidden rounded-full border border-slate-500/30 bg-slate-900/10">
+              <div
+                className="h-3 overflow-hidden rounded-full border border-slate-500/30 bg-slate-900/10"
+                data-tutorial-anchor="vortex-progress-bar"
+              >
                 <div
                   className="h-full rounded-full bg-emerald-700 transition-[width]"
                   data-testid="vortex-progress-bar"

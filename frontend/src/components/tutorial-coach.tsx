@@ -6,12 +6,14 @@ import {
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
   getTutorialActionToolPresentation,
+  getTutorialInventoryCategoryPresentation,
   getTutorialStepPresentation,
   isTutorialActionTool,
   type LimsTutorialField,
   type TutorialAction,
   type TutorialActionTool,
   type TutorialEvaluation,
+  type TutorialStepPresentation,
 } from "@/lib/tutorial-engine";
 import type { TutorialIntervention } from "@/lib/tutorial-action-guard";
 import type { Experiment } from "@/types/experiment";
@@ -54,12 +56,19 @@ function findDirectAnchor(anchor: string): HTMLElement | null {
       : spatula;
   }
   if (anchor === "instrument-console-next") {
-    return document.querySelector<HTMLElement>(
-      '[data-tutorial-anchor="instrument-launch"], [data-tutorial-anchor="instrument-open-console"]',
+    // The button that opens the console stays on screen once the console is open,
+    // and comes first in document order, so the launch button has to be asked for
+    // first rather than left to a comma selector.
+    return (
+      document.querySelector<HTMLElement>('[data-tutorial-anchor="instrument-launch"]')
+      ?? document.querySelector<HTMLElement>('[data-tutorial-anchor="instrument-open-console"]')
     );
   }
-  return document.querySelector<HTMLElement>(
-    `[data-tutorial-anchor="${anchor}"], [data-testid="${anchor}"]`,
+  // A deliberate tutorial anchor wins over an element that merely shares the name
+  // as a test id — a progress track and the bar filling it, for instance.
+  return (
+    document.querySelector<HTMLElement>(`[data-tutorial-anchor="${anchor}"]`)
+    ?? document.querySelector<HTMLElement>(`[data-testid="${anchor}"]`)
   );
 }
 
@@ -68,9 +77,23 @@ type AccessTarget = "basket" | "trash" | null;
 type AnchorResolution = {
   accessTarget: AccessTarget;
   actionTool: TutorialActionTool | null;
+  collapsedCategoryLabel: string | null;
   limsField: LimsTutorialField | null;
   target: HTMLElement | null;
 };
+
+// An inventory item sitting in a collapsed section cannot be dragged, and its
+// hidden card has no visible box to spotlight. The section header is highlighted
+// instead, so the learner opens it themselves before the real step resumes.
+function findCollapsedCategoryToggle(
+  target: HTMLElement,
+): { label: string; toggle: HTMLElement } | null {
+  const category = target.closest<HTMLElement>("[data-tutorial-category]");
+  const toggle = category?.querySelector<HTMLElement>('button[aria-expanded="false"]');
+  return category && toggle
+    ? { label: category.dataset.tutorialCategoryLabel ?? "Inventory", toggle }
+    : null;
+}
 
 // Anchors that already account for the selected tool: the step itself is the tool
 // being used, so a pressed action button is expected there.
@@ -112,6 +135,7 @@ function resolveAnchor(
       return {
         accessTarget: null,
         actionTool: selectedAction.tool,
+        collapsedCategoryLabel: null,
         limsField: null,
         target: selectedAction.target,
       };
@@ -126,6 +150,7 @@ function resolveAnchor(
       return {
         accessTarget: null,
         actionTool: null,
+        collapsedCategoryLabel: null,
         limsField: "mass-summary",
         target: massSummary,
       };
@@ -156,12 +181,19 @@ function resolveAnchor(
         `[data-tutorial-anchor="${field.anchor}"]`,
       );
       if (!input || !field.matches(input.value)) {
-        return { accessTarget: null, actionTool: null, limsField: field.field, target: input };
+        return {
+          accessTarget: null,
+          actionTool: null,
+          collapsedCategoryLabel: null,
+          limsField: field.field,
+          target: input,
+        };
       }
     }
     return {
       accessTarget: null,
       actionTool: null,
+      collapsedCategoryLabel: null,
       limsField: "create-record",
       target: document.querySelector<HTMLElement>(
         '[data-tutorial-anchor="lims-create-record"]',
@@ -170,12 +202,28 @@ function resolveAnchor(
   }
   const directTarget = findDirectAnchor(anchor);
   if (directTarget) {
-    return { accessTarget: null, actionTool: null, limsField: null, target: directTarget };
+    const collapsedCategory = findCollapsedCategoryToggle(directTarget);
+    return collapsedCategory
+      ? {
+          accessTarget: null,
+          actionTool: null,
+          collapsedCategoryLabel: collapsedCategory.label,
+          limsField: null,
+          target: collapsedCategory.toggle,
+        }
+      : {
+          accessTarget: null,
+          actionTool: null,
+          collapsedCategoryLabel: null,
+          limsField: null,
+          target: directTarget,
+        };
   }
   if (anchor === "basket-received-bag" || anchor.startsWith("basket-produce-")) {
     return {
       accessTarget: "basket",
       actionTool: null,
+      collapsedCategoryLabel: null,
       limsField: null,
       target: document.querySelector<HTMLElement>('[data-testid="basket-open-button"]'),
     };
@@ -184,11 +232,18 @@ function resolveAnchor(
     return {
       accessTarget: "trash",
       actionTool: null,
+      collapsedCategoryLabel: null,
       limsField: null,
       target: document.querySelector<HTMLElement>('[data-testid="trash-dropzone"]'),
     };
   }
-  return { accessTarget: null, actionTool: null, limsField: null, target: null };
+  return {
+    accessTarget: null,
+    actionTool: null,
+    collapsedCategoryLabel: null,
+    limsField: null,
+    target: null,
+  };
 }
 
 type TutorialActionKind = TutorialAction["kind"];
@@ -266,38 +321,64 @@ function clipBoundsFor(target: HTMLElement): ClipBounds {
   return { bottom, left, right, top };
 }
 
-function isFullyVisible(target: HTMLElement, bounds: DOMRect) {
-  const clip = clipBoundsFor(target);
-
-  // Only the target itself has to be visible. The spotlight halo is drawn in a fixed
-  // overlay that no ancestor clips, so counting its padding here would drop the
-  // highlight on controls sitting flush against a card edge (widget store buttons).
-  return (
-    bounds.width > 0 &&
-    bounds.height > 0 &&
-    bounds.left >= clip.left &&
-    bounds.top >= clip.top &&
-    bounds.right <= clip.right &&
-    bounds.bottom <= clip.bottom
-  );
-}
-
-// A drop destination is regularly larger than the viewport — the workspace canvas
-// is taller than the screen and sits inside clipping ancestors — so demanding full
-// visibility would hide the halo exactly where it is needed most. The halo is drawn
-// on the visible part instead, and only disappears when nothing of the target is left.
-const minimumVisibleDropSpan = 24;
+// A highlighted element is regularly larger than the visible area — tall widgets
+// overflow the bottom of the screen, and the workspace canvas is taller than the
+// viewport while sitting inside clipping ancestors — so demanding full visibility
+// would hide the halo exactly where it is needed most. The halo is drawn on the
+// visible part instead, and only disappears when nothing of the target is left.
+// The span is measured on the target itself, never on the padded halo: several
+// controls are hugged by a clipping ancestor of their own size (a 10 px progress
+// track, a start button inside a scaled-down <foreignObject>), and counting the
+// trimmed padding as missing target hid the highlight on a perfectly visible
+// control.
+const minimumVisibleSpan = 8;
 
 function visibleSpotlightBounds(target: HTMLElement, bounds: DOMRect) {
   const clip = clipBoundsFor(target);
-  const left = Math.max(bounds.left - spotlightPadding, clip.left);
-  const top = Math.max(bounds.top - spotlightPadding, clip.top);
-  const right = Math.min(bounds.right + spotlightPadding, clip.right);
-  const bottom = Math.min(bounds.bottom + spotlightPadding, clip.bottom);
+  const left = Math.max(bounds.left, clip.left);
+  const top = Math.max(bounds.top, clip.top);
+  const right = Math.min(bounds.right, clip.right);
+  const bottom = Math.min(bounds.bottom, clip.bottom);
+  if (right - left < minimumVisibleSpan || bottom - top < minimumVisibleSpan) {
+    return null;
+  }
 
-  return right - left >= minimumVisibleDropSpan && bottom - top >= minimumVisibleDropSpan
-    ? { height: bottom - top, left, top, width: right - left }
-    : null;
+  // The margin may spill over an ancestor that hugs the target, but never past the
+  // viewport, where the halo would be drawn where nobody can see it.
+  const haloLeft = Math.max(left - spotlightPadding, 0);
+  const haloTop = Math.max(top - spotlightPadding, 0);
+  const haloRight = Math.min(right + spotlightPadding, window.innerWidth);
+  const haloBottom = Math.min(bottom + spotlightPadding, window.innerHeight);
+
+  return {
+    height: haloBottom - haloTop,
+    left: haloLeft,
+    top: haloTop,
+    width: haloRight - haloLeft,
+  };
+}
+
+// 22px = badge size (28) − halo padding (8) + halo border (2): the offsets are
+// measured from the halo's padding box, so this lands the badge exactly past the
+// target's corner instead of over it. Small controls such as a machine power button
+// were being masked by it.
+const spotlightBadgeOffset = 22;
+// Where the halo is cut by the visible area, the badge is flipped inside instead:
+// hanging it outside a clamped edge would push it off screen.
+const spotlightBadgeInset = 2;
+
+function placeSpotlightBadge(
+  badge: HTMLElement | null,
+  visible: { left: number; top: number; width: number },
+) {
+  if (!badge) {
+    return;
+  }
+  const overflowsTop = visible.top < spotlightBadgeOffset;
+  const overflowsRight =
+    visible.left + visible.width + spotlightBadgeOffset > window.innerWidth;
+  badge.style.top = overflowsTop ? `${spotlightBadgeInset}px` : `-${spotlightBadgeOffset}px`;
+  badge.style.right = overflowsRight ? `${spotlightBadgeInset}px` : `-${spotlightBadgeOffset}px`;
 }
 
 // While an item is being dragged, the destination the tutorial expects is marked
@@ -363,6 +444,67 @@ function TutorialDropSpotlight({ anchor }: { anchor: string }) {
   );
 }
 
+function getAccessTargetPresentation(accessTarget: Exclude<AccessTarget, null>) {
+  return accessTarget === "basket"
+    ? {
+        action: { kind: "click" as const, label: "Click the highlighted basket" },
+        hint: "The tutorial will highlight the required item as soon as the container is open.",
+        instruction:
+          "Click the highlighted Produce basket to open it. The sample bag or apples will then appear inside.",
+        title: "Open the Produce basket",
+      }
+    : {
+        action: { kind: "click" as const, label: "Click the highlighted trash" },
+        hint: "The tutorial will highlight the required item as soon as the container is open.",
+        instruction: "Click the highlighted Trash to open it. The item to recover will then appear inside.",
+        title: "Open the Trash",
+      };
+}
+
+// The step the learner is on is rarely the step they can act on right now: a tool
+// may still be in hand, the section or container holding the item may be closed, or
+// a form field may be waiting upstream. The sub-step that is actually reachable wins
+// over the step's own wording, in the order the learner has to clear them.
+function resolvePresentation({
+  accessTarget,
+  actionTool,
+  collapsedCategoryLabel,
+  currentStepPresentation,
+  experiment,
+  intervention,
+  limsField,
+}: {
+  accessTarget: AccessTarget;
+  actionTool: TutorialActionTool | null;
+  collapsedCategoryLabel: string | null;
+  currentStepPresentation: TutorialStepPresentation | null;
+  experiment: Experiment;
+  intervention: TutorialIntervention | null;
+  limsField: LimsTutorialField | null;
+}): TutorialStepPresentation | null {
+  if (intervention) {
+    return {
+      action: { kind: "click", label: intervention.actionLabel },
+      hint: intervention.hint,
+      instruction: intervention.instruction,
+      title: intervention.title,
+    };
+  }
+  if (actionTool) {
+    return getTutorialActionToolPresentation(actionTool);
+  }
+  if (collapsedCategoryLabel) {
+    return getTutorialInventoryCategoryPresentation(collapsedCategoryLabel);
+  }
+  if (accessTarget) {
+    return getAccessTargetPresentation(accessTarget);
+  }
+  if (limsField) {
+    return getLimsTutorialFieldPresentation(experiment, limsField);
+  }
+  return currentStepPresentation;
+}
+
 export function TutorialCoach({
   active,
   evaluation,
@@ -375,11 +517,15 @@ export function TutorialCoach({
   onRestart,
   onResume,
 }: TutorialCoachProps) {
-  const categoryRevealAnchorRef = useRef<string | null>(null);
-  const revealedAnchorRef = useRef<string | null>(null);
+  const badgeRef = useRef<HTMLSpanElement | null>(null);
+  // Keyed on the resolved element, not on the anchor: a single step walks through
+  // several targets (put the tool away, open the inventory section, then the item),
+  // and each of them has to be brought on screen in turn.
+  const revealedTargetRef = useRef<HTMLElement | null>(null);
   const spotlightRef = useRef<HTMLDivElement | null>(null);
   const [accessTarget, setAccessTarget] = useState<AccessTarget>(null);
   const [actionTool, setActionTool] = useState<TutorialActionTool | null>(null);
+  const [collapsedCategoryLabel, setCollapsedCategoryLabel] = useState<string | null>(null);
   const [limsField, setLimsField] = useState<LimsTutorialField | null>(null);
   const anchor = intervention?.anchor
     ?? evaluation.currentStep?.anchor(evaluation.experiment)
@@ -393,8 +539,7 @@ export function TutorialCoach({
     : evaluation.currentStep?.dropAnchor?.(evaluation.experiment) ?? null;
   useEffect(() => {
     if (!active || !anchor) {
-      categoryRevealAnchorRef.current = null;
-      revealedAnchorRef.current = null;
+      revealedTargetRef.current = null;
       if (spotlightRef.current) {
         spotlightRef.current.style.display = "none";
       }
@@ -405,7 +550,7 @@ export function TutorialCoach({
     let resizeObserver: ResizeObserver | null = null;
     let animationFrame = 0;
 
-    const update = (allowReveal = false) => {
+    const update = () => {
       const spotlight = spotlightRef.current;
       const resolution = resolveAnchor(anchor, evaluation.experiment, guideActionTool);
       const target = resolution.target;
@@ -415,6 +560,9 @@ export function TutorialCoach({
       setActionTool((current) =>
         current === resolution.actionTool ? current : resolution.actionTool,
       );
+      setCollapsedCategoryLabel((current) =>
+        current === resolution.collapsedCategoryLabel ? current : resolution.collapsedCategoryLabel,
+      );
       setLimsField((current) => current === resolution.limsField ? current : resolution.limsField);
       if (!spotlight || !target) {
         if (spotlight) {
@@ -423,28 +571,19 @@ export function TutorialCoach({
         return;
       }
 
-      if (allowReveal && categoryRevealAnchorRef.current !== anchor) {
-        const category = target.closest<HTMLElement>("[data-tutorial-category]");
-        const toggle = category?.querySelector<HTMLButtonElement>(
-          'button[aria-expanded="false"]',
-        );
-        if (toggle) {
-          categoryRevealAnchorRef.current = anchor;
-          toggle.click();
-        }
-      }
-
       const bounds = target.getBoundingClientRect();
-      if (!isFullyVisible(target, bounds)) {
+      const visible = visibleSpotlightBounds(target, bounds);
+      if (!visible) {
         spotlight.style.display = "none";
         return;
       }
 
       spotlight.style.display = "block";
-      spotlight.style.height = `${bounds.height + spotlightPadding * 2}px`;
-      spotlight.style.left = `${bounds.left - spotlightPadding}px`;
-      spotlight.style.top = `${bounds.top - spotlightPadding}px`;
-      spotlight.style.width = `${bounds.width + spotlightPadding * 2}px`;
+      spotlight.style.height = `${visible.height}px`;
+      spotlight.style.left = `${visible.left}px`;
+      spotlight.style.top = `${visible.top}px`;
+      spotlight.style.width = `${visible.width}px`;
+      placeSpotlightBadge(badgeRef.current, visible);
 
       if (observedTarget !== target && typeof ResizeObserver !== "undefined") {
         resizeObserver?.disconnect();
@@ -455,25 +594,21 @@ export function TutorialCoach({
     };
 
     const revealTargetOnce = () => {
-      if (revealedAnchorRef.current === anchor) {
-        return;
-      }
-
       const target = resolveAnchor(anchor, evaluation.experiment, guideActionTool).target;
-      if (!target) {
+      if (!target || revealedTargetRef.current === target) {
         return;
       }
 
-      revealedAnchorRef.current = anchor;
+      revealedTargetRef.current = target;
       target?.scrollIntoView?.({ behavior: "smooth", block: "center", inline: "nearest" });
       update();
     };
 
-    update(revealedAnchorRef.current !== anchor);
+    update();
     animationFrame = window.requestAnimationFrame(revealTargetOnce);
 
     const mutationObserver = new MutationObserver(() => {
-      update(revealedAnchorRef.current !== anchor);
+      update();
       revealTargetOnce();
     });
     const handleViewportChange = () => update();
@@ -493,30 +628,15 @@ export function TutorialCoach({
     };
   }, [active, anchor, evaluation.experiment, guideActionTool]);
 
-  const displayedPresentation = intervention
-    ? {
-        action: { kind: "click" as const, label: intervention.actionLabel },
-        hint: intervention.hint,
-        instruction: intervention.instruction,
-        title: intervention.title,
-      }
-    : actionTool
-      ? getTutorialActionToolPresentation(actionTool)
-      : accessTarget
-        ? {
-          action: {
-            kind: "click" as const,
-            label: accessTarget === "basket" ? "Click the highlighted basket" : "Click the highlighted trash",
-          },
-          hint: "The tutorial will highlight the required item as soon as the container is open.",
-          instruction: accessTarget === "basket"
-            ? "Click the highlighted Produce basket to open it. The sample bag or apples will then appear inside."
-            : "Click the highlighted Trash to open it. The item to recover will then appear inside.",
-          title: accessTarget === "basket" ? "Open the Produce basket" : "Open the Trash",
-          }
-        : limsField
-          ? getLimsTutorialFieldPresentation(evaluation.experiment, limsField)
-          : currentStepPresentation;
+  const displayedPresentation = resolvePresentation({
+    accessTarget,
+    actionTool,
+    collapsedCategoryLabel,
+    currentStepPresentation,
+    experiment: evaluation.experiment,
+    intervention,
+    limsField,
+  });
 
   if (!active) {
     return (
@@ -541,19 +661,17 @@ export function TutorialCoach({
         ref={spotlightRef}
         style={{ display: "none" }}
       >
-        {/* 22px = badge size (28) − halo padding (8) + halo border (2): absolute
-            offsets are measured from the halo's padding box, so this lands the badge
-            exactly past the target's corner instead of over it. Small controls such
-            as a machine power button were being masked by it. */}
         {displayedPresentation?.action ? (
           <span
-            className={`absolute -right-[22px] -top-[22px] flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-base font-bold text-white shadow-lg ${
+            className={`absolute flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-base font-bold text-white shadow-lg ${
               displayedPresentation.action.kind === "wait"
                 ? "animate-pulse bg-amber-500"
                 : "bg-amber-500"
             }`}
             data-action-kind={displayedPresentation.action.kind}
             data-testid="tutorial-spotlight-action-icon"
+            ref={badgeRef}
+            style={{ right: `-${spotlightBadgeOffset}px`, top: `-${spotlightBadgeOffset}px` }}
           >
             <TutorialActionIcon
               className="h-4 w-4"

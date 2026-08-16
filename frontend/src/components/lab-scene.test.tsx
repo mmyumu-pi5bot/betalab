@@ -724,9 +724,13 @@ describe("LabScene", () => {
     render(<PesticideWorkbench tutorialId="calibration-sample-v1" />);
 
     expect(await screen.findByTestId("workbench-header")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("complementary", { name: "Guided tutorial" }),
-    ).not.toBeInTheDocument();
+    // The saved session is only read once the experiment is loaded, so the coach may
+    // be mounted for one render before free mode takes over.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("complementary", { name: "Guided tutorial" }),
+      ).not.toBeInTheDocument();
+    });
     expect(screen.queryByRole("button", { name: "Resume tutorial" })).not.toBeInTheDocument();
   });
 
@@ -2612,6 +2616,44 @@ describe("LabScene", () => {
       "data-status",
       "idle",
     );
+  });
+
+  it("reads the loaded lot temperature on the grinder illustration", async () => {
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        workspaceWidgets: makeWorkspaceWithGrinderVisible({
+          produceLots: [
+            makeProduceLot({ id: "produce_1", materialState: "cut", temperatureC: -52.3 }),
+          ],
+        }),
+      }),
+    );
+
+    render(<PesticideWorkbench />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("grinder-power-button")).toBeInTheDocument();
+    });
+
+    const readout = screen.getByTestId("grinder-temperature-readout");
+    expect(readout).toHaveTextContent("-52°C");
+    expect(readout).toHaveAttribute("data-tone", "cryogenic");
+  });
+
+  it("shows no grinder temperature reading while the chamber is empty", async () => {
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        workspaceWidgets: makeWorkspaceWithGrinderVisible({ produceLots: [] }),
+      }),
+    );
+
+    render(<PesticideWorkbench />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("grinder-power-button")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("grinder-temperature-readout")).toHaveTextContent("--°C");
   });
 
   it("starts a backend-authoritative grinder cycle from the power button", async () => {
