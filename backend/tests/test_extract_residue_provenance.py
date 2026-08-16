@@ -200,3 +200,35 @@ def test_reminting_a_material_state_carries_the_degradation_factors_over() -> No
         state for state in experiment.produce_material_states if state.material_state == "ground"
     )
     assert reminted.pesticide_degradation_factors == {"boscalid": 1.0, "captan": 0.5}
+
+
+def test_the_injection_reads_the_degradation_of_the_portion_not_of_the_jar() -> None:
+    # Once a portion is wetted, two states share the lot id: the jar's untouched
+    # powder and the tube's own, which carries whatever the exotherm cost it.
+    # Resolving by lot id alone returns whichever comes first, so the residues
+    # reaching the injection depended on where the two containers happened to sit
+    # on the bench -- a jar placed before the tube quietly restored them.
+    service, experiment_id = _jar_and_tube()
+    AddLiquidToWorkbenchToolService(service).run(
+        experiment_id,
+        AddLiquidToWorkbenchToolRequest(
+            slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0
+        ),
+    )
+    experiment = service._require_experiment(experiment_id)
+    tube = experiment.workbench.slots[0].tool
+    assert tube is not None
+
+    portion_state = next(
+        state
+        for state in experiment.produce_material_states
+        if state.id == tube.produce_fractions[0].produce_material_state_id
+    )
+    portion_state.pesticide_degradation_factors = {"boscalid": 1.0, "captan": 0.25}
+    # The jar's powder is intact and listed first, exactly as it is when the jar
+    # was placed on the bench before the tube.
+    experiment.produce_material_states.sort(key=lambda state: state.id != "state_ground")
+
+    context = build_extract_injection_context(experiment, tube, extract_volume_ml=1.0)
+
+    assert context.effective_residues_ug_per_kg["captan"] == pytest.approx(640.0 * 0.25)

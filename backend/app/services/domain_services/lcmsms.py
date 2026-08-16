@@ -86,6 +86,12 @@ def _effective_residues(
     are combined proportionally by mass.
     """
     lot_map = {lot.id: lot for lot in produce_lots}
+    # A wetted portion gets a material state of its own, distinct from the one
+    # describing the stock it was scooped from, and both carry the same lot id.
+    # Resolving by lot id alone returns whichever comes first -- usually the
+    # untouched powder still in the jar -- so the exotherm's cost would show up
+    # or not depending on where the two containers sat on the bench.
+    states_by_id = {state.id: state for state in material_states}
 
     total_mass_g: dict[str, float] = {}
     weighted_residues: dict[str, dict[str, float]] = {}
@@ -95,7 +101,9 @@ def _effective_residues(
         lot = lot_map.get(lot_id)
         if lot is None or not lot.pesticide_residues:
             continue
-        state = find_material_state(material_states, lot_id)
+        state = states_by_id.get(fraction.produce_material_state_id) or find_material_state(
+            material_states, lot_id
+        )
         deg_factors = state.pesticide_degradation_factors if state else {}
 
         mass = (
