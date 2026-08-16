@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from app.domain.models import ProduceFraction, ProduceMaterialState
 from app.services.dnd_move_service import (
     DndMoveObjectRequest,
     DndMoveObjectService,
@@ -34,6 +35,7 @@ from app.services.domain_services.workspace import (
 )
 from app.services.experiment_repository import SqliteExperimentRepository
 from app.services.experiment_service import ExperimentRuntimeService
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 
 def _place_tube(service: ExperimentRuntimeService, experiment_id: str) -> None:
@@ -398,3 +400,108 @@ def test_cemented_tube_can_still_be_discarded_from_the_vortex() -> None:
     vortex = next(widget for widget in reloaded.workspace.widgets if widget.id == "vortex")
     assert vortex.tool is None
     assert [tool.id for tool in reloaded.trash.children] == [tube.id]
+
+
+def _tube_with_produce_at(
+    service: ExperimentRuntimeService,
+    experiment_id: str,
+    temperature_c: float,
+) -> None:
+    """Put a weighed portion of powder at a chosen temperature into the tube."""
+    experiment = service._require_experiment(experiment_id)
+    tube = experiment.workbench.slots[0].tool
+    assert tube is not None
+    experiment.produce_material_states.append(
+        ProduceMaterialState(
+            id="state_portion",
+            produce_lot_id="lot_apples",
+            material_state="slurry",
+            temperature_c=temperature_c,
+            pesticide_degradation_factors={"captan": 1.0, "boscalid": 1.0},
+        )
+    )
+    tube.produce_fractions.append(
+        ProduceFraction(
+            id="fraction_portion",
+            produce_lot_id="lot_apples",
+            produce_material_state_id="state_portion",
+            mass_g=10.0,
+            location_kind="workbench_tool",
+            location_id=tube.id,
+            container_id=tube.id,
+        )
+    )
+
+
+def test_exotherm_starts_from_the_temperature_of_what_is_in_the_tube() -> None:
+    # The salts release a fixed amount of heat, so the peak is set by where the
+    # mixture started. Powder taken straight from the cryomill lands the whole
+    # exotherm far below where bench-temperature powder would.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, -66.0)
+
+    _add(service, experiment.id, "quechers_salts")
+    _advance(service, experiment.id, 7500)
+
+    state = _tube(service, experiment.id).quechers_state
+    assert state.start_temperature_c < 0.0
+    assert state.temperature_c == pytest.approx(
+        state.start_temperature_c + PhysicalSimulationService.quechers_exotherm_delta_c,
+        abs=0.01,
+    )
+    assert state.temperature_c < PhysicalSimulationService.quechers_degradation_threshold_c
+
+
+def test_cold_powder_spares_the_thermolabile_residues() -> None:
+    # The payoff of weighing promptly after the cryomill: the exotherm never
+    # crosses the degradation threshold, so nothing is lost.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, -66.0)
+
+    _add(service, experiment.id, "quechers_salts")
+    _advance(service, experiment.id, 60000)
+
+    portion = next(state for state in service._require_experiment(experiment.id).produce_material_states if state.id == "state_portion")
+    assert portion.pesticide_degradation_factors["captan"] == pytest.approx(1.0)
+    assert _tube(service, experiment.id).quechers_state.thermal_degradation_progress == 0.0
+
+
+def test_powder_left_to_warm_loses_the_thermolabile_residues() -> None:
+    # Same tube, same gestures, powder that sat on the bench until it reached the
+    # room: the exotherm now peaks at 65 C and the labile compounds pay for it.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, 20.0)
+
+    _add(service, experiment.id, "quechers_salts")
+    _advance(service, experiment.id, 60000)
+
+    portion = next(state for state in service._require_experiment(experiment.id).produce_material_states if state.id == "state_portion")
+    assert portion.pesticide_degradation_factors["captan"] < 0.7
+    # Captan is far more labile than boscalid, so the loss must not be uniform:
+    # that difference is the whole lesson.
+    assert portion.pesticide_degradation_factors["captan"] < portion.pesticide_degradation_factors["boscalid"]
+
+
+def test_a_cold_tube_still_relaxes_towards_the_room() -> None:
+    # The tube exchanges heat with the bench, so it settles at room temperature
+    # once the reaction is spent -- not back down to where it started.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, -66.0)
+
+    _add(service, experiment.id, "quechers_salts")
+    _advance(service, experiment.id, 600000)
+
+    state = _tube(service, experiment.id).quechers_state
+    assert state.temperature_c == pytest.approx(PhysicalSimulationService.ambient_temperature_c, abs=0.5)

@@ -446,6 +446,8 @@ export type QuechersState = {
     | "cemented"
     | "contaminated";
   temperatureC: number;
+  /** Temperature of the mixture when the salts went in; sets how high the exotherm climbs. */
+  startTemperatureC: number;
   cementationProgress: number;
   thermalDegradationProgress: number;
   reactionElapsedSeconds: number;

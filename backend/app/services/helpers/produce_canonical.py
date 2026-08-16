@@ -92,6 +92,14 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             material_state_record.residual_co2_mass_g = existing_state.residual_co2_mass_g
             material_state_record.grinding_elapsed_seconds = existing_state.grinding_elapsed_seconds
             material_state_record.grinding_temperature_integral = existing_state.grinding_temperature_integral
+            # Same physical material under a new record: it keeps the degradation
+            # already booked against it. Without this the record is reminted
+            # intact every time the signature moves -- and temperature is part of
+            # that signature, so powder simply warming on the bench was enough to
+            # wipe the residues back to pristine on every tick.
+            material_state_record.pesticide_degradation_factors = dict(
+                existing_state.pesticide_degradation_factors
+            )
         material_states.append(material_state_record)
         material_state_ids_added.add(state_id)
         return state_id

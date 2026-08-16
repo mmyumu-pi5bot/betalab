@@ -2042,6 +2042,9 @@ function normalizeBenchTool(
         BenchToolInstance["quechersState"]
       >["phase"],
       temperatureC: Number(rawQuechersState.temperatureC ?? rawQuechersState.temperature_c ?? 20),
+      startTemperatureC: Number(
+        rawQuechersState.startTemperatureC ?? rawQuechersState.start_temperature_c ?? 20,
+      ),
       cementationProgress: Number(
         rawQuechersState.cementationProgress ?? rawQuechersState.cementation_progress ?? 0,
       ),

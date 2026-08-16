@@ -57,6 +57,7 @@ class QuechersStateSchema(BaseModel):
     salts_added: bool = False
     phase: str = "idle"
     temperature_c: float = 20.0
+    start_temperature_c: float = 20.0
     cementation_progress: float = 0.0
     thermal_degradation_progress: float = 0.0
     reaction_elapsed_seconds: float = 0.0

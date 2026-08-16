@@ -25,6 +25,7 @@ from app.services.domain_services.workbench import (
     PlaceToolOnWorkbenchService,
 )
 from app.services.experiment_service import ExperimentRuntimeService
+from app.services.helpers.produce_canonical import sync_canonical_produce_model
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 LOT_ID = "lot_apples"
@@ -167,3 +168,35 @@ def test_quechers_heat_degrades_the_tube_portion_not_the_jar_stock() -> None:
     jar_state = experiment.produce_material_states[0]
     assert slurry_state.pesticide_degradation_factors["boscalid"] < 1.0
     assert jar_state.pesticide_degradation_factors["boscalid"] == 1.0
+
+
+def test_reminting_a_material_state_carries_the_degradation_factors_over() -> None:
+    # The canonical resync mints a fresh material state whenever the signature it
+    # keys on changes -- and temperature is part of that signature, so the powder
+    # simply warming up on the bench is enough to trigger it. The new record has
+    # to inherit the degradation factors, otherwise every warming tick quietly
+    # resets the residues to intact and the exotherm can never cost anything.
+    #
+    # It takes more than one state on the lot to bite: the resync resolves the
+    # state to copy from by lot id and takes the first match, so once the wetted
+    # portion has a state of its own the jar's powder gets rebuilt from a
+    # stranger.
+    service, experiment_id = _jar_and_tube()
+    AddLiquidToWorkbenchToolService(service).run(
+        experiment_id,
+        AddLiquidToWorkbenchToolRequest(
+            slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0
+        ),
+    )
+    experiment = service._require_experiment(experiment_id)
+
+    ground_state = next(
+        state for state in experiment.produce_material_states if state.material_state == "ground"
+    )
+    ground_state.temperature_c = 12.34
+    sync_canonical_produce_model(experiment)
+
+    reminted = next(
+        state for state in experiment.produce_material_states if state.material_state == "ground"
+    )
+    assert reminted.pesticide_degradation_factors == {"boscalid": 1.0, "captan": 0.5}

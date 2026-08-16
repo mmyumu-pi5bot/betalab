@@ -70,7 +70,24 @@ class PhysicalSimulationService:
     atmospheric_pressure_bar = 1.0
     pressure_pop_homogeneity_cap = 0.25
     pressure_vent_homogeneity_cap = 0.55
+    #: Peak a tube reaches when the salts go into a mixture already sitting at
+    #: ambient. Kept as the reference scale the degradation severity is measured
+    #: against -- a tube that starts cold peaks lower and must score lower, so
+    #: this denominator stays fixed rather than following the actual peak.
     quechers_peak_temperature_c = 65.0
+    #: The hydration of anhydrous MgSO4 releases a fixed amount of heat, so the
+    #: rise is a property of the mixture, not of where it started: a tube at
+    #: 4 C climbs by the same amount as one at 20 C and simply lands lower. Real
+    #: QuEChERS rises by roughly 20-25 C; this is dialled up as a **pedagogical
+    #: placeholder** so the consequence is visible.
+    quechers_exotherm_delta_c = 65.0 - 20.0
+    #: Specific heat capacities used to mix the starting temperature of a tube,
+    #: in J/g/K. Produce is mostly water; acetonitrile is the extraction solvent.
+    #: **Pedagogical placeholders**, close enough to the real values to give the
+    #: powder the dominant say it has in practice.
+    produce_specific_heat_j_per_g_k = 3.7
+    solvent_specific_heat_j_per_g_k = 2.23
+    solvent_density_g_per_ml = 0.786
     quechers_heat_rise_seconds = 7.5
     quechers_cementation_seconds = 15.0
     quechers_degradation_threshold_c = 45.0
@@ -111,15 +128,19 @@ class PhysicalSimulationService:
             return
 
         state.reaction_elapsed_seconds += elapsed_seconds
+        peak_temperature_c = state.start_temperature_c + self.quechers_exotherm_delta_c
         if state.reaction_elapsed_seconds <= self.quechers_heat_rise_seconds:
             ratio = state.reaction_elapsed_seconds / self.quechers_heat_rise_seconds
-            state.temperature_c = self.ambient_temperature_c + (
-                self.quechers_peak_temperature_c - self.ambient_temperature_c
-            ) * ratio
+            state.temperature_c = (
+                state.start_temperature_c + self.quechers_exotherm_delta_c * ratio
+            )
         else:
+            # Once the salts are spent the tube is just a warm object on a bench:
+            # it relaxes towards the room, not back down to the temperature the
+            # mixture happened to start from.
             cooling_seconds = state.reaction_elapsed_seconds - self.quechers_heat_rise_seconds
             state.temperature_c = self.ambient_temperature_c + (
-                self.quechers_peak_temperature_c - self.ambient_temperature_c
+                peak_temperature_c - self.ambient_temperature_c
             ) * math.exp(-self.quechers_cooling_rate_per_second * cooling_seconds)
 
         if state.phase == "reacting":
@@ -141,6 +162,52 @@ class PhysicalSimulationService:
                 + elapsed_seconds * severity / self.quechers_full_degradation_seconds_at_peak,
                 1.0,
             )
+
+    @classmethod
+    def mixture_temperature_c(
+        cls,
+        tool: WorkbenchTool,
+        material_states: list[ProduceMaterialState],
+    ) -> float:
+        """Temperature of everything currently in a tool, weighted by thermal mass.
+
+        Powder carries its own temperature -- the cryogenic chain leaves it well
+        below the room and it warms back over minutes -- while solvents are drawn
+        at bench temperature. Ten grams of produce outweighs ten millilitres of
+        acetonitrile by roughly two to one in heat capacity, so the powder is
+        what mostly decides where the mixture sits.
+        """
+        thermal_mass = 0.0
+        weighted = 0.0
+        # Resolve each fraction through its own material state id: several states
+        # share a lot id once a portion has been wetted, and looking up by lot
+        # alone would read whichever one happens to come first.
+        states_by_id = {state.id: state for state in material_states}
+        for fraction in tool.produce_fractions:
+            state = states_by_id.get(fraction.produce_material_state_id)
+            if state is None:
+                continue
+            mass_g = fraction.true_mass_g if fraction.true_mass_g is not None else fraction.mass_g
+            capacity = mass_g * cls.produce_specific_heat_j_per_g_k
+            thermal_mass += capacity
+            weighted += capacity * state.temperature_c
+        for lot in tool.produce_lots:
+            state = find_material_state(material_states, lot.id)
+            if state is None:
+                continue
+            capacity = lot.total_mass_g * cls.produce_specific_heat_j_per_g_k
+            thermal_mass += capacity
+            weighted += capacity * state.temperature_c
+        for liquid in tool.liquids:
+            volume_ml = liquid.true_volume_ml if liquid.true_volume_ml is not None else liquid.volume_ml
+            capacity = (
+                volume_ml * cls.solvent_density_g_per_ml * cls.solvent_specific_heat_j_per_g_k
+            )
+            thermal_mass += capacity
+            weighted += capacity * cls.ambient_temperature_c
+        if thermal_mass <= 0:
+            return cls.ambient_temperature_c
+        return weighted / thermal_mass
 
     def advance_quechers_pesticide_degradation(
         self,

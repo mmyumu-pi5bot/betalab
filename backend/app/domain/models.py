@@ -92,6 +92,11 @@ class QuechersState:
     salts_added: bool = False
     phase: str = "idle"
     temperature_c: float = 20.0
+    #: Temperature of the mixture at the moment the salts went in. The exotherm
+    #: releases a fixed amount of heat, so this is what decides how high the
+    #: reaction climbs -- and therefore whether it ever reaches the threshold
+    #: where thermolabile residues start to break down.
+    start_temperature_c: float = 20.0
     cementation_progress: float = 0.0
     thermal_degradation_progress: float = 0.0
     reaction_elapsed_seconds: float = 0.0
