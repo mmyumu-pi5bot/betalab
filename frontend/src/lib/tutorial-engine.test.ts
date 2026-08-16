@@ -1655,6 +1655,38 @@ describe("calibration sample tutorial", () => {
       expect(presentation.instruction).toContain("1.00 mL");
     });
 
+    it("says to keep drawing before the pipette is emptied into the vial", () => {
+      // Catching the short aliquot only after it lands makes the learner dispense,
+      // be told it was not enough, and start over. The pipette is still in hand here.
+      const state = experiment({
+        ...stateWithVial(0),
+        pipette: { capacityMl: 1, volumeMl: 0.05, sourceToolId: "extraction_tube" },
+      });
+      const tutorialStep = calibrationSampleTutorial.steps.find(
+        (entry) => entry.id === "prepare-sample-vial",
+      )!;
+      const presentation = getTutorialStepPresentation(tutorialStep, state);
+
+      expect(presentation.title).toBe("Draw more extract before dispensing");
+      expect(presentation.instruction).toContain("0.05 mL");
+      expect(tutorialStep.anchor(state)).toBe("pipette-aspirate");
+    });
+
+    it("lets a part-filled pipette top up a vial that is already close", () => {
+      const state = experiment({
+        ...stateWithVial(0.18),
+        pipette: { capacityMl: 1, volumeMl: 0.05, sourceToolId: "extraction_tube" },
+      });
+      const tutorialStep = calibrationSampleTutorial.steps.find(
+        (entry) => entry.id === "prepare-sample-vial",
+      )!;
+
+      expect(getTutorialStepPresentation(tutorialStep, state).title).toBe(
+        "Add more extract to the vial",
+      );
+      expect(tutorialStep.anchor(state)).toBe("tool-type-sample_vial");
+    });
+
     it("does not accept a vial holding only the dead volume", () => {
       const state = stateWithVial(0.05);
 

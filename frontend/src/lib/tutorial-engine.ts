@@ -401,6 +401,14 @@ function hasInjectableSampleVial(experiment: Experiment) {
   return vial !== undefined && toolLiquidVolumeMl(vial) >= minimumInjectableAliquotMl;
 }
 
+// What the vial would hold if the pipette were emptied into it now. Judging the
+// aliquot only once it has landed makes the learner dispense, be told it fell short,
+// and start over — the shortfall is knowable while the pipette is still in hand.
+function pendingSampleAliquotMl(experiment: Experiment) {
+  const vial = preparedSampleVial(experiment);
+  return (vial ? toolLiquidVolumeMl(vial) : 0) + experiment.pipette.volumeMl;
+}
+
 function hasAppliedLimsLabel(experiment: Experiment) {
   const sampleCode = experiment.limsReception.labSampleCode;
   if (!sampleCode) {
@@ -681,7 +689,10 @@ function sampleVialTarget(experiment: Experiment): TutorialTarget {
   if (!vial) {
     return workbenchPlacementTarget(experiment, "palette-item-sample_vial_lcms");
   }
-  if (experiment.pipette.volumeMl > 0) {
+  if (
+    experiment.pipette.volumeMl > 0 &&
+    pendingSampleAliquotMl(experiment) >= minimumInjectableAliquotMl
+  ) {
     return { anchor: "tool-type-sample_vial" };
   }
   // Aspirating happens at the bench, and never through a sealed cap.
@@ -724,6 +735,17 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
     // A quick click commits a single step, which is why the volume has to be spelled
     // out as a target rather than implied by the gesture.
     if (experiment.pipette.volumeMl > 0) {
+      if (pendingSampleAliquotMl(experiment) < minimumInjectableAliquotMl) {
+        return {
+          title: "Draw more extract before dispensing",
+          instruction:
+            `The micropipette holds ${experiment.pipette.volumeMl.toFixed(2)} mL, which ` +
+            "would leave the vial too shallow for the autosampler needle to reach. Press " +
+            "and hold on the extraction tube again until the pipette reads about 1.00 mL.",
+          hint: "A quick click commits a single 0.05 mL step. Keep the button held down and watch the volume climb.",
+          action: { kind: "click", label: "Hold on the tube to draw more" },
+        };
+      }
       return {
         title: shortVial ? "Add more extract to the vial" : "Transfer extract into the Autosampler vial",
         instruction:
