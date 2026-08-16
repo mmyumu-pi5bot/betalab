@@ -1187,4 +1187,173 @@ describe("TutorialCoach", () => {
 
     destination.remove();
   });
+  it("sets the cementation deadline apart from the instruction it applies to", () => {
+    // Buried in the paragraph, the 15 s window reads as decoration until it has
+    // already expired, so it gets its own alarm-coloured line and a stopwatch.
+    const tube = {
+      id: "extraction_tube",
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL tube",
+      subtitle: "",
+      accent: "sky" as const,
+      toolType: "centrifuge_tube" as const,
+      capacity_ml: 50,
+      canReceiveLiquids: true,
+      canReceiveProduce: true,
+      canSeal: true,
+      isDraggable: true,
+      allowedDropTargets: [],
+      powderMassG: 10.002,
+      liquids: [
+        { liquidId: "istd_solution", label: "ISTD", volume_ml: 0.05 },
+        { liquidId: "acetonitrile_extraction", label: "MeCN", volume_ml: 10 },
+      ],
+    };
+    const state: Experiment = {
+      ...emptyExperiment(),
+      analyticalBalance: { tareMassG: 12, taredToolId: "extraction_tube" },
+      workbench: { slots: [{ id: "station_1", label: "Station 1", tool: tube }] },
+    };
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, state, [
+          "weigh-received-sample",
+          "register-and-label-sample",
+          "store-gross-balance",
+          "cut-sample",
+          "grind-sample",
+          "store-grinder",
+          "weigh-test-portion",
+          "store-analytical-balance",
+        ])}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    const deadline = screen.getByTestId("tutorial-deadline");
+    expect(deadline).toHaveTextContent("15 seconds");
+    expect(deadline.className).toContain("rose");
+    expect(deadline.querySelector("svg")).not.toBeNull();
+  });
+
+  it("keeps the deadline line off steps that are not on the clock", () => {
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("tutorial-deadline")).not.toBeInTheDocument();
+  });
+  it("runs a chrono while the salts react, and stops it once mixing starts", () => {
+    const reactingTube = (phase: string, cementationProgress: number) => ({
+      id: "extraction_tube",
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL tube",
+      subtitle: "",
+      accent: "sky" as const,
+      toolType: "centrifuge_tube" as const,
+      capacity_ml: 50,
+      canReceiveLiquids: true,
+      canReceiveProduce: true,
+      canSeal: true,
+      isDraggable: true,
+      allowedDropTargets: [],
+      powderMassG: 10.002,
+      liquids: [
+        { liquidId: "istd_solution", label: "ISTD", volume_ml: 0.05 },
+        { liquidId: "acetonitrile_extraction", label: "MeCN", volume_ml: 10 },
+      ],
+      quechersState: {
+        saltsAdded: true,
+        phase,
+        faults: [],
+        isUsable: true,
+        cementationProgress,
+      },
+    });
+    const stateWith = (phase: string, cementationProgress: number): Experiment => ({
+      ...emptyExperiment(),
+      analyticalBalance: { tareMassG: 12, taredToolId: "extraction_tube" },
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: reactingTube(phase, cementationProgress),
+          },
+        ],
+      },
+    });
+    const completed = [
+      "weigh-received-sample",
+      "register-and-label-sample",
+      "store-gross-balance",
+      "cut-sample",
+      "grind-sample",
+      "store-grinder",
+      "weigh-test-portion",
+      "store-analytical-balance",
+    ];
+
+    const { rerender } = render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(
+          calibrationSampleTutorial,
+          stateWith("reacting", 0.2),
+          completed,
+        )}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    // 20% of the 15 s window burnt leaves 12.0 s.
+    expect(screen.getByTestId("tutorial-countdown-seconds")).toHaveTextContent("12.0s");
+    expect(screen.getByTestId("tutorial-countdown-bar")).toHaveStyle({ width: "80%" });
+    // The chrono replaces the static warning rather than stacking with it.
+    expect(screen.queryByTestId("tutorial-deadline")).not.toBeInTheDocument();
+
+    rerender(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(
+          calibrationSampleTutorial,
+          stateWith("reacting", 0.9),
+          completed,
+        )}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-countdown-seconds")).toHaveTextContent("1.5s");
+
+    rerender(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(
+          calibrationSampleTutorial,
+          stateWith("mixing", 0.9),
+          completed,
+        )}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("tutorial-countdown")).not.toBeInTheDocument();
+  });
 });

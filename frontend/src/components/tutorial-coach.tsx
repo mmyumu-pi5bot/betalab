@@ -6,12 +6,14 @@ import {
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
   getTutorialActionToolPresentation,
+  getTutorialCountdown,
   getTutorialInventoryCategoryPresentation,
   getTutorialStepPresentation,
   isTutorialActionTool,
   type LimsTutorialField,
   type TutorialAction,
   type TutorialActionTool,
+  type TutorialCountdown,
   type TutorialEvaluation,
   type TutorialStepPresentation,
 } from "@/lib/tutorial-engine";
@@ -289,6 +291,65 @@ function TutorialActionIcon({
         strokeWidth="1.6"
       />
     </svg>
+  );
+}
+
+function TutorialStopwatchIcon({ className }: { className: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24">
+      <circle cx="12" cy="13.5" r="7.8" stroke="currentColor" strokeWidth="1.9" />
+      <path
+        d="M12 9.6v4.2l2.7 1.9"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.9"
+      />
+      <path
+        d="M9.6 2.6h4.8"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
+
+// The reaction is running whether or not anyone is looking, so the chrono is drawn in
+// alarm colours and given the widest bar on the panel: it is the only thing on screen
+// that is still counting down while the learner reads.
+function TutorialCountdownPanel({ countdown }: { countdown: TutorialCountdown }) {
+  const remainingRatio = Math.min(
+    Math.max(countdown.remainingSeconds / countdown.totalSeconds, 0),
+    1,
+  );
+
+  return (
+    <div
+      className="mt-3 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2.5"
+      data-testid="tutorial-countdown"
+      role="timer"
+    >
+      <div className="flex items-center gap-2 text-sm font-semibold text-rose-900">
+        <span
+          aria-hidden="true"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-600 text-white"
+        >
+          <TutorialStopwatchIcon className="h-[18px] w-[18px]" />
+        </span>
+        <span className="flex-1">{countdown.label}</span>
+        <span className="font-mono text-base tabular-nums" data-testid="tutorial-countdown-seconds">
+          {countdown.remainingSeconds.toFixed(1)}s
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-rose-200">
+        <div
+          className="h-full rounded-full bg-rose-600 transition-[width] duration-200"
+          data-testid="tutorial-countdown-bar"
+          style={{ width: `${remainingRatio * 100}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -638,6 +699,10 @@ export function TutorialCoach({
     limsField,
   });
 
+  // An intervention has already stopped the learner for a different reason, and the
+  // chrono would compete with it for the same glance.
+  const countdown = intervention ? null : getTutorialCountdown(evaluation.experiment);
+
   if (!active) {
     return (
       <button
@@ -722,6 +787,22 @@ export function TutorialCoach({
             <p className="mt-2 text-sm leading-6 text-slate-700">
               {displayedPresentation.instruction}
             </p>
+            {countdown ? (
+              <TutorialCountdownPanel countdown={countdown} />
+            ) : displayedPresentation.deadline ? (
+              <div
+                className="mt-3 flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900"
+                data-testid="tutorial-deadline"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-600 text-white"
+                >
+                  <TutorialStopwatchIcon className="h-[18px] w-[18px]" />
+                </span>
+                <span>{displayedPresentation.deadline}</span>
+              </div>
+            ) : null}
             {displayedPresentation.action ? (
               <div className="mt-3 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-950">
                 <span

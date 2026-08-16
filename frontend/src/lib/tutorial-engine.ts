@@ -51,7 +51,43 @@ export type TutorialStepPresentation = Pick<
   "title" | "instruction" | "hint"
 > & {
   action?: TutorialAction;
+  // A hard time limit the simulation starts enforcing the moment this step's action
+  // lands. Carried apart from the instruction because a deadline buried in a
+  // paragraph reads as decoration until it has already run out.
+  deadline?: string;
 };
+
+// Mirrors quechers_cementation_seconds in the backend physical simulation.
+const cementationWindowSeconds = 15;
+
+export type TutorialCountdown = {
+  label: string;
+  remainingSeconds: number;
+  totalSeconds: number;
+};
+
+// Nothing on the bench states how much of the reaction window is left, and the
+// learner has no reason yet to suspect there is one. A real analyst would be watching
+// their own clock, so the tutorial lends one: it makes the deadline legible without
+// making it any softer.
+export function getTutorialCountdown(experiment: Experiment): TutorialCountdown | null {
+  const reactingTube = allTools(experiment).find(
+    (tool) =>
+      tool.toolType === "centrifuge_tube" && tool.quechersState?.phase === "reacting",
+  );
+  if (!reactingTube) {
+    return null;
+  }
+  const progress = Math.min(
+    Math.max(reactingTube.quechersState?.cementationProgress ?? 0, 0),
+    1,
+  );
+  return {
+    label: "Seal the tube and start the vortex",
+    remainingSeconds: Math.max((1 - progress) * cementationWindowSeconds, 0),
+    totalSeconds: cementationWindowSeconds,
+  };
+}
 
 export type TutorialAction = {
   kind: "click" | "drag" | "inspect" | "keyboard" | "type" | "wait";
@@ -1121,6 +1157,7 @@ function extractionPreparationPresentation(experiment: Experiment): Partial<Tuto
         "the mixer. Deploy the Vortex mixer now so it is waiting. In Inventory, open " +
         "Workspace equipment, then drag it onto the central workspace.",
       hint: "Miss that window and the salts cake solid, taking the extraction with them.",
+      deadline: "15 seconds to vortex once the salts are in",
       action: { kind: "drag", label: "Drag to workspace" },
     };
   }
@@ -1131,6 +1168,7 @@ function extractionPreparationPresentation(experiment: Experiment): Partial<Tuto
       "the addition. The countdown starts on confirmation: you then have 15 seconds to " +
       "seal the tube, drop it into the Vortex mixer and start the cycle.",
     hint: "Know where you are going before you confirm: seal the tube, drag it into the mixer, click Start vortex.",
+    deadline: "15 seconds start the moment you confirm",
     action: { kind: "drag", label: "Add the salts packet" },
   };
 }
