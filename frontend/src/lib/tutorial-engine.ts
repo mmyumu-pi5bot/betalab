@@ -289,8 +289,45 @@ function isSpentExtractionTube(tool: BenchToolInstance) {
   );
 }
 
-function hasSpentExtractionTube(experiment: Experiment) {
-  return allTools(experiment).some(isSpentExtractionTube);
+// A tube still carrying the test portion, whatever stage it has reached: dry powder
+// before the solvent, slurry once the extraction is under way. Wetting the sample
+// turns the ground powder into slurry and drops its powder mass to zero, so mass
+// alone stops describing the line the moment the chapter starts moving.
+function carriesTestPortion(tool: BenchToolInstance) {
+  return (
+    tool.toolType === "centrifuge_tube" &&
+    !isSpentExtractionTube(tool) &&
+    (toolPowderMassG(tool) >= 9.5 ||
+      tool.containsSlurry === true ||
+      (tool.produceFractions ?? []).length > 0)
+  );
+}
+
+// The chapter is walked back only while the ruined tube leaves the learner with no
+// line at all. As soon as a replacement carries the test portion the tutorial runs
+// forward again — the trash keeps the ruined tube for good, so a predicate that only
+// asked whether one exists would rewind the chapter every time a later step legitimately
+// stopped being satisfied.
+function extractionLineIsLost(experiment: Experiment) {
+  const trashedToolIds = new Set(experiment.trash.children.map((tool) => tool.id));
+  return (
+    allTools(experiment).some(isSpentExtractionTube) &&
+    !allTools(experiment).some(
+      (tool) => carriesTestPortion(tool) && !trashedToolIds.has(tool.id),
+    )
+  );
+}
+
+// The reagent step is walked back one stage later: a replacement tube may already
+// carry the test portion and still owe its ISTD, solvent and salts. The salts are the
+// marker because they are irreversible — asking whether the preparation is merely
+// incomplete would also be true late in the run, once extract has been drawn off the
+// prepared tube and its solvent volume has dropped.
+function extractionRestartAwaitsReagents(experiment: Experiment) {
+  return (
+    allTools(experiment).some(isSpentExtractionTube) &&
+    !(extractionTube(experiment)?.quechersState?.saltsAdded ?? false)
+  );
 }
 
 // The tube still has to be reachable while it awaits the trash, so the coach can
@@ -1640,7 +1677,7 @@ const steps: TutorialStep[] = [
     prerequisites: ["store-grinder"],
     ...fromTarget(analyticalWeighingTarget),
     isSatisfied: hasTestPortion,
-    isInvalidated: hasSpentExtractionTube,
+    isInvalidated: extractionLineIsLost,
     presentation: analyticalWeighingPresentation,
   }),
   step({
@@ -1655,7 +1692,7 @@ const steps: TutorialStep[] = [
     isSatisfied: (experiment) =>
       hasTestPortion(experiment) &&
       !workspaceWidget(experiment, "analytical_balance")?.isPresent,
-    isInvalidated: hasSpentExtractionTube,
+    isInvalidated: extractionLineIsLost,
     presentation: (experiment) =>
       storeEquipmentPresentation(
         experiment,
@@ -1674,7 +1711,7 @@ const steps: TutorialStep[] = [
     prerequisites: ["store-analytical-balance"],
     ...fromTarget(extractionPreparationTarget),
     isSatisfied: hasPreparedExtraction,
-    isInvalidated: hasSpentExtractionTube,
+    isInvalidated: extractionRestartAwaitsReagents,
     presentation: extractionPreparationPresentation,
   }),
   step({

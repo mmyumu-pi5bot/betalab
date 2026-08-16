@@ -1494,4 +1494,105 @@ describe("calibration sample tutorial", () => {
       expect(presentation.instruction).not.toContain("15 seconds");
     });
   });
+  describe("progress after an extraction tube has been replaced", () => {
+    // Wetting the test portion turns the ground powder into slurry, so the weighing
+    // step stops being satisfied the moment the extraction starts. That is the normal
+    // course of the chapter, and the ruined tube the trash keeps for good must never
+    // turn it into a reason to walk the learner back.
+    const spentState = {
+      saltsAdded: true,
+      phase: "cemented",
+      faults: ["cemented"],
+      isUsable: false,
+    };
+
+    function replacementTube(overrides: Record<string, unknown>) {
+      return labTool("centrifuge_tube", {
+        id: "fresh_tube",
+        produceFractions: [{ id: "fraction_1", massG: 10.002 }],
+        ...overrides,
+      });
+    }
+
+    const completedThroughWeighing = [
+      "weigh-received-sample",
+      "register-and-label-sample",
+      "store-gross-balance",
+      "cut-sample",
+      "grind-sample",
+      "store-grinder",
+      "weigh-test-portion",
+      "store-analytical-balance",
+    ];
+
+    it("asks for the solvent after the ISTD rather than for the balance again", () => {
+      // Powder mass reads 0 once the produce is slurry, which is exactly the state the
+      // tube is in between the ISTD and the acetonitrile.
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "fresh_tube" },
+        trash: {
+          ...experiment().trash,
+          children: [
+            labTool("centrifuge_tube", { id: "cemented_tube", quechersState: spentState }),
+          ],
+        },
+        workbench: {
+          slots: [
+            {
+              id: "station_1",
+              label: "Station 1",
+              tool: replacementTube({
+                powderMassG: 0,
+                containsSlurry: true,
+                liquids: [{ liquidId: "istd_solution", label: "ISTD", volume_ml: 0.05 }],
+              }),
+            },
+          ],
+        },
+      });
+
+      const result = evaluateTutorial(
+        calibrationSampleTutorial,
+        state,
+        completedThroughWeighing,
+      );
+      const presentation = getTutorialStepPresentation(result.currentStep!, state);
+
+      expect(result.currentStep?.id).toBe("prepare-extraction");
+      expect(result.completedStepIds).toContain("weigh-test-portion");
+      expect(result.currentStep?.anchor(state)).toBe(
+        "palette-item-acetonitrile_extraction",
+      );
+      expect(presentation.title).toBe("Add the extraction solvent");
+    });
+
+    it("still walks back while the ruined tube is the only line the learner has", () => {
+      const state = experiment({
+        analyticalBalance: { tareMassG: 12, taredToolId: "cemented_tube" },
+        workbench: {
+          slots: [
+            {
+              id: "station_1",
+              label: "Station 1",
+              tool: labTool("centrifuge_tube", {
+                id: "cemented_tube",
+                quechersState: spentState,
+                powderMassG: 10.002,
+                produceFractions: [{ id: "fraction_1", massG: 10.002 }],
+              }),
+            },
+          ],
+        },
+      });
+
+      const result = evaluateTutorial(
+        calibrationSampleTutorial,
+        state,
+        completedThroughWeighing,
+      );
+
+      expect(result.currentStep?.id).toBe("weigh-test-portion");
+      expect(result.completedStepIds).not.toContain("weigh-test-portion");
+    });
+  });
 });
