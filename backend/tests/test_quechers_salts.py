@@ -102,7 +102,10 @@ def test_salts_added_to_wet_tube_start_exothermic_reaction_and_cementation() -> 
     state = _tube(service, experiment.id).quechers_state
     assert state.salts_added is True
     assert state.phase == "reacting"
-    assert state.temperature_c == pytest.approx(65.0, abs=0.01)
+    assert state.temperature_c == pytest.approx(
+        PhysicalSimulationService.ambient_temperature_c + PhysicalSimulationService.quechers_exotherm_delta_c,
+        abs=0.01,
+    )
     assert state.cementation_progress == pytest.approx(0.5, abs=0.001)
     assert state.thermal_degradation_progress > 0
 

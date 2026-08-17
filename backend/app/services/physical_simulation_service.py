@@ -74,13 +74,11 @@ class PhysicalSimulationService:
     #: ambient. Kept as the reference scale the degradation severity is measured
     #: against -- a tube that starts cold peaks lower and must score lower, so
     #: this denominator stays fixed rather than following the actual peak.
-    quechers_peak_temperature_c = 65.0
+    quechers_peak_temperature_c = 45.0
     #: The hydration of anhydrous MgSO4 releases a fixed amount of heat, so the
     #: rise is a property of the mixture, not of where it started: a tube at
-    #: 4 C climbs by the same amount as one at 20 C and simply lands lower. Real
-    #: QuEChERS rises by roughly 20-25 C; this is dialled up as a **pedagogical
-    #: placeholder** so the consequence is visible.
-    quechers_exotherm_delta_c = 65.0 - 20.0
+    #: 4 C climbs by the same amount as one at 20 C and simply lands lower.
+    quechers_exotherm_delta_c = 45.0 - 20.0
     #: Specific heat capacities used to mix the starting temperature of a tube,
     #: in J/g/K. Produce is mostly water; acetonitrile is the extraction solvent.
     #: **Pedagogical placeholders**, close enough to the real values to give the
@@ -90,10 +88,18 @@ class PhysicalSimulationService:
     solvent_density_g_per_ml = 0.786
     quechers_heat_rise_seconds = 7.5
     quechers_cementation_seconds = 15.0
-    quechers_degradation_threshold_c = 45.0
+    #: Where the tube starts scoring a thermal fault, set ten degrees under the
+    #: peak so the severity ramp still spans the top of the exotherm.
+    quechers_degradation_threshold_c = 35.0
     quechers_full_degradation_seconds_at_peak = 30.0
-    quechers_cooling_rate_per_second = 0.025
-    pesticide_degradation_threshold_c = 40.0
+    #: A 50 mL tube on a bench sheds heat slowly: at this rate it stays above the
+    #: degradation threshold for about ninety seconds after an exotherm from
+    #: ambient, which is the window the player has to get it into the centrifuge.
+    quechers_cooling_rate_per_second = 0.009
+    #: Thermolabile residues start breaking down here. Below the peak the salts
+    #: reach from ambient, so a tube left to react at room temperature crosses it
+    #: and a tube built from chilled powder does not.
+    pesticide_degradation_threshold_c = 30.0
 
     def check_explosion_risk(
         self,

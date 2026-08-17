@@ -3,15 +3,24 @@ import { describe, expect, it } from "vitest";
 import {
   cryogenicTemperatureC,
   getCryogenicStatus,
+  residueDegradationTemperatureC,
 } from "@/lib/cryogenic-temperature";
 
 describe("getCryogenicStatus", () => {
-  it("reports hot produce above the handling limit", () => {
-    expect(getCryogenicStatus(60)).toEqual({ label: "Hot", tone: "hot" });
+  it("reports hot contents once thermolabile residues start breaking down", () => {
+    expect(getCryogenicStatus(35)).toEqual({ label: "Hot", tone: "hot" });
+    expect(getCryogenicStatus(residueDegradationTemperatureC)).toEqual({
+      label: "Hot",
+      tone: "hot",
+    });
   });
 
-  it("reports warm produce between ambient and the handling limit", () => {
-    expect(getCryogenicStatus(35)).toEqual({ label: "Warm", tone: "warm" });
+  it("reports warm contents climbing towards that threshold", () => {
+    expect(getCryogenicStatus(27)).toEqual({ label: "Warm", tone: "warm" });
+  });
+
+  it("pins the hot band to the temperature the backend degrades residues at", () => {
+    expect(residueDegradationTemperatureC).toBe(30);
   });
 
   it("reports near ambient produce", () => {
