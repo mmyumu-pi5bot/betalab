@@ -112,10 +112,23 @@ class PhysicalSimulationService:
     ) -> None:
         self._advance_widget_cryogenics(widget, elapsed_seconds, material_states=material_states)
 
-    def advance_quechers_tool(self, tool: WorkbenchTool, elapsed_seconds: float) -> None:
+    def advance_quechers_tool(
+        self,
+        tool: WorkbenchTool,
+        elapsed_seconds: float,
+        *,
+        material_states: list[ProduceMaterialState] | None = None,
+    ) -> None:
         state = tool.quechers_state
         elapsed_seconds = max(float(elapsed_seconds), 0.0)
-        if elapsed_seconds <= 0 or not state.salts_added:
+        if elapsed_seconds <= 0:
+            return
+        if state.reaction_elapsed_seconds <= 0:
+            # No exotherm owns the temperature yet, so the tube simply reads what
+            # it holds. Reporting a flat room temperature until the salts go in
+            # would hide the one number that decides how high the reaction climbs.
+            state.temperature_c = self.mixture_temperature_c(tool, material_states or [])
+        if not state.salts_added:
             return
         if state.phase == "armed" and (tool.liquids or tool.produce_lots or tool.produce_fractions):
             state.phase = "cemented"
@@ -216,6 +229,11 @@ class PhysicalSimulationService:
         material_states: list[ProduceMaterialState],
     ) -> None:
         """Degrade pesticide residues in produce inside a QUECHERS tool based on its current temperature."""
+        if tool.quechers_state.phase in {"separating", "separated"}:
+            # Spinning pulls the residues into the acetonitrile and out of the
+            # aqueous phase where heat hydrolyses them. The tube stays hot -- what
+            # protects the extract is the phase transfer, not a drop in temperature.
+            return
         quechers_temp = tool.quechers_state.temperature_c
         if quechers_temp <= self.pesticide_degradation_threshold_c:
             return

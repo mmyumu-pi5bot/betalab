@@ -9,6 +9,7 @@ from app.services.dnd_move_service import (
     DndMoveObjectService,
     DndObjectRef,
 )
+from app.services.domain_services.centrifuge import StartCentrifugeCycleService
 from app.services.domain_services.tool_contents import (
     AddLiquidToToolRequest,
     AddLiquidToToolService,
@@ -75,6 +76,12 @@ def _tube(service: ExperimentRuntimeService, experiment_id: str):
     tool = service._require_experiment(experiment_id).workbench.slots[0].tool
     assert tool is not None
     return tool
+
+
+def _centrifuged_tube(service: ExperimentRuntimeService, experiment_id: str):
+    widget = next(widget for widget in service._require_experiment(experiment_id).workspace.widgets if widget.id == "centrifuge")
+    assert widget.tool is not None
+    return widget.tool
 
 
 def _vortex_tool(service: ExperimentRuntimeService, experiment_id: str):
@@ -505,3 +512,67 @@ def test_a_cold_tube_still_relaxes_towards_the_room() -> None:
 
     state = _tube(service, experiment.id).quechers_state
     assert state.temperature_c == pytest.approx(PhysicalSimulationService.ambient_temperature_c, abs=0.5)
+
+
+def test_an_idle_tube_reports_the_temperature_of_what_it_holds() -> None:
+    # The tube is what the player watches while deciding whether to weigh now or
+    # let the powder sit. Reporting a flat 20 C until the salts go in hides the
+    # only variable that decides how high the exotherm climbs.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _tube_with_produce_at(service, experiment.id, -66.0)
+
+    _advance(service, experiment.id, 1000)
+
+    state = _tube(service, experiment.id).quechers_state
+    assert state.temperature_c < 0.0
+
+
+def test_an_empty_tube_reports_the_room() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+
+    _advance(service, experiment.id, 1000)
+
+    state = _tube(service, experiment.id).quechers_state
+    assert state.temperature_c == pytest.approx(PhysicalSimulationService.ambient_temperature_c)
+
+
+def test_separating_the_phases_stops_the_thermal_degradation() -> None:
+    # Spinning the tube pulls the residues into the acetonitrile, away from the
+    # aqueous phase where the heat does its damage. The tube stays hot -- what
+    # protects the residues is the phase transfer, not a drop in temperature.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, 20.0)
+    _add(service, experiment.id, "quechers_salts")
+    _advance(service, experiment.id, 5000)
+
+    tube = _tube(service, experiment.id)
+    tube.is_sealed = True
+    DndMoveObjectService(service).run(
+        experiment.id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="tool", id=tube.id),
+            source=DndObjectRef(kind="workbench", id="station_1"),
+            destination=DndObjectRef(kind="centrifuge", id="centrifuge"),
+        ),
+    )
+    StartCentrifugeCycleService(service).run(experiment.id, EmptyRequest())
+    _advance(service, experiment.id, 10000)
+
+    portion = next(state for state in service._require_experiment(experiment.id).produce_material_states if state.id == "state_portion")
+    assert _centrifuged_tube(service, experiment.id).quechers_state.phase == "separated"
+    captan_at_separation = portion.pesticide_degradation_factors["captan"]
+    assert captan_at_separation < 1.0
+
+    _advance(service, experiment.id, 5000)
+
+    # The tube has not had time to cool below the threshold, so anything still
+    # degrading would show up here.
+    assert _centrifuged_tube(service, experiment.id).quechers_state.temperature_c > PhysicalSimulationService.pesticide_degradation_threshold_c
+    assert portion.pesticide_degradation_factors["captan"] == pytest.approx(captan_at_separation)
