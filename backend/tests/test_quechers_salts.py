@@ -579,3 +579,57 @@ def test_separating_the_phases_stops_the_thermal_degradation() -> None:
     # degrading would show up here.
     assert _centrifuged_tube(service, experiment.id).quechers_state.temperature_c > PhysicalSimulationService.pesticide_degradation_threshold_c
     assert portion.pesticide_degradation_factors["captan"] == pytest.approx(captan_at_separation)
+
+
+def _portion(service: ExperimentRuntimeService, experiment_id: str) -> ProduceMaterialState:
+    tube = _tube(service, experiment_id)
+    fraction = tube.produce_fractions[0]
+    return next(
+        state for state in service._require_experiment(experiment_id).produce_material_states if state.id == fraction.produce_material_state_id
+    )
+
+
+def test_a_weighed_portion_exchanges_heat_with_the_bench() -> None:
+    # A test portion is ten grams of powder in a plastic tube -- it warms towards
+    # the room exactly as the jar it was scooped from does. Freezing it at the
+    # temperature it was weighed at would let a player weigh cold and then take
+    # the rest of the run at their leisure.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, -60.0)
+
+    _advance(service, experiment.id, 60000)
+
+    portion = _portion(service, experiment.id)
+    assert portion.temperature_c > -30.0
+    assert portion.temperature_c < PhysicalSimulationService.ambient_temperature_c
+
+
+def test_a_portion_left_long_enough_settles_at_room_temperature() -> None:
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, -60.0)
+
+    _advance(service, experiment.id, 600000)
+
+    portion = _portion(service, experiment.id)
+    assert portion.temperature_c == pytest.approx(PhysicalSimulationService.ambient_temperature_c, abs=0.5)
+
+
+def test_a_portion_that_warmed_keeps_the_degradation_already_booked() -> None:
+    # Warming remints the material state, since temperature is part of its
+    # signature. The residues it already lost must survive that.
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _place_tube(service, experiment.id)
+    _add(service, experiment.id, "acetonitrile_extraction", 10)
+    _tube_with_produce_at(service, experiment.id, 20.0)
+    _add(service, experiment.id, "quechers_salts")
+    _advance(service, experiment.id, 20000)
+
+    captan = _portion(service, experiment.id).pesticide_degradation_factors["captan"]
+    assert 0.0 < captan < 1.0

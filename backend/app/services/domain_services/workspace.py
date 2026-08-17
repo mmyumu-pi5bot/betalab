@@ -350,6 +350,9 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
         if widget.tool is not None:
             quechers_tools[widget.tool.id] = widget.tool
     for tool in quechers_tools.values():
+        physical_simulation_service.advance_tool_contents_temperature(
+            tool, elapsed_seconds, experiment.produce_material_states
+        )
         physical_simulation_service.advance_quechers_tool(
             tool, elapsed_seconds, material_states=experiment.produce_material_states
         )

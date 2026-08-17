@@ -118,6 +118,32 @@ class PhysicalSimulationService:
     ) -> None:
         self._advance_widget_cryogenics(widget, elapsed_seconds, material_states=material_states)
 
+    def advance_tool_contents_temperature(
+        self,
+        tool: WorkbenchTool,
+        elapsed_seconds: float,
+        material_states: list[ProduceMaterialState],
+    ) -> None:
+        """Let a weighed portion exchange heat with its surroundings.
+
+        A test portion owns a material state of its own, and nothing else in the
+        tick touches it -- only lots are warmed. Without this a portion weighed
+        straight out of the mill would stay cryogenic for the rest of the run, so
+        weighing early would buy permanent immunity instead of a head start.
+        """
+        elapsed_seconds = max(float(elapsed_seconds), 0.0)
+        if elapsed_seconds <= 0 or not tool.produce_fractions:
+            return
+        warming_progress = min(self.warming_rate_per_second * elapsed_seconds, 0.95)
+        states_by_id = {state.id: state for state in material_states}
+        for fraction in tool.produce_fractions:
+            state = states_by_id.get(fraction.produce_material_state_id)
+            if state is None:
+                continue
+            state.temperature_c += (
+                self.ambient_temperature_c - state.temperature_c
+            ) * warming_progress
+
     def advance_quechers_tool(
         self,
         tool: WorkbenchTool,
