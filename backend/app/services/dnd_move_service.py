@@ -13,6 +13,7 @@ from app.services.domain_services.gross_balance import (
     GrossBalanceProduceLotTarget,
     GrossBalanceServiceBase,
 )
+from app.services.domain_services.ice_bath import IceBathServiceBase
 from app.services.domain_services.vortex import VortexServiceBase
 from app.services.helpers.lookups import (
     find_rack_slot,
@@ -285,6 +286,22 @@ class CentrifugeMoveSource(MoveSourceBase):
         raise ValueError("Centrifuge cannot move produce lots.")
 
 
+class IceBathMoveSource(MoveSourceBase):
+    def _validate_tool_for_destination(self, experiment: Experiment, request: DndMoveObjectRequest, destination: MoveDestination) -> None:
+        widget = next((w for w in experiment.workspace.widgets if w.id == self._source.id), None)
+        if widget is None or widget.tool is None:
+            raise ValueError("Place a tube in Ice bath before moving it.")
+        if request.entity.id != widget.tool.id:
+            raise ValueError("Moved tool entity does not match the source tool.")
+        _assert_entity_can_move(get_dnd_contract("tool", widget.tool.tool_type), widget.tool.label, destination)
+
+    def _remove_tool(self, experiment: Experiment, request: DndMoveObjectRequest) -> tuple[WorkbenchTool, str]:
+        return _DndIceBathService(self._runtime).take_tool(experiment), "Ice bath"
+
+    def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
+        raise ValueError("Ice bath cannot move produce lots.")
+
+
 class GrinderMoveSource(MoveSourceBase):
     def _remove_produce_lot(self, experiment: Experiment, request: DndMoveObjectRequest) -> ProduceLotRemoval:
         return GrinderProduceLotSource(request.source.id, request.entity.id).remove(experiment)
@@ -452,6 +469,15 @@ class CentrifugeMoveDestination(MoveDestinationBase):
         )
 
 
+class IceBathMoveDestination(MoveDestinationBase):
+    def _place_tool(self, experiment: Experiment, moved: DndMovedObject) -> None:
+        _DndIceBathService(self._runtime).place_tool(
+            experiment,
+            _require_tool(moved),
+            action_verb=_tool_action_verb(moved, restored="restored to"),
+        )
+
+
 class GrinderMoveDestination(MoveDestinationBase):
     def __init__(self, runtime: ExperimentRuntime, destination: DndObjectRef) -> None:
         super().__init__(runtime, destination)
@@ -549,6 +575,7 @@ def _resolve_source(runtime: ExperimentRuntime, source: DndObjectRef) -> MoveSou
         "centrifuge": CentrifugeMoveSource,
         "gross_balance": GrossBalanceMoveSource,
         "grinder": GrinderMoveSource,
+        "ice_bath": IceBathMoveSource,
         "palette": PaletteMoveSource,
         "rack": RackMoveSource,
         "toolbar": PaletteMoveSource,
@@ -567,6 +594,7 @@ def _resolve_destination(runtime: ExperimentRuntime, destination: DndObjectRef) 
         "analytical_balance": AnalyticalBalanceMoveDestination,
         "centrifuge": CentrifugeMoveDestination,
         "gross_balance": GrossBalanceMoveDestination,
+        "ice_bath": IceBathMoveDestination,
         "rack_slot": RackSlotMoveDestination,
         "trash_bin": TrashBinMoveDestination,
         "vortex": VortexMoveDestination,
@@ -626,6 +654,7 @@ def _get_drop_target_type(destination_kind: str) -> str:
         "analytical_balance": "analytical_balance_widget",
         "centrifuge": "centrifuge_widget",
         "gross_balance": "gross_balance_widget",
+        "ice_bath": "ice_bath_widget",
         "rack_slot": "rack_slot",
         "trash_bin": "trash_bin",
         "vortex": "vortex_widget",
@@ -644,6 +673,7 @@ def _get_drop_target_label(destination_kind: str) -> str:
         "analytical_balance": "Analytical balance",
         "centrifuge": "Centrifuge",
         "gross_balance": "Gross balance",
+        "ice_bath": "Ice bath",
         "rack_slot": "rack",
         "trash_bin": "trash",
         "vortex": "Vortex mixer",
@@ -716,5 +746,10 @@ class _DndVortexService(VortexServiceBase):
 
 
 class _DndCentrifugeService(CentrifugeServiceBase):
+    def _run(self, experiment: Experiment, arguments: object) -> None:
+        raise NotImplementedError
+
+
+class _DndIceBathService(IceBathServiceBase):
     def _run(self, experiment: Experiment, arguments: object) -> None:
         raise NotImplementedError

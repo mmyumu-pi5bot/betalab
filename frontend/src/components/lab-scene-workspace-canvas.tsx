@@ -5,6 +5,7 @@ import type { DragEvent } from "react";
 
 import { AnalyticalBalanceWidget } from "@/components/analytical-balance-widget";
 import { CentrifugeWidget } from "@/components/centrifuge-widget";
+import { IceBathWidget } from "@/components/ice-bath-widget";
 import { BenchToolCard } from "@/components/bench-tool-card";
 import { DropDraftCard } from "@/components/drop-draft-card";
 import { FloatingWidget } from "@/components/floating-widget";
@@ -29,6 +30,7 @@ import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widge
 import type { SequenceRun } from "@/types/workbench";
 import type { AnalyticalBalanceDndApi } from "@/hooks/use-analytical-balance-dnd";
 import type { CentrifugeDndApi } from "@/hooks/use-centrifuge-dnd";
+import type { IceBathDndApi } from "@/hooks/use-ice-bath-dnd";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { GrinderDndApi } from "@/hooks/use-grinder-dnd";
 import type { GrossBalanceDndApi } from "@/hooks/use-gross-balance-dnd";
@@ -74,6 +76,7 @@ type LabSceneWorkspaceCanvasProps = {
   dnd: {
     analyticalBalance: AnalyticalBalanceDndApi;
     centrifuge: CentrifugeDndApi;
+    iceBath: IceBathDndApi;
     clearDropTargets: () => void;
     dndDisabledByAction: boolean;
     grinder: GrinderDndApi;
@@ -166,6 +169,7 @@ type LabSceneWorkspaceCanvasProps = {
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onToggleVortexToolSeal: () => void;
     onToggleCentrifugeToolSeal: () => void;
+    onToggleIceBathToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
@@ -251,6 +255,8 @@ export function LabSceneWorkspaceCanvas({
       ? Math.round((1 - vortexRunRemainingMs / vortexRunDurationMs) * 100)
       : 0;
   const centrifugeWidget = experiment.workspace.widgets.find((w) => w.id === "centrifuge") ?? null;
+  const iceBathWidget = experiment.workspace.widgets.find((w) => w.id === "ice_bath") ?? null;
+  const iceBathTool = iceBathWidget?.tool ?? null;
   const centrifugeTool = centrifugeWidget?.tool ?? null;
   const centrifugeRunRemainingMs = centrifugeWidget?.centrifugeRunRemainingMs ?? 0;
   const centrifugeRunDurationMs = centrifugeWidget?.centrifugeRunDurationMs ?? 0;
@@ -413,6 +419,25 @@ export function LabSceneWorkspaceCanvas({
     </div>
   ) : undefined;
 
+  const iceBathStagedContent = iceBathTool ? (
+    <div
+      data-testid="ice-bath-staged-item"
+      onDragOver={dnd.iceBath.handleDragOver}
+      onDrop={dnd.iceBath.handleDrop}
+    >
+      <BenchToolCard
+        draggable
+        onDragEnd={dnd.clearDropTargets}
+        onDragStart={(event) => dnd.iceBath.handleItemDragStart(event.dataTransfer)}
+        onDragOver={dnd.iceBath.handleDragOver}
+        onDrop={dnd.iceBath.handleDrop}
+        onRemoveLiquid={() => {}}
+        onToggleSeal={workspaceActions.onToggleIceBathToolSeal}
+        tool={{ ...iceBathTool, id: `ice-bath-${iceBathTool.id}` }}
+      />
+    </div>
+  ) : undefined;
+
   return (
     <section className="overflow-hidden rounded-[2.25rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.75),rgba(255,255,255,0.55))] p-4 shadow-[0_28px_60px_rgba(15,23,42,0.08)] backdrop-blur xl:p-6">
       <div className="rounded-[1.6rem] border border-white/70 bg-white/65 px-4 py-3 shadow-sm">
@@ -505,6 +530,7 @@ export function LabSceneWorkspaceCanvas({
             const grinderTargetType = widgetDropTargets.find((target) => target === "grinder_widget");
             const vortexTargetType = widgetDropTargets.find((target) => target === "vortex_widget");
             const centrifugeTargetType = widgetDropTargets.find((target) => target === "centrifuge_widget");
+            const iceBathTargetType = widgetDropTargets.find((target) => target === "ice_bath_widget");
 
             return (
             <FloatingWidget
@@ -526,6 +552,8 @@ export function LabSceneWorkspaceCanvas({
                             ? "Vortex Widget"
                             : widgetId === "centrifuge"
                               ? "Centrifuge Widget"
+                              : widgetId === "ice_bath"
+                                ? "Ice Bath Widget"
                             : "Produce Basket Widget"
               }
               onDragStart={(id, event) => {
@@ -750,6 +778,16 @@ export function LabSceneWorkspaceCanvas({
                   startBlockReason={formatCentrifugeStartBlockReason(
                     centrifugeWidget?.centrifugeStartBlockReason,
                   )}
+                />
+              ) : widgetId === "ice_bath" ? (
+                <IceBathWidget
+                  headerAction={renderStoreWidgetAction(widget)}
+                  isDropHighlighted={
+                    iceBathTargetType ? dnd.isDropTargetHighlighted(iceBathTargetType) : false
+                  }
+                  onDragOver={dnd.iceBath.handleDragOver}
+                  onDrop={dnd.iceBath.handleDrop}
+                  stagedContent={iceBathStagedContent}
                 />
               ) : (
                 <WorkspaceEquipmentWidget

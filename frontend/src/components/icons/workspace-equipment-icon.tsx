@@ -1,5 +1,6 @@
 import { AutosamplerRackIllustration } from "@/components/illustrations/autosampler-rack-illustration";
 import { CentrifugeIllustration } from "@/components/illustrations/centrifuge-illustration";
+import { IceBathIllustration } from "@/components/illustrations/ice-bath-illustration";
 import { CryogenicGrinderIllustration } from "@/components/illustrations/cryogenic-grinder-illustration";
 import { LcMsMsInstrumentIllustration } from "@/components/illustrations/lc-msms-instrument-illustration";
 import { ProduceBasketIllustration } from "@/components/illustrations/produce-basket-illustration";
@@ -51,6 +52,14 @@ export function WorkspaceEquipmentIcon({
     return (
       <div className={className} data-widget-type={widgetType}>
         <CentrifugeIllustration hasTube={false} isRunning={false} separationProgress={0} startDisabled />
+      </div>
+    );
+  }
+
+  if (widgetType === "ice_bath") {
+    return (
+      <div className={className} data-widget-type={widgetType}>
+        <IceBathIllustration hasTube={false} />
       </div>
     );
   }

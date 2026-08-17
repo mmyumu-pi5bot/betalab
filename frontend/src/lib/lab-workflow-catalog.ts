@@ -159,6 +159,16 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         widgetType: "centrifuge",
       },
       {
+        id: "ice_bath_widget",
+        allowedDropTargets: ["workspace_canvas"],
+        itemType: "workspace_widget",
+        name: "Ice bath",
+        subtitle: "Tube chilling",
+        description: "Tray of ice water used to chill a tube and hold the QuEChERS exotherm down.",
+        accent: "sky",
+        widgetType: "ice_bath",
+      },
+      {
         id: "lims_terminal_widget",
         allowedDropTargets: ["workspace_canvas"],
         itemType: "workspace_widget",

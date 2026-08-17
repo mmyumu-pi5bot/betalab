@@ -127,6 +127,16 @@ def build_experiment(name: str = "Untitled experiment") -> Experiment:
                     is_trashed=False,
                 ),
                 WorkspaceWidget(
+                    id="ice_bath",
+                    widget_type="ice_bath",
+                    label="Ice bath",
+                    anchor="top-left",
+                    offset_x=1204,
+                    offset_y=886,
+                    is_present=False,
+                    is_trashed=False,
+                ),
+                WorkspaceWidget(
                     id="grinder",
                     widget_type="cryogenic_grinder",
                     label="Cryogenic grinder",

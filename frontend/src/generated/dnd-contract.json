@@ -124,7 +124,8 @@
         "gross_balance_widget",
         "analytical_balance_widget",
         "vortex_widget",
-        "centrifuge_widget"
+        "centrifuge_widget",
+        "ice_bath_widget"
       ],
       "can_receive_liquids": true,
       "can_receive_produce": false,

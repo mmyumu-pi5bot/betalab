@@ -26,6 +26,7 @@ export const labSceneWidgetIds = [
   "analytical_balance",
   "vortex",
   "centrifuge",
+  "ice_bath",
 ] as const satisfies readonly ExperimentWorkspaceWidgetId[];
 
 export type LabSceneWidgetId = (typeof labSceneWidgetIds)[number];
@@ -42,6 +43,7 @@ export const labSceneWidgetStorability: Record<LabSceneWidgetId, boolean> = {
   analytical_balance: true,
   vortex: true,
   centrifuge: true,
+  ice_bath: true,
 };
 
 export const labSceneWidgetFrameSpecs: Record<LabSceneWidgetId, WidgetLayout> = {
@@ -56,6 +58,7 @@ export const labSceneWidgetFrameSpecs: Record<LabSceneWidgetId, WidgetLayout> = 
   analytical_balance: { x: 688, y: 886, width: 276, fallbackHeight: 285 },
   vortex: { x: 1444, y: 886, width: 260, fallbackHeight: 260 },
   centrifuge: { x: 1740, y: 886, width: 292, fallbackHeight: 315 },
+  ice_bath: { x: 2064, y: 886, width: 292, fallbackHeight: 300 },
 };
 
 export const rackSlotCount = 12;

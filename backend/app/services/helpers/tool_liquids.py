@@ -106,9 +106,12 @@ def add_liquid_to_tool(
         tool.quechers_state.salts_added = True
         # The heat is released now, so the temperature that matters is the one
         # the mixture has now -- powder straight from the cryomill lands the
-        # whole exotherm far lower than powder left to warm on the bench.
+        # whole exotherm far lower than powder left to warm on the bench, and a
+        # tube standing in ice water has its solvent sitting at zero too.
         tool.quechers_state.start_temperature_c = PhysicalSimulationService.mixture_temperature_c(
-            tool, experiment.produce_material_states
+            tool,
+            experiment.produce_material_states,
+            surroundings=PhysicalSimulationService.surroundings_for_tool(experiment, tool),
         )
         tool.quechers_state.phase = "reacting" if _tool_has_wet_contents(tool) else "armed"
         tool.contents_homogeneity = 0.0 if had_contents else 1.0

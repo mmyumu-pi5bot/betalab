@@ -28,7 +28,7 @@ from app.services.helpers.produce_material_states import (
     set_material_state_name,
     update_material_state,
 )
-from app.services.physical_simulation_service import PhysicalSimulationService
+from app.services.physical_simulation_service import PhysicalSimulationService, ThermalSurroundings
 from app.services.received_sample_generation import build_received_sampling_bag
 
 physical_simulation_service = PhysicalSimulationService()
@@ -335,26 +335,38 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
         return
 
     elapsed_seconds = elapsed_ms / 1000.0
-    quechers_tools: dict[str, WorkbenchTool] = {}
+    # A tool is paired with what it exchanges heat with, because where it stands
+    # is what decides whether it warms towards the room or is pulled down to zero.
+    bench = physical_simulation_service.bench_surroundings()
+    quechers_tools: dict[str, tuple[WorkbenchTool, ThermalSurroundings]] = {}
     for slot in experiment.workbench.slots:
         if slot.tool is not None:
-            quechers_tools[slot.tool.id] = slot.tool
+            quechers_tools[slot.tool.id] = (slot.tool, bench)
     for slot in experiment.rack.slots:
         if slot.tool is not None:
-            quechers_tools[slot.tool.id] = slot.tool
+            quechers_tools[slot.tool.id] = (slot.tool, bench)
     for tool in experiment.trash.children:
-        quechers_tools[tool.id] = tool
+        quechers_tools[tool.id] = (tool, bench)
     for tool in experiment.basket_tools:
-        quechers_tools[tool.id] = tool
+        quechers_tools[tool.id] = (tool, bench)
     for widget in experiment.workspace.widgets:
         if widget.tool is not None:
-            quechers_tools[widget.tool.id] = widget.tool
-    for tool in quechers_tools.values():
+            quechers_tools[widget.tool.id] = (
+                widget.tool,
+                physical_simulation_service.surroundings_for_widget(widget),
+            )
+    for tool, surroundings in quechers_tools.values():
         physical_simulation_service.advance_tool_contents_temperature(
-            tool, elapsed_seconds, experiment.produce_material_states
+            tool,
+            elapsed_seconds,
+            experiment.produce_material_states,
+            surroundings=surroundings,
         )
         physical_simulation_service.advance_quechers_tool(
-            tool, elapsed_seconds, material_states=experiment.produce_material_states
+            tool,
+            elapsed_seconds,
+            material_states=experiment.produce_material_states,
+            surroundings=surroundings,
         )
         physical_simulation_service.advance_quechers_pesticide_degradation(
             tool, elapsed_seconds, experiment.produce_material_states

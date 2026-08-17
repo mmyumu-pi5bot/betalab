@@ -11,6 +11,7 @@ import { SpatulaOverlay } from "@/components/lab-scene-spatula-overlay";
 import { PipetteOverlay } from "@/components/lab-scene-pipette-overlay";
 import type { DebugProducePreset } from "@/components/debug-produce-palette";
 import type { CentrifugeDndApi } from "@/hooks/use-centrifuge-dnd";
+import type { IceBathDndApi } from "@/hooks/use-ice-bath-dnd";
 import type { AnalyticalBalanceDndApi } from "@/hooks/use-analytical-balance-dnd";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { GrinderDndApi } from "@/hooks/use-grinder-dnd";
@@ -68,6 +69,7 @@ type LabSceneViewProps = {
   dnd: {
     analyticalBalance: AnalyticalBalanceDndApi;
     centrifuge: CentrifugeDndApi;
+    iceBath: IceBathDndApi;
     clearDropTargets: () => void;
     dndDisabledByAction: boolean;
     grinder: GrinderDndApi;
@@ -170,6 +172,7 @@ type LabSceneViewProps = {
     onStoreWorkspaceWidget: (widgetId: ExperimentWorkspaceWidget["id"]) => void;
     onToggleVortexToolSeal: () => void;
     onToggleCentrifugeToolSeal: () => void;
+    onToggleIceBathToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;

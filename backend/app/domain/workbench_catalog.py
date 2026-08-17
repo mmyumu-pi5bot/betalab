@@ -213,6 +213,13 @@ _WORKSPACE_WIDGET_ITEMS = {
         "subtitle": "Phase separation",
         "widget_type": "centrifuge",
     },
+    "ice_bath_widget": {
+        "accent": "sky",
+        "description": "Tray of ice water used to chill a tube and hold the QuEChERS exotherm down.",
+        "name": "Ice bath",
+        "subtitle": "Tube chilling",
+        "widget_type": "ice_bath",
+    },
     "lims_terminal_widget": {
         "accent": "emerald",
         "description": "Terminal used to register the sample and print the lab label.",
@@ -270,6 +277,7 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
             "cryogenic_grinder_widget",
             "vortex_mixer_widget",
             "centrifuge_widget",
+            "ice_bath_widget",
             "lims_terminal_widget",
             "gross_balance_widget",
             "analytical_balance_widget",

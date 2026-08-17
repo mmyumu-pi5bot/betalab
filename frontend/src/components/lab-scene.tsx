@@ -17,6 +17,7 @@ import { useLabExperiment } from "@/hooks/use-lab-experiment";
 import { useRackDnd } from "@/hooks/use-rack-dnd";
 import { useActionMode } from "@/hooks/use-action-mode";
 import { useCentrifugeDnd } from "@/hooks/use-centrifuge-dnd";
+import { useIceBathDnd } from "@/hooks/use-ice-bath-dnd";
 import { useTrashDnd } from "@/hooks/use-trash-dnd";
 import { useVortexDnd } from "@/hooks/use-vortex-dnd";
 import { useWorkbenchDnd } from "@/hooks/use-workbench-dnd";
@@ -442,6 +443,10 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       : null;
   const centrifugeTool = centrifugeWidget?.tool ?? null;
   const isCentrifugeRunning = (centrifugeWidget?.centrifugeRunRemainingMs ?? 0) > 0;
+  const iceBathTool =
+    state.status === "ready"
+      ? (state.experiment.workspace.widgets.find((w) => w.id === "ice_bath")?.tool ?? null)
+      : null;
 
   const rackDnd = useRackDnd({
     dndDisabledByAction,
@@ -530,6 +535,13 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
     experimentApi: dndApi,
     isRunning: isCentrifugeRunning,
+  });
+
+  const iceBathDnd = useIceBathDnd({
+    iceBathTool,
+    dndDisabledByAction,
+    dragState: { clearDropTargets, setActiveDragItem, showDropTargets },
+    experimentApi: dndApi,
   });
 
   const { handleWorkspaceDragOver, handleWorkspaceDrop } = useWorkspaceDrop({
@@ -757,6 +769,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       dnd={{
         analyticalBalance: analyticalBalanceDnd,
         centrifuge: centrifugeDnd,
+        iceBath: iceBathDnd,
         clearDropTargets,
         dndDisabledByAction,
         grinder: grinderDnd,
@@ -875,6 +888,16 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
             return;
           }
           void experimentApi.centrifuge.closeTool();
+        },
+        onToggleIceBathToolSeal: () => {
+          if (!iceBathTool) {
+            return;
+          }
+          if (iceBathTool.isSealed) {
+            void experimentApi.iceBath.openTool();
+            return;
+          }
+          void experimentApi.iceBath.closeTool();
         },
         onStartVortex: () => { void experimentApi.vortex.start(); },
         onStoreWorkspaceWidget: (widgetId) => {

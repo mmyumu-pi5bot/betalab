@@ -10,6 +10,7 @@ export type DropTargetType =
   | "analytical_balance_widget"
   | "vortex_widget"
   | "centrifuge_widget"
+  | "ice_bath_widget"
   | "lcmsms_instrument";
 
 type ToolbarBaseItem = {
@@ -52,7 +53,8 @@ export type WorkspaceWidgetType =
   | "gross_balance"
   | "analytical_balance"
   | "vortex_mixer"
-  | "centrifuge";
+  | "centrifuge"
+  | "ice_bath";
 export type ExperimentWorkspaceWidgetId =
   | "workbench"
   | "trash"
@@ -64,7 +66,8 @@ export type ExperimentWorkspaceWidgetId =
   | "gross_balance"
   | "analytical_balance"
   | "vortex"
-  | "centrifuge";
+  | "centrifuge"
+  | "ice_bath";
 export type ExperimentWorkspaceWidgetType = "workbench" | "trash" | WorkspaceWidgetType;
 export type WidgetAnchor = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type ProduceLotType = string;
@@ -89,6 +92,7 @@ type DragSourceKind =
   | "analytical_balance"
   | "vortex"
   | "centrifuge"
+  | "ice_bath"
   | "lims";
 
 export type DebugProducePresetId = "apple_powder_residual_co2";
@@ -298,6 +302,15 @@ export type CentrifugeToolDragPayload = BaseDragPayload & {
   entityKind: "tool";
   sourceId: string;
   sourceKind: "centrifuge";
+  toolId: string;
+  toolType: ToolType;
+};
+
+export type IceBathToolDragPayload = BaseDragPayload & {
+  entityId: string;
+  entityKind: "tool";
+  sourceId: string;
+  sourceKind: "ice_bath";
   toolId: string;
   toolType: ToolType;
 };

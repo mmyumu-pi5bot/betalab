@@ -5,7 +5,7 @@ import random
 from dataclasses import dataclass
 from math import exp
 
-from app.domain.models import ProduceLot, ProduceMaterialState, QuechersExtractionResult, WorkbenchTool, WorkspaceWidget
+from app.domain.models import Experiment, ProduceLot, ProduceMaterialState, QuechersExtractionResult, WorkbenchTool, WorkspaceWidget
 from app.domain.pesticide_catalog import apply_degradation_step
 from app.services.helpers.lookups import round_volume
 from app.services.helpers.produce_material_states import find_material_state, get_material_state_name, get_temperature_c, update_material_state
@@ -23,6 +23,16 @@ class ContainerPressureEvent:
     pressure_bar: float
     lost_mass_g: float
     vented_co2_mass_g: float
+
+
+@dataclass(frozen=True, slots=True)
+class ThermalSurroundings:
+    """What a tool exchanges heat with, and how briskly."""
+
+    temperature_c: float
+    #: Scales whatever bench rate the consumer already uses, so still air stays
+    #: exactly as it was and stirred ice water simply carries heat away faster.
+    exchange_multiplier: float = 1.0
 
 
 class PhysicalSimulationService:
@@ -55,6 +65,10 @@ class PhysicalSimulationService:
     freeze_end_temperature_c = -2.0
     heat_transfer_ua_kj_per_s_c = 1.5
     warming_rate_per_second = 0.014
+    #: Melting ice pins the bath at zero for as long as any ice is left, and water
+    #: pulls heat out of a tube far faster than still air does.
+    ice_bath_temperature_c = 0.0
+    ice_bath_exchange_multiplier = 7.0
     ambient_sublimation_g_per_second = 0.04
     residual_degassing_g_per_second = 12.0
     sealed_pressure_degassing_g_per_second = 0.03
@@ -118,11 +132,34 @@ class PhysicalSimulationService:
     ) -> None:
         self._advance_widget_cryogenics(widget, elapsed_seconds, material_states=material_states)
 
+    @classmethod
+    def bench_surroundings(cls) -> ThermalSurroundings:
+        return ThermalSurroundings(temperature_c=cls.ambient_temperature_c)
+
+    @classmethod
+    def surroundings_for_widget(cls, widget: WorkspaceWidget) -> ThermalSurroundings:
+        if widget.widget_type == "ice_bath":
+            return ThermalSurroundings(
+                temperature_c=cls.ice_bath_temperature_c,
+                exchange_multiplier=cls.ice_bath_exchange_multiplier,
+            )
+        return cls.bench_surroundings()
+
+    @classmethod
+    def surroundings_for_tool(cls, experiment: Experiment, tool: WorkbenchTool) -> ThermalSurroundings:
+        """Where this tool is standing, for anything that needs it outside the tick."""
+        for widget in experiment.workspace.widgets:
+            if widget.tool is not None and widget.tool.id == tool.id:
+                return cls.surroundings_for_widget(widget)
+        return cls.bench_surroundings()
+
     def advance_tool_contents_temperature(
         self,
         tool: WorkbenchTool,
         elapsed_seconds: float,
         material_states: list[ProduceMaterialState],
+        *,
+        surroundings: ThermalSurroundings | None = None,
     ) -> None:
         """Let a weighed portion exchange heat with its surroundings.
 
@@ -134,15 +171,16 @@ class PhysicalSimulationService:
         elapsed_seconds = max(float(elapsed_seconds), 0.0)
         if elapsed_seconds <= 0 or not tool.produce_fractions:
             return
-        warming_progress = min(self.warming_rate_per_second * elapsed_seconds, 0.95)
+        surroundings = surroundings or self.bench_surroundings()
+        progress = 1.0 - exp(
+            -self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds
+        )
         states_by_id = {state.id: state for state in material_states}
         for fraction in tool.produce_fractions:
             state = states_by_id.get(fraction.produce_material_state_id)
             if state is None:
                 continue
-            state.temperature_c += (
-                self.ambient_temperature_c - state.temperature_c
-            ) * warming_progress
+            state.temperature_c += (surroundings.temperature_c - state.temperature_c) * progress
 
     def advance_quechers_tool(
         self,
@@ -150,16 +188,20 @@ class PhysicalSimulationService:
         elapsed_seconds: float,
         *,
         material_states: list[ProduceMaterialState] | None = None,
+        surroundings: ThermalSurroundings | None = None,
     ) -> None:
         state = tool.quechers_state
         elapsed_seconds = max(float(elapsed_seconds), 0.0)
         if elapsed_seconds <= 0:
             return
+        surroundings = surroundings or self.bench_surroundings()
         if state.reaction_elapsed_seconds <= 0:
             # No exotherm owns the temperature yet, so the tube simply reads what
             # it holds. Reporting a flat room temperature until the salts go in
             # would hide the one number that decides how high the reaction climbs.
-            state.temperature_c = self.mixture_temperature_c(tool, material_states or [])
+            state.temperature_c = self.mixture_temperature_c(
+                tool, material_states or [], surroundings=surroundings
+            )
         if not state.salts_added:
             return
         if state.phase == "armed" and (tool.liquids or tool.produce_lots or tool.produce_fractions):
@@ -172,21 +214,39 @@ class PhysicalSimulationService:
         if state.phase == "armed" or (state.phase == "cemented" and state.reaction_elapsed_seconds <= 0):
             return
 
+        elapsed_before = state.reaction_elapsed_seconds
         state.reaction_elapsed_seconds += elapsed_seconds
-        peak_temperature_c = state.start_temperature_c + self.quechers_exotherm_delta_c
-        if state.reaction_elapsed_seconds <= self.quechers_heat_rise_seconds:
-            ratio = state.reaction_elapsed_seconds / self.quechers_heat_rise_seconds
+        rise_seconds = self.quechers_heat_rise_seconds
+        if state.reaction_elapsed_seconds <= rise_seconds:
+            ratio = state.reaction_elapsed_seconds / rise_seconds
             state.temperature_c = (
                 state.start_temperature_c + self.quechers_exotherm_delta_c * ratio
             )
         else:
-            # Once the salts are spent the tube is just a warm object on a bench:
-            # it relaxes towards the room, not back down to the temperature the
-            # mixture happened to start from.
-            cooling_seconds = state.reaction_elapsed_seconds - self.quechers_heat_rise_seconds
-            state.temperature_c = self.ambient_temperature_c + (
-                peak_temperature_c - self.ambient_temperature_c
-            ) * math.exp(-self.quechers_cooling_rate_per_second * cooling_seconds)
+            # Once the salts are spent the tube is just a warm object standing
+            # somewhere: it relaxes towards whatever surrounds it, not back down
+            # to the temperature the mixture happened to start from. Stepping the
+            # relaxation instead of solving it from the peak is what lets the tube
+            # be moved into a colder place partway through and feel it.
+            if elapsed_before < rise_seconds:
+                # This tick straddles the peak. Finish the rise first, then cool
+                # only for the part of the tick that came after it -- otherwise a
+                # tick landing a millisecond past the peak would cool for its whole
+                # length and swallow the top of the exotherm.
+                state.temperature_c = (
+                    state.start_temperature_c + self.quechers_exotherm_delta_c
+                )
+                cooling_seconds = state.reaction_elapsed_seconds - rise_seconds
+            else:
+                cooling_seconds = elapsed_seconds
+            cooling_progress = 1.0 - math.exp(
+                -self.quechers_cooling_rate_per_second
+                * surroundings.exchange_multiplier
+                * cooling_seconds
+            )
+            state.temperature_c += (
+                surroundings.temperature_c - state.temperature_c
+            ) * cooling_progress
 
         if state.phase == "reacting":
             state.cementation_progress = min(
@@ -213,15 +273,18 @@ class PhysicalSimulationService:
         cls,
         tool: WorkbenchTool,
         material_states: list[ProduceMaterialState],
+        *,
+        surroundings: ThermalSurroundings | None = None,
     ) -> float:
         """Temperature of everything currently in a tool, weighted by thermal mass.
 
         Powder carries its own temperature -- the cryogenic chain leaves it well
-        below the room and it warms back over minutes -- while solvents are drawn
-        at bench temperature. Ten grams of produce outweighs ten millilitres of
-        acetonitrile by roughly two to one in heat capacity, so the powder is
+        below the room and it warms back over minutes -- while solvents sit at
+        whatever surrounds the tube. Ten grams of produce outweighs ten millilitres
+        of acetonitrile by roughly two to one in heat capacity, so the powder is
         what mostly decides where the mixture sits.
         """
+        surroundings = surroundings or cls.bench_surroundings()
         thermal_mass = 0.0
         weighted = 0.0
         # Resolve each fraction through its own material state id: several states
@@ -249,9 +312,9 @@ class PhysicalSimulationService:
                 volume_ml * cls.solvent_density_g_per_ml * cls.solvent_specific_heat_j_per_g_k
             )
             thermal_mass += capacity
-            weighted += capacity * cls.ambient_temperature_c
+            weighted += capacity * surroundings.temperature_c
         if thermal_mass <= 0:
-            return cls.ambient_temperature_c
+            return surroundings.temperature_c
         return weighted / thermal_mass
 
     def advance_quechers_pesticide_degradation(

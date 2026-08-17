@@ -64,6 +64,7 @@ export type DndTargetId =
   | "lcmsms-instrument-dropzone"
   | "rack-illustration-slot-1"
   | "vortex-dropzone"
+  | "ice-bath-dropzone"
   | "widget-workspace"
   | "trash-dropzone";
 
@@ -218,6 +219,7 @@ export const dndTargetCases: {
   { id: "lcmsms-instrument-dropzone", label: "LC-MS/MS", assertDragOver: true },
   { id: "rack-illustration-slot-1", label: "rack slot", assertDragOver: true },
   { id: "vortex-dropzone", label: "vortex", assertDragOver: true },
+  { id: "ice-bath-dropzone", label: "ice bath", assertDragOver: true },
   { id: "widget-workspace", label: "workspace canvas", assertDragOver: false },
   { id: "trash-dropzone", label: "trash", assertDragOver: true },
 ];
@@ -425,9 +427,20 @@ function makeWorkspaceWidgets(
       isPresent: true,
       isTrashed: false,
     },
+    {
+      id: "ice_bath",
+      widgetType: "ice_bath",
+      label: "Ice bath",
+      dropTargetTypes: ["ice_bath_widget"],
+      anchor: "top-left",
+      offsetX: 2064,
+      offsetY: 886,
+      isPresent: true,
+      isTrashed: false,
+    },
   ];
 
-  const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex"]);
+  const storableWidgetIds = new Set(["lims", "rack", "instrument", "grinder", "gross_balance", "analytical_balance", "vortex", "ice_bath"]);
 
   return baseWidgets.map((widget, index) => {
     const merged = { ...widget, ...(normalizedOverrides[index] ?? {}) };
@@ -2623,21 +2636,26 @@ function getAnalyticalBalanceTargetExpectation(sourceCase: DndSourceCase) {
   return { compatible: false, command: null };
 }
 
-const vortexCompatibleToolTypes = new Set(["centrifuge_tube"]);
+const tubeWidgetCompatibleToolTypes = new Set(["centrifuge_tube"]);
 
-function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: boolean; command: null | { type: string; payload: unknown } } {
+// The ice bath and the vortex accept the same thing -- a 50 mL centrifuge tube --
+// so they share one expectation builder rather than a copy that can drift.
+function getTubeWidgetTargetExpectation(
+  sourceCase: DndSourceCase,
+  widget: "vortex" | "ice_bath",
+): { compatible: boolean; command: null | { type: string; payload: unknown } } {
   if (sourceCase.id.startsWith("palette-")) {
     const toolId = sourceCase.id.replace("palette-", "");
     const item = toolItems.find((t) => t.id === toolId);
-    if (item && vortexCompatibleToolTypes.has(item.toolType)) {
+    if (item && tubeWidgetCompatibleToolTypes.has(item.toolType)) {
       return {
         compatible: true,
         command: expectedToolMoveCommand({
           entityId: toolId,
           sourceKind: "palette",
           sourceId: toolId,
-          destinationKind: "vortex",
-          destinationId: "vortex",
+          destinationKind: widget,
+          destinationId: widget,
         }),
       };
     }
@@ -2647,15 +2665,15 @@ function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: bo
   if (sourceCase.id.startsWith("workbench-")) {
     const toolId = sourceCase.id.replace("workbench-", "");
     const item = toolItems.find((t) => t.id === toolId);
-    if (item && vortexCompatibleToolTypes.has(item.toolType)) {
+    if (item && tubeWidgetCompatibleToolTypes.has(item.toolType)) {
       return {
         compatible: true,
         command: expectedToolMoveCommand({
           entityId: "bench_tool_1",
           sourceKind: "workbench",
           sourceId: "station_1",
-          destinationKind: "vortex",
-          destinationId: "vortex",
+          destinationKind: widget,
+          destinationId: widget,
         }),
       };
     }
@@ -2665,15 +2683,15 @@ function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: bo
   if (sourceCase.id.startsWith("trash-tool-")) {
     const toolId = sourceCase.id.replace("trash-tool-", "");
     const item = toolItems.find((t) => t.id === toolId);
-    if (item && vortexCompatibleToolTypes.has(item.toolType)) {
+    if (item && tubeWidgetCompatibleToolTypes.has(item.toolType)) {
       return {
         compatible: true,
         command: expectedToolMoveCommand({
           entityId: "bench_tool_1",
           sourceKind: "trash",
           sourceId: "bench_tool_1",
-          destinationKind: "vortex",
-          destinationId: "vortex",
+          destinationKind: widget,
+          destinationId: widget,
         }),
       };
     }
@@ -2685,6 +2703,14 @@ function getVortexTargetExpectation(sourceCase: DndSourceCase): { compatible: bo
   }
 
   return { compatible: false, command: null };
+}
+
+function getVortexTargetExpectation(sourceCase: DndSourceCase) {
+  return getTubeWidgetTargetExpectation(sourceCase, "vortex");
+}
+
+function getIceBathTargetExpectation(sourceCase: DndSourceCase) {
+  return getTubeWidgetTargetExpectation(sourceCase, "ice_bath");
 }
 
 export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCase) => {
@@ -2699,6 +2725,9 @@ export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCas
     "vortex-dropzone":
       sourceCase.targetExpectations["vortex-dropzone"] ??
       getVortexTargetExpectation(sourceCase),
+    "ice-bath-dropzone":
+      sourceCase.targetExpectations["ice-bath-dropzone"] ??
+      getIceBathTargetExpectation(sourceCase),
     "lcmsms-instrument-dropzone":
       sourceCase.targetExpectations["lcmsms-instrument-dropzone"] ?? {
         compatible: false,
@@ -2714,6 +2743,7 @@ export const dndSourceCases: DndSourceCase[] = baseDndSourceCases.map((sourceCas
         : [...sourceCase.availableTargets, "gross-balance-dropzone"]),
       "analytical-balance-dropzone",
       "vortex-dropzone",
+      "ice-bath-dropzone",
       "lcmsms-instrument-dropzone",
     ],
     targetExpectations,

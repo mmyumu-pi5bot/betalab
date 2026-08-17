@@ -4,6 +4,7 @@ import type {
   BasketToolDragPayload,
   BenchToolDragPayload,
   CentrifugeToolDragPayload,
+  IceBathToolDragPayload,
   DragDescriptor,
   DropTargetType,
   GrossBalanceToolDragPayload,
@@ -28,6 +29,7 @@ export type EquipmentToolDragPayload =
   | GrossBalanceToolDragPayload
   | AnalyticalBalanceToolDragPayload
   | CentrifugeToolDragPayload
+  | IceBathToolDragPayload
   | VortexToolDragPayload
   | TrashToolDragPayload;
 
@@ -57,6 +59,7 @@ function isDropTargetType(targetType: unknown): targetType is DropTargetType {
     targetType === "analytical_balance_widget" ||
     targetType === "vortex_widget" ||
     targetType === "centrifuge_widget" ||
+    targetType === "ice_bath_widget" ||
     targetType === "lcmsms_instrument"
   );
 }
@@ -377,6 +380,8 @@ export function readEquipmentToolDragPayload(
         return { ...base, sourceKind: "vortex" };
       case "centrifuge":
         return { ...base, sourceKind: "centrifuge" };
+      case "ice_bath":
+        return { ...base, sourceKind: "ice_bath" };
       case "trash":
         if (typeof parsed.trashToolId !== "string") return null;
         return { ...base, sourceKind: "trash", trashToolId: parsed.trashToolId };

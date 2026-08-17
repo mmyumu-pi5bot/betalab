@@ -1704,6 +1704,28 @@ export async function openCentrifugeTool(
   });
 }
 
+export async function closeIceBathTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/ice-bath/tool/close`,
+  });
+}
+
+export async function openIceBathTool(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  void payload;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/ice-bath/tool/open`,
+  });
+}
+
 export async function pourExtractToVial(
   experimentId: string,
   payload: MutationPayload,

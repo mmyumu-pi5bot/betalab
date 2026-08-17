@@ -332,6 +332,10 @@ export function useLabExperiment({
       closeTool: () => exec(mutationFns.closeCentrifugeTool),
       openTool: () => exec(mutationFns.openCentrifugeTool),
     },
+    iceBath: {
+      closeTool: () => exec(mutationFns.closeIceBathTool),
+      openTool: () => exec(mutationFns.openIceBathTool),
+    },
 
     // ── Grinder ───────────────────────────────────────────────────────────────
     grinder: {
