@@ -32,6 +32,28 @@ class ExperimentStatus(StrEnum):
     PREPARING = "preparing"
 
 
+class JournalEventCategory(StrEnum):
+    SYSTEM = "system"
+    MANIPULATION = "manipulation"
+    SIMULATION = "simulation"
+    LAYOUT = "layout"
+
+
+class JournalEventSeverity(StrEnum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+@dataclass(frozen=True, slots=True)
+class JournalEvent:
+    id: str
+    occurred_at: datetime
+    category: JournalEventCategory
+    severity: JournalEventSeverity
+    message: str
+
+
 @dataclass
 class PrintedLabelTicket:
     id: str
@@ -515,6 +537,7 @@ class Experiment:
     lims_entries: list[LimsReception] = field(default_factory=list)
     snapshot_version: int = 0
     audit_log: list[str] = field(default_factory=list)
+    journal_entries: list[JournalEvent] = field(default_factory=list)
 
 
 def new_id(prefix: str) -> str:

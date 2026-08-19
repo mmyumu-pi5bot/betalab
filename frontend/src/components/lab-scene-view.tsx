@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import type { Dispatch, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject, SetStateAction } from "react";
 import type { DragEvent } from "react";
 
 import { ActionBarPanel } from "@/components/action-bar-panel";
+import { ExperimentAppHeader } from "@/components/experiment-app-header";
 import { LabSceneInventoryPanel } from "@/components/lab-scene-inventory-panel";
 import { LabSceneWorkspaceCanvas } from "@/components/lab-scene-workspace-canvas";
 import { SpatulaOverlay } from "@/components/lab-scene-spatula-overlay";
@@ -201,20 +201,12 @@ export function LabSceneView({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_30%),linear-gradient(180deg,#fffaf0_0%,#eef6ff_100%)] px-4 py-8 text-slate-950 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
       <div className="mx-auto w-full">
-        <nav aria-label="Breadcrumb" className="mb-3">
-          <Link
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
-            href="/"
-          >
-            <span aria-hidden="true">←</span>
-            <span>Experiments</span>
-          </Link>
-        </nav>
-        <header className="mb-8 rounded-[2rem] border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur xl:p-8">
-          <h1 className="text-4xl font-semibold tracking-tight xl:text-[3.25rem]">
-            Laboratory workspace
-          </h1>
-        </header>
+        <ExperimentAppHeader
+          experimentName={experiment.name || experiment.id}
+          isSyncing={ui.isCommandPending}
+          journalEntries={experiment.journalEntries}
+          statusMessage={ui.statusMessage}
+        />
 
         <div className="mt-6 grid gap-4 xl:grid-cols-[202px_minmax(0,1fr)_92px] xl:items-start xl:gap-6">
           <LabSceneInventoryPanel

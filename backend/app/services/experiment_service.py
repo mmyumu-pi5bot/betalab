@@ -13,6 +13,7 @@ from app.services.experiment_factory import build_experiment
 from app.services.experiment_repository import ExperimentRepository, InMemoryExperimentRepository
 from app.services.helpers.lookups import find_experiment_tool
 from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
+from app.services.journal_service import synchronize_journal_entries
 
 
 class ExperimentNotFoundError(KeyError):
@@ -143,6 +144,7 @@ class ExperimentRuntimeService:
                 "pipette": asdict(experiment.pipette),
                 "analytical_balance": asdict(experiment.analytical_balance),
                 "audit_log": experiment.audit_log,
+                "journal_entries": [asdict(entry) for entry in experiment.journal_entries],
             }
         )
 
@@ -150,5 +152,6 @@ class ExperimentRuntimeService:
         experiment.snapshot_version += 1
         sync_canonical_produce_model(experiment)
         sync_pesticide_material_states(experiment)
+        synchronize_journal_entries(experiment, occurred_at=self._now_fn())
         self._repository.save(experiment)
         return self._to_schema(experiment)

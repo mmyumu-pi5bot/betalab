@@ -426,6 +426,15 @@ function makeProduceLot(overrides: Partial<ExperimentProduceLot> & { id: string 
 function makeWorkbenchExperiment({
   analyticalBalance = { tareMassG: null, taredToolId: null },
   auditLog = ["Experiment created", "Receive the grower bag, weigh it, then register it in the LIMS."],
+  journalEntries = auditLog.map((message, index) => ({
+    id: `journal_${index}`,
+    occurredAt: "2026-03-28T19:00:00Z",
+    category: message.includes("moved in workspace") || message.includes("repositioned in workspace")
+      ? "layout" as const
+      : "manipulation" as const,
+    severity: "info" as const,
+    message,
+  })),
   basketProduceLots = [],
   basketTools = [],
   lastSimulationAt = "2026-03-28T19:00:00Z",
@@ -442,6 +451,7 @@ function makeWorkbenchExperiment({
 }: {
   analyticalBalance?: Experiment["analyticalBalance"];
   auditLog?: string[];
+  journalEntries?: Experiment["journalEntries"];
   basketProduceLots?: ExperimentProduceLot[];
   basketTools?: BenchToolInstance[];
   lastSimulationAt?: string;
@@ -500,6 +510,7 @@ function makeWorkbenchExperiment({
     analyticalBalance,
     limsReception,
     limsEntries,
+    journalEntries,
     audit_log: auditLog,
   };
 }
@@ -988,6 +999,8 @@ describe("LabScene", () => {
       "href",
       "/",
     );
+    expect(screen.getByRole("button", { name: "Open experiment journal" })).toBeInTheDocument();
+    expect(screen.queryByText("Custom layout")).not.toBeInTheDocument();
   });
 
   it("shows a separate debug produce palette and spawns its preset on drop", async () => {

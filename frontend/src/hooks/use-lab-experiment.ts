@@ -96,18 +96,14 @@ export function useLabExperiment({
   const grossBalanceOffsetInFlightRef = useRef(false);
   const { isPending: isCommandPending, isPendingRef: isCommandPendingRef, setPending: setCommandPending } = useCommandPending();
 
-  const getLatestStatusMessage = useCallback((experiment: Experiment) => {
-    return experiment.audit_log.at(-1) ?? defaultStatusMessage;
-  }, [defaultStatusMessage]);
-
   const applyExperimentSnapshot = useCallback((experiment: Experiment) => {
     if (experiment.snapshot_version < latestSnapshotVersionRef.current) {
       return;
     }
     latestSnapshotVersionRef.current = experiment.snapshot_version;
     setState({ status: "ready", experiment });
-    setStatusMessage(getLatestStatusMessage(experiment));
-  }, [getLatestStatusMessage]);
+    setStatusMessage(defaultStatusMessage);
+  }, [defaultStatusMessage]);
 
   const loadExperiment = useCallback(async () => {
     latestSnapshotVersionRef.current = 0;

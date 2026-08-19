@@ -37,6 +37,14 @@ export type ExperimentWorkspace = {
   widgets: ExperimentWorkspaceWidget[];
 };
 
+export type JournalEntry = {
+  id: string;
+  occurredAt: string;
+  category: "system" | "manipulation" | "simulation" | "layout";
+  severity: "info" | "warning" | "error";
+  message: string;
+};
+
 export type Experiment = {
   id: string;
   name: string;
@@ -54,6 +62,7 @@ export type Experiment = {
   spatula: SpatulaState;
   pipette: PipetteState;
   analyticalBalance: AnalyticalBalanceState;
+  journalEntries: JournalEntry[];
   audit_log: string[];
 };
 

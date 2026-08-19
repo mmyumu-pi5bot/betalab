@@ -122,7 +122,6 @@ type LabSceneWorkspaceCanvasProps = {
     isTrashOpen: boolean;
     setIsBasketOpen: Dispatch<SetStateAction<boolean>>;
     setIsTrashOpen: Dispatch<SetStateAction<boolean>>;
-    statusMessage: string;
   };
   workbench: {
     canApplyLimsLabelToSlot: (slot: BenchSlot) => boolean;
@@ -440,19 +439,8 @@ export function LabSceneWorkspaceCanvas({
 
   return (
     <section className="overflow-hidden rounded-[2.25rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.75),rgba(255,255,255,0.55))] p-4 shadow-[0_28px_60px_rgba(15,23,42,0.08)] backdrop-blur xl:p-6">
-      <div className="rounded-[1.6rem] border border-white/70 bg-white/65 px-4 py-3 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Custom layout
-          </p>
-          <p className="min-w-0 truncate text-sm text-slate-600">
-            {ui.isCommandPending ? `${ui.statusMessage} Syncing...` : ui.statusMessage}
-          </p>
-        </div>
-      </div>
-
       <div
-        className={`relative mt-4 overflow-hidden rounded-[2rem] border border-dashed bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.75),rgba(248,250,252,0.7)_40%,rgba(226,232,240,0.55)_100%)] transition-colors ${
+        className={`relative overflow-hidden rounded-[2rem] border border-dashed bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.75),rgba(248,250,252,0.7)_40%,rgba(226,232,240,0.55)_100%)] transition-colors ${
           dnd.isDropTargetHighlighted("workspace_canvas")
             ? "border-sky-300/90 ring-2 ring-sky-200/80"
             : "border-slate-300/80"

@@ -85,6 +85,7 @@ const makeExperiment = (): Experiment => ({
     tareMassG: null,
     taredToolId: null,
   },
+  journalEntries: [],
   audit_log: [],
 });
 
@@ -94,6 +95,38 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("normalizes structured journal entries from snake case", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...makeExperiment(),
+        journalEntries: undefined,
+        journal_entries: [
+          {
+            id: "journal_1",
+            occurred_at: "2026-08-19T12:30:00Z",
+            category: "simulation",
+            severity: "warning",
+            message: "Pressure increased.",
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getExperiment("experiment_test");
+
+    expect(result.journalEntries).toEqual([
+      {
+        id: "journal_1",
+        occurredAt: "2026-08-19T12:30:00Z",
+        category: "simulation",
+        severity: "warning",
+        message: "Pressure increased.",
+      },
+    ]);
+  });
+
   it("normalizes the LIMS packaging tare used to calculate received net mass", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

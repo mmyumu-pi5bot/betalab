@@ -26,6 +26,9 @@ from app.domain.models import (
     ExperimentStatus,
     InjectionContext,
     InjectionMeasurement,
+    JournalEvent,
+    JournalEventCategory,
+    JournalEventSeverity,
     LimsLabel,
     LimsReception,
     ManualLabel,
@@ -63,6 +66,7 @@ from app.services.helpers.produce_canonical import (
     sync_canonical_produce_model,
     sync_pesticide_material_states,
 )
+from app.services.journal_service import build_journal_event
 
 
 class ExperimentRepository(Protocol):
@@ -98,7 +102,14 @@ class SqliteExperimentRepository:
     def save(self, experiment: Experiment) -> None:
         payload = json.dumps(_serialize_experiment(experiment), sort_keys=True)
         now = datetime.now(UTC).isoformat()
-        last_audit_entry = experiment.audit_log[-1] if experiment.audit_log else None
+        last_audit_entry = next(
+            (
+                entry.message
+                for entry in reversed(experiment.journal_entries)
+                if entry.category != JournalEventCategory.LAYOUT
+            ),
+            None,
+        )
         summary = _build_experiment_summary(experiment)
         with self._connect() as connection:
             connection.execute(
@@ -330,6 +341,21 @@ def _summary_metadata_from_payload(payload: dict) -> tuple[str, ExperimentSummar
 
 def _deserialize_experiment(payload: dict) -> Experiment:
     schema = ExperimentSchema.model_validate(payload)
+    journal_entries = [
+        JournalEvent(
+            id=entry.id,
+            occurred_at=entry.occurred_at,
+            category=JournalEventCategory(entry.category),
+            severity=JournalEventSeverity(entry.severity),
+            message=entry.message,
+        )
+        for entry in schema.journal_entries
+    ]
+    if not journal_entries and schema.audit_log:
+        journal_entries = [
+            build_journal_event(message, occurred_at=schema.last_simulation_at)
+            for message in schema.audit_log
+        ]
     experiment = Experiment(
         id=schema.id,
         name=schema.name,
@@ -427,6 +453,7 @@ def _deserialize_experiment(payload: dict) -> Experiment:
         lims_entries=_deserialize_lims_entries(schema),
         snapshot_version=schema.snapshot_version,
         audit_log=list(schema.audit_log),
+        journal_entries=journal_entries,
     )
     sync_canonical_produce_model(experiment)
     sync_pesticide_material_states(experiment)

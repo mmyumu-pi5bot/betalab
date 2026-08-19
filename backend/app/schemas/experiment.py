@@ -749,6 +749,14 @@ class WorkspaceSchema(BaseModel):
     produce_basket_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
 
 
+class JournalEventSchema(BaseModel):
+    id: str
+    occurred_at: datetime
+    category: Literal["system", "manipulation", "simulation", "layout"]
+    severity: Literal["info", "warning", "error"]
+    message: str
+
+
 class ExperimentSchema(BaseModel):
     id: str
     name: str = "Untitled experiment"
@@ -768,6 +776,7 @@ class ExperimentSchema(BaseModel):
     pipette: PipetteStateSchema = Field(default_factory=PipetteStateSchema)
     analytical_balance: AnalyticalBalanceStateSchema = Field(default_factory=AnalyticalBalanceStateSchema)
     audit_log: list[str]
+    journal_entries: list[JournalEventSchema] = Field(default_factory=list)
 
 
 class ExperimentSummarySchema(BaseModel):

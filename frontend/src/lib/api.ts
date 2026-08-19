@@ -1,4 +1,4 @@
-import type { Experiment, ExperimentListEntry } from "@/types/experiment";
+import type { Experiment, ExperimentListEntry, JournalEntry } from "@/types/experiment";
 import type {
   AcquisitionMethod,
   AcquisitionMethodSummary,
@@ -59,6 +59,22 @@ function normalizeAllowedDropTargets(raw: unknown): DropTargetType[] {
   }
 
   return raw.filter((target): target is DropTargetType => typeof target === "string");
+}
+
+function normalizeJournalEntry(raw: unknown): JournalEntry | null {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  const entry = raw as Record<string, unknown>;
+  const category = String(entry.category ?? "system") as JournalEntry["category"];
+  const severity = String(entry.severity ?? "info") as JournalEntry["severity"];
+  return {
+    id: String(entry.id ?? ""),
+    occurredAt: String(entry.occurredAt ?? entry.occurred_at ?? ""),
+    category,
+    severity,
+    message: String(entry.message ?? ""),
+  };
 }
 
 function normalizeContainedEntity(raw: unknown): ContainedEntity | null {
@@ -1952,6 +1968,13 @@ function normalizeExperiment(experiment: Experiment): Experiment {
         {}
       ) as AnalyticalBalanceState & Record<string, unknown>,
     ),
+    journalEntries: ((
+      (experiment as Experiment & Record<string, unknown>).journalEntries ??
+      (experiment as Experiment & Record<string, unknown>).journal_entries ??
+      []
+    ) as unknown[])
+      .map(normalizeJournalEntry)
+      .filter((entry): entry is JournalEntry => entry !== null),
   };
 }
 

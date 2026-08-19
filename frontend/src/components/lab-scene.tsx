@@ -58,7 +58,7 @@ import {
 import type { CreateDebugToolPresetPayload } from "@/types/api-payloads";
 import type { DebugToolPresetId, ToolbarCategory } from "@/types/workbench";
 
-const defaultStatusMessage = "Start by dragging an extraction tool onto the bench.";
+const defaultStatusMessage = "Saved";
 const defaultErrorMessage = "Unable to load lab scene";
 type WidgetId = LabSceneWidgetId;
 
