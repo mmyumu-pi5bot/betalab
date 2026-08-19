@@ -1226,6 +1226,16 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
   };
 }
 
+// The salts release the same fixed rise whatever the tube starts at, and residues
+// begin breaking down above 30 °C. Leaving the ice from here lands the peak in the
+// mid-twenties, with enough headroom that the tube can warm on the bench while the
+// learner aims the salt packet and still lose nothing.
+const chilledExtractionTemperatureC = 1;
+
+function extractionTubeTemperatureC(tube: BenchToolInstance | undefined) {
+  return tube?.quechersState?.temperatureC ?? 20;
+}
+
 function extractionPreparationTarget(experiment: Experiment): TutorialTarget {
   const tube = extractionTube(experiment);
   const tubeAnchor = toolSourceAnchor(experiment, (tool) => tool.id === tube?.id);
@@ -1236,17 +1246,36 @@ function extractionPreparationTarget(experiment: Experiment): TutorialTarget {
   if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
     return { anchor: "palette-item-acetonitrile_extraction", dropAnchor: tubeAnchor };
   }
-  if (tube?.quechersState?.saltsAdded) {
-    return { anchor: tubeAnchor };
-  }
   // The salts start a 15 s countdown to cementation, so the mixer has to be standing
   // on the workspace before they go in. Fetching it from the Inventory afterwards
   // costs more than the whole window.
-  if (!workspaceWidget(experiment, "vortex")?.isPresent) {
-    return {
-      anchor: "palette-item-vortex_mixer_widget",
-      dropAnchor: workspaceCanvasAnchor,
-    };
+  return { anchor: "palette-item-vortex_mixer_widget", dropAnchor: workspaceCanvasAnchor };
+}
+
+function chillExtractionTarget(experiment: Experiment): TutorialTarget {
+  const tube = extractionTube(experiment);
+  if (toolIsInWidget(experiment, "ice_bath", tube)) {
+    return { anchor: iceBathAnchor };
+  }
+  return workspaceWidget(experiment, "ice_bath")?.isPresent
+    ? {
+        anchor: toolSourceAnchor(experiment, (tool) => tool.id === tube?.id),
+        dropAnchor: iceBathAnchor,
+      }
+    : { anchor: "palette-item-ice_bath_widget", dropAnchor: workspaceCanvasAnchor };
+}
+
+function saltExtractionTarget(experiment: Experiment): TutorialTarget {
+  const tube = extractionTube(experiment);
+  const tubeAnchor = toolSourceAnchor(experiment, (tool) => tool.id === tube?.id);
+  if (tube?.quechersState?.saltsAdded) {
+    return { anchor: tubeAnchor };
+  }
+  // The bath takes tools, not reagents, so the tube comes back to the bench for the
+  // last drop. It leaves the ice near zero and climbs slowly, which is what buys the
+  // learner the time to aim.
+  if (toolIsInWidget(experiment, "ice_bath", tube)) {
+    return workbenchPlacementTarget(experiment, iceBathAnchor);
   }
   return { anchor: "palette-item-quechers_salts", dropAnchor: tubeAnchor };
 }
@@ -1260,18 +1289,65 @@ function extractionPreparationPresentation(experiment: Experiment): Partial<Tuto
   if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
     return { title: "Add the extraction solvent", instruction: "Drag the highlighted Acetonitrile onto the same tube. Enter 10 mL in the dialog, then click Confirm.", action: { kind: "drag", label: "Add 10 mL acetonitrile" } };
   }
-  if (!workspaceWidget(experiment, "vortex")?.isPresent) {
+  return {
+    title: "Deploy the Vortex mixer before the salts",
+    instruction:
+      "The salts come last, and they start an exothermic reaction the moment they " +
+      "touch the solvent: from then on you have 15 seconds to seal the tube and start " +
+      "the mixer. Deploy the Vortex mixer now so it is waiting. In Inventory, open " +
+      "Workspace equipment, then drag it onto the central workspace.",
+    hint: "Miss that window and the salts cake solid, taking the extraction with them.",
+    deadline: "15 seconds to vortex once the salts are in",
+    action: { kind: "drag", label: "Drag to workspace" },
+  };
+}
+
+function chillExtractionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  const tube = extractionTube(experiment);
+  if (toolIsInWidget(experiment, "ice_bath", tube)) {
     return {
-      title: "Deploy the Vortex mixer before the salts",
+      title: "Wait for the tube to come down",
       instruction:
-        "The salts come last, and they start an exothermic reaction the moment they " +
-        "touch the solvent: from then on you have 15 seconds to seal the tube and start " +
-        "the mixer. Deploy the Vortex mixer now so it is waiting. In Inventory, open " +
-        "Workspace equipment, then drag it onto the central workspace.",
-      hint: "Miss that window and the salts cake solid, taking the extraction with them.",
-      deadline: "15 seconds to vortex once the salts are in",
+        "Watch the temperature on the tube standing in the ice bath. Leave it there " +
+        `until it reads under ${chilledExtractionTemperatureC} °C.`,
+      hint: "Nothing is degrading yet. The cold is being banked against the heat the salts are about to release.",
+      action: { kind: "wait", label: `Wait for under ${chilledExtractionTemperatureC} °C` },
+    };
+  }
+  if (!workspaceWidget(experiment, "ice_bath")?.isPresent) {
+    return {
+      title: "Deploy the ice bath before the salts",
+      instruction:
+        "The salts release the same exotherm whatever the tube starts at, so the only " +
+        "way to keep the peak low is to start low. In Inventory, open MISC, then drag " +
+        "the Ice bath onto the central workspace.",
+      hint:
+        "Above 30 °C the residues start breaking down, and they do not all break down at " +
+        "the same rate. The internal standard does not degrade at all, so the ratio cannot " +
+        "correct any of it.",
       action: { kind: "drag", label: "Drag to workspace" },
     };
+  }
+  return {
+    title: "Chill the tube in the ice bath",
+    instruction:
+      "Drag the extraction tube into the ice bath and leave it there until it reads " +
+      `under ${chilledExtractionTemperatureC} °C.`,
+    hint: "Salted from room temperature the tube peaks near 45 °C and loses residues even on a perfect run to the mixer.",
+    action: { kind: "drag", label: "Drag the tube into the ice bath" },
+  };
+}
+
+function saltExtractionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (toolIsInWidget(experiment, "ice_bath", extractionTube(experiment))) {
+    return workbenchPlacementPresentation(experiment, "chilled tube", {
+      title: "Take the chilled tube back out",
+      instruction:
+        "Drag the tube out of the ice bath and drop it onto an empty workbench station. " +
+        "The salts cannot be poured in while the tube is standing in the ice.",
+      hint: "Out of the ice the tube climbs back slowly, so there is time to aim — the rush starts when the salts go in.",
+      action: { kind: "drag", label: "Drag the tube out of the ice bath" },
+    });
   }
   return {
     title: "Add the QuEChERS salts",
@@ -1327,6 +1403,7 @@ function hasEmptyWorkbenchStation(experiment: Experiment) {
 
 const addWorkbenchStationAnchor = "add-workbench-slot-button";
 const workspaceCanvasAnchor = "workspace";
+const iceBathAnchor = "widget-ice_bath";
 const trashAnchor = "trash-dropzone";
 
 // Every step that ends with an item on the bench needs a free station first,
@@ -1378,7 +1455,7 @@ function storeGrinderTarget(experiment: Experiment): TutorialTarget {
 
 function storeEquipmentTarget(
   experiment: Experiment,
-  widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge",
+  widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge" | "ice_bath",
 ): TutorialTarget {
   return workspaceWidget(experiment, widgetId)?.tool
     ? workbenchPlacementTarget(experiment, `widget-${widgetId}`)
@@ -1409,9 +1486,25 @@ function storeGrinderPresentation(experiment: Experiment): Partial<TutorialStepP
   };
 }
 
+// The bath finished its job at the same moment the mixer did: once the tube is
+// spinning the residues are in the solvent and no longer care how warm it gets.
+function storeExtractionEquipmentTarget(experiment: Experiment): TutorialTarget {
+  return workspaceWidget(experiment, "vortex")?.isPresent
+    ? storeEquipmentTarget(experiment, "vortex")
+    : storeEquipmentTarget(experiment, "ice_bath");
+}
+
+function storeExtractionEquipmentPresentation(
+  experiment: Experiment,
+): Partial<TutorialStepPresentation> {
+  return workspaceWidget(experiment, "vortex")?.isPresent
+    ? storeEquipmentPresentation(experiment, "vortex", "Vortex mixer", "mixed extraction tube")
+    : storeEquipmentPresentation(experiment, "ice_bath", "Ice bath", "tube");
+}
+
 function storeEquipmentPresentation(
   experiment: Experiment,
-  widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge",
+  widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge" | "ice_bath",
   equipmentName: string,
   itemName: string,
 ): Partial<TutorialStepPresentation> {
@@ -1544,16 +1637,41 @@ function hasTestPortion(experiment: Experiment) {
   );
 }
 
-function hasPreparedExtraction(experiment: Experiment) {
-  const tube = extractionTube(experiment);
-  const liquids = tube?.liquids ?? [];
+function hasExtractionReagents(experiment: Experiment) {
+  const liquids = extractionTube(experiment)?.liquids ?? [];
   return (
     liquids.some((liquid) => liquid.liquidId === "istd_solution") &&
     liquids.some(
       (liquid) =>
         liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5,
-    ) &&
-    Boolean(tube?.quechersState?.saltsAdded)
+    )
+  );
+}
+
+function hasSaltedExtraction(experiment: Experiment) {
+  return Boolean(extractionTube(experiment)?.quechersState?.saltsAdded);
+}
+
+// The mixer has to be waiting before the salts go in, so deploying it belongs to the
+// preparation rather than to the rush that follows.
+function hasStagedExtraction(experiment: Experiment) {
+  return (
+    hasExtractionReagents(experiment) &&
+    (Boolean(workspaceWidget(experiment, "vortex")?.isPresent) ||
+      hasSaltedExtraction(experiment))
+  );
+}
+
+// Completion latches, and that is the point: once the tube has been read cold the
+// step stays done even though the tube starts warming again the moment it leaves the
+// ice. Anything temperature-driven that did not latch would send the learner back to
+// the bath forever.
+function hasChilledExtraction(experiment: Experiment) {
+  const tube = extractionTube(experiment);
+  return (
+    (toolIsInWidget(experiment, "ice_bath", tube) &&
+      extractionTubeTemperatureC(tube) <= chilledExtractionTemperatureC) ||
+    hasSaltedExtraction(experiment)
   );
 }
 
@@ -1781,13 +1899,39 @@ const steps: TutorialStep[] = [
     chapterId: "extraction",
     title: "Prepare the QuEChERS extraction",
     instruction:
-      "Drag the ISTD solution onto the tube and confirm the volume. Repeat with acetonitrile to add 10 mL. Deploy the Vortex mixer onto the workspace, and only then drag the QuEChERS salt packet onto the same tube.",
-    hint: "Add the ISTD before the solvent to preserve the correct analytical provenance. The salts come last: they leave 15 seconds to reach the mixer.",
+      "Drag the ISTD solution onto the tube and confirm the volume. Repeat with acetonitrile to add 10 mL. Then deploy the Vortex mixer onto the workspace so it is waiting.",
+    hint: "Add the ISTD before the solvent to preserve the correct analytical provenance. The mixer is deployed now because the salts leave only 15 seconds to reach it.",
     prerequisites: ["store-analytical-balance"],
     ...fromTarget(extractionPreparationTarget),
-    isSatisfied: hasPreparedExtraction,
+    isSatisfied: hasStagedExtraction,
     isInvalidated: extractionRestartAwaitsReagents,
     presentation: extractionPreparationPresentation,
+  }),
+  step({
+    id: "chill-extraction",
+    chapterId: "extraction",
+    title: "Chill the tube before the salts",
+    instruction:
+      "Deploy the Ice bath from the MISC section of the Inventory, then drag the extraction tube into it and leave it until it reads under 1 °C.",
+    hint: "The salts add the same rise whatever the tube starts at. From room temperature that lands near 45 °C, well above the 30 °C where residues start breaking down.",
+    prerequisites: ["prepare-extraction"],
+    ...fromTarget(chillExtractionTarget),
+    isSatisfied: hasChilledExtraction,
+    isInvalidated: extractionRestartAwaitsReagents,
+    presentation: chillExtractionPresentation,
+  }),
+  step({
+    id: "salt-extraction",
+    chapterId: "extraction",
+    title: "Add the QuEChERS salts",
+    instruction:
+      "Drag the chilled tube out of the ice bath onto an empty workbench station, then drag the QuEChERS salt packet onto it and confirm.",
+    hint: "Confirming starts the 15 second countdown to cementation. Know where the mixer is before you click.",
+    prerequisites: ["chill-extraction"],
+    ...fromTarget(saltExtractionTarget),
+    isSatisfied: hasSaltedExtraction,
+    isInvalidated: extractionRestartAwaitsReagents,
+    presentation: saltExtractionPresentation,
   }),
   step({
     id: "vortex-extract",
@@ -1796,7 +1940,7 @@ const steps: TutorialStep[] = [
     instruction:
       "Drag and drop the sealed extraction tube into the Vortex mixer waiting on the workspace, then click Start vortex. The salts are already reacting, so do it now.",
     hint: "Wait until the vortex cycle is complete before removing the tube.",
-    prerequisites: ["prepare-extraction"],
+    prerequisites: ["salt-extraction"],
     ...fromTarget((experiment) =>
       extractionEquipmentTarget(experiment, "vortex", "vortex_mixer_widget")),
     isSatisfied: hasVortexedExtraction,
@@ -1806,20 +1950,16 @@ const steps: TutorialStep[] = [
   step({
     id: "store-vortex",
     chapterId: "extraction",
-    title: "Store the vortex mixer",
-    instruction: "Drag the mixed tube out of the vortex mixer and drop it onto an empty workbench station. Then click Store in inventory in the mixer header.",
-    hint: "The centrifuge takes over in the next step, so the vortex mixer is no longer needed.",
+    title: "Store the vortex mixer and the ice bath",
+    instruction: "Drag the mixed tube out of the vortex mixer and drop it onto an empty workbench station. Then click Store in inventory in the mixer header, and again in the ice bath header.",
+    hint: "The centrifuge takes over in the next step, and the cold no longer protects anything once the residues are in the solvent.",
     prerequisites: ["vortex-extract"],
-    ...fromTarget((experiment) => storeEquipmentTarget(experiment, "vortex")),
+    ...fromTarget(storeExtractionEquipmentTarget),
     isSatisfied: (experiment) =>
-      hasVortexedExtraction(experiment) && !workspaceWidget(experiment, "vortex")?.isPresent,
-    presentation: (experiment) =>
-      storeEquipmentPresentation(
-        experiment,
-        "vortex",
-        "Vortex mixer",
-        "mixed extraction tube",
-      ),
+      hasVortexedExtraction(experiment) &&
+      !workspaceWidget(experiment, "vortex")?.isPresent &&
+      !workspaceWidget(experiment, "ice_bath")?.isPresent,
+    presentation: storeExtractionEquipmentPresentation,
   }),
   step({
     id: "separate-extract",
@@ -1976,6 +2116,8 @@ export const calibrationSampleTutorial: TutorialDefinition = {
       title: "QuEChERS extraction",
       stepIds: [
         "prepare-extraction",
+        "chill-extraction",
+        "salt-extraction",
         "vortex-extract",
         "store-vortex",
         "separate-extract",

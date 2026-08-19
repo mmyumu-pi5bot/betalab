@@ -18,6 +18,7 @@ const widgetIds = [
   "grinder",
   "vortex",
   "centrifuge",
+  "ice_bath",
   "rack",
   "instrument",
 ] as const;
@@ -424,6 +425,160 @@ describe("calibration sample tutorial", () => {
     const extractionStep = calibrationSampleTutorial.steps.find((entry) => entry.id === "prepare-extraction")!;
     expect(extractionStep.anchor(extractionState)).toBe("palette-item-acetonitrile_extraction");
     expect(getTutorialStepPresentation(extractionStep, extractionState).title).toBe("Add the extraction solvent");
+  });
+
+  describe("chilling the tube before the salts", () => {
+    const stepNamed = (id: string) => calibrationSampleTutorial.steps.find((entry) => entry.id === id)!;
+
+    function reagentedTube(temperatureC: number) {
+      return labTool("centrifuge_tube", {
+        powderMassG: 10,
+        produceFractions: [
+          {
+            id: "fraction_1",
+            produceLotId: "lot_1",
+            produceMaterialStateId: "state_1",
+            massG: 10,
+          },
+        ],
+        liquids: [
+          { id: "istd_1", liquidId: "istd_solution", name: "ISTD", volume_ml: 0.05, accent: "emerald" },
+          { id: "mecn_1", liquidId: "acetonitrile_extraction", name: "MeCN", volume_ml: 10, accent: "sky" },
+        ],
+        quechersState: {
+          saltsAdded: false,
+          phase: "idle",
+          temperatureC,
+          faults: [],
+          isUsable: true,
+        },
+      });
+    }
+
+    function chillingState({
+      bathDeployed = true,
+      inBath,
+      temperatureC,
+    }: {
+      bathDeployed?: boolean;
+      inBath: boolean;
+      temperatureC: number;
+    }) {
+      const tube = reagentedTube(temperatureC);
+      return experiment({
+        workbench: {
+          slots: [{ id: "station_1", label: "Station 1", tool: inBath ? null : tube }],
+        },
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, {
+              isPresent: id === "vortex" || (id === "ice_bath" && bathDeployed),
+              tool: id === "ice_bath" && inBath ? tube : null,
+            }),
+          ),
+        },
+      });
+    }
+
+    it("asks for the ice bath once the mixer is standing by", () => {
+      const state = chillingState({ bathDeployed: false, inBath: false, temperatureC: 20 });
+
+      expect(stepNamed("chill-extraction").anchor(state)).toBe("palette-item-ice_bath_widget");
+      expect(stepNamed("chill-extraction").dropAnchor?.(state)).toBe("workspace");
+      expect(getTutorialStepPresentation(stepNamed("chill-extraction"), state).title).toBe(
+        "Deploy the ice bath before the salts",
+      );
+    });
+
+    it("sends the warm tube into the deployed bath", () => {
+      const state = chillingState({ inBath: false, temperatureC: 20 });
+
+      expect(stepNamed("chill-extraction").anchor(state)).toBe("bench-tool-card-centrifuge_tube_1");
+      expect(stepNamed("chill-extraction").dropAnchor?.(state)).toBe("widget-ice_bath");
+      expect(getTutorialStepPresentation(stepNamed("chill-extraction"), state).action).toEqual({
+        kind: "drag",
+        label: "Drag the tube into the ice bath",
+      });
+    });
+
+    it("waits on the temperature instead of on a clock", () => {
+      const state = chillingState({ inBath: true, temperatureC: 12 });
+
+      expect(stepNamed("chill-extraction").isSatisfied(state)).toBe(false);
+      expect(stepNamed("chill-extraction").anchor(state)).toBe("widget-ice_bath");
+      expect(stepNamed("chill-extraction").dropAnchor?.(state)).toBeNull();
+      expect(getTutorialStepPresentation(stepNamed("chill-extraction"), state).action?.kind).toBe("wait");
+    });
+
+    // The tube starts warming the instant it leaves the ice, so a step that re-read the
+    // temperature would send the learner straight back to the bath, forever.
+    it("stays satisfied once the tube has been read cold, even after it warms again", () => {
+      expect(stepNamed("chill-extraction").isSatisfied(chillingState({ inBath: true, temperatureC: 0.4 }))).toBe(true);
+
+      const warmedOnTheBench = chillingState({ inBath: false, temperatureC: 6 });
+      const result = evaluateTutorial(calibrationSampleTutorial, warmedOnTheBench, [
+        "weigh-received-sample",
+        "register-and-label-sample",
+        "store-gross-balance",
+        "cut-sample",
+        "grind-sample",
+        "store-grinder",
+        "weigh-test-portion",
+        "store-analytical-balance",
+        "prepare-extraction",
+        "chill-extraction",
+      ]);
+
+      expect(result.completedStepIds).toContain("chill-extraction");
+      expect(result.currentStep?.id).toBe("salt-extraction");
+    });
+
+    it("takes the chilled tube back out, because salts cannot go in through the ice", () => {
+      const state = chillingState({ inBath: true, temperatureC: 0.4 });
+
+      expect(stepNamed("salt-extraction").anchor(state)).toBe("widget-ice_bath");
+      expect(stepNamed("salt-extraction").dropAnchor?.(state)).toBe("bench-slot-station_1");
+      expect(getTutorialStepPresentation(stepNamed("salt-extraction"), state).title).toBe(
+        "Take the chilled tube back out",
+      );
+    });
+
+    it("points at the salts once the tube is back on the bench", () => {
+      const state = chillingState({ inBath: false, temperatureC: 4 });
+
+      expect(stepNamed("salt-extraction").anchor(state)).toBe("palette-item-quechers_salts");
+      expect(stepNamed("salt-extraction").dropAnchor?.(state)).toBe("bench-tool-card-centrifuge_tube_1");
+    });
+
+    it("says why the cold matters, not just that it is required", () => {
+      const state = chillingState({ bathDeployed: false, inBath: false, temperatureC: 20 });
+      const presentation = getTutorialStepPresentation(stepNamed("chill-extraction"), state);
+
+      expect(presentation.instruction).toContain("exotherm");
+      expect(`${presentation.instruction} ${presentation.hint}`).toContain("30 °C");
+    });
+
+    it("puts the bath away with the mixer, once the cold protects nothing", () => {
+      const storeStep = stepNamed("store-vortex");
+      const mixedTube = labTool("centrifuge_tube", {
+        id: "mixed_tube",
+        quechersState: { saltsAdded: true, phase: "mixed", faults: [], isUsable: true },
+      });
+      const state = (bathIsPresent: boolean) =>
+        experiment({
+          workbench: { slots: [{ id: "station_1", label: "Station 1", tool: mixedTube }] },
+          workspace: {
+            produceBasketLots: [],
+            widgets: widgetIds.map((id) => widget(id, { isPresent: id === "ice_bath" && bathIsPresent })),
+          },
+        });
+
+      expect(storeStep.isSatisfied(state(true))).toBe(false);
+      expect(storeStep.anchor(state(true))).toBe("store-widget-ice_bath");
+      expect(getTutorialStepPresentation(storeStep, state(true)).title).toBe("Store the Ice bath");
+      expect(storeStep.isSatisfied(state(false))).toBe(true);
+    });
   });
 
   it("highlights the apples themselves before they are loaded into the grinder", () => {
@@ -1008,7 +1163,7 @@ describe("calibration sample tutorial", () => {
       "register-and-label-sample",
     ]);
     expect(result.currentStep?.id).toBe("store-gross-balance");
-    expect(result.progressPercent).toBe(11);
+    expect(result.progressPercent).toBe(10);
   });
 
   it("credits an out-of-order calibration without skipping missing prerequisites", () => {
@@ -1422,6 +1577,8 @@ describe("calibration sample tutorial", () => {
       "store-analytical-balance",
     ];
 
+    // Already chilled: the ice bath sub-steps have their own tests, and these ones
+    // are about the deadline the salts start.
     function wettedTube() {
       return labTool("centrifuge_tube", {
         id: "extraction_tube",
@@ -1429,6 +1586,21 @@ describe("calibration sample tutorial", () => {
         liquids: [
           { liquidId: "istd_solution", label: "ISTD", volume_ml: 0.05 },
           { liquidId: "acetonitrile_extraction", label: "MeCN", volume_ml: 10 },
+        ],
+        quechersState: {
+          saltsAdded: false,
+          phase: "idle",
+          temperatureC: 3,
+          faults: [],
+          isUsable: true,
+        },
+        produceFractions: [
+          {
+            id: "fraction_1",
+            produceLotId: "lot_1",
+            produceMaterialStateId: "state_1",
+            massG: 10.002,
+          },
         ],
       });
     }
@@ -1464,10 +1636,14 @@ describe("calibration sample tutorial", () => {
     it("announces the deadline on the salts themselves once the mixer is ready", () => {
       const state = stateWith(true);
 
-      const result = evaluateTutorial(calibrationSampleTutorial, state, beforeSalts);
+      const result = evaluateTutorial(calibrationSampleTutorial, state, [
+        ...beforeSalts,
+        "prepare-extraction",
+        "chill-extraction",
+      ]);
       const presentation = getTutorialStepPresentation(result.currentStep!, state);
 
-      expect(result.currentStep?.id).toBe("prepare-extraction");
+      expect(result.currentStep?.id).toBe("salt-extraction");
       expect(result.currentStep?.anchor(state)).toBe("palette-item-quechers_salts");
       expect(result.currentStep?.dropAnchor?.(state)).toBe(
         "bench-tool-card-extraction_tube",
