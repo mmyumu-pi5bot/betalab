@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { JournalEntry } from "@/types/experiment";
 
@@ -137,14 +137,49 @@ export function ExperimentAppHeader({
 }: ExperimentAppHeaderProps) {
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState(experimentName);
+  const accumulatedScrollDeltaRef = useRef(0);
+  const headerHasFocusRef = useRef(false);
+  const lastScrollYRef = useRef(0);
   const skipNextBlurRef = useRef(false);
   const visibleEntries = [...(journalEntries ?? [])]
     .filter((entry) => entry.category !== "layout")
     .reverse();
   const hasSyncError = !isSyncing && statusMessage !== "Saved";
   const latestEntry = visibleEntries[0] ?? null;
+
+  useEffect(() => {
+    lastScrollYRef.current = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = Math.max(window.scrollY, 0);
+      const delta = currentScrollY - lastScrollYRef.current;
+      const previousDelta = accumulatedScrollDeltaRef.current;
+
+      if (currentScrollY <= 16 || isJournalOpen || isEditingName || headerHasFocusRef.current) {
+        accumulatedScrollDeltaRef.current = 0;
+        setIsHeaderVisible(true);
+      } else {
+        accumulatedScrollDeltaRef.current =
+          Math.sign(delta) === Math.sign(previousDelta) ? previousDelta + delta : delta;
+
+        if (accumulatedScrollDeltaRef.current >= 32) {
+          accumulatedScrollDeltaRef.current = 0;
+          setIsHeaderVisible(false);
+        } else if (accumulatedScrollDeltaRef.current <= -12) {
+          accumulatedScrollDeltaRef.current = 0;
+          setIsHeaderVisible(true);
+        }
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isEditingName, isJournalOpen]);
 
   const cancelRename = () => {
     skipNextBlurRef.current = true;
@@ -175,7 +210,22 @@ export function ExperimentAppHeader({
 
   return (
     <>
-      <header className="sticky top-4 z-30 rounded-[1.5rem] border border-slate-200/90 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl sm:px-5">
+      <header
+        className={`sticky top-4 z-30 rounded-[1.5rem] border border-slate-200/90 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none sm:px-5 ${
+          isHeaderVisible
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-[calc(100%+1rem)] opacity-0"
+        }`}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            headerHasFocusRef.current = false;
+          }
+        }}
+        onFocusCapture={() => {
+          headerHasFocusRef.current = true;
+          setIsHeaderVisible(true);
+        }}
+      >
         <span aria-live="polite" className="sr-only">
           {latestEntry?.message ?? ""}
         </span>

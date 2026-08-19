@@ -128,4 +128,34 @@ describe("ExperimentAppHeader", () => {
     expect(onRenameExperiment).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Apple preparation" })).toBeInTheDocument();
   });
+
+  it("hides while scrolling down and returns when scrolling up", () => {
+    render(
+      <ExperimentAppHeader
+        experimentName="Apple preparation"
+        isSyncing={false}
+        journalEntries={[]}
+        onRenameExperiment={vi.fn()}
+        statusMessage="Saved"
+      />,
+    );
+
+    const header = screen.getByRole("banner");
+    expect(header).toHaveClass("translate-y-0");
+
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 120 });
+    fireEvent.scroll(window);
+    expect(header).toHaveClass("-translate-y-[calc(100%+1rem)]");
+
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 100 });
+    fireEvent.scroll(window);
+    expect(header).toHaveClass("translate-y-0");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open experiment journal" }));
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 180 });
+    fireEvent.scroll(window);
+    expect(header).toHaveClass("translate-y-0");
+
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  });
 });
