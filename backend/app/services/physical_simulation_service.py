@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Mapping
 from dataclasses import dataclass
 from math import exp
+from types import MappingProxyType
+from typing import ClassVar
 
 from app.domain.models import Experiment, ProduceLot, ProduceMaterialState, QuechersExtractionResult, WorkbenchTool, WorkspaceWidget
 from app.domain.pesticide_catalog import apply_degradation_step
@@ -100,6 +103,16 @@ class PhysicalSimulationService:
     produce_specific_heat_j_per_g_k = 3.7
     solvent_specific_heat_j_per_g_k = 2.23
     solvent_density_g_per_ml = 0.786
+    #: The container wall, in J/K. A 50 mL polypropylene tube weighs about 13 g at
+    #: roughly 1.9 J/g/K, which puts its wall in the same league as ten millilitres
+    #: of solvent -- enough that ignoring it let an empty tube read the room
+    #: instantly. Tools not listed here have no wall worth modelling.
+    container_body_thermal_mass_j_per_k: ClassVar[Mapping[str, float]] = MappingProxyType(
+        {
+            "centrifuge_tube": 13.0 * 1.9,
+            "sample_vial": 2.0 * 1.9,
+        }
+    )
     quechers_heat_rise_seconds = 7.5
     quechers_cementation_seconds = 15.0
     #: Where the tube starts scoring a thermal fault, set ten degrees under the
@@ -161,26 +174,40 @@ class PhysicalSimulationService:
         *,
         surroundings: ThermalSurroundings | None = None,
     ) -> None:
-        """Let a weighed portion exchange heat with its surroundings.
+        """Let everything a tool holds exchange heat with its surroundings.
 
         A test portion owns a material state of its own, and nothing else in the
         tick touches it -- only lots are warmed. Without this a portion weighed
         straight out of the mill would stay cryogenic for the rest of the run, so
         weighing early would buy permanent immunity instead of a head start.
+
+        The solvent and the tube wall are stepped the same way. They used to have
+        no temperature at all, which meant they were read at whatever surrounded
+        the tube: moving a tube into the ice bath dropped their share of its
+        thermal mass to zero instantly, and an empty tube read the room the moment
+        it was lifted out.
         """
         elapsed_seconds = max(float(elapsed_seconds), 0.0)
-        if elapsed_seconds <= 0 or not tool.produce_fractions:
+        if elapsed_seconds <= 0:
             return
         surroundings = surroundings or self.bench_surroundings()
         progress = 1.0 - exp(
             -self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds
         )
+
+        def relax(temperature_c: float) -> float:
+            return temperature_c + (surroundings.temperature_c - temperature_c) * progress
+
         states_by_id = {state.id: state for state in material_states}
         for fraction in tool.produce_fractions:
             state = states_by_id.get(fraction.produce_material_state_id)
             if state is None:
                 continue
-            state.temperature_c += (surroundings.temperature_c - state.temperature_c) * progress
+            state.temperature_c = relax(state.temperature_c)
+        for liquid in tool.liquids:
+            liquid.temperature_c = relax(liquid.temperature_c)
+        if self.container_body_thermal_mass_j_per_k.get(tool.tool_type, 0.0) > 0:
+            tool.body_temperature_c = relax(tool.body_temperature_c)
 
     def advance_quechers_tool(
         self,
@@ -278,11 +305,11 @@ class PhysicalSimulationService:
     ) -> float:
         """Temperature of everything currently in a tool, weighted by thermal mass.
 
-        Powder carries its own temperature -- the cryogenic chain leaves it well
-        below the room and it warms back over minutes -- while solvents sit at
-        whatever surrounds the tube. Ten grams of produce outweighs ten millilitres
-        of acetonitrile by roughly two to one in heat capacity, so the powder is
-        what mostly decides where the mixture sits.
+        Powder, solvent and the tube wall each carry their own temperature and
+        relax towards the surroundings at their own pace; this weighs them by heat
+        capacity. Ten grams of produce outweighs ten millilitres of acetonitrile by
+        roughly two to one, so the powder mostly decides where the mixture sits,
+        but the wall is not negligible -- it is worth about as much as the solvent.
         """
         surroundings = surroundings or cls.bench_surroundings()
         thermal_mass = 0.0
@@ -312,7 +339,11 @@ class PhysicalSimulationService:
                 volume_ml * cls.solvent_density_g_per_ml * cls.solvent_specific_heat_j_per_g_k
             )
             thermal_mass += capacity
-            weighted += capacity * surroundings.temperature_c
+            weighted += capacity * liquid.temperature_c
+        body_capacity = cls.container_body_thermal_mass_j_per_k.get(tool.tool_type, 0.0)
+        if body_capacity > 0:
+            thermal_mass += body_capacity
+            weighted += body_capacity * tool.body_temperature_c
         if thermal_mass <= 0:
             return surroundings.temperature_c
         return weighted / thermal_mass

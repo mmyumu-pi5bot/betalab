@@ -51,6 +51,7 @@ class WorkbenchLiquidSchema(BaseModel):
     volume_ml: float
     accent: str
     true_volume_ml: float | None = Field(default=None, exclude=True)
+    temperature_c: float = Field(default=20.0, exclude=True)
 
 
 class QuechersStateSchema(BaseModel):
@@ -379,6 +380,7 @@ class WorkbenchToolSchema(BaseModel):
     closure_fault: str | None = None
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0
+    body_temperature_c: float = Field(default=20.0, exclude=True)
     field_label_text: str | None = None
     labels: list[ContainerLabelSchema] = Field(default_factory=list)
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)

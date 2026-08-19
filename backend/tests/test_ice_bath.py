@@ -1,7 +1,16 @@
+from dataclasses import asdict
+
 import pytest
 
-from app.domain.models import ProduceFraction, ProduceMaterialState
+from app.domain.models import (
+    ProduceFraction,
+    ProduceMaterialState,
+    WorkbenchLiquid,
+    WorkbenchTool,
+    WorkspaceWidget,
+)
 from app.domain.workbench_catalog import get_toolbar_categories
+from app.schemas.experiment import WorkbenchToolSchema
 from app.services.dnd_move_service import (
     DndMoveObjectRequest,
     DndMoveObjectService,
@@ -17,6 +26,7 @@ from app.services.domain_services.workspace import (
     AdvanceWorkspaceCryogenicsRequest,
     AdvanceWorkspaceCryogenicsService,
 )
+from app.services.experiment_repository import _deserialize_non_null_workbench_tool
 from app.services.experiment_service import ExperimentRuntimeService
 from app.services.physical_simulation_service import PhysicalSimulationService
 
@@ -267,3 +277,151 @@ def test_the_ice_bath_is_listed_under_misc() -> None:
     assert owner["id"] == "misc"
     assert item["item_type"] == "workspace_widget"
     assert item["allowed_drop_targets"] == ["workspace_canvas"]
+
+
+def _bare_tube(temperature_c: float = 20.0) -> WorkbenchTool:
+    return WorkbenchTool(
+        id="tube-thermal",
+        tool_id="centrifuge_tube_50ml",
+        tool_type="centrifuge_tube",
+        label="50 mL tube",
+        subtitle="",
+        accent="amber",
+        capacity_ml=50,
+        body_temperature_c=temperature_c,
+    )
+
+
+def _bath_surroundings():
+    return PhysicalSimulationService.surroundings_for_widget(
+        WorkspaceWidget(
+            id="ice_bath",
+            widget_type="ice_bath",
+            label="Ice bath",
+            anchor="top-left",
+            offset_x=0,
+            offset_y=0,
+            is_present=True,
+            is_trashed=False,
+        )
+    )
+
+
+def test_solvent_does_not_teleport_to_the_temperature_around_it() -> None:
+    """A tube of acetonitrile moved into the bath cools, it does not snap to zero.
+
+    The solvent used to carry no temperature of its own, so it was read at
+    whatever surrounded the tube -- moving a third of the tube's thermal mass to
+    the new temperature the instant the tube was picked up.
+    """
+    service = PhysicalSimulationService()
+    tool = _bare_tube()
+    tool.liquids.append(
+        WorkbenchLiquid(
+            id="acn",
+            liquid_id="acetonitrile",
+            name="Acetonitrile",
+            volume_ml=10.0,
+            accent="amber",
+            true_volume_ml=10.0,
+            temperature_c=20.0,
+        )
+    )
+    bath = _bath_surroundings()
+
+    on_arrival = PhysicalSimulationService.mixture_temperature_c(tool, [], surroundings=bath)
+    service.advance_tool_contents_temperature(tool, 20.0, [], surroundings=bath)
+    later = PhysicalSimulationService.mixture_temperature_c(tool, [], surroundings=bath)
+
+    assert on_arrival == pytest.approx(20.0, abs=0.01)
+    assert 0.0 < later < 20.0
+
+
+def test_an_empty_tube_carries_its_own_warmth_out_of_the_bath() -> None:
+    """The tube body is polypropylene, not a thermometer reading the room."""
+    service = PhysicalSimulationService()
+    tool = _bare_tube(temperature_c=0.0)
+    bench = PhysicalSimulationService.bench_surroundings()
+
+    on_arrival = PhysicalSimulationService.mixture_temperature_c(tool, [], surroundings=bench)
+    service.advance_tool_contents_temperature(tool, 120.0, [], surroundings=bench)
+    later = PhysicalSimulationService.mixture_temperature_c(tool, [], surroundings=bench)
+
+    assert on_arrival == pytest.approx(0.0, abs=0.01)
+    assert 0.0 < later < 20.0
+
+
+def test_the_tube_body_tempers_powder_straight_out_of_the_mill() -> None:
+    """A warm tube gives some of its heat back to cryogenic powder poured in."""
+    tool = _bare_tube(temperature_c=20.0)
+    state = ProduceMaterialState(id="cold", produce_lot_id="lot", temperature_c=-60.0)
+    tool.produce_fractions.append(
+        ProduceFraction(
+            id="frac",
+            produce_lot_id="lot",
+            produce_material_state_id="cold",
+            mass_g=10.0,
+            true_mass_g=10.0,
+        )
+    )
+
+    mixture = PhysicalSimulationService.mixture_temperature_c(
+        tool, [state], surroundings=PhysicalSimulationService.bench_surroundings()
+    )
+
+    assert -60.0 < mixture < -20.0
+
+
+def test_the_thermal_state_of_a_tube_survives_a_reload() -> None:
+    """Temperature is persisted state: a saved run must reopen where it stopped."""
+    tool = _bare_tube(temperature_c=3.5)
+    tool.liquids.append(
+        WorkbenchLiquid(
+            id="acn",
+            liquid_id="acetonitrile",
+            name="Acetonitrile",
+            volume_ml=10.0,
+            accent="amber",
+            true_volume_ml=10.0,
+            temperature_c=4.25,
+        )
+    )
+
+    restored = _deserialize_non_null_workbench_tool(WorkbenchToolSchema.model_validate(asdict(tool)))
+
+    assert restored.body_temperature_c == pytest.approx(3.5)
+    assert restored.liquids[0].temperature_c == pytest.approx(4.25)
+
+
+def test_a_tube_taken_out_of_the_bath_warms_back_through_the_real_tick() -> None:
+    """Solvent and tube wall must keep exchanging heat once they own a temperature.
+
+    Only tools standing somewhere are advanced each tick. Giving the solvent a
+    temperature of its own would trade an instant snap to the room for a
+    permanent freeze if any of those places were missed.
+    """
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _tube_with_portion(service, experiment.id, portion_temperature_c=20.0)
+    _move_tube_to_ice_bath(service, experiment.id)
+    _advance(service, experiment.id, 120_000)
+
+    chilled = _chilled_tube(service, experiment.id)
+    assert chilled.body_temperature_c == pytest.approx(0.0, abs=0.5)
+    assert chilled.liquids[0].temperature_c == pytest.approx(0.0, abs=0.5)
+
+    DndMoveObjectService(service).run(
+        experiment.id,
+        DndMoveObjectRequest(
+            entity=DndObjectRef(kind="tool", id=chilled.id),
+            source=DndObjectRef(kind="ice_bath", id="ice_bath"),
+            destination=DndObjectRef(kind="workbench_slot", id="station_1"),
+        ),
+    )
+    _advance(service, experiment.id, 120_000)
+
+    tube = service._require_experiment(experiment.id).workbench.slots[0].tool
+    assert tube is not None
+    # Warming towards the room, and not there yet: still air is slow.
+    assert 5.0 < tube.body_temperature_c < 19.0
+    assert 5.0 < tube.liquids[0].temperature_c < 19.0

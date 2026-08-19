@@ -81,6 +81,10 @@ class WorkbenchLiquid:
     volume_ml: float
     accent: str
     true_volume_ml: float | None = None   # hidden actual delivered volume; None -> defaults to volume_ml
+    #: Solvent carries its own heat. Without this it was read at whatever
+    #: surrounded the tube, so a third of a tube's thermal mass teleported to the
+    #: new temperature the instant the tube was picked up and moved.
+    temperature_c: float = 20.0
 
     def __post_init__(self) -> None:
         if self.true_volume_ml is None:
@@ -313,6 +317,10 @@ class WorkbenchTool:
 
     internal_pressure_bar: float = 1.0
     trapped_co2_mass_g: float = 0.0  # Non-zero only for sealed containers with CO2 inside
+    #: The container wall itself. Polypropylene is not a thermometer: a tube taken
+    #: out of ice water keeps some of that cold, and a warm tube gives heat back
+    #: to cryogenic powder poured into it.
+    body_temperature_c: float = 20.0
     field_label_text: str | None = None
     labels: list[ContainerLabel] = field(default_factory=list)
     produce_lots: list[ProduceLot] = field(default_factory=list)

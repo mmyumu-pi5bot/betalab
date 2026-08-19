@@ -598,6 +598,7 @@ def _deserialize_workbench_tool(tool_schema) -> WorkbenchTool | None:
         closure_fault=tool_schema.closure_fault,
         internal_pressure_bar=tool_schema.internal_pressure_bar,
         trapped_co2_mass_g=tool_schema.trapped_co2_mass_g,
+        body_temperature_c=tool_schema.body_temperature_c,
         field_label_text=tool_schema.field_label_text,
         labels=[_deserialize_container_label(label) for label in tool_schema.labels],
         produce_lots=[_deserialize_produce_lot(lot) for lot in tool_schema.produce_lots],
@@ -623,6 +624,7 @@ def _deserialize_workbench_liquid(liquid_schema) -> WorkbenchLiquid:
         volume_ml=liquid_schema.volume_ml,
         accent=liquid_schema.accent,
         true_volume_ml=liquid_schema.true_volume_ml,
+        temperature_c=liquid_schema.temperature_c,
     )
 
 
