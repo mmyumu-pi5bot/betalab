@@ -277,7 +277,6 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
             "cryogenic_grinder_widget",
             "vortex_mixer_widget",
             "centrifuge_widget",
-            "ice_bath_widget",
             "lims_terminal_widget",
             "gross_balance_widget",
             "analytical_balance_widget",
@@ -288,7 +287,12 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
     {
         "description": "Temporary catch-all for supporting lab items not yet grouped elsewhere.",
         "id": "misc",
-        "item_ids": ("sealed_sampling_bag", "sampling_bag_label", "cutting_board_hdpe"),
+        "item_ids": (
+            "sealed_sampling_bag",
+            "sampling_bag_label",
+            "cutting_board_hdpe",
+            "ice_bath_widget",
+        ),
         "item_source": "mixed",
         "label": "MISC",
     },
@@ -380,7 +384,7 @@ def _build_toolbar_item(item_id: str, item_source: str) -> dict[str, object]:
         return _build_tool_toolbar_item(item_id)
     if item_source == "liquids" or item_id in WORKBENCH_LIQUIDS:
         return _build_liquid_toolbar_item(item_id)
-    if item_source == "workspace_widgets":
+    if item_source == "workspace_widgets" or item_id in _WORKSPACE_WIDGET_ITEMS:
         return _build_workspace_widget_toolbar_item(item_id)
     raise ValueError(f"Unknown toolbar item: {item_id}")
 

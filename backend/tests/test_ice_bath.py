@@ -1,6 +1,7 @@
 import pytest
 
 from app.domain.models import ProduceFraction, ProduceMaterialState
+from app.domain.workbench_catalog import get_toolbar_categories
 from app.services.dnd_move_service import (
     DndMoveObjectRequest,
     DndMoveObjectService,
@@ -239,3 +240,30 @@ def test_the_bath_is_gentler_than_the_bench_for_the_same_delay() -> None:
         ).pesticide_degradation_factors["captan"]
 
     assert captan_after_salting(use_bath=True) > captan_after_salting(use_bath=False)
+
+
+def test_the_ice_bath_can_be_stored_in_the_inventory() -> None:
+    """The bath is bench glassware, so it has to be tidied away like the rest."""
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+
+    widget = next(widget for widget in experiment.workspace.widgets if widget.id == "ice_bath")
+
+    assert widget.is_storable is True
+    assert widget.can_store is True
+
+
+def test_the_ice_bath_is_listed_under_misc() -> None:
+    """A tray of ice water is a supporting item, not one of the large systems."""
+    categories = get_toolbar_categories()
+
+    owner = next(
+        category
+        for category in categories
+        if any(item["id"] == "ice_bath_widget" for item in category["items"])  # type: ignore[index,union-attr]
+    )
+    item = next(item for item in owner["items"] if item["id"] == "ice_bath_widget")  # type: ignore[index,union-attr]
+
+    assert owner["id"] == "misc"
+    assert item["item_type"] == "workspace_widget"
+    assert item["allowed_drop_targets"] == ["workspace_canvas"]

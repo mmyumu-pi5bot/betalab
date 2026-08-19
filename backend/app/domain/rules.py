@@ -32,6 +32,7 @@ def can_workspace_widget_be_stored(widget_id: str) -> bool:
         "analytical_balance",
         "vortex",
         "centrifuge",
+        "ice_bath",
     }
 
 
