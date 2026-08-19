@@ -824,6 +824,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
         isCommandPending,
         isTrashEmpty,
         isTrashOpen,
+        onRenameExperiment: experimentApi.experiment.rename,
         setIsBasketOpen,
         setIsTrashOpen,
         statusMessage,

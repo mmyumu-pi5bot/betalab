@@ -92,12 +92,13 @@ export function ExperimentsHome() {
   const [editingExperimentId, setEditingExperimentId] = useState<string | null>(null);
   const [managingExperimentId, setManagingExperimentId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
-  const [renamingExperimentId, setRenamingExperimentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tutorialSessionsByExperiment, setTutorialSessionsByExperiment] = useState<
     Record<string, TutorialSession>
   >({});
   const managementMenuRef = useRef<HTMLDivElement | null>(null);
+  const renameInFlightRef = useRef<string | null>(null);
+  const skipNextRenameBlurRef = useRef(false);
 
   useEffect(() => {
     if (managingExperimentId === null) {
@@ -230,10 +231,20 @@ export function ExperimentsHome() {
   };
 
   const handleRenameExperiment = async (experimentId: string) => {
-    setRenamingExperimentId(experimentId);
+    const name = nameDraft.trim();
+    if (renameInFlightRef.current === experimentId) {
+      return;
+    }
+    if (!name) {
+      setEditingExperimentId(null);
+      setNameDraft("");
+      return;
+    }
+
+    renameInFlightRef.current = experimentId;
     setErrorMessage(null);
     try {
-      const renamed = await renameExperiment(experimentId, nameDraft);
+      const renamed = await renameExperiment(experimentId, name);
       setExperiments((current) =>
         current.map((entry) =>
           entry.id === experimentId ? { ...entry, name: renamed.name } : entry,
@@ -244,7 +255,7 @@ export function ExperimentsHome() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to rename experiment");
     } finally {
-      setRenamingExperimentId(null);
+      renameInFlightRef.current = null;
     }
   };
 
@@ -382,25 +393,26 @@ export function ExperimentsHome() {
                             maxLength={80}
                             value={nameDraft}
                             onChange={(event) => setNameDraft(event.target.value)}
+                            onBlur={() => {
+                              if (skipNextRenameBlurRef.current) {
+                                skipNextRenameBlurRef.current = false;
+                                return;
+                              }
+                              void handleRenameExperiment(experiment.id);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void handleRenameExperiment(experiment.id);
+                              } else if (event.key === "Escape") {
+                                event.preventDefault();
+                                skipNextRenameBlurRef.current = true;
+                                setEditingExperimentId(null);
+                                setNameDraft("");
+                              }
+                            }}
                             className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold outline-none ring-amber-200 focus:ring-2"
                           />
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              aria-label="Save name"
-                              disabled={renamingExperimentId === experiment.id || !nameDraft.trim()}
-                              className="rounded-full bg-stone-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingExperimentId(null)}
-                              className="px-2 py-1 text-xs text-stone-500"
-                            >
-                              Cancel
-                            </button>
-                          </div>
                         </form>
                       ) : (
                         <>
@@ -412,6 +424,7 @@ export function ExperimentsHome() {
                               type="button"
                               aria-label={`Rename ${displayName}`}
                               onClick={() => {
+                                skipNextRenameBlurRef.current = false;
                                 setEditingExperimentId(experiment.id);
                                 setNameDraft(displayName);
                               }}

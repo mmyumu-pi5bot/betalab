@@ -123,6 +123,7 @@ type LabSceneViewProps = {
     isCommandPending: boolean;
     isTrashEmpty: boolean;
     isTrashOpen: boolean;
+    onRenameExperiment: (name: string) => Promise<boolean>;
     setIsBasketOpen: Dispatch<SetStateAction<boolean>>;
     setIsTrashOpen: Dispatch<SetStateAction<boolean>>;
     statusMessage: string;
@@ -205,6 +206,7 @@ export function LabSceneView({
           experimentName={experiment.name || experiment.id}
           isSyncing={ui.isCommandPending}
           journalEntries={experiment.journalEntries}
+          onRenameExperiment={ui.onRenameExperiment}
           statusMessage={ui.statusMessage}
         />
 

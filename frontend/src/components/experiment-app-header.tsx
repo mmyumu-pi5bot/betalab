@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { JournalEntry } from "@/types/experiment";
 
@@ -9,8 +9,22 @@ type ExperimentAppHeaderProps = {
   experimentName: string;
   isSyncing: boolean;
   journalEntries: JournalEntry[];
+  onRenameExperiment: (name: string) => Promise<boolean>;
   statusMessage: string;
 };
+
+function PencilIcon() {
+  return (
+    <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+      <path
+        d="m5 19 3.4-.8L18.7 7.9a1.8 1.8 0 0 0 0-2.6 1.8 1.8 0 0 0-2.6 0L5.8 15.6 5 19Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
 
 function JournalIcon() {
   return (
@@ -118,14 +132,46 @@ export function ExperimentAppHeader({
   experimentName,
   isSyncing,
   journalEntries,
+  onRenameExperiment,
   statusMessage,
 }: ExperimentAppHeaderProps) {
   const [isJournalOpen, setIsJournalOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(experimentName);
+  const skipNextBlurRef = useRef(false);
   const visibleEntries = [...(journalEntries ?? [])]
     .filter((entry) => entry.category !== "layout")
     .reverse();
   const hasSyncError = !isSyncing && statusMessage !== "Saved";
   const latestEntry = visibleEntries[0] ?? null;
+
+  const cancelRename = () => {
+    skipNextBlurRef.current = true;
+    setNameDraft(experimentName);
+    setIsEditingName(false);
+  };
+
+  const commitRename = async () => {
+    const name = nameDraft.trim();
+    if (isRenaming) {
+      return;
+    }
+    if (!name || name === experimentName) {
+      setNameDraft(experimentName);
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      if (await onRenameExperiment(name)) {
+        setIsEditingName(false);
+      }
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   return (
     <>
@@ -145,9 +191,53 @@ export function ExperimentAppHeader({
             </Link>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Laboratory workspace</p>
-              <h1 className="truncate text-lg font-semibold tracking-tight text-slate-950 sm:text-xl">
-                {experimentName}
-              </h1>
+              {isEditingName ? (
+                <input
+                  aria-label="Experiment name"
+                  autoFocus
+                  className="mt-0.5 w-full max-w-md rounded-lg border border-sky-300 bg-white px-2 py-0.5 text-lg font-semibold tracking-tight text-slate-950 outline-none ring-sky-200 focus:ring-2 sm:text-xl"
+                  disabled={isRenaming}
+                  maxLength={80}
+                  onBlur={() => {
+                    if (skipNextBlurRef.current) {
+                      skipNextBlurRef.current = false;
+                      return;
+                    }
+                    void commitRename();
+                  }}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void commitRename();
+                    } else if (event.key === "Escape") {
+                      event.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  value={nameDraft}
+                />
+              ) : (
+                <div className="group/name flex min-w-0 items-center gap-1.5">
+                  <h1 className="truncate text-lg font-semibold tracking-tight text-slate-950 sm:text-xl">
+                    {experimentName}
+                  </h1>
+                  <button
+                    aria-label="Rename experiment"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 opacity-70 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover/name:opacity-100"
+                    onClick={() => {
+                      skipNextBlurRef.current = false;
+                      setNameDraft(experimentName);
+                      setIsEditingName(true);
+                    }}
+                    title="Rename experiment"
+                    type="button"
+                  >
+                    <PencilIcon />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

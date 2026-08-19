@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentAppHeader } from "@/components/experiment-app-header";
 import type { JournalEntry } from "@/types/experiment";
@@ -35,6 +35,7 @@ describe("ExperimentAppHeader", () => {
         experimentName="Apple preparation"
         isSyncing={false}
         journalEntries={entries}
+        onRenameExperiment={vi.fn()}
         statusMessage="Saved"
       />,
     );
@@ -67,6 +68,7 @@ describe("ExperimentAppHeader", () => {
         experimentName="Apple preparation"
         isSyncing
         journalEntries={[]}
+        onRenameExperiment={vi.fn()}
         statusMessage="Saved"
       />,
     );
@@ -78,9 +80,52 @@ describe("ExperimentAppHeader", () => {
         experimentName="Apple preparation"
         isSyncing={false}
         journalEntries={[]}
+        onRenameExperiment={vi.fn()}
         statusMessage="Backend unavailable"
       />,
     );
     expect(screen.getByText("Backend unavailable")).toBeInTheDocument();
+  });
+
+  it("renames the experiment inline from its title", async () => {
+    const onRenameExperiment = vi.fn().mockResolvedValue(true);
+    render(
+      <ExperimentAppHeader
+        experimentName="Apple preparation"
+        isSyncing={false}
+        journalEntries={[]}
+        onRenameExperiment={onRenameExperiment}
+        statusMessage="Saved"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename experiment" }));
+    const input = screen.getByRole("textbox", { name: "Experiment name" });
+    fireEvent.change(input, { target: { value: "  Validated extraction  " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onRenameExperiment).toHaveBeenCalledWith("Validated extraction");
+    expect(await screen.findByRole("button", { name: "Rename experiment" })).toBeInTheDocument();
+  });
+
+  it("cancels an inline rename with Escape", () => {
+    const onRenameExperiment = vi.fn();
+    render(
+      <ExperimentAppHeader
+        experimentName="Apple preparation"
+        isSyncing={false}
+        journalEntries={[]}
+        onRenameExperiment={onRenameExperiment}
+        statusMessage="Saved"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename experiment" }));
+    const input = screen.getByRole("textbox", { name: "Experiment name" });
+    fireEvent.change(input, { target: { value: "Discarded draft" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(onRenameExperiment).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Apple preparation" })).toBeInTheDocument();
   });
 });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { createExperiment, getExperiment, subscribeToExperimentStream } from "@/lib/api";
+import { createExperiment, getExperiment, renameExperiment, subscribeToExperimentStream } from "@/lib/api";
 import { mutationFns, type MutationFn } from "@/lib/experiment-mutation-fns";
 import { useCommandPending } from "@/hooks/use-command-pending";
 import type { Experiment } from "@/types/experiment";
@@ -223,7 +223,27 @@ export function useLabExperiment({
   const exec = (fn: MutationFn, payload?: Record<string, unknown>) =>
     executeMutation(fn, payload);
 
+  const rename = async (name: string) => {
+    if (state.status !== "ready" || isCommandPendingRef.current) {
+      return false;
+    }
+
+    setCommandPending(true);
+    try {
+      await runMutation((activeExperimentId) => renameExperiment(activeExperimentId, name));
+      return true;
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Unable to rename experiment");
+      return false;
+    } finally {
+      setCommandPending(false);
+    }
+  };
+
   return {
+    experiment: {
+      rename,
+    },
     isCommandPending,
     loadExperiment,
     state,

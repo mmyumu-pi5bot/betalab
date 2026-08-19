@@ -34,6 +34,7 @@ import {
   emitExperimentSnapshot,
   getAcquisitionMethod,
   getAcquisitionMethodCatalog,
+  renameExperiment,
   resetApiMocks,
   sendExperimentCommand,
   subscribeToExperimentStream,
@@ -1001,6 +1002,31 @@ describe("LabScene", () => {
     );
     expect(screen.getByRole("button", { name: "Open experiment journal" })).toBeInTheDocument();
     expect(screen.queryByText("Custom layout")).not.toBeInTheDocument();
+  });
+
+  it("renames the current experiment from the workspace header", async () => {
+    const experiment = makeWorkbenchExperiment();
+    vi.mocked(createExperiment).mockResolvedValue(experiment);
+    vi.mocked(renameExperiment).mockResolvedValue({
+      ...experiment,
+      name: "Validated extraction",
+      snapshot_version: 2,
+    });
+
+    render(<PesticideWorkbench />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rename experiment" }));
+    const input = screen.getByRole("textbox", { name: "Experiment name" });
+    fireEvent.change(input, { target: { value: "Validated extraction" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(renameExperiment).toHaveBeenCalledWith(
+        "experiment_pesticides",
+        "Validated extraction",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "Validated extraction" })).toBeInTheDocument();
   });
 
   it("shows a separate debug produce palette and spawns its preset on drop", async () => {

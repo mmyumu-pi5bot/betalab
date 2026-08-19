@@ -263,12 +263,48 @@ describe("ExperimentsHome", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Experiment name" }), {
       target: { value: "Validated extraction" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save name" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Experiment name" }), {
+      key: "Enter",
+    });
 
     await waitFor(() => {
       expect(renameExperimentMock).toHaveBeenCalledWith("experiment_2", "Validated extraction");
       expect(screen.getByText("Validated extraction")).toBeInTheDocument();
     });
+  });
+
+  it("saves an experiment name on blur and cancels with Escape", async () => {
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_2",
+        name: "Draft experiment",
+        status: "preparing",
+        last_simulation_at: "2026-04-01T10:00:00Z",
+        snapshot_version: 4,
+        updated_at: "2026-04-01T10:03:00Z",
+        last_audit_entry: null,
+        summary: { workbenchToolCount: 0, rackToolCount: 0, materialCount: 0, runCount: 0 },
+      },
+    ]);
+    renameExperimentMock.mockResolvedValue({ name: "Blurred title" });
+
+    render(<ExperimentsHome />);
+    fireEvent.click(await screen.findByRole("button", { name: "Rename Draft experiment" }));
+    let input = screen.getByRole("textbox", { name: "Experiment name" });
+    fireEvent.change(input, { target: { value: "Blurred title" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(renameExperimentMock).toHaveBeenCalledWith("experiment_2", "Blurred title");
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rename Blurred title" }));
+    input = screen.getByRole("textbox", { name: "Experiment name" });
+    fireEvent.change(input, { target: { value: "Discarded title" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(renameExperimentMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Blurred title")).toBeInTheDocument();
   });
 
   it("duplicates an experiment and adds the copy to the list", async () => {

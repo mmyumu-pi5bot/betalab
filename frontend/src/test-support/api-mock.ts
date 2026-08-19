@@ -17,6 +17,9 @@ import type {
 } from "@/types/workbench";
 
 export const createExperiment = vi.fn<() => Promise<Experiment>>();
+export const renameExperiment = vi.fn<
+  (experimentId: string, name: string) => Promise<Experiment>
+>();
 export const getToolbarCatalog = vi.fn<() => Promise<ToolbarCategory[]>>(() =>
   Promise.resolve(toolbarCatalogFixture),
 );
