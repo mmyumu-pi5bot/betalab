@@ -47,7 +47,7 @@ export const labSceneWidgetStorability: Record<LabSceneWidgetId, boolean> = {
 };
 
 export const labSceneWidgetFrameSpecs: Record<LabSceneWidgetId, WidgetLayout> = {
-  lims: { x: 24, y: 886, width: 440, fallbackHeight: 300 },
+  lims: { x: 24, y: 840, width: 440, fallbackHeight: 300 },
   workbench: { x: 24, y: 24, width: 980, fallbackHeight: 800 },
   trash: { x: 1276, y: 24, width: 164, fallbackHeight: 214 },
   rack: { x: 234, y: 886, width: 440, fallbackHeight: 360 },

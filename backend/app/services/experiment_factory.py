@@ -42,7 +42,7 @@ def build_experiment(name: str = "Untitled experiment") -> Experiment:
                     label="LIMS terminal",
                     anchor="top-left",
                     offset_x=24,
-                    offset_y=886,
+                    offset_y=840,
                     is_present=True,
                     is_trashed=False,
                 ),
