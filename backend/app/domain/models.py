@@ -294,6 +294,11 @@ class ProduceFraction:
     produce_lot_id: str
     produce_material_state_id: str
     mass_g: float
+    #: This body of material's own temperature. It belongs here rather than on the
+    #: material state because the state is shared by lot: a jar of powder and the
+    #: portion weighed out of it are the same material in two places, and they do
+    #: not have the same temperature once one of them is standing in ice water.
+    temperature_c: float = 20.0
     true_mass_g: float | None = None
     unit_count: int | None = None
     is_mixed: bool = False

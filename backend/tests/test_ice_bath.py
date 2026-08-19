@@ -4,6 +4,7 @@ import pytest
 
 from app.domain.models import (
     ProduceFraction,
+    ProduceLot,
     ProduceMaterialState,
     WorkbenchLiquid,
     WorkbenchTool,
@@ -75,6 +76,7 @@ def _tube_with_portion(
             id="fraction_portion",
             produce_lot_id="lot_apples",
             produce_material_state_id="state_portion",
+            temperature_c=portion_temperature_c,
             mass_g=10.0,
             location_kind="workbench_tool",
             location_id=tube.id,
@@ -114,6 +116,11 @@ def _portion(service: ExperimentRuntimeService, experiment_id: str) -> ProduceMa
         for state in service._require_experiment(experiment_id).produce_material_states
         if state.id == fraction.produce_material_state_id
     )
+
+
+def _portion_fraction(service: ExperimentRuntimeService, experiment_id: str):
+    """The body of powder itself, which is what owns a temperature."""
+    return _chilled_tube(service, experiment_id).produce_fractions[0]
 
 
 def test_a_tube_can_be_dragged_into_the_ice_bath_and_back_out() -> None:
@@ -171,7 +178,7 @@ def test_the_bath_chills_a_warm_portion_towards_zero() -> None:
     _move_tube_to_ice_bath(service, experiment.id)
     _advance(service, experiment.id, 60000)
 
-    portion = _portion(service, experiment.id)
+    portion = _portion_fraction(service, experiment.id)
     assert portion.temperature_c == pytest.approx(
         PhysicalSimulationService.ice_bath_temperature_c, abs=1.0
     )
@@ -354,19 +361,19 @@ def test_an_empty_tube_carries_its_own_warmth_out_of_the_bath() -> None:
 def test_the_tube_body_tempers_powder_straight_out_of_the_mill() -> None:
     """A warm tube gives some of its heat back to cryogenic powder poured in."""
     tool = _bare_tube(temperature_c=20.0)
-    state = ProduceMaterialState(id="cold", produce_lot_id="lot", temperature_c=-60.0)
     tool.produce_fractions.append(
         ProduceFraction(
             id="frac",
             produce_lot_id="lot",
             produce_material_state_id="cold",
+            temperature_c=-60.0,
             mass_g=10.0,
             true_mass_g=10.0,
         )
     )
 
     mixture = PhysicalSimulationService.mixture_temperature_c(
-        tool, [state], surroundings=PhysicalSimulationService.bench_surroundings()
+        tool, [], surroundings=PhysicalSimulationService.bench_surroundings()
     )
 
     assert -60.0 < mixture < -20.0
@@ -387,10 +394,21 @@ def test_the_thermal_state_of_a_tube_survives_a_reload() -> None:
         )
     )
 
+    tool.produce_fractions.append(
+        ProduceFraction(
+            id="frac",
+            produce_lot_id="lot",
+            produce_material_state_id="state",
+            temperature_c=1.75,
+            mass_g=10.0,
+        )
+    )
+
     restored = _deserialize_non_null_workbench_tool(WorkbenchToolSchema.model_validate(asdict(tool)))
 
     assert restored.body_temperature_c == pytest.approx(3.5)
     assert restored.liquids[0].temperature_c == pytest.approx(4.25)
+    assert restored.produce_fractions[0].temperature_c == pytest.approx(1.75)
 
 
 def test_a_tube_taken_out_of_the_bath_warms_back_through_the_real_tick() -> None:
@@ -425,3 +443,63 @@ def test_a_tube_taken_out_of_the_bath_warms_back_through_the_real_tick() -> None
     # Warming towards the room, and not there yet: still air is slow.
     assert 5.0 < tube.body_temperature_c < 19.0
     assert 5.0 < tube.liquids[0].temperature_c < 19.0
+
+
+def test_a_chilling_portion_is_not_reset_by_reading_the_experiment() -> None:
+    """The portion keeps its own cold across a read.
+
+    Serialising an experiment re-derives the canonical produce model, and that used
+    to remint the material state a weighed portion points at -- copying temperature
+    from the first state sharing the lot id, which is the jar the powder came from.
+    The frontend polls, so the portion was pinned near the jar's temperature forever:
+    a tube standing in ice water settled around 9 C and drifted back up as the jar
+    warmed, while its solvent and its wall sat at zero.
+    """
+    service = ExperimentRuntimeService()
+    experiment = service.create_experiment()
+    _tube_with_portion(service, experiment.id, portion_temperature_c=20.0)
+
+    # The jar the powder was weighed out of, still standing on the bench and warm.
+    # Its state is listed first, exactly as in a real run: the lot exists before any
+    # portion is taken from it, and the lookup behind this bug takes the first state
+    # matching the lot id.
+    experiment = service._require_experiment(experiment.id)
+    experiment.produce_material_states.insert(
+        0,
+        ProduceMaterialState(
+            id="state_jar",
+            produce_lot_id="lot_apples",
+            material_state="ground",
+            temperature_c=20.0,
+            pesticide_degradation_factors={"captan": 1.0, "boscalid": 1.0},
+        ),
+    )
+    PlaceToolOnWorkbenchService(service).run(
+        experiment.id,
+        PlaceToolOnWorkbenchRequest(slot_id="station_2", tool_id="hdpe_storage_jar_2l"),
+    )
+    experiment = service._require_experiment(experiment.id)
+    jar = experiment.workbench.slots[1].tool
+    assert jar is not None
+    jar.produce_lots.append(
+        ProduceLot(
+            id="lot_apples",
+            label="Ground apples",
+            produce_type="apple",
+            total_mass_g=900.0,
+        )
+    )
+
+    _move_tube_to_ice_bath(service, experiment.id)
+    state_ids = set()
+    readings = []
+    for _ in range(12):
+        _advance(service, experiment.id, 5000)
+        service.get_experiment(experiment.id)
+        state_ids.add(_chilled_tube(service, experiment.id).produce_fractions[0].produce_material_state_id)
+        readings.append(_portion_fraction(service, experiment.id).temperature_c)
+
+    # Reading the experiment must not hand the portion a different record.
+    assert len(state_ids) == 1, state_ids
+    assert readings == sorted(readings, reverse=True), readings
+    assert readings[-1] < 1.0, readings

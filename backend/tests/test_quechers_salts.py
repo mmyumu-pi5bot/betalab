@@ -435,6 +435,7 @@ def _tube_with_produce_at(
             id="fraction_portion",
             produce_lot_id="lot_apples",
             produce_material_state_id="state_portion",
+            temperature_c=temperature_c,
             mass_g=10.0,
             location_kind="workbench_tool",
             location_id=tube.id,
@@ -589,6 +590,11 @@ def _portion(service: ExperimentRuntimeService, experiment_id: str) -> ProduceMa
     )
 
 
+def _portion_fraction(service: ExperimentRuntimeService, experiment_id: str):
+    """The body of powder itself, which is what owns a temperature."""
+    return _tube(service, experiment_id).produce_fractions[0]
+
+
 def test_a_weighed_portion_exchanges_heat_with_the_bench() -> None:
     # A test portion is ten grams of powder in a plastic tube -- it warms towards
     # the room exactly as the jar it was scooped from does. Freezing it at the
@@ -602,7 +608,7 @@ def test_a_weighed_portion_exchanges_heat_with_the_bench() -> None:
 
     _advance(service, experiment.id, 60000)
 
-    portion = _portion(service, experiment.id)
+    portion = _portion_fraction(service, experiment.id)
     assert portion.temperature_c > -30.0
     assert portion.temperature_c < PhysicalSimulationService.ambient_temperature_c
 
@@ -616,7 +622,7 @@ def test_a_portion_left_long_enough_settles_at_room_temperature() -> None:
 
     _advance(service, experiment.id, 600000)
 
-    portion = _portion(service, experiment.id)
+    portion = _portion_fraction(service, experiment.id)
     assert portion.temperature_c == pytest.approx(PhysicalSimulationService.ambient_temperature_c, abs=0.5)
 
 

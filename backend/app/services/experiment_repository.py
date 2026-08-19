@@ -743,4 +743,7 @@ def _deserialize_produce_fraction(fraction_schema) -> ProduceFraction:
     payload = fraction_schema.model_dump()
     payload["is_mixed"] = fraction_schema.is_mixed
     payload["true_mass_g"] = fraction_schema.true_mass_g
+    # Hidden fields are excluded from the dump, so they have to be carried over by
+    # hand or a reload quietly resets them.
+    payload["temperature_c"] = fraction_schema.temperature_c
     return ProduceFraction(**payload)

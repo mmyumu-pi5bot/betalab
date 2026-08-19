@@ -56,6 +56,26 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         material_states.append(existing_state)
         material_state_ids_added.add(state_id)
 
+    def seed_fraction_temperature_c(
+        existing_fraction: ProduceFraction | None, produce_lot_id: str
+    ) -> float:
+        """A rebuilt fraction keeps the temperature it had.
+
+        Fractions are re-derived on every sync, so without this the body of material
+        would forget how warm it is between ticks. A fraction seen for the first time
+        -- including every one restored from a save written before fractions carried
+        a temperature -- starts from the lot's own reading.
+        """
+        if existing_fraction is not None:
+            return existing_fraction.temperature_c
+        state = find_material_state(experiment.produce_material_states, produce_lot_id)
+        return state.temperature_c if state is not None else 20.0
+
+    def keep_material_state_id(state_id: str) -> str:
+        """Carry an existing record through untouched, identity included."""
+        register_material_state(state_id)
+        return state_id
+
     def ensure_material_state_id(produce_lot: ProduceLot, *, material_state: str | None = None) -> str:
         existing_state = find_material_state(experiment.produce_material_states, produce_lot.id)
         state_name = material_state or (existing_state.material_state if existing_state is not None else "whole")
@@ -109,6 +129,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             produce_lots=basket_tool.produce_lots,
             existing_fractions=basket_tool.produce_fractions,
             ensure_material_state_id=ensure_material_state_id,
+            seed_fraction_temperature_c=seed_fraction_temperature_c,
             get_material_state_for_lot=lambda produce_lot_id: get_material_state_name(
                 experiment.produce_material_states,
                 produce_lot_id,
@@ -126,6 +147,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         existing_states_by_lot_id=existing_states_by_lot_id,
         produce_lots_by_id=produce_lots_by_id,
         ensure_material_state_id=ensure_material_state_id,
+        keep_material_state_id=keep_material_state_id,
         location_kind="spatula",
         location_id="spatula",
         container_id="spatula",
@@ -139,6 +161,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             produce_lots=slot.surface_produce_lots,
             existing_fractions=slot.surface_produce_fractions,
             ensure_material_state_id=ensure_material_state_id,
+            seed_fraction_temperature_c=seed_fraction_temperature_c,
             location_kind="workbench_surface",
             location_id=slot.id,
             container_label=slot.label,
@@ -152,6 +175,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             existing_states_by_lot_id=existing_states_by_lot_id,
             produce_lots_by_id=produce_lots_by_id,
             ensure_material_state_id=ensure_material_state_id,
+            keep_material_state_id=keep_material_state_id,
             location_kind="workbench_tool",
             location_id=slot.id,
             container_id=slot.tool.id,
@@ -170,6 +194,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             ],
             existing_fractions=existing_tool_fractions,
             ensure_material_state_id=ensure_material_state_id,
+            seed_fraction_temperature_c=seed_fraction_temperature_c,
             get_material_state_for_lot=lambda produce_lot_id: get_material_state_name(
                 experiment.produce_material_states,
                 produce_lot_id,
@@ -192,6 +217,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             existing_states_by_lot_id=existing_states_by_lot_id,
             produce_lots_by_id=produce_lots_by_id,
             ensure_material_state_id=ensure_material_state_id,
+            keep_material_state_id=keep_material_state_id,
             location_kind="rack_tool",
             location_id=slot.id,
             container_id=slot.tool.id,
@@ -207,6 +233,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             ],
             existing_fractions=existing_tool_fractions,
             ensure_material_state_id=ensure_material_state_id,
+            seed_fraction_temperature_c=seed_fraction_temperature_c,
             get_material_state_for_lot=lambda produce_lot_id: get_material_state_name(
                 experiment.produce_material_states,
                 produce_lot_id,
@@ -224,6 +251,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             produce_lots=widget.produce_lots,
             existing_fractions=widget.produce_fractions,
             ensure_material_state_id=ensure_material_state_id,
+            seed_fraction_temperature_c=seed_fraction_temperature_c,
             get_material_state_for_lot=lambda produce_lot_id: get_material_state_name(
                 experiment.produce_material_states,
                 produce_lot_id,
@@ -242,6 +270,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
                 existing_states_by_lot_id=existing_states_by_lot_id,
                 produce_lots_by_id=produce_lots_by_id,
                 ensure_material_state_id=ensure_material_state_id,
+                keep_material_state_id=keep_material_state_id,
                 location_kind="workspace_widget_tool",
                 location_id=widget.id,
                 container_id=widget.tool.id,
@@ -257,6 +286,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
                 ],
                 existing_fractions=existing_tool_fractions,
                 ensure_material_state_id=ensure_material_state_id,
+                seed_fraction_temperature_c=seed_fraction_temperature_c,
                 get_material_state_for_lot=lambda produce_lot_id: get_material_state_name(
                     experiment.produce_material_states,
                     produce_lot_id,
@@ -273,6 +303,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         produce_lots=experiment.workspace.produce_basket_lots,
         existing_fractions=experiment.workspace.produce_basket_fractions,
         ensure_material_state_id=ensure_material_state_id,
+        seed_fraction_temperature_c=seed_fraction_temperature_c,
         location_kind="produce_basket",
         location_id="basket",
         container_label="Produce basket",
@@ -337,6 +368,7 @@ def _build_tool_produce_fractions(
     existing_fractions: list[ProduceFraction],
     ensure_material_state_id,
     get_material_state_for_lot,
+    seed_fraction_temperature_c,
     *,
     location_kind: ProduceFractionLocationKind,
     location_id: str,
@@ -360,6 +392,7 @@ def _build_tool_produce_fractions(
                 id=f"produce_fraction_{produce_lot.id}_{location_id}",
                 produce_lot_id=produce_lot.id,
                 produce_material_state_id=state_id,
+                temperature_c=seed_fraction_temperature_c(existing_fraction, produce_lot.id),
                 mass_g=produce_lot.total_mass_g,
                 true_mass_g=(
                     existing_fraction.true_mass_g
@@ -384,6 +417,7 @@ def _build_surface_produce_fractions(
     produce_lots: list[ProduceLot],
     existing_fractions: list[ProduceFraction],
     ensure_material_state_id,
+    seed_fraction_temperature_c,
     *,
     location_kind: ProduceFractionLocationKind,
     location_id: str,
@@ -403,6 +437,7 @@ def _build_surface_produce_fractions(
                 id=f"produce_fraction_{produce_lot.id}_{location_id}",
                 produce_lot_id=produce_lot.id,
                 produce_material_state_id=ensure_material_state_id(produce_lot),
+                temperature_c=seed_fraction_temperature_c(existing_fraction, produce_lot.id),
                 mass_g=produce_lot.total_mass_g,
                 true_mass_g=(
                     existing_fraction.true_mass_g
@@ -447,6 +482,7 @@ def _select_canonical_powder_fractions(
     existing_states_by_lot_id: dict[str, ProduceMaterialState],
     produce_lots_by_id: dict[str, ProduceLot],
     ensure_material_state_id,
+    keep_material_state_id,
     location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
@@ -459,6 +495,7 @@ def _select_canonical_powder_fractions(
             existing_states_by_lot_id=existing_states_by_lot_id,
             produce_lots_by_id=produce_lots_by_id,
             ensure_material_state_id=ensure_material_state_id,
+            keep_material_state_id=keep_material_state_id,
             location_kind=location_kind,
             location_id=location_id,
             container_id=container_id,
@@ -498,6 +535,7 @@ def _normalize_existing_particulate_fraction(
     existing_states_by_lot_id: dict[str, ProduceMaterialState],
     produce_lots_by_id: dict[str, ProduceLot],
     ensure_material_state_id,
+    keep_material_state_id,
     location_kind: ProduceFractionLocationKind,
     location_id: str,
     container_id: str | None,
@@ -518,13 +556,20 @@ def _normalize_existing_particulate_fraction(
         material_state = existing_state.material_state
     elif existing_states_by_lot_id.get(fraction.produce_lot_id) is not None:
         material_state = existing_states_by_lot_id[fraction.produce_lot_id].material_state
+    # A portion that already owns a record keeps it, identity and all. Re-deriving
+    # one from the lot resolves by lot id and takes the first match -- the jar the
+    # powder was weighed out of -- so every read wrote the jar's temperature back
+    # over the portion's own. A tube standing in ice water never got below about 9 C.
+    state_id = (
+        keep_material_state_id(existing_state.id)
+        if existing_state is not None
+        else ensure_material_state_id(produce_lot, material_state=material_state)
+    )
     return ProduceFraction(
         id=fraction.id,
         produce_lot_id=fraction.produce_lot_id,
-        produce_material_state_id=ensure_material_state_id(
-            produce_lot,
-            material_state=material_state,
-        ),
+        produce_material_state_id=state_id,
+        temperature_c=fraction.temperature_c,
         mass_g=fraction.mass_g,
         true_mass_g=fraction.true_mass_g,
         unit_count=fraction.unit_count,

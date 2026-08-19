@@ -198,12 +198,14 @@ class PhysicalSimulationService:
         def relax(temperature_c: float) -> float:
             return temperature_c + (surroundings.temperature_c - temperature_c) * progress
 
-        states_by_id = {state.id: state for state in material_states}
         for fraction in tool.produce_fractions:
-            state = states_by_id.get(fraction.produce_material_state_id)
-            if state is None:
+            fraction.temperature_c = relax(fraction.temperature_c)
+        for lot in tool.produce_lots:
+            if any(f.produce_lot_id == lot.id for f in tool.produce_fractions):
                 continue
-            state.temperature_c = relax(state.temperature_c)
+            state = find_material_state(material_states, lot.id)
+            if state is not None:
+                state.temperature_c = relax(state.temperature_c)
         for liquid in tool.liquids:
             liquid.temperature_c = relax(liquid.temperature_c)
         if self.container_body_thermal_mass_j_per_k.get(tool.tool_type, 0.0) > 0:
@@ -314,19 +316,20 @@ class PhysicalSimulationService:
         surroundings = surroundings or cls.bench_surroundings()
         thermal_mass = 0.0
         weighted = 0.0
-        # Resolve each fraction through its own material state id: several states
-        # share a lot id once a portion has been wetted, and looking up by lot
-        # alone would read whichever one happens to come first.
-        states_by_id = {state.id: state for state in material_states}
+        # Each fraction carries its own temperature, so nothing here is resolved by
+        # lot: the jar a portion was weighed out of is the same lot, and reading it
+        # by lot id used to give the tube the jar's warmth.
         for fraction in tool.produce_fractions:
-            state = states_by_id.get(fraction.produce_material_state_id)
-            if state is None:
-                continue
             mass_g = fraction.true_mass_g if fraction.true_mass_g is not None else fraction.mass_g
             capacity = mass_g * cls.produce_specific_heat_j_per_g_k
             thermal_mass += capacity
-            weighted += capacity * state.temperature_c
+            weighted += capacity * fraction.temperature_c
+        covered_lot_ids = {fraction.produce_lot_id for fraction in tool.produce_fractions}
         for lot in tool.produce_lots:
+            # A lot only counts on its own before the canonical model has given it a
+            # fraction; counting both would weigh the same material twice.
+            if lot.id in covered_lot_ids:
+                continue
             state = find_material_state(material_states, lot.id)
             if state is None:
                 continue

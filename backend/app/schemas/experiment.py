@@ -160,6 +160,9 @@ class ProduceFractionSchema(BaseModel):
     produce_lot_id: str
     produce_material_state_id: str
     mass_g: float
+    #: Hidden simulation state, like true_mass_g: the UI reads a container's
+    #: temperature off the mixture the tool reports, never off a single fraction.
+    temperature_c: float = Field(default=20.0, exclude=True)
     true_mass_g: float | None = Field(default=None, exclude=True)
     unit_count: int | None = None
     is_mixed: bool = Field(default=False, exclude=True)
