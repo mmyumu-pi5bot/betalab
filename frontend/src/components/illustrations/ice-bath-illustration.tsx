@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
 
 type IceBathIllustrationProps = {
@@ -19,9 +21,18 @@ const ICE_CUBES = [
 ];
 
 export function IceBathIllustration({ className, hasTube }: IceBathIllustrationProps) {
+  // The palette icon and the widget standing on the canvas are both on screen at
+  // once. Shared gradient ids make the browser resolve every fill against the
+  // first match in the document -- the hidden, zero-sized palette svg -- which
+  // paints nothing, so the water and the ice cubes silently disappear.
+  const instanceId = useId();
+  const waterId = `${instanceId}-water`;
+  const trayId = `${instanceId}-tray`;
+  const cubeId = `${instanceId}-cube`;
+
   const { defs: surfaceDefs, surface } = buildEquipmentIllustrationSurface({
     height: 272,
-    idPrefix: "ice-bath-illustration",
+    idPrefix: instanceId,
     radius: 30,
     width: 495,
   });
@@ -37,15 +48,15 @@ export function IceBathIllustration({ className, hasTube }: IceBathIllustrationP
         <defs>
           {surfaceDefs}
 
-          <linearGradient id="ice-bath-water" x1="80" x2="415" y1="120" y2="228" gradientUnits="userSpaceOnUse">
+          <linearGradient id={waterId} x1="80" x2="415" y1="120" y2="228" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#bae6fd" />
             <stop offset="1" stopColor="#38bdf8" />
           </linearGradient>
-          <linearGradient id="ice-bath-tray" x1="70" x2="425" y1="104" y2="240" gradientUnits="userSpaceOnUse">
+          <linearGradient id={trayId} x1="70" x2="425" y1="104" y2="240" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#f8fafc" />
             <stop offset="1" stopColor="#cbd5e1" />
           </linearGradient>
-          <linearGradient id="ice-bath-cube" x1="0" x2="1" y1="0" y2="1">
+          <linearGradient id={cubeId} x1="0" x2="1" y1="0" y2="1">
             <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
             <stop offset="1" stopColor="#e0f2fe" stopOpacity="0.7" />
           </linearGradient>
@@ -54,16 +65,16 @@ export function IceBathIllustration({ className, hasTube }: IceBathIllustrationP
         {surface}
 
         {/* Stainless tray */}
-        <rect fill="url(#ice-bath-tray)" height={140} rx={22} stroke="#94a3b8" strokeWidth={3} width={360} x={68} y={100} />
+        <rect fill={`url(#${trayId})`} height={140} rx={22} stroke="#94a3b8" strokeWidth={3} width={360} x={68} y={100} />
 
         {/* Water line */}
-        <rect fill="url(#ice-bath-water)" height={104} rx={14} width={330} x={83} y={124} />
+        <rect fill={`url(#${waterId})`} height={104} rx={14} width={330} x={83} y={124} />
         <ellipse cx={248} cy={128} fill="#e0f2fe" opacity={0.55} rx={162} ry={10} />
 
         {ICE_CUBES.map((cube) => (
           <rect
             key={`${cube.x}-${cube.y}`}
-            fill="url(#ice-bath-cube)"
+            fill={`url(#${cubeId})`}
             height={cube.size}
             rx={6}
             stroke="#ffffff"
