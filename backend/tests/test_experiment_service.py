@@ -759,7 +759,7 @@ def test_create_experiment_starts_with_received_bag_and_empty_workbench() -> Non
     assert widgets_by_id["lims"].is_present is True
     assert widgets_by_id["lims"].anchor == "top-left"
     assert widgets_by_id["lims"].offset_x == 24
-    assert widgets_by_id["lims"].offset_y == 840
+    assert widgets_by_id["lims"].offset_y == 584
     assert widgets_by_id["gross_balance"].is_present is False
     assert widgets_by_id["analytical_balance"].is_present is False
     assert widgets_by_id["workbench"].is_present is True

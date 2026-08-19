@@ -10,7 +10,7 @@ describe("labSceneWidgetFrameSpecs", () => {
       grinder: { width: 390 },
       gross_balance: { width: 276 },
       instrument: { width: 460 },
-      lims: { width: 440, y: 840 },
+      lims: { width: 440, y: 584 },
       rack: { width: 440 },
       vortex: { width: 260 },
       workbench: { width: 980 },
