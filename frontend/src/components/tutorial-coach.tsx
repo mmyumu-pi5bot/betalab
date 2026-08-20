@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
+  getTutorialActionToolPickupPresentation,
   getTutorialActionToolPresentation,
   getTutorialCountdown,
   getTutorialInventoryCategoryPresentation,
@@ -90,6 +91,10 @@ function applySpotlightStyle(
   }
 }
 
+// Anchors that only become actionable once the spatula is in hand: loading it from
+// an open container, and pouring out of it onto the balance.
+const spatulaAnchorPrefixes = ["spatula-load-powder:", "spatula-dose:"];
+
 function findDirectAnchor(anchor: string): HTMLElement | null {
   if (anchor.startsWith("cut-apples-")) {
     const lotId = anchor.slice("cut-apples-".length);
@@ -104,11 +109,11 @@ function findDirectAnchor(anchor: string): HTMLElement | null {
       ? document.querySelector<HTMLElement>('[data-tutorial-anchor="tool-type-centrifuge_tube"]')
       : pipette;
   }
-  if (anchor.startsWith("spatula-load-powder:")) {
-    const powderAnchor = anchor.slice("spatula-load-powder:".length);
+  const spatulaPrefix = spatulaAnchorPrefixes.find((prefix) => anchor.startsWith(prefix));
+  if (spatulaPrefix) {
     const spatula = document.querySelector<HTMLElement>('[data-tutorial-anchor="action-spatula"]');
     return spatula?.getAttribute("aria-pressed") === "true"
-      ? findDirectAnchor(powderAnchor)
+      ? findDirectAnchor(anchor.slice(spatulaPrefix.length))
       : spatula;
   }
   if (anchor === "instrument-console-next") {
@@ -158,8 +163,20 @@ function isActionDrivenAnchor(anchor: string) {
     anchor === "pipette-aspirate" ||
     anchor.startsWith("action-") ||
     anchor.startsWith("cut-apples-") ||
-    anchor.startsWith("spatula-load-powder:")
+    spatulaAnchorPrefixes.some((prefix) => anchor.startsWith(prefix))
   );
+}
+
+// The spatula can be put down still holding powder, and a step that pours out of it
+// then reads as impossible: the balance is highlighted, holding it does nothing. The
+// loading anchor needs no equivalent, since its own step already says to take the
+// spatula first.
+function pendingSpatulaPickup(anchor: string): TutorialActionTool | null {
+  if (!anchor.startsWith("spatula-dose:")) {
+    return null;
+  }
+  const spatula = document.querySelector<HTMLElement>('[data-tutorial-anchor="action-spatula"]');
+  return spatula?.getAttribute("aria-pressed") === "true" ? null : "spatula";
 }
 
 function findSelectedActionTool(): { target: HTMLElement; tool: TutorialActionTool } | null {
@@ -604,6 +621,7 @@ function resolvePresentation({
   experiment,
   intervention,
   limsField,
+  pickupTool,
 }: {
   accessTarget: AccessTarget;
   actionTool: TutorialActionTool | null;
@@ -612,6 +630,7 @@ function resolvePresentation({
   experiment: Experiment;
   intervention: TutorialIntervention | null;
   limsField: LimsTutorialField | null;
+  pickupTool: TutorialActionTool | null;
 }): TutorialStepPresentation | null {
   if (intervention) {
     return {
@@ -623,6 +642,9 @@ function resolvePresentation({
   }
   if (actionTool) {
     return getTutorialActionToolPresentation(actionTool);
+  }
+  if (pickupTool) {
+    return getTutorialActionToolPickupPresentation(pickupTool);
   }
   if (collapsedCategoryLabel) {
     return getTutorialInventoryCategoryPresentation(collapsedCategoryLabel);
@@ -658,6 +680,7 @@ export function TutorialCoach({
   const [actionTool, setActionTool] = useState<TutorialActionTool | null>(null);
   const [collapsedCategoryLabel, setCollapsedCategoryLabel] = useState<string | null>(null);
   const [limsField, setLimsField] = useState<LimsTutorialField | null>(null);
+  const [pickupTool, setPickupTool] = useState<TutorialActionTool | null>(null);
   const anchor = intervention?.anchor
     ?? evaluation.currentStep?.anchor(evaluation.experiment)
     ?? null;
@@ -695,6 +718,8 @@ export function TutorialCoach({
         current === resolution.collapsedCategoryLabel ? current : resolution.collapsedCategoryLabel,
       );
       setLimsField((current) => current === resolution.limsField ? current : resolution.limsField);
+      const pendingPickup = pendingSpatulaPickup(anchor);
+      setPickupTool((current) => (current === pendingPickup ? current : pendingPickup));
       if (!spotlight || !target) {
         if (spotlight) {
           applySpotlightStyle(spotlight, "display", "none");
@@ -774,6 +799,7 @@ export function TutorialCoach({
     experiment: evaluation.experiment,
     intervention,
     limsField,
+    pickupTool,
   });
 
   // An intervention has already stopped the learner for a different reason, and the

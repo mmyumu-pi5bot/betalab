@@ -1029,6 +1029,61 @@ describe("TutorialCoach", () => {
     powderJar.remove();
   });
 
+  it("asks for the loaded spatula to be picked back up before dosing", async () => {
+    const spatula = document.createElement("button");
+    spatula.dataset.tutorialAnchor = "action-spatula";
+    spatula.setAttribute("aria-pressed", "false");
+    spatula.getBoundingClientRect = () =>
+      ({ bottom: 100, height: 40, left: 20, right: 100, top: 60, width: 80 } as DOMRect);
+    const balance = document.createElement("div");
+    balance.dataset.tutorialAnchor = "widget-analytical_balance";
+    balance.getBoundingClientRect = () =>
+      ({ bottom: 240, height: 100, left: 300, right: 440, top: 140, width: 140 } as DOMRect);
+    document.body.append(spatula, balance);
+
+    const state = emptyExperiment();
+    state.spatula = { isLoaded: true, sourceToolId: "powder_jar" };
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: {
+            ...step,
+            anchor: () => "spatula-dose:widget-analytical_balance",
+          },
+          experiment: state,
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "12px", top: "52px" });
+    expect(screen.getByText("Pick the Powder spatula back up")).toBeInTheDocument();
+
+    spatula.setAttribute("aria-pressed", "true");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+        left: "292px",
+        top: "132px",
+      });
+    });
+    expect(screen.queryByText("Pick the Powder spatula back up")).not.toBeInTheDocument();
+
+    spatula.remove();
+    balance.remove();
+  });
+
   it("highlights the expected drop destination only while an item is dragged", async () => {
     const source = document.createElement("div");
     source.dataset.tutorialAnchor = "palette-item-gross_balance_widget";

@@ -795,6 +795,35 @@ describe("calibration sample tutorial", () => {
     );
   });
 
+  it("routes dosing through the spatula, which stays loaded between test portions", () => {
+    // Pouring stops when the learner lets go, so the spatula keeps whatever powder
+    // was left. Coming back to it later, the tutorial used to say "hold to dose"
+    // while the spatula was lying on the bench: holding the tube did nothing.
+    const tube = labTool("centrifuge_tube");
+    const powderJar = labTool("storage_jar", { id: "powder_jar" });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 12, taredToolId: null },
+      spatula: { isLoaded: true, sourceToolId: "powder_jar" },
+      workbench: {
+        slots: [{ id: "station_1", label: "Station 1", tool: powderJar }],
+      },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "analytical_balance",
+            tool: id === "analytical_balance" ? tube : undefined,
+          }),
+        ),
+      },
+    });
+    const tutorialStep = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "weigh-test-portion",
+    )!;
+
+    expect(tutorialStep.anchor(state)).toBe("spatula-dose:widget-analytical_balance");
+  });
+
   it("validates the stored analytical balance once the weighed tube sits on the workbench", () => {
     // Storing the balance requires taking the tube off the pan first, so the test
     // portion has to be recognised wherever the tube now stands.

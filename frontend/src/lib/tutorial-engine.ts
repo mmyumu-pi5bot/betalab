@@ -127,6 +127,23 @@ export function getTutorialActionToolPresentation(
   };
 }
 
+// A tool that is put down still loaded reads as a dead end: the step points at the
+// container to pour into, and nothing happens on click. Naming the pickup first is
+// the same move as asking for a tool to be put away before a drag.
+export function getTutorialActionToolPickupPresentation(
+  tool: TutorialActionTool,
+): TutorialStepPresentation {
+  const { key, name } = tutorialActionTools[tool];
+  return {
+    title: `Pick the ${name} back up`,
+    instruction:
+      `The ${name} still holds what was left of the last pour, but it is not in hand. ` +
+      `Click the highlighted ${name} in Actions, or press ${key}, to take it again.`,
+    hint: `Pouring stops when you release, so the ${name} keeps whatever it has left.`,
+    action: { kind: "click", label: `Click it or press ${key}` },
+  };
+}
+
 // Inventory sections start collapsed, so the item a step asks for is regularly out
 // of reach. Rather than opening the section behind the learner's back, the coach
 // inserts this sub-step: the learner opens it themselves and learns where the
@@ -1150,7 +1167,9 @@ function analyticalWeighingTarget(experiment: Experiment): TutorialTarget {
     return { anchor: "analytical-balance-tare" };
   }
   if (experiment.spatula.isLoaded) {
-    return { anchor: "widget-analytical_balance" };
+    // Pouring stops the moment the learner lets go, so the spatula keeps what is
+    // left in it and can be put down still loaded. Dosing needs it back in hand.
+    return { anchor: "spatula-dose:widget-analytical_balance" };
   }
   const powderJar = storageContainer(experiment);
   return {
