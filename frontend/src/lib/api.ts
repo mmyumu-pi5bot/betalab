@@ -2203,7 +2203,6 @@ function normalizeProduceMaterialState(
     id: String(state.id ?? ""),
     produceLotId: String(state.produceLotId ?? state.produce_lot_id ?? ""),
     materialState: String(state.materialState ?? state.material_state ?? "whole") as ProduceMaterialState["materialState"],
-    temperatureC: Number(state.temperatureC ?? state.temperature_c ?? 20),
     grindQualityLabel:
       state.grindQualityLabel !== undefined
         ? (state.grindQualityLabel as string | null)
@@ -2228,6 +2227,7 @@ function normalizeProduceFractions(raw: unknown): ProduceFraction[] {
         fraction.produceMaterialStateId ?? fraction.produce_material_state_id ?? "",
       ),
       massG: Number(fraction.massG ?? fraction.mass_g ?? 0),
+      temperatureC: Number(fraction.temperatureC ?? fraction.temperature_c ?? 20),
       unitCount:
         fraction.unitCount !== undefined && fraction.unitCount !== null
           ? Number(fraction.unitCount)
@@ -2819,7 +2819,9 @@ function normalizeProduceLot(
     residualCo2MassG: Number(
       stateRecord?.residualCo2MassG ?? lot.residualCo2MassG ?? lot.residual_co2_mass_g ?? 0,
     ),
-    temperatureC: Number(stateRecord?.temperatureC ?? lot.temperatureC ?? lot.temperature_c ?? 20),
+    // Temperature is a property of the body of material standing here, not of the
+    // lot: the same lot in a jar and in a chilled tube is at two temperatures.
+    temperatureC: Number(fractionRecord?.temperatureC ?? lot.temperatureC ?? lot.temperature_c ?? 20),
     totalMassG: Number(lot.totalMassG ?? lot.total_mass_g),
     unitCount:
       unitCountValue !== undefined && unitCountValue !== null

@@ -151,8 +151,35 @@ def _material_state_name(experiment, produce_lot_id: str) -> str:
     return state.material_state if state is not None else "whole"
 
 
+def _set_lot_temperature_c(experiment, produce_lot_id: str, temperature_c: float) -> None:
+    """Put every body of this lot at a temperature, the way the mill would have."""
+    from app.services.helpers.produce_canonical import set_lot_fraction_temperatures
+
+    set_lot_fraction_temperatures(experiment, produce_lot_id, temperature_c)
+
+
+def _lot_fraction(experiment, produce_lot_id: str):
+    """The body of this lot, wherever it is standing -- fractions own temperature."""
+    containers = [
+        experiment.workspace.produce_basket_fractions,
+        experiment.spatula.produce_fractions,
+        *(t.produce_fractions for t in experiment.basket_tools),
+        *(s.surface_produce_fractions for s in experiment.workbench.slots),
+        *(s.tool.produce_fractions for s in experiment.workbench.slots if s.tool is not None),
+        *(s.tool.produce_fractions for s in experiment.rack.slots if s.tool is not None),
+        *(w.produce_fractions for w in experiment.workspace.widgets),
+        *(w.tool.produce_fractions for w in experiment.workspace.widgets if w.tool is not None),
+        *(t.produce_fractions for t in experiment.trash.children),
+    ]
+    for fractions in containers:
+        for fraction in fractions:
+            if fraction.produce_lot_id == produce_lot_id:
+                return fraction
+    raise AssertionError(f"no fraction for {produce_lot_id}")
+
+
 def _lot_temperature_c(experiment, produce_lot_id: str) -> float:
-    return _lot_state(experiment, produce_lot_id).temperature_c
+    return _lot_fraction(experiment, produce_lot_id).temperature_c
 
 
 def _lot_grind_quality_label(experiment, produce_lot_id: str):
@@ -2011,7 +2038,7 @@ def test_start_grinder_cycle_marks_the_grinder_as_running() -> None:
         },
     )
     grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
-    _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -75.0
+    _set_lot_temperature_c(service._experiments[experiment.id], grinder_lot.id, -75.0)
 
     started = apply_command(
         service,
@@ -2090,7 +2117,7 @@ def test_start_grinder_cycle_rejects_produce_above_minus_twenty_c() -> None:
         },
     )
     grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
-    _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -15.0
+    _set_lot_temperature_c(service._experiments[experiment.id], grinder_lot.id, -15.0)
 
     with pytest.raises(ValueError, match=r"not cold enough"):
         apply_command(
@@ -2175,7 +2202,7 @@ def test_active_grinder_cycle_warms_the_sample_and_consumes_dry_ice_until_comple
         },
     )
     grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
-    _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -75.0
+    _set_lot_temperature_c(service._experiments[experiment.id], grinder_lot.id, -75.0)
 
     apply_command(
         service,
@@ -2282,7 +2309,7 @@ def test_active_grinder_cycle_scores_warmer_runs_as_coarser_results() -> None:
         },
     )
     grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
-    _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -30.0
+    _set_lot_temperature_c(service._experiments[experiment.id], grinder_lot.id, -30.0)
 
     apply_command(
         service,
@@ -2375,7 +2402,7 @@ def test_active_grinder_cycle_jams_if_the_sample_warms_above_minus_ten_c() -> No
         },
     )
     grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
-    _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -20.0
+    _set_lot_temperature_c(service._experiments[experiment.id], grinder_lot.id, -20.0)
 
     apply_command(
         service,
@@ -2476,7 +2503,7 @@ def test_jammed_grinder_waste_can_be_moved_to_a_workbench_tool() -> None:
         },
     )
     grinder_lot = service._experiments[experiment.id].workspace.widgets[-2].produce_lots[0]
-    _lot_state(service._experiments[experiment.id], grinder_lot.id).temperature_c = -20.0
+    _set_lot_temperature_c(service._experiments[experiment.id], grinder_lot.id, -20.0)
 
     apply_command(
         service,

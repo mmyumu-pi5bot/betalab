@@ -170,17 +170,17 @@ def test_quechers_heat_degrades_the_tube_portion_not_the_jar_stock() -> None:
     assert jar_state.pesticide_degradation_factors["boscalid"] == 1.0
 
 
-def test_reminting_a_material_state_carries_the_degradation_factors_over() -> None:
-    # The canonical resync mints a fresh material state whenever the signature it
-    # keys on changes -- and temperature is part of that signature, so the powder
-    # simply warming up on the bench is enough to trigger it. The new record has
-    # to inherit the degradation factors, otherwise every warming tick quietly
-    # resets the residues to intact and the exotherm can never cost anything.
+def test_the_canonical_resync_leaves_existing_material_states_alone() -> None:
+    # The resync used to mint a fresh material state whenever the signature it keys
+    # on changed, and temperature was part of that signature -- so powder simply
+    # warming on the bench rebuilt the record, from whichever state came first for
+    # the lot. That is how a portion in ice water ended up being handed the jar's
+    # temperature on every read, and it took a deliberate copy to stop the same
+    # churn wiping the degradation back to intact.
     #
-    # It takes more than one state on the lot to bite: the resync resolves the
-    # state to copy from by lot id and takes the first match, so once the wetted
-    # portion has a state of its own the jar's powder gets rebuilt from a
-    # stranger.
+    # Temperature belongs to the fraction now, so nothing about a body warming or
+    # cooling touches these records at all. Identity is the guarantee: same ids in,
+    # same ids out, degradation included.
     service, experiment_id = _jar_and_tube()
     AddLiquidToWorkbenchToolService(service).run(
         experiment_id,
@@ -189,17 +189,15 @@ def test_reminting_a_material_state_carries_the_degradation_factors_over() -> No
         ),
     )
     experiment = service._require_experiment(experiment_id)
+    before = {state.id for state in experiment.produce_material_states}
 
-    ground_state = next(
-        state for state in experiment.produce_material_states if state.material_state == "ground"
-    )
-    ground_state.temperature_c = 12.34
     sync_canonical_produce_model(experiment)
 
-    reminted = next(
+    assert {state.id for state in experiment.produce_material_states} == before
+    ground = next(
         state for state in experiment.produce_material_states if state.material_state == "ground"
     )
-    assert reminted.pesticide_degradation_factors == {"boscalid": 1.0, "captan": 0.5}
+    assert ground.pesticide_degradation_factors == {"boscalid": 1.0, "captan": 0.5}
 
 
 def test_the_injection_reads_the_degradation_of_the_portion_not_of_the_jar() -> None:

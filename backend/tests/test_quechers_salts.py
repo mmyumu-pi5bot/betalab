@@ -426,7 +426,6 @@ def _tube_with_produce_at(
             id="state_portion",
             produce_lot_id="lot_apples",
             material_state="slurry",
-            temperature_c=temperature_c,
             pesticide_degradation_factors={"captan": 1.0, "boscalid": 1.0},
         )
     )

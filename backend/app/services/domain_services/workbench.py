@@ -445,7 +445,6 @@ def _clone_material_state(state: ProduceMaterialState) -> ProduceMaterialState:
         id=new_id("produce_material_state"),
         produce_lot_id=state.produce_lot_id,
         material_state=state.material_state,
-        temperature_c=state.temperature_c,
         grind_quality_label=state.grind_quality_label,
         homogeneity_score=state.homogeneity_score,
         residual_co2_mass_g=state.residual_co2_mass_g,

@@ -3,7 +3,6 @@ from __future__ import annotations
 from app.domain.models import ProduceMaterialState, new_id
 
 DEFAULT_MATERIAL_STATE = "whole"
-DEFAULT_TEMPERATURE_C = 20.0
 PARTICULATE_MATERIAL_STATES = {"ground", "slurry"}
 
 
@@ -64,12 +63,3 @@ def update_material_state(
         setattr(state, field_name, field_value)
     return state
 
-
-def get_temperature_c(
-    material_states: list[ProduceMaterialState],
-    produce_lot_id: str,
-    *,
-    default: float = DEFAULT_TEMPERATURE_C,
-) -> float:
-    state = find_material_state(material_states, produce_lot_id)
-    return state.temperature_c if state is not None else default

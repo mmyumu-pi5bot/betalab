@@ -70,6 +70,28 @@ def _find_material_state(payload: dict, produce_lot_id: str) -> dict:
     return next(state for state in payload["produce_material_states"] if state["produce_lot_id"] == produce_lot_id)
 
 
+def _find_produce_fraction(payload: dict, produce_lot_id: str) -> dict:
+    """Temperature lives on the body of material, so it is read off a fraction."""
+    found: list[dict] = []
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if "fraction" in key and isinstance(value, list):
+                    found.extend(
+                        f for f in value
+                        if isinstance(f, dict) and f.get("produce_lot_id") == produce_lot_id
+                    )
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(payload)
+    assert found, f"no fraction for {produce_lot_id}"
+    return found[0]
+
+
 def _dnd_move(client: TestClient, experiment_id: str, *, entity: dict, source: dict, destination: dict):
     return client.post(
         f"/experiments/{experiment_id}/dnd/move",
@@ -1082,7 +1104,7 @@ def test_debug_produce_preset_route_spawns_powder_on_workbench() -> None:
     assert lot_state["material_state"] == "ground"
     assert tool["produce_lots"][0]["total_mass_g"] == 2450.0
     assert lot_state["residual_co2_mass_g"] == 18.0
-    assert lot_state["temperature_c"] == -62.0
+    assert tool["produce_fractions"][0]["temperature_c"] == -62.0
 
 
 def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
@@ -1108,7 +1130,7 @@ def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
     assert tool["liquids"] == []
     lot_state = _find_material_state(spawned.json(), tool["produce_lots"][0]["id"])
     assert lot_state["material_state"] == "slurry"
-    assert lot_state["temperature_c"] == 4.0
+    assert tool["produce_fractions"][0]["temperature_c"] == 4.0
     assert "homogeneity_score" not in lot_state
 
 def test_open_workbench_tool_route_unseals_a_jar() -> None:
@@ -1323,7 +1345,7 @@ def test_workspace_routes_round_trip_over_http() -> None:
     assert _find_widget(updated_liquid.json(), "grinder")["liquids"][0]["volume_ml"] == 125.5
     assert advanced.status_code == 200
     grinder_lot_id = _find_widget(advanced.json(), "grinder")["produce_lots"][0]["id"]
-    assert _find_material_state(advanced.json(), grinder_lot_id)["temperature_c"] < 20.0
+    assert _find_produce_fraction(advanced.json(), grinder_lot_id)["temperature_c"] < 20.0
     assert removed_liquid.status_code == 200
     assert _find_widget(removed_liquid.json(), "grinder")["liquids"] == []
     assert discarded_produce_lot.status_code == 200
@@ -1377,7 +1399,7 @@ def test_experiment_stream_pushes_updated_snapshots() -> None:
     assert snapshot["id"] == experiment_id
     assert snapshot["snapshot_version"] >= 1
     grinder_lot_id = _find_widget(snapshot, "grinder")["produce_lots"][0]["id"]
-    assert _find_material_state(snapshot, grinder_lot_id)["temperature_c"] < 20.0
+    assert _find_produce_fraction(snapshot, grinder_lot_id)["temperature_c"] < 20.0
 
 
 def test_produce_lot_routes_round_trip_over_http() -> None:

@@ -36,7 +36,7 @@ def test_debug_apple_slurry_tube_defaults_to_ten_grams_on_workbench() -> None:
     assert tool.liquids == []
     material_state = next(state for state in updated.produce_material_states if state.id == tool.produce_fractions[0].produce_material_state_id)
     assert material_state.material_state == "slurry"
-    assert material_state.temperature_c == pytest.approx(20.0)
+    assert tool.produce_fractions[0].temperature_c == pytest.approx(20.0)
 
 
 def test_debug_apple_slurry_tube_can_spawn_on_analytical_balance_with_overrides() -> None:

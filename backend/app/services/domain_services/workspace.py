@@ -24,7 +24,6 @@ from app.services.helpers.produce_canonical import sync_canonical_produce_model
 from app.services.helpers.produce_material_states import (
     ensure_material_state,
     get_material_state_name,
-    get_temperature_c,
     set_material_state_name,
     update_material_state,
 )
@@ -293,7 +292,10 @@ class StartGrinderCycleService(WriteDomainService[WorkspaceWidgetRequest]):
             raise ValueError(f"{produce_lot.label} must be cut before grinding.")
         if material_state == "ground":
             raise ValueError(f"{produce_lot.label} is already ground.")
-        if get_temperature_c(experiment.produce_material_states, produce_lot.id) > physical_simulation_service.grinder_start_threshold_c:
+        if (
+            physical_simulation_service.fraction_temperature_c(widget.produce_fractions, produce_lot.id)
+            > physical_simulation_service.grinder_start_threshold_c
+        ):
             raise ValueError(f"{produce_lot.label} is not cold enough for cryogenic grinding.")
         if widget.grinder_run_remaining_ms > 0:
             return
@@ -387,7 +389,8 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
             loaded_lot = widget.produce_lots[0] if widget.produce_lots else None
             if (
                 loaded_lot is not None
-                and get_temperature_c(experiment.produce_material_states, loaded_lot.id) >= physical_simulation_service.grinder_jam_threshold_c
+                and physical_simulation_service.fraction_temperature_c(widget.produce_fractions, loaded_lot.id)
+                >= physical_simulation_service.grinder_jam_threshold_c
             ):
                 widget.grinder_run_duration_ms = 0.0
                 widget.grinder_run_remaining_ms = 0.0
@@ -397,7 +400,8 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
 
             if (
                 loaded_lot is not None
-                and get_temperature_c(experiment.produce_material_states, loaded_lot.id) >= physical_simulation_service.grinder_start_threshold_c
+                and physical_simulation_service.fraction_temperature_c(widget.produce_fractions, loaded_lot.id)
+                >= physical_simulation_service.grinder_start_threshold_c
             ):
                 widget.grinder_fault = "high_torque"
             elif widget.grinder_fault == "high_torque":
@@ -440,6 +444,16 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
                 material_states=experiment.produce_material_states,
             )
 
+    # Produce standing on a bare bench surface, or waiting in the basket, is a body
+    # of material like any other: it exchanges heat with the room even though it is
+    # not inside a tool that the loop above would have reached.
+    for slot in experiment.workbench.slots:
+        physical_simulation_service.advance_fraction_temperatures(
+            slot.surface_produce_fractions, elapsed_seconds, surroundings=bench
+        )
+    physical_simulation_service.advance_fraction_temperatures(
+        experiment.workspace.produce_basket_fractions, elapsed_seconds, surroundings=bench
+    )
     for slot in experiment.workbench.slots:
         if slot.tool is not None:
             if slot.tool.is_sealed and can_tool_be_sealed(slot.tool.tool_type):

@@ -659,7 +659,6 @@ export type ProduceMaterialState = {
   id: string;
   produceLotId: string;
   materialState?: ProduceMaterialKind;
-  temperatureC?: number;
   grindQualityLabel?: string | null;
   residualCo2MassG?: number;
   pesticideDegradationFactors?: Record<string, number>;
@@ -668,6 +667,8 @@ export type ProduceMaterialState = {
 export type ProduceFraction = {
   id: string;
   produceLotId: string;
+  /** How warm this body of material is. A lot split across two places has two. */
+  temperatureC?: number;
   produceMaterialStateId: string;
   materialState?: ProduceMaterialKind;
   massG: number;

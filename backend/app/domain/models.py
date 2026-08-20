@@ -263,7 +263,6 @@ class ProduceMaterialState:
     id: str
     produce_lot_id: str
     material_state: str = "whole"
-    temperature_c: float = 20.0
     grind_quality_label: str | None = None
     homogeneity_score: float | None = None
     residual_co2_mass_g: float = 0.0

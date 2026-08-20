@@ -28,6 +28,10 @@ GROUND_POWDER_APPARENT_DENSITY_G_PER_ML = 0.5
 
 def sync_canonical_produce_model(experiment: Experiment) -> None:
     produce_lots_by_id = collect_produce_lots(experiment)
+    temperature_before_sync = {
+        fraction.produce_lot_id: fraction.temperature_c
+        for fraction in reversed(_all_produce_fractions(experiment))
+    }
     state_ids_by_signature: dict[tuple[object, ...], str] = {}
     material_states: list[ProduceMaterialState] = []
     existing_states_by_id = {state.id: state for state in experiment.produce_material_states}
@@ -36,7 +40,6 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         (
             state.produce_lot_id,
             state.material_state,
-            state.temperature_c,
             state.grind_quality_label,
             state.homogeneity_score,
             state.residual_co2_mass_g,
@@ -68,8 +71,10 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         """
         if existing_fraction is not None:
             return existing_fraction.temperature_c
-        state = find_material_state(experiment.produce_material_states, produce_lot_id)
-        return state.temperature_c if state is not None else 20.0
+        # No predecessor here, so this lot has just arrived. Material that moves
+        # carries its warmth with it: take it from the body it was until now,
+        # wherever that was standing.
+        return temperature_before_sync.get(produce_lot_id, 20.0)
 
     def keep_material_state_id(state_id: str) -> str:
         """Carry an existing record through untouched, identity included."""
@@ -82,7 +87,6 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         signature = (
             produce_lot.id,
             state_name,
-            existing_state.temperature_c if existing_state is not None else 20.0,
             existing_state.grind_quality_label if existing_state is not None else None,
             existing_state.homogeneity_score if existing_state is not None else None,
             existing_state.residual_co2_mass_g if existing_state is not None else 0.0,
@@ -106,7 +110,6 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             material_state=state_name,
         )
         if existing_state is not None:
-            material_state_record.temperature_c = existing_state.temperature_c
             material_state_record.grind_quality_label = existing_state.grind_quality_label
             material_state_record.homogeneity_score = existing_state.homogeneity_score
             material_state_record.residual_co2_mass_g = existing_state.residual_co2_mass_g
@@ -335,6 +338,49 @@ def _generate_residues_if_missing(lot: ProduceLot) -> None:
     """Backfill pesticide_residues on a lot that was created without them."""
     if not lot.pesticide_residues:
         lot.pesticide_residues = generate_pesticide_residues(lot.produce_type)
+
+
+def set_lot_fraction_temperatures(
+    experiment: Experiment, produce_lot_id: str, temperature_c: float
+) -> None:
+    """Put every body of this lot at a chosen temperature.
+
+    Only debug presets need this: they conjure material that is already cold, and
+    the bodies that carry the temperature do not exist until the canonical model
+    has been rebuilt around the new lot.
+    """
+    sync_canonical_produce_model(experiment)
+    for fraction in _all_produce_fractions(experiment):
+        if fraction.produce_lot_id == produce_lot_id:
+            fraction.temperature_c = temperature_c
+
+
+def _all_produce_fractions(experiment: Experiment) -> list[ProduceFraction]:
+    """Every body of produce currently modelled, wherever it is standing."""
+    fractions: list[ProduceFraction] = [
+        *experiment.workspace.produce_basket_fractions,
+        *experiment.spatula.produce_fractions,
+        *experiment.pipette.produce_fractions,
+    ]
+    for basket_tool in experiment.basket_tools:
+        fractions.extend(basket_tool.produce_fractions)
+    for slot in experiment.workbench.slots:
+        fractions.extend(slot.surface_produce_fractions)
+        if slot.tool is not None:
+            fractions.extend(slot.tool.produce_fractions)
+    for slot in experiment.rack.slots:
+        if slot.tool is not None:
+            fractions.extend(slot.tool.produce_fractions)
+    for widget in experiment.workspace.widgets:
+        fractions.extend(widget.produce_fractions)
+        if widget.tool is not None:
+            fractions.extend(widget.tool.produce_fractions)
+    for tool in experiment.trash.children:
+        fractions.extend(tool.produce_fractions)
+    for entry in experiment.trash.produce_lots:
+        if entry.produce_fraction is not None:
+            fractions.append(entry.produce_fraction)
+    return fractions
 
 
 def collect_produce_lots(experiment: Experiment) -> dict[str, ProduceLot]:

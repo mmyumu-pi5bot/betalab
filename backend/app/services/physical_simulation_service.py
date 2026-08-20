@@ -8,10 +8,18 @@ from math import exp
 from types import MappingProxyType
 from typing import ClassVar
 
-from app.domain.models import Experiment, ProduceLot, ProduceMaterialState, QuechersExtractionResult, WorkbenchTool, WorkspaceWidget
+from app.domain.models import (
+    Experiment,
+    ProduceFraction,
+    ProduceLot,
+    ProduceMaterialState,
+    QuechersExtractionResult,
+    WorkbenchTool,
+    WorkspaceWidget,
+)
 from app.domain.pesticide_catalog import apply_degradation_step
 from app.services.helpers.lookups import round_volume
-from app.services.helpers.produce_material_states import find_material_state, get_material_state_name, get_temperature_c, update_material_state
+from app.services.helpers.produce_material_states import find_material_state, get_material_state_name, update_material_state
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +153,52 @@ class PhysicalSimulationService:
     ) -> None:
         self._advance_widget_cryogenics(widget, elapsed_seconds, material_states=material_states)
 
+    def advance_fraction_temperatures(
+        self,
+        fractions: list[ProduceFraction],
+        elapsed_seconds: float,
+        *,
+        surroundings: ThermalSurroundings | None = None,
+    ) -> None:
+        """Relax bodies of produce towards what is around them."""
+        elapsed_seconds = max(float(elapsed_seconds), 0.0)
+        if elapsed_seconds <= 0 or not fractions:
+            return
+        surroundings = surroundings or self.bench_surroundings()
+        progress = 1.0 - exp(
+            -self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds
+        )
+        for fraction in fractions:
+            fraction.temperature_c += (surroundings.temperature_c - fraction.temperature_c) * progress
+
+    @staticmethod
+    def fraction_temperature_c(
+        fractions: list[ProduceFraction],
+        produce_lot_id: str,
+        *,
+        default: float = 20.0,
+    ) -> float:
+        """How warm this lot's material is here.
+
+        A lot can be in several places at once -- a jar on the bench and a portion
+        weighed out of it into a tube -- and each body has its own temperature. The
+        answer therefore depends on which container is asking, never on the lot alone.
+        """
+        for fraction in fractions:
+            if fraction.produce_lot_id == produce_lot_id:
+                return fraction.temperature_c
+        return default
+
+    @staticmethod
+    def set_fraction_temperature_c(
+        fractions: list[ProduceFraction],
+        produce_lot_id: str,
+        temperature_c: float,
+    ) -> None:
+        for fraction in fractions:
+            if fraction.produce_lot_id == produce_lot_id:
+                fraction.temperature_c = temperature_c
+
     @classmethod
     def bench_surroundings(cls) -> ThermalSurroundings:
         return ThermalSurroundings(temperature_c=cls.ambient_temperature_c)
@@ -200,12 +254,6 @@ class PhysicalSimulationService:
 
         for fraction in tool.produce_fractions:
             fraction.temperature_c = relax(fraction.temperature_c)
-        for lot in tool.produce_lots:
-            if any(f.produce_lot_id == lot.id for f in tool.produce_fractions):
-                continue
-            state = find_material_state(material_states, lot.id)
-            if state is not None:
-                state.temperature_c = relax(state.temperature_c)
         for liquid in tool.liquids:
             liquid.temperature_c = relax(liquid.temperature_c)
         if self.container_body_thermal_mass_j_per_k.get(tool.tool_type, 0.0) > 0:
@@ -324,18 +372,6 @@ class PhysicalSimulationService:
             capacity = mass_g * cls.produce_specific_heat_j_per_g_k
             thermal_mass += capacity
             weighted += capacity * fraction.temperature_c
-        covered_lot_ids = {fraction.produce_lot_id for fraction in tool.produce_fractions}
-        for lot in tool.produce_lots:
-            # A lot only counts on its own before the canonical model has given it a
-            # fraction; counting both would weigh the same material twice.
-            if lot.id in covered_lot_ids:
-                continue
-            state = find_material_state(material_states, lot.id)
-            if state is None:
-                continue
-            capacity = lot.total_mass_g * cls.produce_specific_heat_j_per_g_k
-            thermal_mass += capacity
-            weighted += capacity * state.temperature_c
         for liquid in tool.liquids:
             volume_ml = liquid.true_volume_ml if liquid.true_volume_ml is not None else liquid.volume_ml
             capacity = (
@@ -866,6 +902,11 @@ class PhysicalSimulationService:
             return
 
         self.warm_produce_lots(widget.produce_lots, elapsed_seconds, material_states=material_states)
+        self.advance_fraction_temperatures(
+            widget.produce_fractions,
+            elapsed_seconds,
+            surroundings=self.surroundings_for_widget(widget),
+        )
 
     def _advance_grinding_cryogenics(
         self,
@@ -894,14 +935,16 @@ class PhysicalSimulationService:
         effective_heat_gain_c = base_heat_gain_c * (1.0 - absorbed_heat_ratio)
 
         for lot in widget.produce_lots:
-            previous_temperature_c = get_temperature_c(material_states or [], lot.id)
+            previous_temperature_c = self.fraction_temperature_c(widget.produce_fractions, lot.id)
             next_temperature_c = previous_temperature_c + effective_heat_gain_c
             average_step_temperature_c = (previous_temperature_c + next_temperature_c) / 2.0
             existing_state = find_material_state(material_states or [], lot.id)
+            self.set_fraction_temperature_c(widget.produce_fractions, lot.id, next_temperature_c)
+            # The grinding history stays on the material state: it describes what the
+            # mill did to this lot, not how warm one body of it happens to be.
             update_material_state(
                 material_states or [],
                 lot.id,
-                temperature_c=next_temperature_c,
                 grinding_temperature_integral=(
                     (existing_state.grinding_temperature_integral if existing_state is not None else 0.0)
                     + (average_step_temperature_c * elapsed_seconds)
@@ -952,7 +995,7 @@ class PhysicalSimulationService:
         lot_requests: list[tuple[ProduceLot, float, float]] = []
 
         for lot in widget.produce_lots:
-            current_temperature_c = get_temperature_c(material_states or [], lot.id)
+            current_temperature_c = self.fraction_temperature_c(widget.produce_fractions, lot.id)
             temperature_gap_c = max(current_temperature_c - self.dry_ice_temperature_c, 0.0)
             if temperature_gap_c <= 0:
                 lot_requests.append((lot, 0.0, current_temperature_c))
@@ -989,20 +1032,20 @@ class PhysicalSimulationService:
                 continue
 
             if scaling_factor >= 0.999:
-                update_material_state(
-                    material_states or [],
+                self.set_fraction_temperature_c(
+                    widget.produce_fractions,
                     lot.id,
-                    temperature_c=max(candidate_temperature_c, self.dry_ice_temperature_c),
+                    max(candidate_temperature_c, self.dry_ice_temperature_c),
                 )
                 continue
 
-            current_temperature_c = get_temperature_c(material_states or [], lot.id)
+            current_temperature_c = self.fraction_temperature_c(widget.produce_fractions, lot.id)
             current_enthalpy = self._get_specific_enthalpy(current_temperature_c)
             next_enthalpy = current_enthalpy - (actual_heat_kj / thermal_mass_kg)
-            update_material_state(
-                material_states or [],
+            self.set_fraction_temperature_c(
+                widget.produce_fractions,
                 lot.id,
-                temperature_c=self._get_temperature_from_specific_enthalpy(next_enthalpy),
+                self._get_temperature_from_specific_enthalpy(next_enthalpy),
             )
 
         thermal_mass_loss_g = usable_heat_removal_kj / self.dry_ice_latent_heat_kj_per_kg * 1000.0
@@ -1024,17 +1067,13 @@ class PhysicalSimulationService:
         *,
         material_states: list[ProduceMaterialState] | None = None,
     ) -> None:
-        warming_progress = min(self.warming_rate_per_second * elapsed_seconds, 0.95)
-        current_temperature_c = get_temperature_c(material_states or [], lot.id)
         current_state = find_material_state(material_states or [], lot.id)
         current_residual_co2_mass_g = current_state.residual_co2_mass_g if current_state is not None else 0.0
+        # Temperature is not touched here: the fractions this lot is made of are
+        # relaxed towards their own surroundings by advance_fraction_temperatures.
         update_material_state(
             material_states or [],
             lot.id,
-            temperature_c=min(
-                current_temperature_c + ((self.ambient_temperature_c - current_temperature_c) * warming_progress),
-                self.ambient_temperature_c,
-            ),
             residual_co2_mass_g=round_volume(
                 max(
                     current_residual_co2_mass_g - (self.residual_degassing_g_per_second * elapsed_seconds),
@@ -1052,11 +1091,12 @@ class PhysicalSimulationService:
     ) -> None:
         for lot in tool.produce_lots:
             warming_progress = min(self.warming_rate_per_second * elapsed_seconds, 0.95)
-            current_temperature_c = get_temperature_c(material_states or [], lot.id)
+            current_temperature_c = self.fraction_temperature_c(tool.produce_fractions, lot.id)
             next_temperature_c = min(
                 current_temperature_c + ((self.ambient_temperature_c - current_temperature_c) * warming_progress),
                 self.ambient_temperature_c,
             )
+            self.set_fraction_temperature_c(tool.produce_fractions, lot.id, next_temperature_c)
             degassing_rate_g_per_second = self._get_sealed_degassing_rate(next_temperature_c)
             existing_state = find_material_state(material_states or [], lot.id)
             trapped_mass_g = min(
@@ -1066,7 +1106,6 @@ class PhysicalSimulationService:
             update_material_state(
                 material_states or [],
                 lot.id,
-                temperature_c=next_temperature_c,
                 residual_co2_mass_g=round_volume(
                     max(
                         (existing_state.residual_co2_mass_g if existing_state is not None else 0.0) - trapped_mass_g,
@@ -1099,7 +1138,8 @@ class PhysicalSimulationService:
 
         gas_moles = trapped_co2_mass_g / self.co2_molar_mass_g_per_mol
         mean_temperature_c = (
-            sum(get_temperature_c(material_states or [], lot.id) for lot in tool.produce_lots) / len(tool.produce_lots)
+            sum(self.fraction_temperature_c(tool.produce_fractions, lot.id) for lot in tool.produce_lots)
+            / len(tool.produce_lots)
             if tool.produce_lots
             else self.ambient_temperature_c
         )

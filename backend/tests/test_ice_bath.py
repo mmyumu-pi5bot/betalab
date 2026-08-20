@@ -67,7 +67,6 @@ def _tube_with_portion(
             id="state_portion",
             produce_lot_id="lot_apples",
             material_state="slurry",
-            temperature_c=portion_temperature_c,
             pesticide_degradation_factors={"captan": 1.0, "boscalid": 1.0},
         )
     )
@@ -470,7 +469,6 @@ def test_a_chilling_portion_is_not_reset_by_reading_the_experiment() -> None:
             id="state_jar",
             produce_lot_id="lot_apples",
             material_state="ground",
-            temperature_c=20.0,
             pesticide_degradation_factors={"captan": 1.0, "boscalid": 1.0},
         ),
     )

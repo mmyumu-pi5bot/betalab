@@ -146,7 +146,6 @@ class ProduceMaterialStateSchema(BaseModel):
     id: str
     produce_lot_id: str
     material_state: str = "whole"
-    temperature_c: float = 20.0
     grind_quality_label: str | None = None
     homogeneity_score: float | None = Field(default=None, exclude=True)
     residual_co2_mass_g: float = 0.0
@@ -160,9 +159,10 @@ class ProduceFractionSchema(BaseModel):
     produce_lot_id: str
     produce_material_state_id: str
     mass_g: float
-    #: Hidden simulation state, like true_mass_g: the UI reads a container's
-    #: temperature off the mixture the tool reports, never off a single fraction.
-    temperature_c: float = Field(default=20.0, exclude=True)
+    #: How warm this body of material is. Served because a lot card shows the
+    #: temperature of the produce in front of it, and a lot split across two places
+    #: has two of them.
+    temperature_c: float = 20.0
     true_mass_g: float | None = Field(default=None, exclude=True)
     unit_count: int | None = None
     is_mixed: bool = Field(default=False, exclude=True)
@@ -730,7 +730,7 @@ class WorkspaceWidgetSchema(BaseModel):
         return {s.produce_lot_id: s.material_state for s in self.produce_material_states}
 
     def _produce_temperatures_map(self) -> dict[str, float]:
-        return {s.produce_lot_id: s.temperature_c for s in self.produce_material_states}
+        return {f.produce_lot_id: f.temperature_c for f in self.produce_fractions}
 
     def _can_store(self) -> bool:
         if self.store_allowed_override is not None:

@@ -21,6 +21,7 @@ from app.services.domain_services.lcmsms import (
     apply_prepared_extract,
 )
 from app.services.helpers.lookups import find_workbench_slot
+from app.services.helpers.produce_canonical import set_lot_fraction_temperatures
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
 from app.services.helpers.tool_liquids import ACETONITRILE_ID
 from app.services.helpers.workbench import build_workbench_tool
@@ -115,7 +116,6 @@ class CreateDebugProduceLotOnWorkbenchService(WriteDomainService[CreateDebugProd
         update_material_state(
             experiment.produce_material_states,
             produce_lot.id,
-            temperature_c=produce_lot_temperature_c(request.temperature_c),
             grind_quality_label="powder_fine",
             homogeneity_score=0.96,
             residual_co2_mass_g=(request.residual_co2_mass_g if request.residual_co2_mass_g is not None else 18.0),
@@ -123,6 +123,9 @@ class CreateDebugProduceLotOnWorkbenchService(WriteDomainService[CreateDebugProd
         target = WorkbenchProduceLotTarget(slot_id=request.target_slot_id)
         target.validate(experiment)
         placement = target.place(experiment, produce_lot)
+        set_lot_fraction_temperatures(
+            experiment, produce_lot.id, produce_lot_temperature_c(request.temperature_c)
+        )
         experiment.audit_log.append(f"Debug preset {produce_lot.label} spawned on {placement.target_label}.")
 
 
@@ -141,7 +144,6 @@ class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduce
         update_material_state(
             experiment.produce_material_states,
             produce_lot.id,
-            temperature_c=produce_lot_temperature_c(request.temperature_c),
             grind_quality_label="powder_fine",
             homogeneity_score=0.96,
             residual_co2_mass_g=(request.residual_co2_mass_g if request.residual_co2_mass_g is not None else 18.0),
@@ -152,6 +154,9 @@ class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduce
             target = GrinderProduceLotTarget(widget_id=request.widget_id)
         target.validate(experiment)
         placement = target.place(experiment, produce_lot)
+        set_lot_fraction_temperatures(
+            experiment, produce_lot.id, produce_lot_temperature_c(request.temperature_c)
+        )
         experiment.audit_log.append(f"Debug preset {produce_lot.label} spawned in {placement.target_label}.")
 
 
@@ -343,7 +348,6 @@ def _fill_tool_with_debug_slurry(
     tool.produce_lots.append(produce_lot)
     set_material_state_name(experiment.produce_material_states, produce_lot.id, "slurry")
     state = next(state for state in experiment.produce_material_states if state.produce_lot_id == produce_lot.id)
-    state.temperature_c = temperature_c
     state.grind_quality_label = "slurry"
     state.homogeneity_score = 1.0
     tool.contents_homogeneity = 1.0
@@ -352,6 +356,7 @@ def _fill_tool_with_debug_slurry(
             id=new_id("produce_fraction"),
             produce_lot_id=produce_lot.id,
             produce_material_state_id=state.id,
+            temperature_c=temperature_c,
             mass_g=produce_mass_g,
             is_mixed=True,
             location_kind=location_kind,

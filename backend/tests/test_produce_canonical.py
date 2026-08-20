@@ -32,7 +32,6 @@ def test_sync_canonical_produce_model_exposes_tool_fraction_and_material_state()
             id="state_1",
             produce_lot_id="lot_1",
             material_state="ground",
-            temperature_c=-62.0,
             grind_quality_label="powder_fine",
             residual_co2_mass_g=18.0,
         )
