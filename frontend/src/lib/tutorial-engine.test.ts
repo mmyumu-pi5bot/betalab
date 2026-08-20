@@ -9,7 +9,7 @@ import {
   getTutorialStepPresentation,
 } from "@/lib/tutorial-engine";
 import type { Experiment } from "@/types/experiment";
-import type { ExperimentWorkspaceWidget } from "@/types/workbench";
+import type { BenchToolInstance, ExperimentWorkspaceWidget } from "@/types/workbench";
 
 const widgetIds = [
   "lims",
@@ -301,6 +301,35 @@ describe("calibration sample tutorial", () => {
     expect(presentation.title).toBe("Return the sample bag to the Gross balance");
     expect(presentation.instruction).toContain("Drag the sample bag");
     expect(presentation.hint).toContain("Keep the bag on the balance");
+  });
+
+  it("points at the tube's own Close button while it waits open in the vortex", () => {
+    // The rush after salting is exactly where an unhighlighted step costs the tube:
+    // the start button runs an open tube and sprays it, and the seal button lives on
+    // the card staged inside the mixer.
+    const saltedTube = labTool("centrifuge_tube", {
+      isSealed: false,
+      powderMassG: 10,
+      quechersState: { saltsAdded: true, phase: "armed", faults: [], isUsable: true },
+    });
+    const inVortex = (tool: BenchToolInstance) =>
+      experiment({
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, { isPresent: id === "vortex", tool: id === "vortex" ? tool : undefined }),
+          ),
+        },
+      });
+    const step = calibrationSampleTutorial.steps.find((entry) => entry.id === "vortex-extract")!;
+
+    const openState = inVortex(saltedTube);
+    expect(step.anchor(openState)).toBe(`seal-tool-${saltedTube.id}`);
+    expect(getTutorialStepPresentation(step, openState).title).toBe("Seal the extraction tube");
+
+    const sealedState = inVortex({ ...saltedTube, isSealed: true });
+    expect(step.anchor(sealedState)).toBe("vortex-start-button");
+    expect(getTutorialStepPresentation(step, sealedState).title).toBe("Start the vortex cycle");
   });
 
   it.each([

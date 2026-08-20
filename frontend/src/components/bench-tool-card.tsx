@@ -36,6 +36,11 @@ type BenchToolCardProps = {
   onStore?: () => void;
   onToolIllustrationClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   tool: BenchToolInstance;
+  // The identity the tutorial points at. A card staged inside a widget is rendered
+  // with a prefixed id so its test id cannot clash with the bench one, and that
+  // prefix reached the anchors too: the coach asked for a button that exists under
+  // another name, found nothing, and highlighted nothing.
+  tutorialToolId?: string;
 };
 
 function formatLotMetadata(produceLot: ExperimentProduceLot) {
@@ -78,6 +83,7 @@ export function BenchToolCard({
   onStore,
   onToolIllustrationClick,
   tool,
+  tutorialToolId = tool.id,
 }: BenchToolCardProps) {
   const produceLots = tool.produceLots ?? [];
   const totalVolumeMl = tool.liquids.reduce((total, liquid) => total + liquid.volume_ml, 0);
@@ -172,7 +178,7 @@ export function BenchToolCard({
             {onStore ? (
               <button
                 aria-label={`Store ${tool.label} in inventory`}
-                data-tutorial-anchor={`store-tool-${tool.id}`}
+                data-tutorial-anchor={`store-tool-${tutorialToolId}`}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
                 disabled={!canStore}
                 draggable={false}
@@ -195,7 +201,7 @@ export function BenchToolCard({
                 </span>
                 <button
                   aria-label={`${isSealed ? "Open" : "Close"} ${tool.label}`}
-                  data-tutorial-anchor={`seal-tool-${tool.id}`}
+                  data-tutorial-anchor={`seal-tool-${tutorialToolId}`}
                   className="inline-flex min-w-[3.75rem] justify-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                   draggable={false}
                   onClick={() => {

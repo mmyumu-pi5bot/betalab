@@ -5977,6 +5977,27 @@ describe("LabScene", () => {
     );
   });
 
+  it("anchors the tutorial to the seal button of the tube staged in the vortex", async () => {
+    const vortexTube = makeTool({
+      toolId: "centrifuge_tube_50ml",
+      label: "50 mL centrifuge tube",
+      subtitle: "QuEChERS extraction",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      isSealed: false,
+    });
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        workspaceWidgets: makeWorkspaceWithVortexVisible({ tool: vortexTube }),
+      }) as Experiment,
+    );
+
+    render(<PesticideWorkbench />);
+
+    const closeButton = await screen.findByRole("button", { name: "Close 50 mL centrifuge tube" });
+    expect(closeButton).toHaveAttribute("data-tutorial-anchor", `seal-tool-${vortexTube.id}`);
+  });
+
   it("opens a sealed tube from the vortex card", async () => {
     const vortexTube = makeTool({
       toolId: "centrifuge_tube_50ml",

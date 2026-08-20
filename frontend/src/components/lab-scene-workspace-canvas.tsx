@@ -323,6 +323,7 @@ export function LabSceneWorkspaceCanvas({
         onToggleSeal={workspaceActions.handleBalanceToolSealToggle}
         onRemoveLiquid={() => {}}
         tool={{ ...displayBalanceTool, id: `balance-${displayBalanceTool.id}` }}
+        tutorialToolId={displayBalanceTool.id}
       />
     </div>
   ) : displayBalanceProduceLot ? (
@@ -377,6 +378,7 @@ export function LabSceneWorkspaceCanvas({
         onToggleSeal={workspaceActions.handleAnalyticalBalanceToolSealToggle}
         onRemoveLiquid={() => {}}
         tool={{ ...displayAnalyticalBalanceTool, id: `analytical-${displayAnalyticalBalanceTool.id}` }}
+        tutorialToolId={displayAnalyticalBalanceTool.id}
       />
     </div>
   ) : null;
@@ -396,6 +398,7 @@ export function LabSceneWorkspaceCanvas({
         onRemoveLiquid={() => {}}
         onToggleSeal={workspaceActions.onToggleVortexToolSeal}
         tool={{ ...vortexTool, id: `vortex-${vortexTool.id}` }}
+        tutorialToolId={vortexTool.id}
       />
     </div>
   ) : undefined;
@@ -414,6 +417,7 @@ export function LabSceneWorkspaceCanvas({
         onRemoveLiquid={() => {}}
         onToggleSeal={workspaceActions.onToggleCentrifugeToolSeal}
         tool={{ ...centrifugeTool, id: `centrifuge-${centrifugeTool.id}` }}
+        tutorialToolId={centrifugeTool.id}
       />
     </div>
   ) : undefined;
@@ -433,6 +437,7 @@ export function LabSceneWorkspaceCanvas({
         onRemoveLiquid={() => {}}
         onToggleSeal={workspaceActions.onToggleIceBathToolSeal}
         tool={{ ...iceBathTool, id: `ice-bath-${iceBathTool.id}` }}
+        tutorialToolId={iceBathTool.id}
       />
     </div>
   ) : undefined;
