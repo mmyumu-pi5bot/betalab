@@ -3700,6 +3700,49 @@ describe("LabScene", () => {
     expect(screen.getByTestId("basket-received-bag")).toBeInTheDocument();
   });
 
+  it("drops the ticket onto a bag when it is dragged out of the printer itself", async () => {
+    // Same entity, same target, same command — only the hand's starting point differs.
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        slots: makeSlots([
+          {
+            tool: makeSampleBagTool({
+              id: "bench_tool_1",
+              fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
+            }),
+          },
+        ]),
+        limsReception: makeLimsReception({
+          measuredGrossMassG: 2486,
+          labSampleCode: "APP-0001-01",
+          status: "awaiting_label_application",
+          printedLabelTicket: makePrintedLimsTicket(),
+        }),
+      }),
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
+
+    render(<PesticideWorkbench />);
+
+    const printer = await screen.findByTestId("lims-printed-ticket-printer");
+    const station = screen.getByTestId("bench-slot-station_1");
+    const transfer = createDataTransfer();
+
+    fireEvent.dragStart(printer, { dataTransfer: transfer });
+    const dragOverEvent = createEvent.dragOver(station, { dataTransfer: transfer });
+    fireEvent(station, dragOverEvent);
+    fireEvent.drop(station, { dataTransfer: transfer });
+
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    await waitFor(() => {
+      expect(sendExperimentCommand).toHaveBeenCalledWith(
+        "experiment_pesticides",
+        "apply_printed_lims_label",
+        { slot_id: "station_1" },
+      );
+    });
+  });
+
   it("prints a LIMS ticket and drops it onto the received sampling bag", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({

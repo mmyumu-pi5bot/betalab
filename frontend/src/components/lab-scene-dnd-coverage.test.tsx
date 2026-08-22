@@ -77,7 +77,9 @@ function normalizeDragSourceTestId(testId: string): string {
   if (testId.startsWith("grinder-liquid-")) {
     return "grinder-liquid";
   }
-  if (testId === "lims-printed-ticket") {
+  // One printed ticket, two places to grab it: the card and the printer it sticks out
+  // of. Same entity, same allowed targets — one family in the matrix.
+  if (testId.startsWith("lims-printed-ticket")) {
     return "lims-printed-ticket";
   }
   return testId;

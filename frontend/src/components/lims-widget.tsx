@@ -154,6 +154,7 @@ export function LimsWidget({
     selectedEntryView === null;
   const displayedEntry = selectedEntryView ?? reception;
   const displayedTicket = selectedEntryView?.printedLabelTicket ?? reception.printedLabelTicket;
+  const isTicketDraggable = displayedTicket?.isDraggable ?? true;
   const saveButtonLabel = selectedEntryView === null ? "Create LIMS record" : "Update LIMS record";
   const displayedGrossMassG = displayedEntry.measuredGrossMassG;
   const displayedPackagingTareMassG = displayedEntry.packagingTareMassG;
@@ -259,7 +260,24 @@ export function LimsWidget({
               )}
             </svg>
           </div>
-          <div className="border-t border-slate-300 bg-[linear-gradient(180deg,#c9d2dc,#b6c2cd)] px-3 pb-2 pt-1.5">
+          {/* The label is drawn sticking out of the printer, which is where the hand
+              reaches for it first. The strip is therefore a drag source in its own
+              right — the same gesture, the same payload as the card further down. */}
+          <div
+            className={`border-t border-slate-300 bg-[linear-gradient(180deg,#c9d2dc,#b6c2cd)] px-3 pb-2 pt-1.5${
+              displayedTicket === null ? "" : isTicketDraggable ? " cursor-grab" : " cursor-default"
+            }`}
+            data-testid={displayedTicket === null ? undefined : "lims-printed-ticket-printer"}
+            draggable={displayedTicket === null ? undefined : isTicketDraggable}
+            onDragEnd={displayedTicket === null ? undefined : onTicketDragEnd}
+            onDragStart={
+              displayedTicket === null
+                ? undefined
+                : (event) => {
+                    onTicketDragStart?.(displayedTicket, event.dataTransfer);
+                  }
+            }
+          >
             <LimsLabelPrinterIllustration
               className="h-[4.4rem] w-full"
               hasTicket={displayedTicket !== null}
@@ -421,10 +439,10 @@ export function LimsWidget({
         </div>
         {displayedTicket ? (
           <div
-            className={`${displayedTicket.isDraggable ?? true ? "cursor-grab" : "cursor-default opacity-70"} rounded-[0.9rem] border border-dashed border-sky-300 bg-sky-50 px-3 py-1.5`.trim()}
+            className={`${isTicketDraggable ? "cursor-grab" : "cursor-default opacity-70"} rounded-[0.9rem] border border-dashed border-sky-300 bg-sky-50 px-3 py-1.5`.trim()}
             data-testid="lims-printed-ticket"
             data-tutorial-anchor="lims-printed-ticket"
-            draggable={displayedTicket.isDraggable ?? true}
+            draggable={isTicketDraggable}
             onDragEnd={onTicketDragEnd}
             onDragStart={(event) => {
               onTicketDragStart?.(displayedTicket, event.dataTransfer);

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LimsWidget } from "@/components/lims-widget";
+import { createDataTransfer } from "@/test-support/lab-scene-dnd-test-helpers";
 import type { LimsReception } from "@/types/workbench";
 
 function reception(overrides: Partial<LimsReception> = {}): LimsReception {
@@ -101,7 +102,99 @@ describe("LimsWidget", () => {
 
     expect(onAcknowledgeMassCheck).toHaveBeenCalledWith("lims_1");
   });
+  it("lets the ticket be dragged straight out of the printer", () => {
+    // The label is drawn sticking out of the printer, so that is where the hand goes
+    // first. Grabbing it there has to be the same gesture as grabbing the card below.
+    const onTicketDragStart = vi.fn();
+    const ticket = {
+      id: "lims_ticket_1",
+      sampleCode: "S-2026-0001",
+      labelText: "S-2026-0001",
+      receivedDate: "2026-08-10",
+    };
+    render(
+      <LimsWidget
+        entries={[]}
+        onAcknowledgeMassCheck={vi.fn()}
+        onPrintLabel={vi.fn()}
+        onSaveReception={vi.fn()}
+        onTicketDragStart={onTicketDragStart}
+        reception={reception({ printedLabelTicket: ticket })}
+      />,
+    );
 
+    const printerSource = screen.getByTestId("lims-printed-ticket-printer");
+    expect(printerSource).toHaveAttribute("draggable", "true");
 
+    fireEvent.dragStart(printerSource, { dataTransfer: createDataTransfer() });
 
+    expect(onTicketDragStart).toHaveBeenCalledWith(ticket, expect.anything());
+  });
+
+  it("still lets the ticket be dragged from the card", () => {
+    const onTicketDragStart = vi.fn();
+    const ticket = {
+      id: "lims_ticket_1",
+      sampleCode: "S-2026-0001",
+      labelText: "S-2026-0001",
+      receivedDate: "2026-08-10",
+    };
+    render(
+      <LimsWidget
+        entries={[]}
+        onAcknowledgeMassCheck={vi.fn()}
+        onPrintLabel={vi.fn()}
+        onSaveReception={vi.fn()}
+        onTicketDragStart={onTicketDragStart}
+        reception={reception({ printedLabelTicket: ticket })}
+      />,
+    );
+
+    fireEvent.dragStart(screen.getByTestId("lims-printed-ticket"), {
+      dataTransfer: createDataTransfer(),
+    });
+
+    expect(onTicketDragStart).toHaveBeenCalledWith(ticket, expect.anything());
+  });
+
+  it("offers no printer drag source while the printer is empty", () => {
+    render(
+      <LimsWidget
+        entries={[]}
+        onAcknowledgeMassCheck={vi.fn()}
+        onPrintLabel={vi.fn()}
+        onSaveReception={vi.fn()}
+        reception={reception()}
+      />,
+    );
+
+    expect(screen.queryByTestId("lims-printed-ticket-printer")).not.toBeInTheDocument();
+  });
+
+  it("refuses the printer gesture for a ticket that cannot be dragged", () => {
+    const onTicketDragStart = vi.fn();
+    render(
+      <LimsWidget
+        entries={[]}
+        onAcknowledgeMassCheck={vi.fn()}
+        onPrintLabel={vi.fn()}
+        onSaveReception={vi.fn()}
+        onTicketDragStart={onTicketDragStart}
+        reception={reception({
+          printedLabelTicket: {
+            id: "lims_ticket_1",
+            sampleCode: "S-2026-0001",
+            labelText: "S-2026-0001",
+            receivedDate: "2026-08-10",
+            isDraggable: false,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("lims-printed-ticket-printer")).toHaveAttribute(
+      "draggable",
+      "false",
+    );
+  });
 });
