@@ -479,6 +479,76 @@ describe("ExperimentsHome", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
+  it("deletes the experiment whose management menu is open when pressing Delete", async () => {
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_2",
+        name: "Ready state",
+        status: "preparing",
+        last_simulation_at: "2026-04-01T10:00:00Z",
+        snapshot_version: 4,
+        updated_at: "2026-04-01T10:03:00Z",
+        last_audit_entry: null,
+        summary: { workbenchToolCount: 1, rackToolCount: 2, materialCount: 1, runCount: 0 },
+      },
+    ]);
+    deleteExperimentMock.mockResolvedValue(undefined);
+
+    render(<ExperimentsHome />);
+    fireEvent.click(await screen.findByRole("button", { name: "Manage Ready state" }));
+    fireEvent.keyDown(document, { key: "Delete" });
+
+    await waitFor(() => {
+      expect(deleteExperimentMock).toHaveBeenCalledWith("experiment_2");
+      expect(screen.queryByText("Ready state")).not.toBeInTheDocument();
+    });
+  });
+
+  it("ignores Delete when no management menu is open", async () => {
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_2",
+        name: "Ready state",
+        status: "preparing",
+        last_simulation_at: "2026-04-01T10:00:00Z",
+        snapshot_version: 4,
+        updated_at: "2026-04-01T10:03:00Z",
+        last_audit_entry: null,
+        summary: { workbenchToolCount: 1, rackToolCount: 2, materialCount: 1, runCount: 0 },
+      },
+    ]);
+
+    render(<ExperimentsHome />);
+    expect(await screen.findByText("Ready state")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Delete" });
+
+    expect(deleteExperimentMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves Delete to the caret while renaming an experiment", async () => {
+    listExperimentsMock.mockResolvedValue([
+      {
+        id: "experiment_2",
+        name: "Ready state",
+        status: "preparing",
+        last_simulation_at: "2026-04-01T10:00:00Z",
+        snapshot_version: 4,
+        updated_at: "2026-04-01T10:03:00Z",
+        last_audit_entry: null,
+        summary: { workbenchToolCount: 1, rackToolCount: 2, materialCount: 1, runCount: 0 },
+      },
+    ]);
+
+    render(<ExperimentsHome />);
+    fireEvent.click(await screen.findByRole("button", { name: "Manage Ready state" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename Ready state" }));
+
+    const input = screen.getByDisplayValue("Ready state");
+    fireEvent.keyDown(input, { key: "Delete" });
+
+    expect(deleteExperimentMock).not.toHaveBeenCalled();
+  });
+
   it("closes the management menu when clicking elsewhere", async () => {
     listExperimentsMock.mockResolvedValue([
       {

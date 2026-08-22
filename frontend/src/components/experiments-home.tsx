@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -205,7 +205,7 @@ export function ExperimentsHome() {
     });
   };
 
-  const handleDeleteExperiment = async (experimentId: string) => {
+  const handleDeleteExperiment = useCallback(async (experimentId: string) => {
     setDeletingExperimentId(experimentId);
     setErrorMessage(null);
 
@@ -214,13 +214,14 @@ export function ExperimentsHome() {
       setManagingExperimentId(null);
       setExperiments((current) => current.filter((entry) => entry.id !== experimentId));
       clearTutorialSession(CALIBRATION_SAMPLE_TUTORIAL_ID, experimentId);
-      if (tutorialSessionsByExperiment[experimentId]) {
-        setTutorialSessionsByExperiment((current) => {
-          const next = { ...current };
-          delete next[experimentId];
-          return next;
-        });
-      }
+      setTutorialSessionsByExperiment((current) => {
+        if (!current[experimentId]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[experimentId];
+        return next;
+      });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to delete experiment",
@@ -228,7 +229,37 @@ export function ExperimentsHome() {
     } finally {
       setDeletingExperimentId(null);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (managingExperimentId === null) {
+      return;
+    }
+
+    const handleDeleteKey = (event: KeyboardEvent) => {
+      if (event.key !== "Delete") {
+        return;
+      }
+      // The rename field lives on the same card, so the caret keeps its own Delete.
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement)
+      ) {
+        return;
+      }
+      if (deletingExperimentId !== null) {
+        return;
+      }
+      event.preventDefault();
+      void handleDeleteExperiment(managingExperimentId);
+    };
+
+    document.addEventListener("keydown", handleDeleteKey);
+    return () => document.removeEventListener("keydown", handleDeleteKey);
+  }, [managingExperimentId, deletingExperimentId, handleDeleteExperiment]);
 
   const handleRenameExperiment = async (experimentId: string) => {
     const name = nameDraft.trim();
