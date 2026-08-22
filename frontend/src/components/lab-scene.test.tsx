@@ -538,8 +538,8 @@ function makePrintedLimsTicket(
 ): NonNullable<LimsReception["printedLabelTicket"]> {
   return {
     id: "lims_ticket_1",
-    sampleCode: "APP-2026-0001",
-    labelText: "APP-2026-0001",
+    sampleCode: "APP-0001-01",
+    labelText: "APP-0001-01",
     receivedDate: "2026-04-03",
     isDraggable: true,
     allowedDropTargets: getLimsLabelTicketDropTargets(),
@@ -3455,7 +3455,7 @@ describe("LabScene", () => {
           harvestDate: "2026-03-29",
           indicativeMassG: 2041.1,
           measuredGrossMassG: null,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
         }),
       }),
@@ -3502,7 +3502,7 @@ describe("LabScene", () => {
           harvestDate: "2026-03-29",
           indicativeMassG: 2041.1,
           measuredSampleMassG: 10,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
         }),
       }),
@@ -3549,7 +3549,7 @@ describe("LabScene", () => {
           harvestDate: "2026-03-29",
           indicativeMassG: 2041.1,
           measuredGrossMassG: null,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
         }),
       }),
@@ -3575,7 +3575,7 @@ describe("LabScene", () => {
       harvestDate: "2026-03-29",
       indicativeMassG: 2041.1,
       measuredSampleMassG: 10,
-      labSampleCode: "APP-2026-0001",
+      labSampleCode: "APP-0001-01",
       status: "awaiting_label_application",
     });
     const entryWithoutSampleMass = makeLimsReception({
@@ -3584,7 +3584,7 @@ describe("LabScene", () => {
       harvestDate: "2026-03-30",
       indicativeMassG: 1998.4,
       measuredSampleMassG: null,
-      labSampleCode: "APP-2026-0002",
+      labSampleCode: "APP-0001-02",
       status: "awaiting_label_application",
     });
 
@@ -3617,7 +3617,7 @@ describe("LabScene", () => {
       harvestDate: "2026-03-29",
       indicativeMassG: 2041.1,
       measuredSampleMassG: 10.02,
-      labSampleCode: "APP-2026-0001",
+      labSampleCode: "APP-0001-01",
       status: "awaiting_label_application",
     });
 
@@ -3635,7 +3635,7 @@ describe("LabScene", () => {
           harvestDate: "2026-03-30",
           indicativeMassG: 1998.4,
           measuredSampleMassG: null,
-          labSampleCode: "APP-2026-0002",
+          labSampleCode: "APP-0001-02",
           status: "awaiting_label_application",
         }),
       }),
@@ -3783,7 +3783,7 @@ describe("LabScene", () => {
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -3796,13 +3796,13 @@ describe("LabScene", () => {
             tool: makeSampleBagTool({
               id: "bench_tool_1",
               fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
-              labels: [makeSampleBagLabel({ text: "APP-2026-0001" })],
+              labels: [makeSampleBagLabel({ text: "APP-0001-01" })],
             }),
           },
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "received",
           printedLabelTicket: null,
         }),
@@ -3847,7 +3847,7 @@ describe("LabScene", () => {
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -3868,8 +3868,8 @@ describe("LabScene", () => {
                 makeSampleBagLabel({
                   id: "bench_tube_1-lims-label",
                   labelKind: "lims",
-                  text: "APP-2026-0001",
-                  sampleCode: "APP-2026-0001",
+                  text: "APP-0001-01",
+                  sampleCode: "APP-0001-01",
                   receivedDate: "2026-04-03",
                 }),
               ],
@@ -3878,7 +3878,7 @@ describe("LabScene", () => {
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "received",
           printedLabelTicket: null,
         }),
@@ -3923,7 +3923,7 @@ describe("LabScene", () => {
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -3944,8 +3944,8 @@ describe("LabScene", () => {
                 makeSampleBagLabel({
                   id: "bench_jar_1-lims-label",
                   labelKind: "lims",
-                  text: "APP-2026-0001",
-                  sampleCode: "APP-2026-0001",
+                  text: "APP-0001-01",
+                  sampleCode: "APP-0001-01",
                   receivedDate: "2026-04-03",
                 }),
               ],
@@ -3954,7 +3954,7 @@ describe("LabScene", () => {
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "received",
           printedLabelTicket: null,
         }),
@@ -3995,7 +3995,7 @@ describe("LabScene", () => {
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -4015,7 +4015,7 @@ describe("LabScene", () => {
           ]),
           limsReception: makeLimsReception({
             measuredGrossMassG: 2486,
-            labSampleCode: "APP-2026-0001",
+            labSampleCode: "APP-0001-01",
             status: "awaiting_label_application",
             printedLabelTicket: makePrintedLimsTicket(),
           }),
@@ -4034,13 +4034,13 @@ describe("LabScene", () => {
             tool: makeSampleBagTool({
               id: "bench_tool_1",
               fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
-              labels: [makeSampleBagLabel({ text: "APP-2026-0001" })],
+              labels: [makeSampleBagLabel({ text: "APP-0001-01" })],
             }),
           },
         ]),
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "received",
           printedLabelTicket: null,
         }),
@@ -4048,7 +4048,7 @@ describe("LabScene", () => {
           tool: makeSampleBagTool({
             id: "bench_tool_1",
             fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
-            labels: [makeSampleBagLabel({ text: "APP-2026-0001" })],
+            labels: [makeSampleBagLabel({ text: "APP-0001-01" })],
           }),
         }),
       });
@@ -4092,7 +4092,7 @@ describe("LabScene", () => {
         })],
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -4105,7 +4105,7 @@ describe("LabScene", () => {
           basketTools: [],
           limsReception: makeLimsReception({
             measuredGrossMassG: 2486,
-            labSampleCode: "APP-2026-0001",
+            labSampleCode: "APP-0001-01",
             status: "awaiting_label_application",
             printedLabelTicket: makePrintedLimsTicket(),
           }),
@@ -4122,11 +4122,11 @@ describe("LabScene", () => {
         basketTools: [makeSampleBagTool({
           id: "basket_bag_1",
           fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
-          labels: [makeSampleBagLabel({ text: "APP-2026-0001" })],
+          labels: [makeSampleBagLabel({ text: "APP-0001-01" })],
         })],
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "received",
           printedLabelTicket: null,
         }),
@@ -4134,7 +4134,7 @@ describe("LabScene", () => {
           tool: makeSampleBagTool({
             id: "basket_bag_1",
             fieldLabelText: "Martin Orchard • Harvest 2026-03-29 • Approx. 2.50 kg",
-            labels: [makeSampleBagLabel({ text: "APP-2026-0001" })],
+            labels: [makeSampleBagLabel({ text: "APP-0001-01" })],
           }),
         }),
       });
@@ -4337,7 +4337,7 @@ describe("LabScene", () => {
       makeWorkbenchExperiment({
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -4347,7 +4347,7 @@ describe("LabScene", () => {
       makeWorkbenchExperiment({
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: null,
         }),
@@ -4355,7 +4355,7 @@ describe("LabScene", () => {
           {
             id: "trash_sample_label_1",
             originLabel: "LIMS terminal",
-            labels: [makeSampleBagLabel({ text: "APP-2026-0001" })],
+            labels: [makeSampleBagLabel({ text: "APP-0001-01" })],
           },
         ],
       }),
@@ -4391,7 +4391,7 @@ describe("LabScene", () => {
       makeWorkbenchExperiment({
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -5843,7 +5843,7 @@ describe("LabScene", () => {
       makeWorkbenchExperiment({
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -5854,7 +5854,7 @@ describe("LabScene", () => {
       makeWorkbenchExperiment({
         limsReception: makeLimsReception({
           measuredGrossMassG: 2486,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "received",
           printedLabelTicket: null,
         }),
@@ -5865,8 +5865,8 @@ describe("LabScene", () => {
               {
                 id: "analytical_lims_label_1",
                 labelKind: "lims",
-                text: "APP-2026-0001",
-                sampleCode: "APP-2026-0001",
+                text: "APP-0001-01",
+                sampleCode: "APP-0001-01",
                 receivedDate: "2026-04-03",
               },
             ],

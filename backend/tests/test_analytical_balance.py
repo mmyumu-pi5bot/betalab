@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from app.domain.models import ProduceFraction, ProduceMaterialState, TrashSampleLabelEntry
@@ -417,5 +419,5 @@ def test_printed_lims_ticket_can_apply_to_analytical_balance_tool() -> None:
     assert analytical_widget.tool is not None
     assert analytical_widget.tool.labels[0].label_kind == "lims"
     assert analytical_widget.tool.labels[0].sample_code is not None
-    assert analytical_widget.tool.labels[0].sample_code.startswith("APP-2026-")
+    assert re.fullmatch(r"APP-\d{4}-\d{2}", analytical_widget.tool.labels[0].sample_code)
     assert updated.lims_reception.printed_label_ticket is None

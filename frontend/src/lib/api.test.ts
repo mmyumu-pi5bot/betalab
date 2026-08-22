@@ -608,8 +608,8 @@ describe("api client", () => {
         ...makeExperiment().limsReception,
         printedLabelTicket: {
           id: "ticket_1",
-          sampleCode: "APP-2026-001",
-          labelText: "APP-2026-001",
+          sampleCode: "APP-0001-01",
+          labelText: "APP-0001-01",
           receivedDate: "2026-04-14",
           isDraggable: true,
           allowedDropTargets: ["workbench_slot", "gross_balance_widget", "analytical_balance_widget", "trash_bin"],

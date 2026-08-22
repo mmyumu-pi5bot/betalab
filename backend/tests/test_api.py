@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -235,7 +236,7 @@ def test_reception_routes_register_and_label_received_bag_over_http() -> None:
     assert registered.status_code == 200
     assert registered.json()["lims_reception"]["measured_sample_mass_g"] == pytest.approx(10.0)
     sample_code = registered.json()["lims_reception"]["lab_sample_code"]
-    assert sample_code.startswith("APP-2026-")
+    assert re.fullmatch(r"APP-\d{4}-\d{2}", sample_code)
     assert printed.status_code == 200
     assert printed.json()["lims_reception"]["printed_label_ticket"]["sample_code"] == sample_code
     assert printed.json()["lims_reception"]["printed_label_ticket"]["received_date"]
@@ -569,7 +570,7 @@ def test_received_lot_can_flow_from_reception_to_ground_jar_over_http() -> None:
     assert basket_moved_to_balance.json()["lims_reception"]["measured_gross_mass_g"] > 0
     assert registered.status_code == 200
     sample_code = registered.json()["lims_reception"]["lab_sample_code"]
-    assert sample_code.startswith("APP-2026-")
+    assert re.fullmatch(r"APP-\d{4}-\d{2}", sample_code)
     assert printed.status_code == 200
     assert labeled.status_code == 200
     gross_balance = _find_widget(labeled.json(), "gross_balance")
@@ -664,7 +665,7 @@ def test_printed_lims_label_can_apply_to_analytical_balance_tool_over_http() -> 
     updated_tool = _find_widget(applied.json(), "analytical_balance")["tool"]
     assert updated_tool is not None
     assert updated_tool["labels"][0]["label_kind"] == "lims"
-    assert updated_tool["labels"][0]["sample_code"].startswith("APP-2026-")
+    assert re.fullmatch(r"APP-\d{4}-\d{2}", updated_tool["labels"][0]["sample_code"])
     assert applied.json()["lims_reception"]["printed_label_ticket"] is None
 
 
@@ -683,7 +684,7 @@ def test_lims_reception_route_allows_missing_gross_weight_over_http() -> None:
         )
 
     assert registered.status_code == 200
-    assert registered.json()["lims_reception"]["lab_sample_code"].startswith("APP-2026-")
+    assert re.fullmatch(r"APP-\d{4}-\d{2}", registered.json()["lims_reception"]["lab_sample_code"])
     assert registered.json()["lims_reception"]["measured_gross_mass_g"] is None
 
 

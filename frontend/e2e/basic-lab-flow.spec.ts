@@ -119,7 +119,7 @@ test.describe("Basic lab flow", () => {
     );
 
     await expect(page.getByTestId("lims-printed-ticket")).toHaveCount(0);
-    await expect(page.getByTestId("gross-balance-staged-item")).toContainText(/APP-2026-/);
+    await expect(page.getByTestId("gross-balance-staged-item")).toContainText(/APP-/);
 
     await page.getByTestId("add-workbench-slot-button").click();
     await expect(page.getByTestId("bench-slot-station_3")).toBeVisible();

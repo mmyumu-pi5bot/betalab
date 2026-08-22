@@ -537,6 +537,11 @@ class Experiment:
     lims_reception: LimsReception
     last_simulation_at: datetime
     name: str = "Untitled experiment"
+    # Position of this experiment on the platform, handed out once by the store that
+    # knows every experiment and never reused — a deleted experiment's samples may
+    # already be sitting downstream under codes built from it. 0 means unnumbered,
+    # which only legacy rows saved before numbering existed should ever be.
+    sequence_number: int = 0
     basket_tools: list[WorkbenchTool] = field(default_factory=list)
     produce_material_states: list[ProduceMaterialState] = field(default_factory=list)
     spatula: SpatulaState = field(default_factory=SpatulaState)

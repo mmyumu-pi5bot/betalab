@@ -786,6 +786,7 @@ class ExperimentSchema(BaseModel):
     status: str
     last_simulation_at: datetime
     snapshot_version: int
+    sequence_number: int = 0
     workbench: WorkbenchSchema
     rack: RackSchema
     trash: TrashSchema

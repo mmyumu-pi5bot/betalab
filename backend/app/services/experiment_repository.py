@@ -78,8 +78,20 @@ class ExperimentRepository(Protocol):
 
     def delete(self, experiment_id: str) -> bool: ...
 
+    def reserve_experiment_number(self) -> int:
+        """Hand out the next platform-wide experiment number.
+
+        Sample codes are built on it, and those codes leave the platform on labels and
+        in injection file names, so a number is never handed out twice — not after a
+        restart, and not after the experiment that held it was deleted.
+        """
+        ...
+
 
 class InMemoryExperimentRepository:
+    def __init__(self) -> None:
+        self._last_experiment_number = 0
+
     def save(self, experiment: Experiment) -> None:
         return None
 
@@ -92,12 +104,36 @@ class InMemoryExperimentRepository:
     def delete(self, experiment_id: str) -> bool:
         return False
 
+    def reserve_experiment_number(self) -> int:
+        self._last_experiment_number += 1
+        return self._last_experiment_number
+
 
 class SqliteExperimentRepository:
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
         self._ensure_parent_directory()
         self._initialize_schema()
+
+    def reserve_experiment_number(self) -> int:
+        """Bump and read the counter in one transaction, so two callers cannot tie.
+
+        The counter is its own row rather than ``MAX(sequence_number) + 1`` precisely so
+        that deleting the highest-numbered experiment does not put its number back in
+        circulation.
+        """
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO platform_counters (name, value) VALUES ('experiment_number', 1)
+                ON CONFLICT(name) DO UPDATE SET value = value + 1
+                """
+            )
+            row = connection.execute(
+                "SELECT value FROM platform_counters WHERE name = 'experiment_number'"
+            ).fetchone()
+            connection.commit()
+        return int(row[0])
 
     def save(self, experiment: Experiment) -> None:
         payload = json.dumps(_serialize_experiment(experiment), sort_keys=True)
@@ -269,8 +305,55 @@ class SqliteExperimentRepository:
         self._ensure_column(connection, "rack_tool_count", "INTEGER")
         self._ensure_column(connection, "material_count", "INTEGER")
         self._ensure_column(connection, "run_count", "INTEGER")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS platform_counters (
+                name TEXT PRIMARY KEY,
+                value INTEGER NOT NULL
+            )
+            """
+        )
         self._backfill_summary_metadata(connection)
+        self._backfill_experiment_numbers(connection)
         connection.commit()
+
+    def _backfill_experiment_numbers(self, connection: sqlite3.Connection) -> None:
+        """Number the experiments saved before numbering existed, oldest first.
+
+        Without this they all report number 0 and hand out identical sample codes —
+        the very collision the number exists to prevent. The counter is left above the
+        highest number assigned, so new experiments carry on from there.
+        """
+        rows = connection.execute(
+            "SELECT id, payload FROM experiments ORDER BY created_at, id"
+        ).fetchall()
+        unnumbered = [
+            (experiment_id, payload)
+            for experiment_id, payload in rows
+            if not json.loads(payload).get("sequence_number")
+        ]
+        if not unnumbered:
+            return
+
+        counter_row = connection.execute(
+            "SELECT value FROM platform_counters WHERE name = 'experiment_number'"
+        ).fetchone()
+        next_number = int(counter_row[0]) if counter_row is not None else 0
+        for experiment_id, serialized_payload in unnumbered:
+            next_number += 1
+            payload = json.loads(serialized_payload)
+            payload["sequence_number"] = next_number
+            connection.execute(
+                "UPDATE experiments SET payload = ? WHERE id = ?",
+                (json.dumps(payload, sort_keys=True), experiment_id),
+            )
+        connection.execute(
+            """
+            INSERT INTO platform_counters (name, value) VALUES ('experiment_number', ?)
+            ON CONFLICT(name) DO UPDATE SET value = excluded.value
+            """,
+            (next_number,),
+        )
 
     def _backfill_summary_metadata(self, connection: sqlite3.Connection) -> None:
         rows = connection.execute(
@@ -359,6 +442,7 @@ def _deserialize_experiment(payload: dict) -> Experiment:
     experiment = Experiment(
         id=schema.id,
         name=schema.name,
+        sequence_number=schema.sequence_number,
         status=ExperimentStatus(schema.status),
         workbench=Workbench(
             slots=[

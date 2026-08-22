@@ -294,13 +294,20 @@ class ApplyPrintedLimsLabelToAnalyticalBalanceToolService(WriteDomainService[Emp
 
 
 def _build_sample_code(experiment: Experiment) -> str:
+    """``APP-<experiment>-<sample>``: globally unique, and readable as a pair.
+
+    The experiment number comes from the platform and is never reused; the sample
+    number only has to be unique within the experiment. Together they identify one
+    sample anywhere — which is what the label, and every injection file built from it,
+    ends up claiming.
+    """
     existing_suffixes = [
         int(entry.lab_sample_code.rsplit("-", 1)[-1])
         for entry in experiment.lims_entries
         if entry.lab_sample_code is not None and entry.lab_sample_code.rsplit("-", 1)[-1].isdigit()
     ]
     next_sequence = max(existing_suffixes, default=0) + 1
-    return f"APP-2026-{next_sequence:04d}"
+    return f"APP-{experiment.sequence_number:04d}-{next_sequence:02d}"
 
 
 def _resolve_measured_gross_mass_g(

@@ -1160,8 +1160,8 @@ describe("calibration sample tutorial", () => {
         {
           id: "label_1",
           labelKind: "lims" as const,
-          text: "APP-2026-0001",
-          sampleCode: "APP-2026-0001",
+          text: "APP-0001-01",
+          sampleCode: "APP-0001-01",
           isDraggable: true,
           allowedDropTargets: [],
         },
@@ -1172,7 +1172,7 @@ describe("calibration sample tutorial", () => {
       limsReception: {
         ...experiment().limsReception,
         measuredGrossMassG: 2500,
-        labSampleCode: "APP-2026-0001",
+        labSampleCode: "APP-0001-01",
         status: "received",
       },
       workspace: {
@@ -1194,7 +1194,7 @@ describe("calibration sample tutorial", () => {
       limsReception: {
         ...experiment().limsReception,
         measuredGrossMassG: null,
-        labSampleCode: "APP-2026-0001",
+        labSampleCode: "APP-0001-01",
         status: "received",
       },
       basketTools: [
@@ -1216,8 +1216,8 @@ describe("calibration sample tutorial", () => {
             {
               id: "label_1",
               labelKind: "lims",
-              text: "APP-2026-0001",
-              sampleCode: "APP-2026-0001",
+              text: "APP-0001-01",
+              sampleCode: "APP-0001-01",
               isDraggable: true,
               allowedDropTargets: [],
             },

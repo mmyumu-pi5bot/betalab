@@ -621,8 +621,8 @@ function makePrintedLimsTicket(
 ): NonNullable<LimsReception["printedLabelTicket"]> {
   return {
     id: "lims_ticket_1",
-    sampleCode: "APP-2026-0001",
-    labelText: "APP-2026-0001",
+    sampleCode: "APP-0001-01",
+    labelText: "APP-0001-01",
     receivedDate: "2026-04-03",
     isDraggable: true,
     allowedDropTargets: getLimsLabelTicketDropTargets(),
@@ -2122,7 +2122,7 @@ function createLimsPrintedTicketSourceCase(): DndSourceCase {
           harvestDate: "2026-03-29",
           indicativeMassG: 2500,
           measuredGrossMassG: null,
-          labSampleCode: "APP-2026-0001",
+          labSampleCode: "APP-0001-01",
           status: "awaiting_label_application",
           printedLabelTicket: makePrintedLimsTicket(),
         }),
@@ -2820,7 +2820,7 @@ export function buildDndCoverageExperiment(scenario: DndCoverageScenario): Exper
       harvestDate: "2026-03-29",
       indicativeMassG: 2500,
       measuredGrossMassG: null,
-      labSampleCode: "APP-2026-0001",
+      labSampleCode: "APP-0001-01",
       status: "awaiting_label_application",
       printedLabelTicket: makePrintedLimsTicket(),
     }),

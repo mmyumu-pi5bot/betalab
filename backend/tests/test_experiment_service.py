@@ -913,7 +913,7 @@ def test_reception_flow_moves_bag_registers_lims_and_applies_ticket() -> None:
         },
     )
     assert updated.lims_reception.lab_sample_code is not None
-    assert updated.lims_reception.lab_sample_code.startswith("APP-2026-")
+    assert re.fullmatch(r"APP-\d{4}-\d{2}", updated.lims_reception.lab_sample_code)
     assert updated.lims_reception.status == "awaiting_label_application"
     assert updated.lims_reception.measured_sample_mass_g == pytest.approx(10.0)
 
@@ -1198,7 +1198,7 @@ def test_discard_printed_lims_label_moves_ticket_to_trash_sample_labels() -> Non
     assert updated.lims_reception.printed_label_ticket is None
     assert len(updated.trash.sample_labels) == 1
     assert updated.trash.sample_labels[0].origin_label == "LIMS terminal"
-    assert updated.trash.sample_labels[0].sample_label_text == "APP-2026-0001"
+    assert updated.trash.sample_labels[0].sample_label_text == "APP-0001-01"
 
 
 def test_print_lims_label_can_target_a_selected_existing_entry() -> None:
@@ -1228,13 +1228,13 @@ def test_print_lims_label_can_target_a_selected_existing_entry() -> None:
 
     first_entry_id = first.lims_entries[0].id
     assert first_entry_id is not None
-    assert second.lims_reception.lab_sample_code == "APP-2026-0002"
+    assert second.lims_reception.lab_sample_code == "APP-0001-02"
 
     updated = print_lims_label(service, experiment.id, first_entry_id)
 
-    assert updated.lims_reception.lab_sample_code == "APP-2026-0001"
+    assert updated.lims_reception.lab_sample_code == "APP-0001-01"
     assert updated.lims_reception.printed_label_ticket is not None
-    assert updated.lims_reception.printed_label_ticket.sample_code == "APP-2026-0001"
+    assert updated.lims_reception.printed_label_ticket.sample_code == "APP-0001-01"
 
 
 def test_discard_basket_tool_moves_received_sampling_bag_to_trash() -> None:

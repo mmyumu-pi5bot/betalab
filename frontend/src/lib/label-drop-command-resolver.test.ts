@@ -74,8 +74,8 @@ function createLimsTicketPayload(): LabelDragPayload {
       sourceId: "ticket_1",
       sourceKind: "lims",
       ticketId: "ticket_1",
-      sampleCode: "APP-2026-0001",
-      labelText: "APP-2026-0001",
+      sampleCode: "APP-0001-01",
+      labelText: "APP-0001-01",
     } as LimsLabelTicketDragPayload,
   };
 }

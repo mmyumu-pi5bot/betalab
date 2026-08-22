@@ -104,7 +104,7 @@ test.describe("Analytical balance sample labels", () => {
     await expect(
       page
         .getByTestId("analytical-balance-staged-item")
-        .getByText("APP-2026-", { exact: false }),
+        .getByText("APP-", { exact: false }),
     ).toBeVisible();
   });
 });

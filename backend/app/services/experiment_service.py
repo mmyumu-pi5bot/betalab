@@ -32,6 +32,7 @@ class ExperimentRuntimeService:
 
     def create_experiment(self, name: str = "Untitled experiment") -> ExperimentSchema:
         experiment = build_experiment(self._validate_experiment_name(name))
+        experiment.sequence_number = self._repository.reserve_experiment_number()
         experiment.last_simulation_at = self._now_fn()
         self._experiments[experiment.id] = experiment
         return self._persist_mutation_and_to_schema(experiment)
@@ -48,6 +49,9 @@ class ExperimentRuntimeService:
         source = self._require_experiment(experiment_id)
         duplicate = deepcopy(source)
         duplicate.id = new_id("experiment")
+        # A copy is a second experiment on the platform: its samples are not the
+        # originals, so it may not inherit the number their codes are built on.
+        duplicate.sequence_number = self._repository.reserve_experiment_number()
         duplicate.name = f"{source.name[:73].rstrip()} (copy)"
         duplicate.snapshot_version = 0
         duplicate.last_simulation_at = self._now_fn()
