@@ -314,6 +314,44 @@ describe("TutorialCoach", () => {
     track.remove();
   });
 
+  it("takes the spotlight to the dosing box while a drop draft is open", () => {
+    // The step's own anchor is the palette item that was just dragged. Once the
+    // dosing dialog is up that drag is history, and the amount box is the only
+    // thing standing between the learner and the drop landing.
+    const paletteItem = document.createElement("div");
+    paletteItem.dataset.tutorialAnchor = "palette-item-gross_balance_widget";
+    paletteItem.getBoundingClientRect = () =>
+      ({ bottom: 90, height: 50, left: 20, right: 120, top: 40, width: 100 }) as DOMRect;
+    document.body.appendChild(paletteItem);
+
+    const quantity = document.createElement("input");
+    quantity.dataset.tutorialAnchor = "drop-draft-quantity";
+    quantity.getBoundingClientRect = () =>
+      ({ bottom: 320, height: 20, left: 400, right: 470, top: 300, width: 70 }) as DOMRect;
+    document.body.appendChild(quantity);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluateTutorial(calibrationSampleTutorial, emptyExperiment())}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      display: "block",
+      height: "36px",
+      left: "392px",
+      top: "292px",
+      width: "86px",
+    });
+
+    paletteItem.remove();
+    quantity.remove();
+  });
+
   it("moves the spotlight to the launch button once the acquisition console is open", async () => {
     const openConsole = document.createElement("button");
     openConsole.dataset.tutorialAnchor = "instrument-open-console";
@@ -360,6 +398,203 @@ describe("TutorialCoach", () => {
 
     openConsole.remove();
     launch.remove();
+  });
+
+  it("walks the method manager from Duplicate to the calibration field", async () => {
+    // Nothing in the experiment records which method is selected or which tab is
+    // open, so the anchor has to read the modal's own DOM. Each element appears
+    // only in the state that calls for it, and the deepest one present wins.
+    function anchored(anchorName: string, left: number, extra: Partial<HTMLElement> = {}) {
+      const element = document.createElement("button");
+      element.dataset.tutorialAnchor = anchorName;
+      Object.assign(element, extra);
+      element.getBoundingClientRect = () =>
+        ({ bottom: 140, height: 40, left, right: left + 160, top: 100, width: 160 }) as DOMRect;
+      document.body.appendChild(element);
+      return element;
+    }
+
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "declare-calibration-levels",
+    )!;
+    const manageMethods = anchored("instrument-manage-methods", 100);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: { ...step, anchor: () => "instrument-manage-methods-next" },
+          experiment: emptyExperiment(),
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "92px" });
+
+    // Manager open on the Details tab: send the learner to the Edit tab.
+    const editTab = anchored("method-manager-edit-tab", 200);
+    editTab.setAttribute("aria-selected", "false");
+    await waitFor(() =>
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "192px" }),
+    );
+
+    // Edit tab open on a built-in method: the editor refuses, so duplicate first.
+    editTab.setAttribute("aria-selected", "true");
+    const notice = anchored("method-editor-builtin-notice", 300);
+    const duplicate = anchored("method-manager-duplicate", 400);
+    await waitFor(() =>
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "392px" }),
+    );
+
+    // A user method is being edited: the field itself is the target.
+    notice.remove();
+    const field = anchored("method-editor-calibration-levels", 500);
+    await waitFor(() =>
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "492px" }),
+    );
+
+    for (const element of [manageMethods, editTab, duplicate, field]) element.remove();
+  });
+
+  it("names the level to type once the learner reaches the calibration field", async () => {
+    function anchored(anchorName: string) {
+      const element = document.createElement("button");
+      element.dataset.tutorialAnchor = anchorName;
+      element.getBoundingClientRect = () =>
+        ({ bottom: 140, height: 40, left: 100, right: 260, top: 100, width: 160 }) as DOMRect;
+      document.body.appendChild(element);
+      return element;
+    }
+
+    const withStandard = {
+      ...emptyExperiment(),
+      rack: {
+        ...emptyExperiment().rack,
+        slots: [
+          {
+            id: "rack_slot_2",
+            tool: {
+              id: "vial_2",
+              toolType: "sample_vial",
+              calibrationContext: { levelNgPerMl: 10 },
+            },
+          },
+        ],
+      },
+    } as unknown as Experiment;
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "declare-calibration-levels",
+    )!;
+    const manageMethods = anchored("instrument-manage-methods");
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: { ...step, anchor: () => "instrument-manage-methods-next" },
+          experiment: withStandard,
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    // Outside the editor the wording still describes the walk as a whole.
+    expect(screen.queryByText(/enter exactly: 10/i)).not.toBeInTheDocument();
+
+    const field = anchored("method-editor-calibration-levels");
+
+    await waitFor(() =>
+      expect(screen.getByText(/enter exactly: 10/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/10 ng\/mL/)).toBeInTheDocument();
+
+    manageMethods.remove();
+    field.remove();
+  });
+
+  it("moves on to Save, then to the console selector, as the field fills in", async () => {
+    function anchored(anchorName: string, tag = "button") {
+      const element = document.createElement(tag);
+      element.dataset.tutorialAnchor = anchorName;
+      element.getBoundingClientRect = () =>
+        ({ bottom: 140, height: 40, left: 100, right: 260, top: 100, width: 160 }) as DOMRect;
+      document.body.appendChild(element);
+      return element;
+    }
+
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "declare-calibration-levels",
+    )!;
+    const field = anchored("method-editor-calibration-levels", "input") as HTMLInputElement;
+    const save = anchored("method-editor-save");
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[0],
+          currentStep: { ...step, anchor: () => "instrument-manage-methods-next" },
+          experiment: emptyExperiment(),
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Type the calibration level/i)).toBeInTheDocument();
+
+    // A filled field means the typing is done; saving is what is left.
+    field.value = "10";
+    fireEvent.input(field);
+    await waitFor(() =>
+      expect(screen.getByText(/Save the method/i)).toBeInTheDocument(),
+    );
+
+    // The save landed but the modal is still open: get out of it first.
+    const savedNotice = anchored("method-editor-saved", "p");
+    anchored("method-manager-close");
+    await waitFor(() =>
+      expect(screen.getByText(/Close the method manager/i)).toBeInTheDocument(),
+    );
+    savedNotice.remove();
+
+    // Modal closed. Duplicating already pointed the console at the copy, so the
+    // only thing left is to run it — the declared ladder says the work is done.
+    field.remove();
+    save.remove();
+    const select = anchored("console-method-select", "select");
+    select.setAttribute("data-tutorial-declared-levels", "1");
+    await waitFor(() =>
+      expect(screen.getByText(/Launch the acquisition/i)).toBeInTheDocument(),
+    );
+
+    // A copy that declares nothing sends the learner back into the manager.
+    select.setAttribute("data-tutorial-declared-levels", "0");
+    await waitFor(() =>
+      expect(screen.queryByText(/Launch the acquisition/i)).not.toBeInTheDocument(),
+    );
+
+    document.body.querySelectorAll("[data-tutorial-anchor]").forEach((e) => e.remove());
   });
 
   it("keeps the action badge inside the halo when the target overflows the top edge", () => {

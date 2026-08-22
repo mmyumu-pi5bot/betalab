@@ -63,6 +63,25 @@ function labTool(
   };
 }
 
+function istdLiquid() {
+  return {
+    id: "istd_1",
+    liquidId: "istd_solution",
+    name: "ISTD solution",
+    volume_ml: 0.05,
+    accent: "emerald" as const,
+  };
+}
+
+function calibrationVial(overrides: Record<string, unknown> = {}) {
+  return labTool("sample_vial", {
+    id: "cal-vial",
+    capacity_ml: 2,
+    calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] },
+    ...overrides,
+  });
+}
+
 function widget(
   id: ExperimentWorkspaceWidget["id"],
   overrides: Partial<ExperimentWorkspaceWidget> = {},
@@ -535,7 +554,9 @@ describe("calibration sample tutorial", () => {
       const state = chillingState({ inBath: true, temperatureC: 12 });
 
       expect(stepNamed("chill-extraction").isSatisfied(state)).toBe(false);
-      expect(stepNamed("chill-extraction").anchor(state)).toBe("widget-ice_bath");
+      // Waiting has nothing to drag, so the bath as a whole is the wrong thing
+      // to point at: the only moving part is the reading being waited on.
+      expect(stepNamed("chill-extraction").anchor(state)).toBe("temperature-centrifuge_tube_1");
       expect(stepNamed("chill-extraction").dropAnchor?.(state)).toBeNull();
       expect(getTutorialStepPresentation(stepNamed("chill-extraction"), state).action?.kind).toBe("wait");
     });
@@ -1221,7 +1242,78 @@ describe("calibration sample tutorial", () => {
       "register-and-label-sample",
     ]);
     expect(result.currentStep?.id).toBe("store-gross-balance");
-    expect(result.progressPercent).toBe(10);
+    // Two of the tutorial's steps are done; the percentage follows the step count.
+    expect(result.progressPercent).toBe(
+      Math.round((2 / calibrationSampleTutorial.steps.length) * 100),
+    );
+  });
+
+  it("still asks for the ISTD once the standard carries its level", () => {
+    const state = experiment({
+      workbench: {
+        slots: [
+          { id: "station_1", label: "Station 1", tool: calibrationVial({ liquids: [] }) },
+        ],
+      },
+    });
+
+    const result = evaluateTutorial(calibrationSampleTutorial, state);
+
+    expect(result.completedStepIds).not.toContain("prepare-calibration-vial");
+  });
+
+  it("points at the ISTD solution once the standard carries its level", () => {
+    const state = experiment({
+      workbench: {
+        slots: [
+          { id: "station_1", label: "Station 1", tool: calibrationVial({ liquids: [] }) },
+        ],
+      },
+    });
+
+    const step = calibrationSampleTutorial.steps.find(
+      (candidate) => candidate.id === "prepare-calibration-vial",
+    );
+
+    expect(step?.anchor(state)).toBe("palette-item-istd_solution");
+  });
+
+  it("asks for a tenth of the tube's ISTD dose in the 1 mL standard", () => {
+    const state = experiment({
+      workbench: {
+        slots: [
+          { id: "station_1", label: "Station 1", tool: calibrationVial({ liquids: [] }) },
+        ],
+      },
+    });
+    const step = calibrationSampleTutorial.steps.find(
+      (candidate) => candidate.id === "prepare-calibration-vial",
+    );
+
+    const presentation = getTutorialStepPresentation(step!, state);
+
+    // Matching the tube's 0.05 mL by volume would put ten times too much ISTD in
+    // a 1 mL vial, and bias every ratio drawn against it by the same factor.
+    expect(presentation.instruction).toContain("0.005 mL");
+    expect(presentation.action).toEqual({ kind: "drag", label: "Add 0.005 mL ISTD" });
+  });
+
+  it("completes the standard once it is spiked with the ISTD", () => {
+    const state = experiment({
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: calibrationVial({ liquids: [istdLiquid()] }),
+          },
+        ],
+      },
+    });
+
+    const result = evaluateTutorial(calibrationSampleTutorial, state);
+
+    expect(result.completedStepIds).toContain("prepare-calibration-vial");
   });
 
   it("credits an out-of-order calibration without skipping missing prerequisites", () => {
@@ -1238,7 +1330,7 @@ describe("calibration sample tutorial", () => {
       canSeal: true,
       isDraggable: true,
       allowedDropTargets: [],
-      liquids: [],
+      liquids: [istdLiquid()],
       calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] },
     };
     const state = experiment({
@@ -1287,6 +1379,72 @@ describe("calibration sample tutorial", () => {
     expect(result.currentStep).toBeNull();
     expect(result.completedStepIds).toHaveLength(calibrationSampleTutorial.steps.length);
   });
+  describe("declaring the calibration ladder in the method", () => {
+    const stepById = (stepId: string) =>
+      calibrationSampleTutorial.steps.find((entry) => entry.id === stepId)!;
+
+    function withRun(calibrationLevelsNgPerMl: number[] | undefined) {
+      return experiment({
+        rack: { ...experiment().rack, state: "loaded" },
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            widget(id, {
+              isPresent: id === "instrument" || id === "rack",
+              sequenceRuns:
+                id === "instrument"
+                  ? [
+                      {
+                        id: "run_1",
+                        methodId: "mine",
+                        methodSnapshot: { calibrationLevelsNgPerMl } as never,
+                        totalDurationS: 20,
+                        elapsedS: 20,
+                        injections: [] as never,
+                      },
+                    ]
+                  : undefined,
+            }),
+          ),
+        },
+      });
+    }
+
+    it("is satisfied once a run carries a method that declares a ladder", () => {
+      const tutorialStep = stepById("declare-calibration-levels");
+
+      expect(tutorialStep.isSatisfied(withRun([10]))).toBe(true);
+    });
+
+    it("is not satisfied by a method that declares none", () => {
+      const tutorialStep = stepById("declare-calibration-levels");
+
+      expect(tutorialStep.isSatisfied(withRun([]))).toBe(false);
+      expect(tutorialStep.isSatisfied(withRun(undefined))).toBe(false);
+      expect(tutorialStep.isSatisfied(experiment())).toBe(false);
+    });
+
+    it("does not check the ladder against the vial, so a wrong value still passes", () => {
+      // The mismatch is the lesson: the method file will disagree with what was
+      // actually injected, and only the downstream platform will notice.
+      const tutorialStep = stepById("declare-calibration-levels");
+
+      expect(tutorialStep.isSatisfied(withRun([999]))).toBe(true);
+    });
+
+    it("gates the launch step behind the declaration", () => {
+      expect(stepById("launch-sequence").prerequisites).toContain(
+        "declare-calibration-levels",
+      );
+    });
+
+    it("points at the method library once the rack is loaded", () => {
+      const tutorialStep = stepById("declare-calibration-levels");
+
+      expect(tutorialStep.anchor(withRun([]))).toBe("instrument-manage-methods-next");
+    });
+  });
+
   describe("drop destinations", () => {
     const stepById = (stepId: string) =>
       calibrationSampleTutorial.steps.find((entry) => entry.id === stepId)!;

@@ -380,6 +380,26 @@ function preparedCalibrationVial(experiment: Experiment) {
   );
 }
 
+// A standard the internal standard never reached cannot correct anything: the
+// ratio needs the ISTD on both injections, so an unspiked standard silently
+// demotes the whole run to external calibration. Spiking it is therefore part of
+// preparing the standard, not an optional extra.
+//
+// What the standard needs is the same ISTD *concentration* as the sample, and the
+// sample's is fixed by the extraction — 0.05 mL of stock in 10 mL of solvent. The
+// calibration vial holds 1 mL, so it takes a tenth of the tube's dose. Copying the
+// tube's volume instead puts ten times too much in the standard and biases every
+// ratio drawn against it by that factor, which reads as a clean run with wrong
+// numbers. The dialog offers the tube's 0.05 mL, so this has to be typed.
+const calibrationIstdVolumeMl = 0.005;
+
+function spikedCalibrationVial(experiment: Experiment) {
+  const vial = preparedCalibrationVial(experiment);
+  return vial?.liquids.some((liquid) => liquid.liquidId === "istd_solution")
+    ? vial
+    : undefined;
+}
+
 // The autosampler needle cannot reach the last 0.05 mL of a vial, so an aliquot at or
 // below that draws nothing and every channel records baseline. The floor sits well
 // clear of it rather than at the exact millilitre: the aspiration is a press-and-hold
@@ -504,6 +524,78 @@ export function getLimsTutorialValues(experiment: Experiment): LimsTutorialValue
     measuredGrossMassG,
     measuredNetMassG,
     packagingTareMassG,
+  };
+}
+
+/** Where the learner stands inside the method manager, read from its own DOM. */
+export type MethodWalkStage =
+  | "duplicate"
+  | "edit-tab"
+  | "levels"
+  | "save"
+  | "close-manager"
+  | "launch";
+
+export function getMethodWalkPresentation(
+  experiment: Experiment,
+  stage: MethodWalkStage,
+): TutorialStepPresentation {
+  if (stage === "edit-tab") {
+    return {
+      title: "Open the method editor",
+      instruction: "Click the highlighted Edit tab to open the editor for this method.",
+      hint: "The Details tab only shows the method; the concentration ladder is edited on Edit.",
+      action: { kind: "click", label: "Open Edit" },
+    };
+  }
+  if (stage === "duplicate") {
+    return {
+      title: "Duplicate the method first",
+      instruction:
+        "This is a built-in method and cannot be edited. Click the highlighted Duplicate method to obtain an editable copy, then edit the copy.",
+      hint: "The copy keeps every transition of the original — only its identity changes.",
+      action: { kind: "click", label: "Duplicate method" },
+    };
+  }
+  if (stage === "save") {
+    return {
+      title: "Save the method",
+      instruction:
+        "Click the highlighted Save as new version to store the copy with its calibration ladder.",
+      hint: "Nothing is written until you save: leaving the editor now would lose the level you typed.",
+      action: { kind: "click", label: "Save as new version" },
+    };
+  }
+  if (stage === "close-manager") {
+    return {
+      title: "Close the method manager",
+      instruction:
+        "The method is saved. Close the highlighted method manager to get back to the acquisition console.",
+      hint: "The console still has to be pointed at the copy — the manager does not switch it for you.",
+      action: { kind: "click", label: "Close the manager" },
+    };
+  }
+  if (stage === "launch") {
+    return {
+      title: "Launch the acquisition",
+      instruction:
+        "The method is saved and the console is already pointed at it — duplicating switched the selection for you. Click Launch acquisition to record the sequence.",
+      hint: "The declared ladder only reaches the method file through a run: the step confirms itself once the sequence starts.",
+      action: { kind: "click", label: "Launch acquisition" },
+    };
+  }
+  const level = preparedCalibrationVial(experiment)?.calibrationContext?.levelNgPerMl;
+  const levelText = level ? `${level}` : "the level you prepared";
+  return {
+    title: "Type the calibration level",
+    instruction:
+      `Click the highlighted Calibration levels field and enter exactly: ${levelText}. ` +
+      "Then click Save as new version, and select the copy as the acquisition method.",
+    hint:
+      level
+        ? `Your standard was prepared at ${level} ng/mL. Nothing checks the two against each other — whatever you type here is what the exported method file will claim was in the vial.`
+        : "Nothing checks this against the vial: whatever you type here is what the exported method file will claim was in the standard.",
+    action: { kind: "type", label: `Type ${levelText}` },
   };
 }
 
@@ -1274,7 +1366,11 @@ function extractionPreparationTarget(experiment: Experiment): TutorialTarget {
 function chillExtractionTarget(experiment: Experiment): TutorialTarget {
   const tube = extractionTube(experiment);
   if (toolIsInWidget(experiment, "ice_bath", tube)) {
-    return { anchor: iceBathAnchor };
+    // Nothing left to drag: the step is a wait, and the only moving part is the
+    // reading. Spotlighting the whole bath says "look here" without saying what
+    // to look at, so the thermometer takes the light — the same way the grinder
+    // step points at the lot's own reading while the dry ice does its work.
+    return { anchor: tube ? `temperature-${tube.id}` : iceBathAnchor };
   }
   return workspaceWidget(experiment, "ice_bath")?.isPresent
     ? {
@@ -1381,6 +1477,13 @@ function saltExtractionPresentation(experiment: Experiment): Partial<TutorialSte
 }
 
 function calibrationVialTarget(experiment: Experiment): TutorialTarget {
+  const standard = preparedCalibrationVial(experiment);
+  if (standard) {
+    return {
+      anchor: "palette-item-istd_solution",
+      dropAnchor: toolSourceAnchor(experiment, (tool) => tool.id === standard.id),
+    };
+  }
   const vial = plainSampleVial(experiment);
   return vial
     ? {
@@ -1391,6 +1494,16 @@ function calibrationVialTarget(experiment: Experiment): TutorialTarget {
 }
 
 function calibrationVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (preparedCalibrationVial(experiment)) {
+    return {
+      title: "Spike the standard with the ISTD",
+      instruction:
+        `Drag the highlighted ISTD solution onto the calibration vial. Replace the `
+        + `suggested volume with ${calibrationIstdVolumeMl} mL, then click Confirm.`,
+      hint: "The standard needs the same ISTD concentration as the sample, not the same volume: the tube took 0.05 mL into 10 mL of solvent, and this vial holds 1 mL. Ten times too much here would bias every ratio by ten.",
+      action: { kind: "drag", label: `Add ${calibrationIstdVolumeMl} mL ISTD` },
+    };
+  }
   return plainSampleVial(experiment)
     ? {
         title: "Prepare the calibration vial",
@@ -1559,6 +1672,57 @@ function inferTutorialAction(instruction: string): TutorialAction {
     return { kind: "click", label: "Click the highlighted control" };
   }
   return { kind: "inspect", label: "Follow the highlighted area" };
+}
+
+function declareCalibrationLevelsTarget(experiment: Experiment): TutorialTarget {
+  if (!workspaceWidget(experiment, "instrument")?.isPresent) {
+    return {
+      anchor: "palette-item-lc_msms_instrument_widget",
+      dropAnchor: workspaceCanvasAnchor,
+    };
+  }
+  return experiment.rack.state === "loaded"
+    ? { anchor: "instrument-manage-methods-next" }
+    : { anchor: "widget-rack", dropAnchor: "widget-instrument" };
+}
+
+/**
+ * Nothing in the experiment records the method library, so this step can only
+ * confirm itself from the snapshot a run freezes. It therefore turns green at
+ * the same moment as the launch that follows it — the instruction says so,
+ * rather than leaving the learner waiting on a tick that cannot come earlier.
+ */
+function declaredCalibrationLadder(experiment: Experiment) {
+  return sequenceRuns(experiment).some(
+    (run) => (run.methodSnapshot?.calibrationLevelsNgPerMl ?? []).length > 0,
+  );
+}
+
+function declareCalibrationLevelsPresentation(
+  experiment: Experiment,
+): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, "instrument")?.isPresent) {
+    return {
+      title: "Deploy the LC-MS/MS",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the LC-MS/MS and drop it onto the central workspace.",
+    };
+  }
+  if (experiment.rack.state !== "loaded") {
+    return {
+      title: "Load the rack into the LC-MS/MS",
+      instruction: "Drag the highlighted loaded rack and drop it into the LC-MS/MS.",
+    };
+  }
+  const level = preparedCalibrationVial(experiment)?.calibrationContext?.levelNgPerMl;
+  const levelText = level ? `${level} ng/mL` : "the level you prepared";
+  return {
+    title: "Declare the calibration level in the method",
+    instruction:
+      `Open the acquisition console and click Manage methods. A built-in method cannot be edited, so duplicate it first, then type ${levelText} into Calibration levels and save the copy. Select that copy as the acquisition method.`,
+    hint: `Nothing checks this against the vial. Whatever you type here is what the exported method file will claim was in the standard — declare ${levelText}, the level you actually prepared.`,
+    action: { kind: "click", label: "Manage methods" },
+  };
 }
 
 function launchSequenceTarget(experiment: Experiment): TutorialTarget {
@@ -2031,11 +2195,11 @@ const steps: TutorialStep[] = [
     chapterId: "vials",
     title: "Prepare a calibration point",
     instruction:
-      "Drag a second Autosampler vial onto the workbench. Then drag the Multi-residue stock solution onto it, enter a concentration greater than zero, and confirm.",
-    hint: "You may choose any positive level; this tutorial requires a single calibration point.",
+      `Drag a second Autosampler vial onto the workbench. Drag the Multi-residue stock solution onto it, enter a concentration greater than zero, and confirm. Then drag the ISTD solution onto the same vial and set it to ${calibrationIstdVolumeMl} mL.`,
+    hint: "You may choose any positive level; this tutorial requires a single calibration point. The standard needs the same internal standard concentration as the sample, otherwise the two injections cannot be compared through the ISTD.",
     prerequisites: ["store-centrifuge"],
     ...fromTarget(calibrationVialTarget),
-    isSatisfied: (experiment) => Boolean(preparedCalibrationVial(experiment)),
+    isSatisfied: (experiment) => Boolean(spikedCalibrationVial(experiment)),
     presentation: calibrationVialPresentation,
   }),
   step({
@@ -2057,13 +2221,25 @@ const steps: TutorialStep[] = [
     presentation: stageVialsPresentation,
   }),
   step({
+    id: "declare-calibration-levels",
+    chapterId: "acquisition",
+    title: "Declare the calibration level in the method",
+    instruction:
+      "Drag the highlighted LC-MS/MS from Inventory and drop it onto the central workspace. Load the rack, open the console and click Manage methods. Duplicate the built-in method, type the level you prepared into Calibration levels, and save the copy.",
+    hint: "The exported method file gets one concentration column per level declared here, and none at all if you declare nothing. This step confirms itself when the sequence starts.",
+    prerequisites: ["stage-vials"],
+    ...fromTarget(declareCalibrationLevelsTarget),
+    isSatisfied: declaredCalibrationLadder,
+    presentation: declareCalibrationLevelsPresentation,
+  }),
+  step({
     id: "launch-sequence",
     chapterId: "acquisition",
     title: "Load and start the sequence",
     instruction:
       "Drag the highlighted LC-MS/MS from Inventory and drop it onto the central workspace. Drag and drop the loaded rack into the instrument, open the console, check both rows, and click Launch acquisition.",
     hint: "The sequence must contain one calibration injection and one sample injection.",
-    prerequisites: ["stage-vials"],
+    prerequisites: ["declare-calibration-levels"],
     ...fromTarget(launchSequenceTarget),
     isSatisfied: (experiment) => sequenceRuns(experiment).length > 0,
     presentation: launchSequencePresentation,
@@ -2156,6 +2332,7 @@ export const calibrationSampleTutorial: TutorialDefinition = {
       title: "Rack and acquisition",
       stepIds: [
         "stage-vials",
+        "declare-calibration-levels",
         "launch-sequence",
         "review-results",
         "store-acquisition-equipment",

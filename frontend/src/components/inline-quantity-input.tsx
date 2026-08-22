@@ -10,6 +10,7 @@ type InlineQuantityInputProps = {
   onChange: (value: number) => void;
   onFocus?: (event: FocusEvent<HTMLInputElement>) => void;
   inputStep?: number;
+  tutorialAnchor?: string;
   unitLabel: string;
   value: number;
   wheelStep?: number;
@@ -65,6 +66,7 @@ export function InlineQuantityInput({
   onChange,
   onFocus,
   inputStep = 0.1,
+  tutorialAnchor,
   unitLabel,
   value,
   wheelStep = 0.1,
@@ -75,6 +77,7 @@ export function InlineQuantityInput({
       <input
         aria-label={ariaLabel}
         className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0 text-right text-[11px] font-semibold text-slate-900 outline-none transition focus:border-slate-400"
+        data-tutorial-anchor={tutorialAnchor}
         draggable={false}
         min={0}
         onBlur={(event) => {

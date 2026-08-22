@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { dropDraftQuantityAnchor } from "@/components/drop-draft-card";
+
 import {
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
+  getMethodWalkPresentation,
   getTutorialActionToolPickupPresentation,
   getTutorialActionToolPresentation,
   getTutorialCountdown,
@@ -12,6 +15,7 @@ import {
   getTutorialStepPresentation,
   isTutorialActionTool,
   type LimsTutorialField,
+  type MethodWalkStage,
   type TutorialAction,
   type TutorialActionTool,
   type TutorialCountdown,
@@ -19,6 +23,7 @@ import {
   type TutorialStepPresentation,
 } from "@/lib/tutorial-engine";
 import type { TutorialIntervention } from "@/lib/tutorial-action-guard";
+import { LAYER } from "@/lib/layers";
 import type { Experiment } from "@/types/experiment";
 
 type TutorialCoachProps = {
@@ -140,6 +145,7 @@ type AnchorResolution = {
   actionTool: TutorialActionTool | null;
   collapsedCategoryLabel: string | null;
   limsField: LimsTutorialField | null;
+  methodWalkStage: MethodWalkStage | null;
   target: HTMLElement | null;
 };
 
@@ -196,11 +202,93 @@ function isActionToolInUse(experiment: Experiment, tool: TutorialActionTool) {
   );
 }
 
+// Declaring the ladder is a walk through a modal, and nothing in the experiment
+// records where in that walk the learner stands: not which method is selected,
+// not which tab is open. The modal's own DOM says it instead. Each element below
+// exists only in the state that calls for it, and they are read deepest-first so
+// progress inside the modal always wins over the button that opened it — which
+// stays mounted behind the overlay.
+function resolveMethodWalk(): {
+  methodWalkStage: MethodWalkStage | null;
+  target: HTMLElement | null;
+} {
+  // The save leaves every field exactly as it was, so only the editor's own
+  // confirmation distinguishes "saved" from "still typing".
+  const saved = findDirectAnchor("method-editor-saved");
+  if (saved) {
+    return {
+      methodWalkStage: "close-manager",
+      target: findDirectAnchor("method-manager-close") ?? saved,
+    };
+  }
+  const field = findDirectAnchor("method-editor-calibration-levels");
+  if (field) {
+    // A filled field means the typing is done and only the save is left. The
+    // value is read off the input because nothing else records it: the method is
+    // unchanged on the server until the save lands.
+    const isFilled = (field as HTMLInputElement).value?.trim().length > 0;
+    return isFilled
+      ? { methodWalkStage: "save", target: findDirectAnchor("method-editor-save") ?? field }
+      : { methodWalkStage: "levels", target: field };
+  }
+  // The editor is refusing a built-in, so duplication has to come first. The
+  // notice and the Duplicate button sit in different branches of the modal, so
+  // the first is read as a condition rather than as a path to the second.
+  if (findDirectAnchor("method-editor-builtin-notice")) {
+    return {
+      methodWalkStage: "duplicate",
+      target: findDirectAnchor("method-manager-duplicate"),
+    };
+  }
+  const editTab = document.querySelector<HTMLElement>(
+    '[data-tutorial-anchor="method-manager-edit-tab"][aria-selected="false"]',
+  );
+  if (editTab) {
+    return { methodWalkStage: "edit-tab", target: editTab };
+  }
+  // Out of the modal. Duplicating already pointed the console at the copy, so
+  // there is no selection left to make; what matters is whether the method now
+  // selected actually declares a ladder. The console publishes that count
+  // because it cannot be read off the select's options, and a method declaring
+  // none has to send the learner back into the manager rather than forward.
+  const declaringSelect = document.querySelector<HTMLElement>(
+    '[data-tutorial-anchor="console-method-select"]:not([data-tutorial-declared-levels="0"])',
+  );
+  if (declaringSelect) {
+    return {
+      methodWalkStage: "launch",
+      target: findDirectAnchor("instrument-launch") ?? declaringSelect,
+    };
+  }
+  // Not in the modal yet: the step's own wording still describes the whole walk.
+  return {
+    methodWalkStage: null,
+    target:
+      findDirectAnchor("instrument-manage-methods")
+      ?? findDirectAnchor("instrument-open-console"),
+  };
+}
+
 function resolveAnchor(
   anchor: string,
   experiment: Experiment,
   guideActionTool: boolean,
 ): AnchorResolution {
+  // A dosing dialog is a hard gate: it went up because a drop landed and it will
+  // not clear until an amount is confirmed. Whatever the step was pointing at is
+  // therefore stale — the drag it described already happened — so the amount box
+  // takes the light until the dialog is gone.
+  const dropDraftQuantity = findDirectAnchor(dropDraftQuantityAnchor);
+  if (dropDraftQuantity) {
+    return {
+      accessTarget: null,
+      actionTool: null,
+      collapsedCategoryLabel: null,
+      limsField: null,
+      methodWalkStage: null,
+      target: dropDraftQuantity,
+    };
+  }
   if (guideActionTool && !isActionDrivenAnchor(anchor)) {
     // A tool stays in hand until it is put away, and blocks drag and drop meanwhile.
     const selectedAction = findSelectedActionTool();
@@ -210,6 +298,7 @@ function resolveAnchor(
         actionTool: selectedAction.tool,
         collapsedCategoryLabel: null,
         limsField: null,
+        methodWalkStage: null,
         target: selectedAction.target,
       };
     }
@@ -225,6 +314,7 @@ function resolveAnchor(
         actionTool: null,
         collapsedCategoryLabel: null,
         limsField: "mass-summary",
+        methodWalkStage: null,
         target: massSummary,
       };
     }
@@ -259,6 +349,7 @@ function resolveAnchor(
           actionTool: null,
           collapsedCategoryLabel: null,
           limsField: field.field,
+          methodWalkStage: null,
           target: input,
         };
       }
@@ -268,6 +359,7 @@ function resolveAnchor(
       actionTool: null,
       collapsedCategoryLabel: null,
       limsField: "create-record",
+      methodWalkStage: null,
       target: document.querySelector<HTMLElement>(
         '[data-tutorial-anchor="lims-create-record"]',
       ),
@@ -282,6 +374,7 @@ function resolveAnchor(
           actionTool: null,
           collapsedCategoryLabel: collapsedCategory.label,
           limsField: null,
+          methodWalkStage: null,
           target: collapsedCategory.toggle,
         }
       : {
@@ -289,8 +382,20 @@ function resolveAnchor(
           actionTool: null,
           collapsedCategoryLabel: null,
           limsField: null,
+          methodWalkStage: null,
           target: directTarget,
         };
+  }
+  if (anchor === "instrument-manage-methods-next") {
+    const walk = resolveMethodWalk();
+    return {
+      accessTarget: null,
+      actionTool: null,
+      collapsedCategoryLabel: null,
+      limsField: null,
+      methodWalkStage: walk.methodWalkStage,
+      target: walk.target,
+    };
   }
   if (anchor === "basket-received-bag" || anchor.startsWith("basket-produce-")) {
     return {
@@ -298,6 +403,7 @@ function resolveAnchor(
       actionTool: null,
       collapsedCategoryLabel: null,
       limsField: null,
+      methodWalkStage: null,
       target: document.querySelector<HTMLElement>('[data-testid="basket-open-button"]'),
     };
   }
@@ -307,6 +413,7 @@ function resolveAnchor(
       actionTool: null,
       collapsedCategoryLabel: null,
       limsField: null,
+      methodWalkStage: null,
       target: document.querySelector<HTMLElement>('[data-testid="trash-dropzone"]'),
     };
   }
@@ -315,6 +422,7 @@ function resolveAnchor(
     actionTool: null,
     collapsedCategoryLabel: null,
     limsField: null,
+    methodWalkStage: null,
     target: null,
   };
 }
@@ -583,11 +691,11 @@ function TutorialDropSpotlight({ anchor }: { anchor: string }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[59] rounded-[1.4rem] border-[3px] border-dashed border-yellow-400 bg-yellow-300/25 shadow-[0_0_0_5px_rgba(250,204,21,0.32),0_0_38px_rgba(234,179,8,0.45)]"
+      className="pointer-events-none fixed rounded-[1.4rem] border-[3px] border-dashed border-yellow-400 bg-yellow-300/25 shadow-[0_0_0_5px_rgba(250,204,21,0.32),0_0_38px_rgba(234,179,8,0.45)]"
       data-testid="tutorial-drop-spotlight"
       data-tutorial-spotlight-overlay="true"
       ref={spotlightRef}
-      style={{ display: "none" }}
+      style={{ display: "none", zIndex: LAYER.coachDropHalo }}
     />
   );
 }
@@ -621,6 +729,7 @@ function resolvePresentation({
   experiment,
   intervention,
   limsField,
+  methodWalkStage,
   pickupTool,
 }: {
   accessTarget: AccessTarget;
@@ -630,6 +739,7 @@ function resolvePresentation({
   experiment: Experiment;
   intervention: TutorialIntervention | null;
   limsField: LimsTutorialField | null;
+  methodWalkStage: MethodWalkStage | null;
   pickupTool: TutorialActionTool | null;
 }): TutorialStepPresentation | null {
   if (intervention) {
@@ -654,6 +764,9 @@ function resolvePresentation({
   }
   if (limsField) {
     return getLimsTutorialFieldPresentation(experiment, limsField);
+  }
+  if (methodWalkStage) {
+    return getMethodWalkPresentation(experiment, methodWalkStage);
   }
   return currentStepPresentation;
 }
@@ -680,6 +793,7 @@ export function TutorialCoach({
   const [actionTool, setActionTool] = useState<TutorialActionTool | null>(null);
   const [collapsedCategoryLabel, setCollapsedCategoryLabel] = useState<string | null>(null);
   const [limsField, setLimsField] = useState<LimsTutorialField | null>(null);
+  const [methodWalkStage, setMethodWalkStage] = useState<MethodWalkStage | null>(null);
   const [pickupTool, setPickupTool] = useState<TutorialActionTool | null>(null);
   const anchor = intervention?.anchor
     ?? evaluation.currentStep?.anchor(evaluation.experiment)
@@ -718,6 +832,9 @@ export function TutorialCoach({
         current === resolution.collapsedCategoryLabel ? current : resolution.collapsedCategoryLabel,
       );
       setLimsField((current) => current === resolution.limsField ? current : resolution.limsField);
+      setMethodWalkStage((current) =>
+        current === resolution.methodWalkStage ? current : resolution.methodWalkStage,
+      );
       const pendingPickup = pendingSpatulaPickup(anchor);
       setPickupTool((current) => (current === pendingPickup ? current : pendingPickup));
       if (!spotlight || !target) {
@@ -799,6 +916,7 @@ export function TutorialCoach({
     experiment: evaluation.experiment,
     intervention,
     limsField,
+    methodWalkStage,
     pickupTool,
   });
 
@@ -810,8 +928,9 @@ export function TutorialCoach({
     return (
       <button
         aria-label="Resume tutorial"
-        className="fixed bottom-5 right-5 z-[70] rounded-full border-2 border-amber-400 bg-white px-5 py-3 text-sm font-semibold text-sky-800 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_18px_42px_rgba(15,23,42,0.2)] transition hover:border-amber-500 hover:bg-amber-50"
+        className="fixed bottom-5 right-5 rounded-full border-2 border-amber-400 bg-white px-5 py-3 text-sm font-semibold text-sky-800 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_18px_42px_rgba(15,23,42,0.2)] transition hover:border-amber-500 hover:bg-amber-50"
         onClick={onResume}
+        style={{ zIndex: LAYER.coachPanel }}
         type="button"
       >
         Resume tutorial
@@ -824,11 +943,11 @@ export function TutorialCoach({
       {isDragging && dropAnchor ? <TutorialDropSpotlight anchor={dropAnchor} /> : null}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed z-[60] rounded-[1.4rem] border-2 border-amber-400 bg-amber-200/10 shadow-[0_0_0_5px_rgba(251,191,36,0.28),0_0_38px_rgba(245,158,11,0.38)]"
+        className="pointer-events-none fixed rounded-[1.4rem] border-2 border-amber-400 bg-amber-200/10 shadow-[0_0_0_5px_rgba(251,191,36,0.28),0_0_38px_rgba(245,158,11,0.38)]"
         data-testid="tutorial-spotlight"
         data-tutorial-spotlight-overlay="true"
         ref={spotlightRef}
-        style={{ display: "none" }}
+        style={{ display: "none", zIndex: LAYER.coachSpotlight }}
       >
         {displayedPresentation?.action ? (
           <span
@@ -853,7 +972,8 @@ export function TutorialCoach({
       <aside
         aria-label="Guided tutorial"
         aria-live="polite"
-        className="fixed inset-x-3 bottom-3 z-[70] max-h-[min(70vh,34rem)] overflow-y-auto rounded-[1.6rem] border-2 border-amber-400 bg-white/95 p-5 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_24px_80px_rgba(15,23,42,0.28)] backdrop-blur md:inset-x-auto md:bottom-5 md:right-5 md:w-[24rem]"
+        className="fixed inset-x-3 bottom-3 max-h-[min(70vh,34rem)] overflow-y-auto rounded-[1.6rem] border-2 border-amber-400 bg-white/95 p-5 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_24px_80px_rgba(15,23,42,0.28)] backdrop-blur md:inset-x-auto md:bottom-5 md:right-5 md:w-[24rem]"
+        style={{ zIndex: LAYER.coachPanel }}
       >
         <div className="flex items-start justify-between gap-4">
           <div>

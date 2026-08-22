@@ -244,7 +244,10 @@ export function BenchToolCard({
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 text-xs text-slate-600">{tool.subtitle}</p>
                 {isContainer ? (
-                  <TemperatureIndicator temperatureC={quechers.temperatureC} />
+                  <TemperatureIndicator
+                    temperatureC={quechers.temperatureC}
+                    tutorialAnchor={`temperature-${tutorialToolId}`}
+                  />
                 ) : null}
               </div>
               <p className="mt-1.5 text-[11px] font-medium text-slate-500">

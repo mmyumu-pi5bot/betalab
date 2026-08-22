@@ -156,6 +156,8 @@ export function LcMsMsAcquisitionConsole({
         <select
           aria-label="Acquisition method"
           className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 font-mono text-xs text-cyan-200"
+          data-tutorial-anchor="console-method-select"
+          data-tutorial-declared-levels={method?.calibrationLevelsNgPerMl.length ?? 0}
           onChange={(event) =>
             onSequenceChange({ ...sequence, method_id: event.target.value })
           }
@@ -212,6 +214,7 @@ export function LcMsMsAcquisitionConsole({
         </div>
         <button
           className="shrink-0 rounded-full border border-slate-700 px-3 py-1.5 text-[11px] font-semibold text-slate-200 hover:bg-slate-800"
+          data-tutorial-anchor="instrument-manage-methods"
           onClick={() => setIsMethodManagerOpen(true)}
           type="button"
         >

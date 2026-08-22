@@ -3,6 +3,11 @@
 import { InlineQuantityInput } from "@/components/inline-quantity-input";
 import { TemperatureIndicator } from "@/components/temperature-indicator";
 
+//: The amount box of a dosing dialog. The tutorial coach retargets its spotlight
+//: here whenever such a dialog is open, because by then the drag it was pointing
+//: at has already happened and the only thing left to do is type and confirm.
+export const dropDraftQuantityAnchor = "drop-draft-quantity";
+
 export type DropDraftField = {
   ariaLabel: string;
   id: string;
@@ -40,7 +45,7 @@ export function DropDraftForm({
 }: DropDraftFormProps) {
   return (
     <div className="space-y-3">
-      {fields.map((field) => (
+      {fields.map((field, fieldIndex) => (
         <div key={field.id} className="space-y-1.5">
           {field.presets && field.presets.length > 0 ? (
             <div className="flex flex-wrap justify-end gap-0.5">
@@ -71,6 +76,10 @@ export function DropDraftForm({
               <InlineQuantityInput
                 ariaLabel={field.ariaLabel}
                 inputStep={field.inputStep ?? 0.1}
+                // The coach spotlights the amount to type. Only the first field
+                // claims the anchor: a card with several of them is walked from
+                // the top, and two elements answering one anchor is ambiguous.
+                tutorialAnchor={fieldIndex === 0 ? dropDraftQuantityAnchor : undefined}
                 onChange={(nextValue) => {
                   onChangeField(field.id, Math.max(nextValue, field.minValue ?? 0));
                 }}
