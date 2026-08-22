@@ -1234,6 +1234,21 @@ export async function createLimsReception(experimentId: string, payload: Mutatio
   });
 }
 
+export async function acknowledgeReceptionMassCheck(
+  experimentId: string,
+  payload?: MutationPayload,
+): Promise<Experiment> {
+  const entryId =
+    payload && payload.entry_id !== undefined && payload.entry_id !== null
+      ? requireString(payload, "entry_id")
+      : null;
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/lims/acknowledge-mass-check`,
+    body: entryId === null ? undefined : { entry_id: entryId },
+  });
+}
+
 export async function printLimsLabel(experimentId: string, payload?: MutationPayload): Promise<Experiment> {
   const entryId =
     payload && payload.entry_id !== undefined && payload.entry_id !== null
@@ -2484,6 +2499,9 @@ function normalizeLimsReception(
               reception.printed_label_ticket as PrintedLabelTicket & Record<string, unknown>,
             )
           : null,
+    isMassCheckAcknowledged: Boolean(
+      reception?.isMassCheckAcknowledged ?? reception?.is_mass_check_acknowledged ?? false,
+    ),
   };
 }
 

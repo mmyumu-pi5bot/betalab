@@ -420,6 +420,7 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             printed_label_ticket=_deserialize_printed_label_ticket(schema.lims_reception.printed_label_ticket)
             if schema.lims_reception.printed_label_ticket is not None
             else None,
+            acknowledged_net_mass_g=schema.lims_reception.acknowledged_net_mass_g,
         ),
         last_simulation_at=schema.last_simulation_at,
         basket_tools=[_deserialize_non_null_workbench_tool(t) for t in schema.basket_tools],
@@ -584,6 +585,7 @@ def _deserialize_lims_entries(schema: ExperimentSchema) -> list[LimsReception]:
                 printed_label_ticket=_deserialize_printed_label_ticket(entry.printed_label_ticket)
                 if entry.printed_label_ticket is not None
                 else None,
+                acknowledged_net_mass_g=entry.acknowledged_net_mass_g,
             )
             for entry in schema.lims_entries
         ]
@@ -604,6 +606,7 @@ def _deserialize_lims_entries(schema: ExperimentSchema) -> list[LimsReception]:
             lab_sample_code=schema.lims_reception.lab_sample_code,
             status=schema.lims_reception.status,
             printed_label_ticket=None,
+            acknowledged_net_mass_g=schema.lims_reception.acknowledged_net_mass_g,
         )
     ]
 

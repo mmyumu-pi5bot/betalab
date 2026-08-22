@@ -175,6 +175,7 @@ type LabSceneViewProps = {
     onToggleCentrifugeToolSeal: () => void;
     onToggleIceBathToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
+    onAcknowledgeReceptionMassCheck: (entryId?: string) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;

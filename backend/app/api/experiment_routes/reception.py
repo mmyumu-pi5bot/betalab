@@ -4,11 +4,14 @@ from app.schemas.experiment import (
     GrossMassOffsetUpdateSchema,
     GrossWeightRecordSchema,
     LimsLabelPrintSchema,
+    LimsMassCheckAcknowledgementSchema,
     LimsReceptionCreateSchema,
     ReceivedBagPlacementSchema,
     WorkbenchSlotReferenceSchema,
 )
 from app.services.domain_services.reception import (
+    AcknowledgeReceptionMassCheckRequest,
+    AcknowledgeReceptionMassCheckService,
     ApplyPrintedLimsLabelRequest,
     ApplyPrintedLimsLabelService,
     ApplyPrintedLimsLabelToAnalyticalBalanceToolService,
@@ -96,6 +99,21 @@ def create_lims_reception(
                 measured_gross_mass_g=request.measured_gross_mass_g,
                 measured_sample_mass_g=request.measured_sample_mass_g,
                 entry_id=request.entry_id,
+            ),
+        )
+    )
+
+
+@router.post("/{experiment_id}/lims/acknowledge-mass-check", response_model=ExperimentSchema)
+def acknowledge_reception_mass_check(
+    experiment_id: str,
+    request: LimsMassCheckAcknowledgementSchema | None = None,
+) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: AcknowledgeReceptionMassCheckService(experiment_service).run(
+            experiment_id,
+            AcknowledgeReceptionMassCheckRequest(
+                entry_id=request.entry_id if request is not None else None
             ),
         )
     )

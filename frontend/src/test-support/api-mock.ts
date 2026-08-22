@@ -157,6 +157,10 @@ export const recordAnalyticalSampleMass = vi.fn((experimentId: string) =>
   sendExperimentCommand(experimentId, "record_analytical_sample_mass", {}),
 );
 export const createLimsReception = wrapCommand("create_lims_reception");
+export const acknowledgeReceptionMassCheck = vi.fn(
+  (experimentId: string, payload?: Record<string, unknown>) =>
+    sendExperimentCommand(experimentId, "acknowledge_reception_mass_check", payload ?? {}),
+);
 export const printLimsLabel = vi.fn((experimentId: string, payload?: Record<string, unknown>) =>
   sendExperimentCommand(experimentId, "print_lims_label", payload ?? {}),
 );

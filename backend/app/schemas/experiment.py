@@ -351,6 +351,25 @@ class LimsReceptionSchema(BaseModel):
     lab_sample_code: str | None = None
     status: str
     printed_label_ticket: PrintedLabelTicketSchema | None = None
+    acknowledged_net_mass_g: float | None = None
+
+    @computed_field
+    def net_mass_g(self) -> float | None:
+        if self.measured_gross_mass_g is None:
+            return None
+        return max(0.0, self.measured_gross_mass_g - self.packaging_tare_mass_g)
+
+    @computed_field
+    def is_mass_check_acknowledged(self) -> bool:
+        """Whether the operator vouched for the calculation currently on screen.
+
+        Comparing values rather than trusting a flag is what makes a new weighing
+        reopen the check without anyone having to remember to clear it.
+        """
+        net_mass_g = self.net_mass_g
+        if net_mass_g is None or self.acknowledged_net_mass_g is None:
+            return False
+        return abs(self.acknowledged_net_mass_g - net_mass_g) < 1e-6
 
 
 def build_default_lims_reception_schema() -> LimsReceptionSchema:
@@ -366,6 +385,7 @@ def build_default_lims_reception_schema() -> LimsReceptionSchema:
         lab_sample_code=None,
         status="awaiting_reception",
         printed_label_ticket=None,
+        acknowledged_net_mass_g=None,
     )
 
 
@@ -1008,4 +1028,8 @@ class LimsReceptionCreateSchema(BaseModel):
 
 
 class LimsLabelPrintSchema(BaseModel):
+    entry_id: str | None = None
+
+
+class LimsMassCheckAcknowledgementSchema(BaseModel):
     entry_id: str | None = None

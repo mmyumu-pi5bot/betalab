@@ -57,6 +57,11 @@ class ApplyPrintedLimsLabelRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class AcknowledgeReceptionMassCheckRequest:
+    entry_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class EmptyReceptionRequest:
     pass
 
@@ -149,6 +154,33 @@ class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest])
             experiment.audit_log.append(f"LIMS reception updated for {entry.lab_sample_code}.")
 
         experiment.lims_reception = _clone_lims_entry(entry, printed_label_ticket=entry.printed_label_ticket)
+
+
+class AcknowledgeReceptionMassCheckService(WriteDomainService[AcknowledgeReceptionMassCheckRequest]):
+    """Record that the operator checked the gross / tare / net calculation.
+
+    The LIMS record is created against numbers a human said they had read, so the
+    acknowledgement belongs to the reception, not to whichever browser tab happened to
+    be open. It is taken before the record exists — that is where the reception form
+    starts — so it lands on the live reception and, once an entry is named, on that
+    entry too.
+    """
+
+    def __init__(self, runtime: ExperimentRuntime) -> None:
+        super().__init__(runtime)
+
+    def _run(self, experiment: Experiment, request: AcknowledgeReceptionMassCheckRequest) -> None:
+        entry = _resolve_lims_entry_for_mass_check(experiment, request.entry_id)
+        if entry.measured_gross_mass_g is None:
+            raise ValueError("Weigh the sample before confirming the reception mass check.")
+
+        net_mass_g = max(0.0, entry.measured_gross_mass_g - entry.packaging_tare_mass_g)
+        entry.acknowledged_net_mass_g = net_mass_g
+        if entry is not experiment.lims_reception and entry.id == experiment.lims_reception.id:
+            experiment.lims_reception.acknowledged_net_mass_g = net_mass_g
+        experiment.audit_log.append(
+            f"Reception mass check confirmed at {net_mass_g:.1f} g net."
+        )
 
 
 class PrintLimsLabelService(WriteDomainService[PrintLimsLabelRequest]):
@@ -318,6 +350,13 @@ def _find_lims_entry(experiment: Experiment, entry_id: str) -> LimsReception:
     raise ValueError("The selected LIMS entry does not exist.")
 
 
+def _resolve_lims_entry_for_mass_check(experiment: Experiment, entry_id: str | None) -> LimsReception:
+    """The entry whose calculation is on screen — the live reception until one is named."""
+    if entry_id is not None:
+        return _find_lims_entry(experiment, entry_id)
+    return experiment.lims_reception
+
+
 def _resolve_lims_entry_for_print(experiment: Experiment, entry_id: str | None) -> LimsReception:
     if entry_id is not None:
         return _find_lims_entry(experiment, entry_id)
@@ -343,6 +382,7 @@ def _clone_lims_entry(
         lab_sample_code=entry.lab_sample_code,
         status=entry.status,
         printed_label_ticket=printed_label_ticket,
+        acknowledged_net_mass_g=entry.acknowledged_net_mass_g,
     )
 
 

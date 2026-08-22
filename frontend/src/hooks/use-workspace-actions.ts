@@ -1,6 +1,7 @@
 import type { BenchToolInstance } from "@/types/workbench";
 
 export type WorkspaceActionsExperimentApi = {
+  acknowledgeReceptionMassCheck: (payload?: { entry_id: string }) => void;
   closeAnalyticalBalanceTool: () => void;
   closeGrossBalanceTool: () => void;
   createLimsReception: (payload: {
@@ -38,6 +39,7 @@ type WorkspaceActions = {
     measured_sample_mass_g: number | null;
     orchard_name: string;
   }) => void;
+  onAcknowledgeReceptionMassCheck: (entryId?: string) => void;
   onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
   onPrintLimsLabel: (entryId?: string) => void;
   onTareAnalyticalBalance: () => void;
@@ -96,6 +98,10 @@ export function useWorkspaceActions({
     void experimentApi.setGrossBalanceContainerOffset({ gross_mass_offset_g: nextOffsetG });
   };
 
+  const onAcknowledgeReceptionMassCheck = (entryId?: string) => {
+    void experimentApi.acknowledgeReceptionMassCheck(entryId ? { entry_id: entryId } : undefined);
+  };
+
   const onPrintLimsLabel = (entryId?: string) => {
     void experimentApi.printLimsLabel(entryId ? { entry_id: entryId } : undefined);
   };
@@ -109,6 +115,7 @@ export function useWorkspaceActions({
     handleBalanceToolSealToggle,
     handleCreateAppleLot,
     handleSaveLimsReception,
+    onAcknowledgeReceptionMassCheck,
     onCommitGrossBalanceOffset,
     onPrintLimsLabel,
     onTareAnalyticalBalance,

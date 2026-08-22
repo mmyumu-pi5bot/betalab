@@ -170,6 +170,7 @@ type LabSceneWorkspaceCanvasProps = {
     onToggleCentrifugeToolSeal: () => void;
     onToggleIceBathToolSeal: () => void;
     onCommitGrossBalanceOffset: (nextOffsetG: number) => void;
+    onAcknowledgeReceptionMassCheck: (entryId?: string) => void;
     onPrintLimsLabel: (entryId?: string) => void;
     onLoadRackIntoInstrument: () => void;
     onRunSequence: (payload: RunSequencePayload) => void;
@@ -562,6 +563,7 @@ export function LabSceneWorkspaceCanvas({
                 <LimsWidget
                   entries={experiment.limsEntries}
                   headerAction={renderStoreWidgetAction(widget)}
+                  onAcknowledgeMassCheck={workspaceActions.onAcknowledgeReceptionMassCheck}
                   onPrintLabel={workspaceActions.onPrintLimsLabel}
                   onSaveReception={workspaceActions.handleSaveLimsReception}
                   onTicketDragEnd={dnd.clearDropTargets}

@@ -738,6 +738,8 @@ export type LimsReception = {
   labSampleCode: string | null;
   status: "awaiting_reception" | "awaiting_label_application" | "received";
   printedLabelTicket: PrintedLabelTicket | null;
+  /** Whether the operator vouched for the gross / tare / net calculation now on screen. */
+  isMassCheckAcknowledged: boolean;
 };
 
 export type AnalyticalBalanceState = {

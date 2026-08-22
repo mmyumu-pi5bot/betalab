@@ -17,6 +17,7 @@ function reception(overrides: Partial<LimsReception> = {}): LimsReception {
     labSampleCode: null,
     status: "awaiting_reception",
     printedLabelTicket: null,
+    isMassCheckAcknowledged: false,
     ...overrides,
   };
 }
@@ -26,6 +27,7 @@ describe("LimsWidget", () => {
     render(
       <LimsWidget
         entries={[]}
+        onAcknowledgeMassCheck={vi.fn()}
         onPrintLabel={vi.fn()}
         onSaveReception={vi.fn()}
         reception={reception()}
@@ -42,10 +44,15 @@ describe("LimsWidget", () => {
     expect(screen.getByText(/gross mass minus the known bag tare/i)).toBeInTheDocument();
   });
 
-  it("lets the tutorial verify that the user reviewed the reception calculation", () => {
+  it("records the review against the reception rather than the component", () => {
+    // Holding the acknowledgement in component state made every page reload silently
+    // un-review the calculation, and sent a mid-tutorial learner back to a button they
+    // had already pressed.
+    const onAcknowledgeMassCheck = vi.fn();
     render(
       <LimsWidget
         entries={[]}
+        onAcknowledgeMassCheck={onAcknowledgeMassCheck}
         onPrintLabel={vi.fn()}
         onSaveReception={vi.fn()}
         reception={reception()}
@@ -54,9 +61,47 @@ describe("LimsWidget", () => {
 
     const summary = screen.getByRole("button", { name: "Review reception mass calculation" });
     expect(summary).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Review")).toBeInTheDocument();
 
     fireEvent.click(summary);
 
-    expect(summary).toHaveAttribute("aria-pressed", "true");
+    expect(onAcknowledgeMassCheck).toHaveBeenCalledWith(undefined);
   });
+
+  it("shows the calculation as reviewed on a freshly mounted widget", () => {
+    render(
+      <LimsWidget
+        entries={[]}
+        onAcknowledgeMassCheck={vi.fn()}
+        onPrintLabel={vi.fn()}
+        onSaveReception={vi.fn()}
+        reception={reception({ isMassCheckAcknowledged: true })}
+      />,
+    );
+
+    const summary = screen.getByRole("button", { name: "Review reception mass calculation" });
+    expect(summary).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Reviewed")).toBeInTheDocument();
+  });
+
+  it("names the entry it reviewed when browsing a saved record", () => {
+    const onAcknowledgeMassCheck = vi.fn();
+    const saved = reception({ id: "lims_1", labSampleCode: "S-2026-0001", status: "received" });
+    render(
+      <LimsWidget
+        entries={[saved]}
+        onAcknowledgeMassCheck={onAcknowledgeMassCheck}
+        onPrintLabel={vi.fn()}
+        onSaveReception={vi.fn()}
+        reception={saved}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Review reception mass calculation" }));
+
+    expect(onAcknowledgeMassCheck).toHaveBeenCalledWith("lims_1");
+  });
+
+
+
 });

@@ -93,6 +93,10 @@ class LimsReception:
     lab_sample_code: str | None = None
     status: str = "awaiting_reception"
     printed_label_ticket: PrintedLabelTicket | None = None
+    # Net mass the operator confirmed having checked. Stored as the reviewed *value*
+    # rather than a flag, so a later weighing or a different bag tare invalidates the
+    # acknowledgement on its own: what was vouched for no longer matches what is shown.
+    acknowledged_net_mass_g: float | None = None
 
 
 @dataclass

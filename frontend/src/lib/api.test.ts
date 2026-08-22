@@ -64,6 +64,7 @@ const makeExperiment = (): Experiment => ({
     labSampleCode: null,
     status: "awaiting_reception",
     printedLabelTicket: null,
+    isMassCheckAcknowledged: false,
   },
   limsEntries: [],
   basketTools: [],

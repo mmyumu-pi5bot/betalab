@@ -246,6 +246,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     applyPrintedLimsLabelToBasketBag: experimentApi.lims.applyLabelToBasketBag,
     createLimsReception: experimentApi.lims.createReception,
     discardPrintedLimsLabel: experimentApi.lims.discardLabel,
+    acknowledgeReceptionMassCheck: experimentApi.lims.acknowledgeMassCheck,
     printLimsLabel: experimentApi.lims.printLabel,
     // Produce / debug
     createDebugProduceLotOnWorkbench: experimentApi.produce.debugSpawnOnWorkbench,

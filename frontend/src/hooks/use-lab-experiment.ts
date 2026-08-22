@@ -380,6 +380,8 @@ export function useLabExperiment({
     // ── LIMS / Reception ──────────────────────────────────────────────────────
     lims: {
       createReception: (p: CreateLimsReceptionPayload) => exec(mutationFns.createLimsReception, p),
+      acknowledgeMassCheck: (p?: PrintLimsLabelPayload) =>
+        exec(mutationFns.acknowledgeReceptionMassCheck, p),
       printLabel: (p?: PrintLimsLabelPayload) => exec(mutationFns.printLimsLabel, p),
       discardLabel: () => exec(mutationFns.discardPrintedLimsLabel),
       applyLabel: (p: ApplyPrintedLimsLabelPayload) => exec(mutationFns.applyPrintedLimsLabel, p),

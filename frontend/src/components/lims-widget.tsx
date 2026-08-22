@@ -18,6 +18,7 @@ type LimsWidgetProps = {
     measured_sample_mass_g: number | null;
     orchard_name: string;
   }) => void;
+  onAcknowledgeMassCheck: (entryId?: string) => void;
   onPrintLabel: (entryId?: string) => void;
   onTicketDragEnd?: () => void;
   onTicketDragStart?: (ticket: PrintedLabelTicket, dataTransfer: DataTransfer) => void;
@@ -28,6 +29,7 @@ export function LimsWidget({
   entries,
   headerAction,
   onSaveReception,
+  onAcknowledgeMassCheck,
   onPrintLabel,
   onTicketDragEnd,
   onTicketDragStart,
@@ -38,7 +40,6 @@ export function LimsWidget({
   const [harvestDate, setHarvestDate] = useState("");
   const [indicativeMassText, setIndicativeMassText] = useState("");
   const [measuredSampleMassText, setMeasuredSampleMassText] = useState("");
-  const [hasReviewedMassSummary, setHasReviewedMassSummary] = useState(false);
   const previousReceptionIdRef = useRef<string | null>(reception.id);
   const selectedEntryIdRef = useRef<string>(reception.id ?? "new");
 
@@ -167,9 +168,10 @@ export function LimsWidget({
         ? indicativeMassValue
         : null;
 
-  useEffect(() => {
-    setHasReviewedMassSummary(false);
-  }, [displayedGrossMassG, displayedPackagingTareMassG, selectedEntryId]);
+  // Whether the calculation was reviewed is state of the reception, not of this
+  // component: it has to outlive a page reload, and a new weighing has to reopen it.
+  // The backend answers both by comparing the acknowledged net mass to the current one.
+  const hasReviewedMassSummary = displayedEntry.isMassCheckAcknowledged;
 
   return (
     <WorkspaceEquipmentWidget
@@ -274,7 +276,9 @@ export function LimsWidget({
               : "border-sky-200 bg-sky-50/80 hover:border-sky-300"
           }`}
           data-tutorial-anchor="lims-mass-summary"
-          onClick={() => setHasReviewedMassSummary(true)}
+          onClick={() =>
+            onAcknowledgeMassCheck(selectedEntryId === "new" ? undefined : selectedEntryId)
+          }
           type="button"
         >
           <div className="flex items-start justify-between gap-3">
