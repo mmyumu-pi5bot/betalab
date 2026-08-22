@@ -48,6 +48,9 @@ def validate_acquisition_method(method: AcquisitionMethod) -> list[str]:
     if method.runtime_s <= 0:
         errors.append("Run duration must be positive.")
 
+    if any(level <= 0 for level in method.calibration_levels_ng_per_ml):
+        errors.append("Calibration levels must be positive.")
+
     if not method.transitions:
         errors.append("A method needs at least one transition.")
         return errors

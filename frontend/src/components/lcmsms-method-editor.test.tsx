@@ -293,3 +293,159 @@ describe("LcMsMsMethodEditor", () => {
     expect(screen.getByRole("button", { name: "Save as new version" })).toBeDisabled();
   });
 });
+
+describe("LcMsMsMethodEditor calibration ladder", () => {
+  beforeEach(() => {
+    resetApiMocks();
+  });
+
+  function renderUserMethod(levels: number[] = []) {
+    const userMethod = {
+      ...acquisitionMethodFixture,
+      id: "mine",
+      isBuiltIn: false,
+      calibrationLevelsNgPerMl: levels,
+    };
+    return renderEditor({ method: userMethod });
+  }
+
+  it("sends the declared levels in the order they were typed", async () => {
+    renderUserMethod();
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "10, 1, 5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+
+    await waitFor(() => expect(saveAcquisitionMethod).toHaveBeenCalled());
+    const [, payload] = vi.mocked(saveAcquisitionMethod).mock.calls[0];
+    expect(payload.calibrationLevelsNgPerMl).toEqual([10, 1, 5]);
+  });
+
+  it("treats an empty field as a method that declares no ladder", async () => {
+    renderUserMethod([1, 2, 5]);
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+
+    await waitFor(() => expect(saveAcquisitionMethod).toHaveBeenCalled());
+    const [, payload] = vi.mocked(saveAcquisitionMethod).mock.calls[0];
+    expect(payload.calibrationLevelsNgPerMl).toEqual([]);
+  });
+
+  it("shows the ladder already declared by the method", () => {
+    renderUserMethod([1, 2, 5]);
+
+    expect(screen.getByLabelText("Calibration levels (ng/mL)")).toHaveValue("1, 2, 5");
+  });
+
+  it("refuses to save a ladder that is not a list of positive numbers", async () => {
+    renderUserMethod();
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "1, oops, 5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+
+    expect(
+      await screen.findByText(/Calibration levels must be a list of positive numbers/i),
+    ).toBeInTheDocument();
+    expect(saveAcquisitionMethod).not.toHaveBeenCalled();
+  });
+
+  it("confirms the save, and drops the confirmation as soon as editing resumes", async () => {
+    renderUserMethod();
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+
+    // Without this the learner clicks Save and sees nothing change at all.
+    expect(await screen.findByTestId("method-saved-confirmation")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "10, 20" },
+    });
+
+    expect(screen.queryByTestId("method-saved-confirmation")).not.toBeInTheDocument();
+  });
+
+  it("keeps the confirmation when the saved method flows back in as a prop", async () => {
+    // Saving hands the stored method back up, and the parent passes it down
+    // again. Reloading the fields on that round trip would wipe the very
+    // confirmation the save just produced — the learner sees a flash and
+    // nothing else.
+    const userMethod = {
+      ...acquisitionMethodFixture,
+      id: "mine",
+      isBuiltIn: false,
+      calibrationLevelsNgPerMl: [],
+    };
+    const view = render(
+      <LcMsMsMethodEditor method={userMethod} onMethodSaved={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+    expect(await screen.findByTestId("method-saved-confirmation")).toBeInTheDocument();
+
+    view.rerender(
+      <LcMsMsMethodEditor
+        method={{ ...userMethod, version: "0.2.0", calibrationLevelsNgPerMl: [10] }}
+        onMethodSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("method-saved-confirmation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Calibration levels (ng/mL)")).toHaveValue("10");
+  });
+
+  it("still reloads its fields when a different method is selected", () => {
+    const view = render(
+      <LcMsMsMethodEditor
+        method={{
+          ...acquisitionMethodFixture,
+          id: "mine",
+          isBuiltIn: false,
+          calibrationLevelsNgPerMl: [10],
+        }}
+        onMethodSaved={vi.fn()}
+      />,
+    );
+
+    view.rerender(
+      <LcMsMsMethodEditor
+        method={{
+          ...acquisitionMethodFixture,
+          id: "other",
+          name: "Other",
+          isBuiltIn: false,
+          calibrationLevelsNgPerMl: [1, 2],
+        }}
+        onMethodSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Calibration levels (ng/mL)")).toHaveValue("1, 2");
+    expect(screen.getByLabelText("Method name")).toHaveValue("Other");
+  });
+
+  it("refuses a zero or negative level", async () => {
+    renderUserMethod();
+
+    fireEvent.change(screen.getByLabelText("Calibration levels (ng/mL)"), {
+      target: { value: "1, 0, 5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+
+    expect(
+      await screen.findByText(/Calibration levels must be a list of positive numbers/i),
+    ).toBeInTheDocument();
+    expect(saveAcquisitionMethod).not.toHaveBeenCalled();
+  });
+});

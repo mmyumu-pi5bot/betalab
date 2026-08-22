@@ -27,23 +27,59 @@ type Props = {
 
 type EditorMode = "simple" | "advanced";
 
+const CALIBRATION_LEVELS_ERROR =
+  "Calibration levels must be a list of positive numbers, separated by commas.";
+
+/**
+ * Read the ladder the user typed, or say why it cannot be read.
+ *
+ * The number of levels is whatever was typed — the exported method file gets
+ * exactly that many concentration columns, and none at all when the field is
+ * left empty. There is no default ladder to fall back on: the method declares
+ * one or it declares nothing.
+ */
+function parseCalibrationLevels(text: string): number[] | null {
+  const parts = text.split(/[,;\s]+/).filter((part) => part.length > 0);
+  const levels = parts.map((part) => Number(part));
+  if (levels.some((level) => !Number.isFinite(level) || level <= 0)) return null;
+  return levels;
+}
+
+function formatCalibrationLevels(levels: number[]): string {
+  return levels.join(", ");
+}
+
 export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
   const [mode, setMode] = useState<EditorMode>("simple");
   const [name, setName] = useState(method.name);
   const [version, setVersion] = useState(method.version);
   const [transitions, setTransitions] = useState<MrmTransition[]>(method.transitions);
+  const [calibrationLevelsText, setCalibrationLevelsText] = useState(
+    formatCalibrationLevels(method.calibrationLevelsNgPerMl),
+  );
   const [referenceCatalog, setReferenceCatalog] = useState<ReferenceCompound[]>([]);
   const [warnings, setWarnings] = useState<MethodWarning[]>([]);
+  // Saving is otherwise entirely silent: the editor keeps showing the same
+  // values, so nothing tells the learner the version was written.
+  const [savedVersion, setSavedVersion] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
+  // Reload the fields when the learner selects a *different* method — keyed on
+  // the identity, not on the object. Saving hands the stored method back up and
+  // the parent passes it down again; reacting to that round trip would reload
+  // the fields from what was just written and wipe the save confirmation with
+  // them, which reads as a flash and nothing else.
   useEffect(() => {
     setName(method.name);
     setVersion(method.version);
     setTransitions(method.transitions);
+    setCalibrationLevelsText(formatCalibrationLevels(method.calibrationLevelsNgPerMl));
+    setSavedVersion(null);
     setWarnings([]);
     setFailure(null);
-  }, [method]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method.id]);
 
   useEffect(() => {
     if (method.isBuiltIn) return;
@@ -96,16 +132,23 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
 
   async function handleSave() {
     if (errors.length > 0) return;
+    const calibrationLevelsNgPerMl = parseCalibrationLevels(calibrationLevelsText);
+    if (calibrationLevelsNgPerMl === null) {
+      setFailure(CALIBRATION_LEVELS_ERROR);
+      return;
+    }
     setIsBusy(true);
     setFailure(null);
     try {
       const saved = await saveAcquisitionMethod(method.id, {
+        calibrationLevelsNgPerMl,
         name,
         version,
         runtimeS: method.runtimeS,
         transitions,
       });
       setWarnings(saved.warnings);
+      setSavedVersion(saved.method.version);
       onMethodSaved(saved.method);
     } catch (cause) {
       setFailure(cause instanceof Error ? cause.message : "Failed to save the method.");
@@ -119,6 +162,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
       <section
         aria-label="Acquisition method editor"
         className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3"
+        data-tutorial-anchor="method-editor-builtin-notice"
       >
         <p className="text-[11px] leading-relaxed text-slate-300">
           <span className="font-semibold text-slate-100">{method.name}</span> is a built-in
@@ -165,7 +209,10 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
           <input
             aria-label="Method name"
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+            setSavedVersion(null);
+            setName(event.target.value);
+          }}
             value={name}
           />
         </label>
@@ -174,11 +221,34 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
           <input
             aria-label="Version"
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-            onChange={(event) => setVersion(event.target.value)}
+            onChange={(event) => {
+            setSavedVersion(null);
+            setVersion(event.target.value);
+          }}
             value={version}
           />
         </label>
       </div>
+
+      <label className="mt-2 block text-[10px] text-slate-400">
+        Calibration levels (ng/mL)
+        <input
+          aria-label="Calibration levels (ng/mL)"
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
+          data-tutorial-anchor="method-editor-calibration-levels"
+          onChange={(event) => {
+            setSavedVersion(null);
+            setCalibrationLevelsText(event.target.value);
+          }}
+          placeholder="e.g. 1, 2, 5, 10, 20"
+          value={calibrationLevelsText}
+        />
+        <span className="mt-1 block leading-relaxed text-slate-500">
+          Optional. The exported method file gets one concentration column per level,
+          in this order. Leave empty to export no concentration column and fill them in
+          yourself. Nothing checks these against the standards actually in the rack.
+        </span>
+      </label>
 
       {mode === "simple" ? (
         <div className="mt-3" data-testid="simple-mode-compounds">
@@ -311,12 +381,23 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
       <div className="sticky bottom-0 z-10 -mx-3 -mb-3 mt-3 rounded-b-xl border-t border-slate-800 bg-slate-900/95 px-3 py-2 backdrop-blur">
       <button
         className="w-full rounded-full bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+        data-tutorial-anchor="method-editor-save"
         disabled={errors.length > 0 || isBusy}
         onClick={handleSave}
         type="button"
       >
         Save as new version
       </button>
+
+      {savedVersion !== null ? (
+        <p
+          className="mt-2 rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-2 py-1.5 text-[11px] text-emerald-300"
+          data-testid="method-saved-confirmation"
+          data-tutorial-anchor="method-editor-saved"
+        >
+          Saved as v{savedVersion}. Select it as the acquisition method in the console.
+        </p>
+      ) : null}
       </div>
     </section>
   );

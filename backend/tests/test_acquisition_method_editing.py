@@ -1,10 +1,13 @@
 """Tests for authoring user acquisition methods: duplicate, validate, edit, persist."""
 from __future__ import annotations
 
+import json
+import sqlite3
 from dataclasses import asdict, replace
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic_core import to_jsonable_python
 
 from app.api.experiment_routes import acquisition_methods as method_routes
 from app.domain.acquisition_method_rules import (
@@ -549,3 +552,152 @@ class TestAcquisitionMethodRoutes:
         )
 
         assert response.status_code == 400
+
+
+class TestCalibrationLevels:
+    """The concentration ladder a method declares for its calibration series.
+
+    It is a *declaration*, exactly like a retention window: the user states what
+    the standards are meant to contain. Nothing reads it back from the vials in
+    the rack, so a method whose ladder does not match the standards actually
+    injected produces a method file that lies — and that is the point.
+    """
+
+    def test_the_built_in_method_declares_no_ladder(self) -> None:
+        assert APPLE_PESTICIDES_MRM_V1.calibration_levels_ng_per_ml == ()
+
+    def test_a_ladder_is_declared_in_the_order_it_was_typed(self) -> None:
+        method = replace(
+            APPLE_PESTICIDES_MRM_V1,
+            id="mine",
+            is_built_in=False,
+            calibration_levels_ng_per_ml=(10.0, 1.0, 5.0),
+        )
+
+        assert validate_acquisition_method(method) == []
+        assert method.calibration_levels_ng_per_ml == (10.0, 1.0, 5.0)
+
+    def test_a_non_positive_level_is_rejected(self) -> None:
+        method = replace(
+            APPLE_PESTICIDES_MRM_V1,
+            id="mine",
+            is_built_in=False,
+            calibration_levels_ng_per_ml=(1.0, 0.0),
+        )
+
+        assert validate_acquisition_method(method) == [
+            "Calibration levels must be positive."
+        ]
+
+    def test_a_ladder_survives_a_restart_as_a_tuple(self, tmp_path) -> None:
+        db_path = str(tmp_path / "methods.sqlite3")
+        service = AcquisitionMethodService(
+            repository=SqliteAcquisitionMethodRepository(db_path)
+        )
+        copy = service.duplicate(APPLE_PESTICIDES_MRM_V1_ID, "mine", "Mine", "0.1.0")
+        service.save_new_version(
+            replace(copy, calibration_levels_ng_per_ml=(1.0, 2.0, 5.0))
+        )
+
+        reloaded = AcquisitionMethodService(
+            repository=SqliteAcquisitionMethodRepository(db_path)
+        ).get_method("mine")
+
+        assert reloaded.calibration_levels_ng_per_ml == (1.0, 2.0, 5.0)
+        assert isinstance(reloaded.calibration_levels_ng_per_ml, tuple)
+
+    def test_a_method_stored_before_the_field_existed_still_loads(self, tmp_path) -> None:
+        """Old payloads carry no ladder key; they must default to an empty one."""
+        db_path = str(tmp_path / "methods.sqlite3")
+        repository = SqliteAcquisitionMethodRepository(db_path)
+        legacy = asdict(
+            replace(APPLE_PESTICIDES_MRM_V1, id="legacy", is_built_in=False)
+        )
+        legacy.pop("calibration_levels_ng_per_ml", None)
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "INSERT INTO acquisition_methods (id, payload) VALUES (?, ?)",
+                ("legacy", json.dumps(to_jsonable_python(legacy), sort_keys=True)),
+            )
+            connection.commit()
+
+        assert repository.load("legacy").calibration_levels_ng_per_ml == ()
+
+    def test_duplicating_carries_the_ladder_over(self) -> None:
+        service = _service()
+        source = replace(
+            APPLE_PESTICIDES_MRM_V1,
+            id="source",
+            is_built_in=False,
+            calibration_levels_ng_per_ml=(1.0, 2.0),
+        )
+        service.save_new_version(source)
+
+        copy = service.duplicate("source", "copy", "Copy", "0.1.0")
+
+        assert copy.calibration_levels_ng_per_ml == (1.0, 2.0)
+
+    def test_the_save_route_records_the_ladder(self) -> None:
+        client = TestClient(app)
+        client.post(
+            "/experiments/catalog/acquisition-methods/duplicate",
+            json={
+                "source_method_id": APPLE_PESTICIDES_MRM_V1_ID,
+                "new_method_id": "ladder_route",
+                "name": "Ladder",
+                "version": "0.1.0",
+            },
+        )
+        detail = client.get(
+            "/experiments/catalog/acquisition-methods/ladder_route"
+        ).json()
+
+        response = client.put(
+            "/experiments/catalog/acquisition-methods/ladder_route",
+            json={
+                "name": "Ladder",
+                "version": "0.2.0",
+                "runtime_s": detail["runtime_s"],
+                "transitions": detail["transitions"],
+                "calibration_levels_ng_per_ml": [1.0, 2.0, 5.0, 10.0],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["method"]["calibration_levels_ng_per_ml"] == [
+            1.0,
+            2.0,
+            5.0,
+            10.0,
+        ]
+        client.delete("/experiments/catalog/acquisition-methods/ladder_route")
+
+    def test_the_save_route_defaults_to_no_ladder(self) -> None:
+        """Omitting the field must not silently wipe nothing into something."""
+        client = TestClient(app)
+        client.post(
+            "/experiments/catalog/acquisition-methods/duplicate",
+            json={
+                "source_method_id": APPLE_PESTICIDES_MRM_V1_ID,
+                "new_method_id": "no_ladder",
+                "name": "No ladder",
+                "version": "0.1.0",
+            },
+        )
+        detail = client.get(
+            "/experiments/catalog/acquisition-methods/no_ladder"
+        ).json()
+
+        response = client.put(
+            "/experiments/catalog/acquisition-methods/no_ladder",
+            json={
+                "name": "No ladder",
+                "version": "0.2.0",
+                "runtime_s": detail["runtime_s"],
+                "transitions": detail["transitions"],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["method"]["calibration_levels_ng_per_ml"] == []
+        client.delete("/experiments/catalog/acquisition-methods/no_ladder")

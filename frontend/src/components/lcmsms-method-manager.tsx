@@ -12,6 +12,7 @@ import {
 } from "@/lib/acquisition-method-format";
 import { deleteAcquisitionMethod, duplicateAcquisitionMethod } from "@/lib/api";
 import type { AcquisitionMethod, AcquisitionMethodSummary } from "@/types/workbench";
+import { LAYER } from "@/lib/layers";
 
 type Props = {
   catalog: AcquisitionMethodSummary[];
@@ -133,7 +134,10 @@ export function LcMsMsMethodManager({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: LAYER.dialogAbove }}
+    >
       <div
         className="absolute inset-0 bg-slate-950/70"
         data-testid="method-manager-backdrop"
@@ -154,6 +158,7 @@ export function LcMsMsMethodManager({
           </div>
           <button
             aria-label="Close method manager"
+            data-tutorial-anchor="method-manager-close"
             className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800"
             onClick={onClose}
             type="button"
@@ -245,6 +250,7 @@ export function LcMsMsMethodManager({
               </label>
               <button
                 className="mt-2 w-full rounded-full bg-cyan-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+                data-tutorial-anchor="method-manager-duplicate"
                 disabled={isBusy || method === null}
                 onClick={handleDuplicate}
                 type="button"
@@ -272,6 +278,7 @@ export function LcMsMsMethodManager({
                       ? "bg-cyan-600 text-white"
                       : "border border-slate-700 text-slate-300 hover:bg-slate-800"
                   }`}
+                  data-tutorial-anchor={id === "edit" ? "method-manager-edit-tab" : undefined}
                   key={id}
                   onClick={() => setTab(id)}
                   role="tab"

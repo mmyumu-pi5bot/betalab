@@ -95,6 +95,12 @@ class AcquisitionMethod:
     liquid_chromatography: LiquidChromatographyParameters
     ion_source: IonSourceParameters
     transitions: tuple[MrmTransition, ...]
+    #: Concentration ladder of the calibration series, in the order it was
+    #: typed. Purely declarative: nothing reads it back from the standards
+    #: actually sitting in the rack, so a ladder that does not match them
+    #: yields a method file that lies. Empty means "not declared" — the
+    #: exported method then carries no concentration column at all.
+    calibration_levels_ng_per_ml: tuple[float, ...] = ()
 
     @property
     def compound_ids(self) -> tuple[str, ...]:

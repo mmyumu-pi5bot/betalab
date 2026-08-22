@@ -494,9 +494,21 @@ export async function duplicateAcquisitionMethod(payload: {
   return normalizeSavedMethod(await response.json());
 }
 
+/**
+ * Where a run's result archive is served from.
+ *
+ * The browser fetches it as a plain navigation rather than through the client:
+ * the response is an attachment, and letting the browser handle it keeps the
+ * download out of React's hands entirely.
+ */
+export function sequenceRunResultsUrl(experimentId: string, runId: string): string {
+  return `${API_BASE_URL}/experiments/${encodeURIComponent(experimentId)}/lcmsms/runs/${encodeURIComponent(runId)}/results`;
+}
+
 export async function saveAcquisitionMethod(
   methodId: string,
   payload: {
+    calibrationLevelsNgPerMl: number[];
     name: string;
     runtimeS: number;
     transitions: MrmTransition[];
@@ -528,6 +540,7 @@ export async function saveAcquisitionMethod(
           internal_standard_id: transition.internalStandardId,
           provenance: transition.provenance,
         })),
+        calibration_levels_ng_per_ml: payload.calibrationLevelsNgPerMl,
       }),
     },
   );
@@ -2685,7 +2698,15 @@ export function normalizeAcquisitionMethod(raw: unknown): AcquisitionMethod {
     transitions: Array.isArray(method.transitions)
       ? (method.transitions as Record<string, unknown>[]).map(normalizeMrmTransition)
       : [],
+    calibrationLevelsNgPerMl: normalizeCalibrationLevels(
+      method.calibrationLevelsNgPerMl ?? method.calibration_levels_ng_per_ml,
+    ),
   };
+}
+
+function normalizeCalibrationLevels(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((level) => Number(level));
 }
 
 export function normalizeAcquisitionMethodSummary(

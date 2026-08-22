@@ -2,7 +2,7 @@
 from dataclasses import asdict, replace
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.acquisition_methods import (
     AcquisitionMethod,
@@ -45,6 +45,7 @@ class SaveMethodBody(BaseModel):
     version: str
     runtime_s: float
     transitions: list[MrmTransitionSchema]
+    calibration_levels_ng_per_ml: list[float] = Field(default_factory=list)
 
 
 class ProposeTransitionsBody(BaseModel):
@@ -181,6 +182,7 @@ def save_acquisition_method(
         transitions=tuple(
             MrmTransition(**transition.model_dump()) for transition in body.transitions
         ),
+        calibration_levels_ng_per_ml=tuple(body.calibration_levels_ng_per_ml),
     )
     try:
         saved = acquisition_method_service.save_new_version(edited)

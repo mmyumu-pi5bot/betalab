@@ -63,6 +63,7 @@ class AcquisitionMethodSchema(BaseModel):
     liquid_chromatography: LiquidChromatographyParametersSchema
     ion_source: IonSourceParametersSchema
     transitions: list[MrmTransitionSchema] = Field(default_factory=list)
+    calibration_levels_ng_per_ml: list[float] = Field(default_factory=list)
 
 
 class AcquisitionMethodSummarySchema(BaseModel):

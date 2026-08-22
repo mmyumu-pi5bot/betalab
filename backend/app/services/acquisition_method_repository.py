@@ -53,6 +53,7 @@ def deserialize_acquisition_method(schema: AcquisitionMethodSchema) -> Acquisiti
         transitions=tuple(
             MrmTransition(**transition.model_dump()) for transition in schema.transitions
         ),
+        calibration_levels_ng_per_ml=tuple(schema.calibration_levels_ng_per_ml),
     )
 
 

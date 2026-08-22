@@ -33,6 +33,7 @@ export const acquisitionMethodFixture: AcquisitionMethod = {
     heaterGasPsi: 55,
     curtainGasPsi: 30,
   },
+  calibrationLevelsNgPerMl: [],
   transitions: [
     {
       id: "boscalid__quantifier",

@@ -577,6 +577,10 @@ export type AcquisitionMethod = {
   liquidChromatography: LiquidChromatographyParameters;
   ionSource: IonSourceParameters;
   transitions: MrmTransition[];
+  /** Declared calibration ladder, in the order it was typed. Empty means the
+   *  method declares none, and the exported method file carries no
+   *  concentration column at all. */
+  calibrationLevelsNgPerMl: number[];
 };
 
 export type MethodWarning = {
