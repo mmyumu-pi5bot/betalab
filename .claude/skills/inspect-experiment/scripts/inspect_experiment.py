@@ -27,13 +27,12 @@ from app.services.domain_services.lcmsms import (
 )
 from app.services.physical_simulation_service import PhysicalSimulationService as Sim
 
-#: The signal model computes ``pesticide_amount_ng = ug_per_kg * mass_g * 1e-3``
-#: (lcmsms.py, _compute_sample_responses) while a calibration standard is built
-#: straight in ng/mL. Sample and standard therefore sit 1000x apart on the same
-#: sequence, and an external calibration only reads back the true residue level
-#: once this factor is applied. Kept explicit so the report can flag it rather
-#: than silently hide it.
-EXTERNAL_CALIBRATION_UNIT_FACTOR = 1000.0
+#: Sample and standard now share one unit scale: ``ug_per_kg * mass_g`` is ng,
+#: and a standard is built in ng/mL, so ng/mL times mL/g reads back directly in
+#: ug/kg. The factor survives as a named 1.0 because it was 1000.0 for as long
+#: as ``_compute_sample_responses`` carried a stray milli, and a report that
+#: quietly agreed with a broken model is exactly what hid that bug.
+EXTERNAL_CALIBRATION_UNIT_FACTOR = 1.0
 
 #: Below this, one weighed aliquot no longer represents the lot well enough for
 #: the result to mean anything — the payoff of the cryogenic grinding chain.
@@ -509,9 +508,10 @@ def report_recovery(report: Report, payload: dict[str, Any], run: dict[str, Any]
     )
     if istd_peak is not None and istd_peak.signal_to_noise < 6:
         report.finding(
-            "The calibration standard contains no internal standard (its ISTD channel is at noise "
-            "level) — ISTD correction across sample and standard is impossible, so matrix "
-            "suppression stays uncorrected in the final result."
+            "The calibration standard was never spiked with internal standard (its ISTD channel "
+            "is at noise level) — ISTD correction across sample and standard is impossible, so "
+            "matrix suppression stays uncorrected in the final result. Pipette the ISTD solution "
+            "into the calibration vial as well as into the extraction tube."
         )
 
     for sample in samples:

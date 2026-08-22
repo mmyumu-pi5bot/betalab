@@ -538,7 +538,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                     foreign_matter_mg = 0.0
                 elif vial.calibration_context is not None:
                     status = "calibration"
-                    responses = _compute_calibration_responses(vial.calibration_context)
+                    responses = _compute_calibration_responses(vial, vial.calibration_context)
                     # A standard is prepared in clean solvent: no grime, no matrix.
                     foreign_matter_mg = 0.0
                 elif vial.injection_context is None:
@@ -783,17 +783,47 @@ class AddCalibrationToVialService(WriteDomainService[AddCalibrationToVialRequest
         )
 
 
-def _compute_calibration_responses(ctx: CalibrationContext) -> dict[str, float]:
+def _compute_calibration_responses(
+    vial: WorkbenchTool, ctx: CalibrationContext
+) -> dict[str, float]:
     """Extract concentration seen by the detector for a calibration standard.
 
     A pure solution carries no extraction variance: the response follows the
     truly prepared concentration, with environmental noise only.
+
+    A standard spiked with internal standard also records the ISTD channel. That
+    spike is what makes the internal standard worth anything: the ratio only
+    corrects the sample when both injections carry the ISTD, so a standard left
+    unspiked silently reduces the run to external calibration. The added volume
+    dilutes the residues it was pipetted into, exactly as it would in any vial,
+    and the ISTD itself is only ever as accurate as the stroke that delivered it
+    — a bias no ratio can undo, since it lands on the reference side.
     """
     true_level = ctx.true_level_ng_per_ml if ctx.true_level_ng_per_ml is not None else ctx.level_ng_per_ml
-    return {
-        compound_id: round(true_level * random.gauss(1.0, ENV_NOISE_SIGMA), 6)
+    calibrant_v = 0.0
+    istd_v = 0.0
+    for liquid in vial.liquids:
+        delivered = liquid.true_volume_ml if liquid.true_volume_ml is not None else liquid.volume_ml
+        if liquid.liquid_id == ISTD_SOLUTION_ID:
+            istd_v += delivered
+        else:
+            calibrant_v += delivered
+
+    total_v = calibrant_v + istd_v
+    # A context without liquids is the pure standard the caller declared: nothing
+    # was added to it, so nothing dilutes it.
+    dilution = calibrant_v / total_v if total_v > 0 and istd_v > 0 else 1.0
+
+    responses = {
+        compound_id: round(true_level * dilution * random.gauss(1.0, ENV_NOISE_SIGMA), 6)
         for compound_id in ctx.compound_ids
     }
+    if istd_v > 0 and total_v > 0:
+        istd_conc = istd_v * ISTD_REFERENCE_CONC_NG_PER_ML / total_v
+        responses[INTERNAL_STANDARD_COMPOUND_ID] = round(
+            istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6
+        )
+    return responses
 
 
 def _compute_sample_responses(
@@ -840,8 +870,11 @@ def _compute_sample_responses(
     )
 
     for compound_id, true_effective_ug_per_kg in ctx.effective_residues_ug_per_kg.items():
-        # Pesticide amount in the extract (ng) — same unit convention as before
-        pesticide_amount_ng = true_effective_ug_per_kg * sample_true_mass_g * 1e-3
+        # Pesticide amount in the extract, in nanograms. µg/kg times grams already
+        # is ng (1 µg/kg = 1 ng/g), on the very same scale as the ISTD amount
+        # computed below from mL times ng/mL. Scaling one of the two and not the
+        # other is what buries a real residue in the baseline.
+        pesticide_amount_ng = true_effective_ug_per_kg * sample_true_mass_g
 
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
         suppression = PhysicalSimulationService.matrix_suppression_factor(

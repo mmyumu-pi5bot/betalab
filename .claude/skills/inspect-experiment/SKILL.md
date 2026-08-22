@@ -70,14 +70,10 @@ relative to `backend/`.
   cleaner technique.
 - **`ε_manip` ≠ `istd_manip`** — the ISTD was added at `post_salts`, so it got an
   independent draw and the ratio no longer corrects the extraction loss.
-- **Calibration ISTD channel at noise level** — the standard carries no internal
-  standard, so nothing can be ISTD-corrected across the two injections.
-- **The ×1000 unit factor** — the signal model builds a sample amount as
-  `µg/kg × g × 1e-3` (`lcmsms.py`, `_compute_sample_responses`) while a calibration
-  standard is built directly in ng/mL. The two injections of one sequence therefore
-  sit 1000× apart, and the script applies the factor to report meaningful
-  recoveries. It says so under the recovery table. If that convention is ever
-  fixed in the domain, drop `EXTERNAL_CALIBRATION_UNIT_FACTOR` from the script.
+- **Calibration ISTD channel at noise level** — the standard was never spiked with
+  internal standard, so nothing can be ISTD-corrected across the two injections and
+  matrix suppression stays in the final result. The fix is on the bench: pipette the
+  ISTD solution into the calibration vial too, as the tutorial now instructs.
 
 ## Reporting to the user
 

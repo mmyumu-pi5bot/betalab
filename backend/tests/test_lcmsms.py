@@ -18,6 +18,7 @@ from app.domain.models import (
     CalibrationContext,
     InjectionContext,
     QuechersExtractionResult,
+    WorkbenchLiquid,
     WorkbenchTool,
     new_id,
 )
@@ -28,6 +29,8 @@ from app.services.domain_services.debug import (
     CreateDebugToolPresetService,
 )
 from app.services.domain_services.lcmsms import (
+    ISTD_REFERENCE_CONC_NG_PER_ML,
+    ISTD_SOLUTION_ID,
     AcquisitionSequenceLineRequest,
     AddCalibrationToVialRequest,
     AddCalibrationToVialService,
@@ -54,6 +57,7 @@ from app.services.domain_services.workbench import (
 )
 from app.services.experiment_repository import SqliteExperimentRepository
 from app.services.experiment_service import ExperimentRuntimeService
+from app.services.helpers.tool_liquids import add_liquid_to_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 
@@ -317,9 +321,9 @@ class TestComputeCalibrationResponses:
         )
 
         random.seed(SEED)
-        responses_a = _compute_calibration_responses(ctx_a)
+        responses_a = _compute_calibration_responses(_make_vial(), ctx_a)
         random.seed(SEED)
-        responses_b = _compute_calibration_responses(ctx_b)
+        responses_b = _compute_calibration_responses(_make_vial(), ctx_b)
 
         # Same seed → same env_noise draw → responses differ exactly by the true-level ratio.
         assert responses_b["chlorpyrifos"] == pytest.approx(
@@ -332,14 +336,70 @@ class TestComputeCalibrationResponses:
             compound_ids=["boscalid", "acetamiprid"],
         )
 
-        responses = _compute_calibration_responses(ctx)
+        responses = _compute_calibration_responses(_make_vial(), ctx)
 
         assert set(responses) == {"boscalid", "acetamiprid"}
 
     def test_a_pure_standard_carries_no_internal_standard_channel(self) -> None:
         ctx = CalibrationContext(level_ng_per_ml=10.0, compound_ids=["boscalid"])
 
-        assert INTERNAL_STANDARD_COMPOUND_ID not in _compute_calibration_responses(ctx)
+        assert INTERNAL_STANDARD_COMPOUND_ID not in _compute_calibration_responses(_make_vial(), ctx)
+
+    def test_a_spiked_standard_carries_the_istd_at_the_volume_delivered(self) -> None:
+        """The standard must see the same internal standard the sample sees.
+
+        Without it the ISTD channel of the calibration injection is baseline, and
+        nothing downstream can form the ratio the internal standard exists for.
+        """
+        vial = _make_vial()
+        vial.liquids = [
+            _liquid("calibration_solution", 1.0),
+            _liquid(ISTD_SOLUTION_ID, 0.05),
+        ]
+        ctx = CalibrationContext(level_ng_per_ml=10.0, compound_ids=["boscalid"])
+
+        random.seed(SEED)
+        responses = _compute_calibration_responses(vial, ctx)
+
+        # 0.05 mL of a 100 ng/mL stock in 1.05 mL of solution.
+        expected = 0.05 * ISTD_REFERENCE_CONC_NG_PER_ML / 1.05
+        assert responses[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(
+            expected, rel=0.02
+        )
+
+    def test_spiking_the_standard_dilutes_the_residues_it_carries(self) -> None:
+        """Adding ISTD adds volume, and volume dilutes — as it does in any vial."""
+        vial = _make_vial()
+        vial.liquids = [
+            _liquid("calibration_solution", 1.0),
+            _liquid(ISTD_SOLUTION_ID, 0.05),
+        ]
+        ctx = CalibrationContext(level_ng_per_ml=10.0, compound_ids=["boscalid"])
+
+        random.seed(SEED)
+        responses = _compute_calibration_responses(vial, ctx)
+
+        assert responses["boscalid"] == pytest.approx(10.0 * (1.0 / 1.05), rel=0.02)
+
+    def test_the_hidden_delivered_volume_drives_the_istd_the_learner_gets(
+        self,
+    ) -> None:
+        """A short pipette stroke on the standard is a real, uncorrectable bias."""
+        vial = _make_vial()
+        vial.liquids = [
+            _liquid("calibration_solution", 1.0),
+            _liquid(ISTD_SOLUTION_ID, 0.05, true_volume_ml=0.045),
+        ]
+        ctx = CalibrationContext(level_ng_per_ml=10.0, compound_ids=["boscalid"])
+
+        random.seed(SEED)
+        responses = _compute_calibration_responses(vial, ctx)
+
+        expected = 0.045 * ISTD_REFERENCE_CONC_NG_PER_ML / 1.045
+        assert responses[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(
+            expected, rel=0.02
+        )
+
 
 
 # ---------------------------------------------------------------------------
@@ -1024,6 +1084,62 @@ class TestRunSequenceWithCalibration:
         assert isinstance(snapshot.liquid_chromatography.gradient, tuple)
         assert snapshot.ion_source == APPLE_PESTICIDES_MRM_V1.ion_source
 
+    def test_a_spiked_standard_records_an_istd_channel_the_sample_can_be_read_against(
+        self,
+    ) -> None:
+        """End to end: the ISTD dropped on the standard reaches the detector.
+
+        The unit tests pin the concentration; this pins the wiring, because the
+        tutorial now sends the learner to spike the standard and a silent break
+        here would leave them staring at a flat channel with nothing to fix.
+        """
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+        AddCalibrationToVialService(service).run(
+            exp_id,
+            AddCalibrationToVialRequest(
+                vial_tool_id=calibration_vial_id, level_ng_per_ml=10.0
+            ),
+        )
+        experiment = service._require_experiment(exp_id)
+        vial = next(
+            slot.tool
+            for slot in experiment.rack.slots
+            if slot.tool is not None and slot.tool.id == calibration_vial_id
+        )
+        add_liquid_to_tool(experiment, vial, liquid_id=ISTD_SOLUTION_ID, volume_ml=0.05)
+        service._repository.save(experiment)
+        _load_rack_into_instrument(service, exp_id)
+
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Cal 10",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="cal_10.mzML",
+                    )
+                ],
+            ),
+        )
+
+        reloaded = service._require_experiment(exp_id)
+        instrument = next(
+            w for w in reloaded.workspace.widgets if w.id == "instrument"
+        )
+        istd_trace = next(
+            trace
+            for trace in instrument.sequence_runs[0].injections[0].traces
+            if trace.transition.compound_id == INTERNAL_STANDARD_COMPOUND_ID
+        )
+        assert max(istd_trace.intensities) > 10 * BASELINE_COUNTS
+
     def test_roundtrip_preserves_acquisition_metadata(self, tmp_path) -> None:
         repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
         service = ExperimentRuntimeService(repository=repository)
@@ -1149,6 +1265,20 @@ def test_unload_rack_route_marks_the_rack_as_available(monkeypatch) -> None:
 # _compute_compounds unit tests — four invariants
 # ---------------------------------------------------------------------------
 
+def _liquid(
+    liquid_id: str, volume_ml: float, *, true_volume_ml: float | None = None
+) -> WorkbenchLiquid:
+    """One liquid sitting in a vial, with an optionally divergent delivered volume."""
+    return WorkbenchLiquid(
+        id=new_id("bench_liquid"),
+        liquid_id=liquid_id,
+        name=liquid_id,
+        volume_ml=volume_ml,
+        accent="blue",
+        true_volume_ml=true_volume_ml,
+    )
+
+
 def _make_vial() -> WorkbenchTool:
     """Return a minimal valid WorkbenchTool to pass as the vial arg."""
     return WorkbenchTool(
@@ -1245,7 +1375,7 @@ class TestSampleResponseInvariants:
         random.seed(SEED)
         responses = _compute_sample_responses(_make_vial(), ctx)
 
-        expected = (100.0 * 10.0 * 1e-3) / (0.05 * 100.0)
+        expected = (100.0 * 10.0) / (0.05 * 100.0)
         assert self._ratio(responses) == pytest.approx(expected, rel=0.02)
 
     def test_solvent_volume_error_cancels_in_the_ratio_inv1(self) -> None:
@@ -1329,9 +1459,42 @@ class TestSampleResponseInvariants:
             _reference_retention_time_s("boscalid"),
         )
         expected = (
-            true_effective * 10.0 * 1e-3 * extraction_manip * suppression
+            true_effective * 10.0 * extraction_manip * suppression
         ) / extract_true
         assert responses["boscalid"] == pytest.approx(expected, rel=0.02)
+
+    def test_the_residue_amount_is_expressed_in_the_same_unit_as_the_istd_amount(
+        self,
+    ) -> None:
+        """A residue at its true level must reach the detector on the ISTD's scale.
+
+        Both amounts in this function are nanograms: ``ug_per_kg * g`` already is
+        ng, exactly as ``mL * ng_per_mL`` is. A stray milli factor on one of them
+        sinks every real residue into the baseline while the standard towers over
+        it, which is what made a 4 ug/kg residue read as noise.
+        """
+        ctx = _make_ctx(
+            true_effective_ug_per_kg=100.0,
+            sample_mass_g=10.0,
+            sample_true_mass_g=10.0,
+            extract_nominal=10.0,
+            extract_true=10.0,
+            istd_nominal=0.05,
+            istd_true=0.05,
+            extraction_manip=1.0,
+            istd_manip=1.0,
+            ref_conc=100.0,
+        )
+
+        random.seed(SEED)
+        responses = _compute_sample_responses(_make_vial(), ctx)
+
+        suppression = PhysicalSimulationService.matrix_suppression_factor(
+            PhysicalSimulationService.matrix_load_g_per_ml(10.0, 10.0),
+            _reference_retention_time_s("boscalid"),
+        )
+        # 100 ug/kg over 10 g is 1 ug, i.e. 1000 ng, in 10 mL of extract.
+        assert responses["boscalid"] == pytest.approx(100.0 * suppression, rel=0.02)
 
     def test_returns_no_quantification_only_raw_responses(self) -> None:
         responses = _compute_sample_responses(_make_vial(), _make_ctx())
