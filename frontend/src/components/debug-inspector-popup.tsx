@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { DebugInspectorState } from "@/hooks/use-debug-inspector";
+import { LAYER } from "@/lib/layers";
 
 type Props = {
   inspection: NonNullable<DebugInspectorState>;
@@ -33,7 +34,8 @@ export function DebugInspectorPopup({ inspection, onClose }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999]"
+      className="fixed inset-0"
+      style={{ zIndex: LAYER.dialogTop }}
       onClick={onClose}
     >
       <div
