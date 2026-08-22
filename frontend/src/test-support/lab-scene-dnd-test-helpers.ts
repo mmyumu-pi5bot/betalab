@@ -1,4 +1,5 @@
 import {
+  CALIBRATION_STANDARD_VIAL_ITEM_ID,
   labToolCatalog,
   labWorkflowCategories,
 } from "@/lib/lab-workflow-catalog";
@@ -629,8 +630,20 @@ function makePrintedLimsTicket(
   };
 }
 
+/** Palette items whose drop opens a draft card instead of moving straight away.
+ *
+ * They need a value the drop itself cannot carry — the calibration vial needs its
+ * level. Compatibility is untouched (it still comes from the entity's tool type, as
+ * the DnD contract requires); only the backend command is deferred to the confirm.
+ */
+function spawnsViaDropDraft(item: ToolbarItem): boolean {
+  return item.id === CALIBRATION_STANDARD_VIAL_ITEM_ID;
+}
+
 function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
   const widgetId = item.itemType === "workspace_widget" ? getWorkspaceEquipmentWidgetId(item.id) : null;
+  const paletteToolMoveCommand: typeof expectedToolMoveCommand = (args) =>
+    spawnsViaDropDraft(item) ? null : expectedToolMoveCommand(args);
 
   return {
     id: `palette-${item.id}`,
@@ -693,7 +706,7 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
         command:
           item.itemType === "tool" &&
           getToolDropTargets(item.toolType).includes("analytical_balance_widget")
-            ? expectedToolMoveCommand({
+            ? paletteToolMoveCommand({
                 entityId: item.id,
                 sourceKind: "palette",
                 sourceId: item.id,
@@ -706,7 +719,7 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
         compatible: item.itemType === "tool",
         command:
           item.itemType === "tool"
-            ? expectedToolMoveCommand({
+            ? paletteToolMoveCommand({
                 entityId: item.id,
                 sourceKind: "palette",
                 sourceId: item.id,
@@ -725,7 +738,7 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
           (item.itemType === "liquid" && item.id === "quechers_salts"),
         command:
           item.itemType === "tool" && item.toolType === "centrifuge_tube"
-            ? expectedToolMoveCommand({
+            ? paletteToolMoveCommand({
                 entityId: item.id,
                 sourceKind: "palette",
                 sourceId: item.id,
@@ -738,7 +751,7 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
         compatible: item.itemType === "tool" && item.toolType === "sample_vial",
         command:
           item.itemType === "tool" && item.toolType === "sample_vial"
-            ? expectedToolMoveCommand({
+            ? paletteToolMoveCommand({
                 entityId: item.id,
                 sourceKind: "palette",
                 sourceId: item.id,
@@ -761,7 +774,7 @@ function createPaletteSourceCase(item: ToolbarItem): DndSourceCase {
         compatible: item.itemType === "tool" && getToolDropTargets(item.toolType).includes("trash_bin"),
         command:
           item.itemType === "tool" && getToolDropTargets(item.toolType).includes("trash_bin")
-            ? expectedToolMoveCommand({
+            ? paletteToolMoveCommand({
                 entityId: item.id,
                 sourceKind: "palette",
                 sourceId: item.id,
@@ -1021,46 +1034,6 @@ function createSeparatedSlurryTubePresetSourceCase(): DndSourceCase {
       "analytical-balance-dropzone": { compatible: true, command: null },
       "rack-illustration-slot-1": { compatible: false, command: null },
       "vortex-dropzone": { compatible: true, command: null },
-      "widget-workspace": { compatible: false, command: null },
-      "trash-dropzone": { compatible: true, command: null },
-    },
-  };
-}
-
-function createCalibrationVialPresetSourceCase(): DndSourceCase {
-  // Spawn-only vial preset (a calibration point). Because it is an autosampler vial it
-  // is the mirror image of the tube presets: the rack accepts it while the vortex does
-  // not. Every compatible target spawns a prepared calibration standard via the draft.
-  return {
-    id: "debug-palette-calibration_standard_vial",
-    label: "debug palette calibration standard vial preset",
-    sourceTestId: "debug-palette-preset-calibration_standard_vial",
-    openBasket: false,
-    openTrash: false,
-    expectRackWidget: true,
-    availableTargets: [
-      "bench-slot-station_1",
-      "bench-slot-station_2",
-      "grinder-dropzone",
-      "gross-balance-dropzone",
-      "analytical-balance-dropzone",
-      "rack-illustration-slot-1",
-      "vortex-dropzone",
-      "widget-workspace",
-      "trash-dropzone",
-    ],
-    buildExperiment: () =>
-      makeExperiment({
-        slots: makeSlots(),
-      }),
-    targetExpectations: {
-      "bench-slot-station_1": { compatible: true, command: null },
-      "bench-slot-station_2": { compatible: true, command: null },
-      "grinder-dropzone": { compatible: false, command: null },
-      "gross-balance-dropzone": { compatible: true, command: null },
-      "analytical-balance-dropzone": { compatible: true, command: null },
-      "rack-illustration-slot-1": { compatible: true, command: null },
-      "vortex-dropzone": { compatible: false, command: null },
       "widget-workspace": { compatible: false, command: null },
       "trash-dropzone": { compatible: true, command: null },
     },
@@ -2358,7 +2331,6 @@ const baseDndSourceCases: DndSourceCase[] = [
   createVortexedSlurryTubePresetSourceCase(),
   createSeparatedSlurryTubePresetSourceCase(),
   createPreparedExtractVialPresetSourceCase(),
-  createCalibrationVialPresetSourceCase(),
   createCalibrationTubePresetSourceCase(),
   ...toolItems.map(createWorkbenchToolSourceCase),
   createBasketReceivedBagSourceCase(),
@@ -2393,13 +2365,16 @@ function getGrossBalanceTargetExpectation(sourceCase: DndSourceCase) {
     const toolId = sourceCase.id.replace("palette-", "");
     return {
       compatible: true,
-      command: expectedToolMoveCommand({
-        entityId: toolId,
-        sourceKind: "palette",
-        sourceId: toolId,
-        destinationKind: "gross_balance",
-        destinationId: "gross_balance",
-      }),
+      command:
+        toolId === CALIBRATION_STANDARD_VIAL_ITEM_ID
+          ? null
+          : expectedToolMoveCommand({
+              entityId: toolId,
+              sourceKind: "palette",
+              sourceId: toolId,
+              destinationKind: "gross_balance",
+              destinationId: "gross_balance",
+            }),
     };
   }
 

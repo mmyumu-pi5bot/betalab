@@ -4,10 +4,10 @@ from pydantic import BaseModel
 from app.schemas.experiment import ExperimentSchema
 from app.services.domain_services.lcmsms import (
     AcquisitionSequenceLineRequest,
-    AddCalibrationToVialRequest,
-    AddCalibrationToVialService,
     LoadRackIntoInstrumentRequest,
     LoadRackIntoInstrumentService,
+    PlaceCalibrationStandardVialRequest,
+    PlaceCalibrationStandardVialService,
     PourExtractToVialRequest,
     PourExtractToVialService,
     RunSequenceRequest,
@@ -44,9 +44,10 @@ def pour_extract_to_vial(experiment_id: str, body: PourExtractBody) -> Experimen
     )
 
 
-class AddCalibrationBody(BaseModel):
-    vial_tool_id: str
+class PlaceCalibrationStandardVialBody(BaseModel):
     level_ng_per_ml: float
+    destination_kind: str
+    destination_id: str
 
 
 class AcquisitionSequenceLineBody(BaseModel):
@@ -82,14 +83,17 @@ def unload_rack_from_instrument(experiment_id: str) -> ExperimentSchema:
     )
 
 
-@router.post("/{experiment_id}/lcmsms/add-calibration", response_model=ExperimentSchema)
-def add_calibration_to_vial(experiment_id: str, body: AddCalibrationBody) -> ExperimentSchema:
+@router.post("/{experiment_id}/lcmsms/place-calibration-vial", response_model=ExperimentSchema)
+def place_calibration_standard_vial(
+    experiment_id: str, body: PlaceCalibrationStandardVialBody
+) -> ExperimentSchema:
     return handle_service_errors(
-        lambda: AddCalibrationToVialService(experiment_service).run(
+        lambda: PlaceCalibrationStandardVialService(experiment_service).run(
             experiment_id,
-            AddCalibrationToVialRequest(
-                vial_tool_id=body.vial_tool_id,
+            PlaceCalibrationStandardVialRequest(
                 level_ng_per_ml=body.level_ng_per_ml,
+                destination_kind=body.destination_kind,
+                destination_id=body.destination_id,
             ),
         )
     )

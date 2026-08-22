@@ -152,49 +152,6 @@ def test_debug_separated_slurry_tube_aspirates_as_supernatant() -> None:
     assert aspirated.pipette.produce_fractions == []
 
 
-def test_debug_calibration_vial_defaults_to_level_100_in_rack() -> None:
-    service = ExperimentRuntimeService()
-    experiment = service.create_experiment()
-
-    updated = CreateDebugToolPresetService(service).run(
-        experiment.id,
-        CreateDebugToolPresetRequest(
-            preset_id="calibration_standard_vial",
-            destination_kind="rack_slot",
-            destination_id="rack_slot_1",
-        ),
-    )
-
-    slot = next(slot for slot in updated.rack.slots if slot.id == "rack_slot_1")
-    vial = slot.tool
-    assert vial is not None
-    assert vial.tool_id == "sample_vial_lcms"
-    assert vial.calibration_context is not None
-    assert vial.calibration_context.level_ng_per_ml == pytest.approx(100.0)
-    assert [liq.liquid_id for liq in vial.liquids] == ["calibration_solution"]
-
-
-def test_debug_calibration_vial_honors_custom_level_on_workbench() -> None:
-    service = ExperimentRuntimeService()
-    experiment = service.create_experiment()
-
-    updated = CreateDebugToolPresetService(service).run(
-        experiment.id,
-        CreateDebugToolPresetRequest(
-            preset_id="calibration_standard_vial",
-            destination_kind="workbench_slot",
-            destination_id="station_1",
-            level_ng_per_ml=250.0,
-        ),
-    )
-
-    vial = updated.workbench.slots[0].tool
-    assert vial is not None
-    assert vial.tool_id == "sample_vial_lcms"
-    assert vial.calibration_context is not None
-    assert vial.calibration_context.level_ng_per_ml == pytest.approx(250.0)
-
-
 def test_debug_calibration_tube_spawns_a_centrifuge_tube_stock() -> None:
     service = ExperimentRuntimeService()
     experiment = service.create_experiment()
@@ -302,7 +259,7 @@ def test_debug_prepared_extract_vial_defaults_are_ready_to_inject() -> None:
     assert result.sampling_representativeness == pytest.approx(1.0)
 
 
-@pytest.mark.parametrize("preset_id", ["apple_extract_vial", "calibration_standard_vial"])
+@pytest.mark.parametrize("preset_id", ["apple_extract_vial"])
 def test_debug_vial_dropped_straight_into_the_rack_arrives_capped(preset_id: str) -> None:
     """A vial spawned in the rack is a finished preparation, so it arrives closed.
 
@@ -326,7 +283,7 @@ def test_debug_vial_dropped_straight_into_the_rack_arrives_capped(preset_id: str
     assert slot.tool.is_sealed is True
 
 
-@pytest.mark.parametrize("preset_id", ["apple_extract_vial", "calibration_standard_vial"])
+@pytest.mark.parametrize("preset_id", ["apple_extract_vial"])
 def test_debug_vial_spawned_on_the_bench_stays_open(preset_id: str) -> None:
     """On the bench the vial is still being worked on, so it keeps its cap off."""
     service = ExperimentRuntimeService()

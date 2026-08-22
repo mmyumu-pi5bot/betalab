@@ -56,6 +56,10 @@ import {
   saveTutorialSession,
 } from "@/lib/tutorial-session-store";
 import type { CreateDebugToolPresetPayload } from "@/types/api-payloads";
+import {
+  CALIBRATION_STANDARD_VIAL_ITEM_ID,
+  buildCalibrationLevelDraftFields,
+} from "@/lib/lab-workflow-catalog";
 import type { DebugToolPresetId, ToolbarCategory } from "@/types/workbench";
 
 const defaultStatusMessage = "Saved";
@@ -196,7 +200,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
   // Flat adapter — maps grouped API back to the flat shape expected by consumer hooks.
   const flatApi: FlatExperimentApi = {
     // LC-MS/MS
-    addCalibrationToVial: (p) => void experimentApi.lcmsms.addCalibration(p),
+    placeCalibrationStandardVial: (p) => void experimentApi.lcmsms.placeCalibrationVial(p),
     // Workbench
     addWorkbenchSlot: experimentApi.workbench.addSlot,
     addLiquidToWorkbenchTool: experimentApi.workbench.addLiquid,
@@ -263,7 +267,27 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
   } = useDropDraft(flatApi);
   const dndApi: FlatExperimentApi = {
     ...flatApi,
+    // A few palette items cannot be spawned from their id alone: they need a value
+    // the drop itself does not carry. Those open a draft card instead of moving, and
+    // the move happens on confirm. Everything else takes the plain move path.
     moveObject: (payload) => {
+      const destinationKind =
+        payload.destination.kind as CreateDebugToolPresetPayload["destination_kind"];
+      if (
+        payload.source.kind === "palette" &&
+        payload.entity.id === CALIBRATION_STANDARD_VIAL_ITEM_ID
+      ) {
+        setPendingDropDraft({
+          commandType: "place_calibration_standard_vial",
+          confirmLabel: "Take vial",
+          destinationKind,
+          fields: buildCalibrationLevelDraftFields(),
+          targetId: payload.destination.id,
+          targetKind: "workspace_widget",
+          title: "Pick the calibration level",
+        });
+        return;
+      }
       const preset =
         payload.source.kind === "palette" ? debugToolPresetsById[payload.entity.id] : undefined;
       if (!preset) {
@@ -273,8 +297,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       setPendingDropDraft({
         commandType: "create_debug_tool_preset",
         confirmLabel: "Spawn",
-        destinationKind:
-          payload.destination.kind as CreateDebugToolPresetPayload["destination_kind"],
+        destinationKind,
         fields: buildDebugToolPresetDraftFields(preset.id as DebugToolPresetId),
         presetId: preset.id,
         targetId: payload.destination.id,
@@ -949,8 +972,9 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       {debugInspection ? (
         <DebugInspectorPopup inspection={debugInspection} onClose={clearDebugInspection} />
       ) : null}
-      {pendingDropDraft?.commandType === "create_debug_tool_preset" &&
-      pendingDropDraft.destinationKind !== "workbench_tool" ? (
+      {(pendingDropDraft?.commandType === "create_debug_tool_preset" &&
+        pendingDropDraft.destinationKind !== "workbench_tool") ||
+      pendingDropDraft?.commandType === "place_calibration_standard_vial" ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-md rounded-[1.5rem] bg-white p-3 shadow-2xl">
             <DropDraftCard

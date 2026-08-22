@@ -29,16 +29,18 @@ from app.domain.mrm_reference import (
 )
 from app.domain.pesticide_catalog import generate_pesticide_residues
 from app.services.acquisition_method_service import acquisition_method_service
+from app.services.dnd_move_service import DndObjectRef, place_new_tool
 from app.services.domain_services.acquisition_clock import (
     is_sequence_complete,
     skip_to_end_of_sequence,
 )
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.domain_services.mrm_signal import generate_transition_traces
-from app.services.helpers.lookups import find_workspace_widget
+from app.services.helpers.lookups import build_manual_label, find_workspace_widget
 from app.services.helpers.produce_canonical import collect_produce_lots
 from app.services.helpers.produce_material_states import find_material_state
 from app.services.helpers.tool_liquids import add_liquid_to_tool
+from app.services.helpers.workbench import build_workbench_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 ISTD_SOLUTION_ID = "istd_solution"
@@ -46,6 +48,8 @@ ACETONITRILE_ID = "acetonitrile_extraction"
 APPLE_EXTRACT_ID = "apple_extract"
 ISTD_REFERENCE_CONC_NG_PER_ML = 100.0
 CALIBRATION_STANDARD_VOLUME_ML = 1.0
+#: Catalog tool the standards lab hands over: a vial already holding one level.
+CALIBRATION_STANDARD_VIAL_TOOL_ID = "calibration_standard_vial"
 #: Aliquot a technician pipettes from a separated extract into an autosampler vial.
 PREPARED_EXTRACT_ALIQUOT_ML = 1.0
 ENV_NOISE_SIGMA = 0.005  # 0.5% environmental noise per measurement
@@ -648,13 +652,14 @@ def _replicate_output_filename(
 
 
 # ---------------------------------------------------------------------------
-# Add calibration standard to vial
+# Take a prepared calibration standard off the shelf
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
-class AddCalibrationToVialRequest:
-    vial_tool_id: str
+class PlaceCalibrationStandardVialRequest:
     level_ng_per_ml: float
+    destination_kind: str
+    destination_id: str
 
 
 def apply_calibration_standard(
@@ -665,8 +670,9 @@ def apply_calibration_standard(
     """Mark ``vial`` as a multi-residue calibration standard at ``level_ng_per_ml``.
 
     Draws the hidden true concentration, records the calibration context and adds the
-    calibration solution. Shared by the manual ``AddCalibrationToVialService`` drop and
-    the debug calibration-vial preset so both prepare an identical standard.
+    calibration solution. Shared by the ready-to-use vial handed out by
+    ``PlaceCalibrationStandardVialService`` and the debug calibration stock tube, so
+    both carry an identical standard.
     """
     from app.domain.dnd_rules import can_tool_receive_liquids
     from app.domain.pesticide_catalog import APPLE_PESTICIDE_CATALOG
@@ -769,17 +775,48 @@ def apply_prepared_extract(
     )
 
 
-class AddCalibrationToVialService(WriteDomainService[AddCalibrationToVialRequest]):
+def format_calibration_level(level_ng_per_ml: float) -> str:
+    """Render a level the way it is written on a vial: no padding, no trailing zeros.
+
+    The decimal point survives on purpose. The label ends up in the injection file
+    name, and the reprocessing platform matches a pattern against that name — a
+    level flattened to ``2_5`` reads as a different analysis downstream.
+    """
+    text = f"{level_ng_per_ml:.4f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+class PlaceCalibrationStandardVialService(WriteDomainService[PlaceCalibrationStandardVialRequest]):
+    """Take a ready-to-use calibration point off the standards shelf and put it down.
+
+    Nobody dilutes a calibration level at the bench on the morning of a batch: the
+    series is prepared, dispensed and labelled in advance, and the analyst picks the
+    vial they need. So the vial arrives already carrying its standard and its label
+    — but uncapped and unspiked, because the internal standard is still the
+    analyst's own gesture, and it is the one the run depends on.
+
+    The label states the nominal level and is always right; the liquid inside keeps
+    the small dilution error every real standard carries.
+    """
+
     def __init__(self, runtime: ExperimentRuntime) -> None:
         super().__init__(runtime)
 
-    def _run(self, experiment: Experiment, request: AddCalibrationToVialRequest) -> None:
-        vial = _find_tool_anywhere(experiment, request.vial_tool_id)
-        if vial is None:
-            raise ValueError("Tool not found.")
+    def _run(self, experiment: Experiment, request: PlaceCalibrationStandardVialRequest) -> None:
+        vial = build_workbench_tool(CALIBRATION_STANDARD_VIAL_TOOL_ID)
         apply_calibration_standard(experiment, vial, request.level_ng_per_ml)
+        level_text = format_calibration_level(request.level_ng_per_ml)
+        vial.labels.append(build_manual_label(text=f"std {level_text}"))
+        place_new_tool(
+            self._runtime,
+            experiment,
+            vial,
+            DndObjectRef(kind=request.destination_kind, id=request.destination_id),
+            source_label="Palette",
+            source_kind="palette",
+        )
         experiment.audit_log.append(
-            f"Calibration standard {request.level_ng_per_ml} ng/mL prepared in {vial.label}."
+            f"Calibration standard {level_text} ng/mL taken from the shelf."
         )
 
 

@@ -43,6 +43,7 @@ import type {
   MoveWorkbenchToolToGrossBalancePayload,
   MoveWorkspaceWidgetPayload,
   OpenWorkbenchToolPayload,
+  PlaceCalibrationStandardVialPayload,
   PlaceReceivedBagOnWorkbenchPayload,
   PlaceToolInRackSlotPayload,
   PlaceToolOnAnalyticalBalancePayload,
@@ -392,8 +393,8 @@ export function useLabExperiment({
 
     // ── LC-MS/MS ──────────────────────────────────────────────────────────────
     lcmsms: {
-      addCalibration: (p: { vial_tool_id: string; level_ng_per_ml: number }) =>
-        exec(mutationFns.addCalibrationToVial, p),
+      placeCalibrationVial: (p: PlaceCalibrationStandardVialPayload) =>
+        exec(mutationFns.placeCalibrationStandardVial, p),
       pourExtract: (p: { tube_tool_id: string; vial_tool_id: string }) =>
         exec(mutationFns.pourExtractToVial, p),
       loadRack: () => exec(mutationFns.loadRackIntoInstrument),

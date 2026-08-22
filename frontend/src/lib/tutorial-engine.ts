@@ -1484,13 +1484,7 @@ function calibrationVialTarget(experiment: Experiment): TutorialTarget {
       dropAnchor: toolSourceAnchor(experiment, (tool) => tool.id === standard.id),
     };
   }
-  const vial = plainSampleVial(experiment);
-  return vial
-    ? {
-        anchor: "palette-item-calibration_solution",
-        dropAnchor: toolSourceAnchor(experiment, (tool) => tool.id === vial.id),
-      }
-    : workbenchPlacementTarget(experiment, "palette-item-sample_vial_lcms");
+  return workbenchPlacementTarget(experiment, "palette-item-calibration_standard_vial");
 }
 
 function calibrationVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
@@ -1504,18 +1498,13 @@ function calibrationVialPresentation(experiment: Experiment): Partial<TutorialSt
       action: { kind: "drag", label: `Add ${calibrationIstdVolumeMl} mL ISTD` },
     };
   }
-  return plainSampleVial(experiment)
-    ? {
-        title: "Prepare the calibration vial",
-        instruction:
-          "Drag the highlighted Multi-residue stock solution onto the empty Autosampler vial. Enter 10 ng/mL, then click Confirm.",
-        action: { kind: "drag", label: "Prepare 10 ng/mL" },
-      }
-    : workbenchPlacementPresentation(experiment, "Autosampler vial", {
-        title: "Deploy a second Autosampler vial",
-        instruction:
-          "In Inventory, open Containers. Drag another Autosampler vial and drop it onto an empty workbench station.",
-      });
+  return workbenchPlacementPresentation(experiment, "Calibration standard vial", {
+    title: "Take a calibration point off the shelf",
+    instruction:
+      "In Inventory, open Containers. Drag the highlighted Calibration standard vial onto an empty workbench station, set the level to 10 ng/mL, then click Take vial.",
+    hint: "Nobody dilutes a standard at the bench on the morning of a batch: the levels are prepared, dispensed and labelled in advance. The label already says which level is in the vial.",
+    action: { kind: "drag", label: "Take a 10 ng/mL vial" },
+  });
 }
 
 function storageContainer(experiment: Experiment) {
@@ -2195,8 +2184,8 @@ const steps: TutorialStep[] = [
     chapterId: "vials",
     title: "Prepare a calibration point",
     instruction:
-      `Drag a second Autosampler vial onto the workbench. Drag the Multi-residue stock solution onto it, enter a concentration greater than zero, and confirm. Then drag the ISTD solution onto the same vial and set it to ${calibrationIstdVolumeMl} mL.`,
-    hint: "You may choose any positive level; this tutorial requires a single calibration point. The standard needs the same internal standard concentration as the sample, otherwise the two injections cannot be compared through the ISTD.",
+      `Drag a Calibration standard vial from Containers onto the workbench and pick a level greater than zero. Then drag the ISTD solution onto that vial and set it to ${calibrationIstdVolumeMl} mL.`,
+    hint: "The vial arrives prepared and labelled by the standards lab, but uncapped and unspiked: the internal standard is still yours to add. Any positive level works here; the tutorial needs a single calibration point. The standard needs the same internal standard concentration as the sample, otherwise the two injections cannot be compared through the ISTD.",
     prerequisites: ["store-centrifuge"],
     ...fromTarget(calibrationVialTarget),
     isSatisfied: (experiment) => Boolean(spikedCalibrationVial(experiment)),

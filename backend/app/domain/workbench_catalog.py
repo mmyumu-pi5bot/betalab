@@ -50,6 +50,14 @@ WORKBENCH_TOOLS = {
         tool_type="sample_vial",
         capacity_ml=2.0,
     ),
+    "calibration_standard_vial": WorkbenchToolDefinition(
+        id="calibration_standard_vial",
+        name="Calibration standard vial",
+        subtitle="Ready to use · choose the level",
+        accent="rose",
+        tool_type="sample_vial",
+        capacity_ml=2.0,
+    ),
     "cutting_board_hdpe": WorkbenchToolDefinition(
         id="cutting_board_hdpe",
         name="Cutting board",
@@ -126,6 +134,11 @@ WORKBENCH_LIQUIDS = {
 _TOOL_DESCRIPTIONS = {
     "centrifuge_tube_50ml": "Receives apple sample and extraction solvent before salts and centrifugation.",
     "sample_vial_lcms": "Standard autosampler vial used to load the final extract into the chromatograph.",
+    "calibration_standard_vial": (
+        "Autosampler vial of multi-residue calibration standard, prepared and labelled in advance by the "
+        "standards lab. Drop it on the bench or straight into the rack and pick the level in ng/mL \u2014 "
+        "the internal standard is still yours to spike."
+    ),
     "hdpe_storage_jar_2l": "Wide-mouth 2 L HDPE storage jar with a thick screw cap for cold, sealed bulk homogenate handling.",
     "sealed_sampling_bag": "Tamper-evident sample collection bag for sealed produce or field intake.",
     "cutting_board_hdpe": "Clean prep board used to stage apples before cutting.",
@@ -250,6 +263,7 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
         "item_ids": (
             "centrifuge_tube_50ml",
             "sample_vial_lcms",
+            "calibration_standard_vial",
             "hdpe_storage_jar_2l",
         ),
         "item_source": "tools",
@@ -263,7 +277,6 @@ _TOOLBAR_CATEGORY_DEFINITIONS = (
             "dry_ice_pellets",
             "quechers_salts",
             "istd_solution",
-            "calibration_solution",
         ),
         "item_source": "liquids",
         "label": "Reagents & materials",

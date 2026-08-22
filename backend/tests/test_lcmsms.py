@@ -32,10 +32,10 @@ from app.services.domain_services.lcmsms import (
     ISTD_REFERENCE_CONC_NG_PER_ML,
     ISTD_SOLUTION_ID,
     AcquisitionSequenceLineRequest,
-    AddCalibrationToVialRequest,
-    AddCalibrationToVialService,
     LoadRackIntoInstrumentRequest,
     LoadRackIntoInstrumentService,
+    PlaceCalibrationStandardVialRequest,
+    PlaceCalibrationStandardVialService,
     RunSequenceRequest,
     RunSequenceService,
     UnloadRackFromInstrumentRequest,
@@ -85,6 +85,26 @@ def _place_vial_in_rack(service: ExperimentRuntimeService, exp_id: str, rack_slo
     return slot.tool.id
 
 
+def _place_calibration_vial_in_rack(
+    service: ExperimentRuntimeService,
+    exp_id: str,
+    rack_slot_id: str = "rack_slot_1",
+    level_ng_per_ml: float = 10.0,
+) -> str:
+    PlaceCalibrationStandardVialService(service).run(
+        exp_id,
+        PlaceCalibrationStandardVialRequest(
+            level_ng_per_ml=level_ng_per_ml,
+            destination_kind="rack_slot",
+            destination_id=rack_slot_id,
+        ),
+    )
+    exp = service._require_experiment(exp_id)
+    slot = next(s for s in exp.rack.slots if s.id == rack_slot_id)
+    assert slot.tool is not None
+    return slot.tool.id
+
+
 def _deploy_instrument_and_rack(service: ExperimentRuntimeService, exp_id: str) -> None:
     exp = service._require_experiment(exp_id)
     for widget in exp.workspace.widgets:
@@ -106,22 +126,36 @@ def _load_rack_into_instrument(service: ExperimentRuntimeService, exp_id: str) -
 
 
 # ---------------------------------------------------------------------------
-# AddCalibrationToVialService
+# PlaceCalibrationStandardVialService
 # ---------------------------------------------------------------------------
 
-class TestAddCalibrationToVial:
-    def test_happy_path(self) -> None:
+class TestPlaceCalibrationStandardVial:
+    """The lab buys its calibration points ready to use.
+
+    Nobody dilutes a standard at the bench the morning of a batch: the levels are
+    prepared in advance, dispensed into vials and labelled by whoever made the
+    series. The analyst takes the vial off the shelf and racks it. What is still
+    theirs to do is the internal standard.
+    """
+
+    def test_places_a_prepared_vial_on_the_workbench(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
-        vial_id = _place_vial_on_bench(service, exp_id)
 
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=10.0,
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
         )
 
         exp = service._require_experiment(exp_id)
-        vial = exp.workbench.slots[0].tool
+        vial = next(s for s in exp.workbench.slots if s.id == "station_1").tool
         assert vial is not None
+        assert vial.tool_id == "calibration_standard_vial"
+        assert vial.tool_type == "sample_vial"
         assert vial.calibration_context is not None
         assert vial.calibration_context.level_ng_per_ml == 10.0
         assert len(vial.calibration_context.compound_ids) > 0
@@ -129,14 +163,128 @@ class TestAddCalibrationToVial:
             ("calibration_solution", 1.0)
         ]
 
+    def test_places_a_prepared_vial_straight_into_the_rack(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=50.0,
+                destination_kind="rack_slot",
+                destination_id="rack_slot_1",
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        vial = next(s for s in exp.rack.slots if s.id == "rack_slot_1").tool
+        assert vial is not None
+        assert vial.calibration_context is not None
+        assert vial.calibration_context.level_ng_per_ml == 50.0
+
+    def test_arrives_uncapped_so_the_istd_can_still_be_spiked(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=10.0,
+                destination_kind="rack_slot",
+                destination_id="rack_slot_1",
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        vial = next(s for s in exp.rack.slots if s.id == "rack_slot_1").tool
+        assert vial is not None
+        assert vial.is_sealed is False
+
+    def test_arrives_with_a_label_naming_the_level(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=10.0,
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        vial = next(s for s in exp.workbench.slots if s.id == "station_1").tool
+        assert vial is not None
+        assert [(label.label_kind, label.text) for label in vial.labels] == [("manual", "std 10")]
+
+    def test_label_keeps_the_decimal_point(self) -> None:
+        # The reprocessing platform reads the type off the file name, and the file
+        # name is derived from the label. A level written "std 2_5" is a different
+        # analysis to whoever reads it downstream.
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=2.5,
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
+        )
+
+        exp = service._require_experiment(exp_id)
+        vial = next(s for s in exp.workbench.slots if s.id == "station_1").tool
+        assert vial is not None
+        assert vial.labels[0].text == "std 2.5"
+
+    def test_negative_level_raises(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+
+        with pytest.raises(ValueError, match="positive"):
+            PlaceCalibrationStandardVialService(service).run(
+                exp_id,
+                PlaceCalibrationStandardVialRequest(
+                    level_ng_per_ml=0.0,
+                    destination_kind="workbench_slot",
+                    destination_id="station_1",
+                ),
+            )
+
+    def test_occupied_slot_raises_and_leaves_no_vial_behind(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _place_vial_on_bench(service, exp_id)
+
+        with pytest.raises(ValueError):
+            PlaceCalibrationStandardVialService(service).run(
+                exp_id,
+                PlaceCalibrationStandardVialRequest(
+                    level_ng_per_ml=10.0,
+                    destination_kind="workbench_slot",
+                    destination_id="station_1",
+                ),
+            )
+
+        exp = service._require_experiment(exp_id)
+        vial = next(s for s in exp.workbench.slots if s.id == "station_1").tool
+        assert vial is not None
+        assert vial.calibration_context is None
+
     def test_roundtrip_preserves_calibration_liquid_and_hidden_level(self, tmp_path) -> None:
         repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
         service = ExperimentRuntimeService(repository=repository)
         exp_id = _create(service)
-        vial_id = _place_vial_on_bench(service, exp_id)
 
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=10.0,
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
         )
         original_vial = service._require_experiment(exp_id).workbench.slots[0].tool
         assert original_vial is not None
@@ -152,36 +300,18 @@ class TestAddCalibrationToVial:
         assert len(vial.liquids) == 1
         assert vial.liquids[0].liquid_id == "calibration_solution"
         assert vial.liquids[0].true_volume_ml == original_true_volume
-
-    def test_negative_level_raises(self) -> None:
-        service = ExperimentRuntimeService()
-        exp_id = _create(service)
-        vial_id = _place_vial_on_bench(service, exp_id)
-
-        with pytest.raises(ValueError, match="positive"):
-            AddCalibrationToVialService(service).run(
-                exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=0.0)
-            )
-
-    def test_double_calibration_raises(self) -> None:
-        service = ExperimentRuntimeService()
-        exp_id = _create(service)
-        vial_id = _place_vial_on_bench(service, exp_id)
-
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=5.0)
-        )
-        with pytest.raises(ValueError, match="already contains a calibration"):
-            AddCalibrationToVialService(service).run(
-                exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
-            )
+        assert [label.text for label in vial.labels] == ["std 10"]
 
     def test_removing_calibration_liquid_clears_calibration_context(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
-        vial_id = _place_vial_on_bench(service, exp_id)
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=10.0,
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
         )
         vial = service._require_experiment(exp_id).workbench.slots[0].tool
         assert vial is not None
@@ -197,35 +327,6 @@ class TestAddCalibrationToVial:
         assert vial.liquids == []
         assert vial.calibration_context is None
 
-    def test_tool_not_found_raises(self) -> None:
-        service = ExperimentRuntimeService()
-        exp_id = _create(service)
-
-        with pytest.raises(ValueError, match="not found"):
-            AddCalibrationToVialService(service).run(
-                exp_id, AddCalibrationToVialRequest(vial_tool_id="nonexistent", level_ng_per_ml=10.0)
-            )
-
-    def test_centrifuge_tube_accepts_calibrant(self) -> None:
-        # A liquid can physically go into any container that holds liquids. A calibrant
-        # prepared in a centrifuge tube is accepted — it is simply never injected, since
-        # a tube cannot enter the autosampler rack. Useless, but not an error.
-        service = ExperimentRuntimeService()
-        exp_id = _create(service)
-        PlaceToolOnWorkbenchService(service).run(
-            exp_id, PlaceToolOnWorkbenchRequest(slot_id="station_1", tool_id="centrifuge_tube_50ml")
-        )
-        exp = service._require_experiment(exp_id)
-        tube = next(s for s in exp.workbench.slots if s.id == "station_1").tool
-        assert tube is not None
-
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=tube.id, level_ng_per_ml=10.0)
-        )
-
-        assert tube.calibration_context is not None
-        assert tube.calibration_context.level_ng_per_ml == 10.0
-
     def test_true_level_within_clamp_band_of_nominal(self) -> None:
         nominal = 25.0
         factor_min = PhysicalSimulationService.calibration_prep_factor_min
@@ -233,10 +334,14 @@ class TestAddCalibrationToVial:
         random.seed(42)
         service = ExperimentRuntimeService()
         exp_id = _create(service)
-        vial_id = _place_vial_on_bench(service, exp_id)
 
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=nominal)
+        PlaceCalibrationStandardVialService(service).run(
+            exp_id,
+            PlaceCalibrationStandardVialRequest(
+                level_ng_per_ml=nominal,
+                destination_kind="workbench_slot",
+                destination_id="station_1",
+            ),
         )
 
         exp = service._require_experiment(exp_id)
@@ -249,16 +354,24 @@ class TestAddCalibrationToVial:
         assert factor_min * nominal <= ctx.true_level_ng_per_ml <= factor_max * nominal
 
     def test_true_level_differs_from_nominal_for_some_seed(self) -> None:
-        """With at least one seed, true_level_ng_per_ml != level_ng_per_ml."""
+        """The label states the nominal; the vial keeps its own truth.
+
+        Whoever prepared the series never mislabels a vial, but no dilution lands
+        exactly on target — the same uncertainty a certified standard carries.
+        """
         any_differs = False
         for seed in range(50):
             random.seed(seed)
             service = ExperimentRuntimeService()
             exp_id = _create(service)
-            vial_id = _place_vial_on_bench(service, exp_id)
 
-            AddCalibrationToVialService(service).run(
-                exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=25.0)
+            PlaceCalibrationStandardVialService(service).run(
+                exp_id,
+                PlaceCalibrationStandardVialRequest(
+                    level_ng_per_ml=25.0,
+                    destination_kind="workbench_slot",
+                    destination_id="station_1",
+                ),
             )
 
             exp = service._require_experiment(exp_id)
@@ -469,14 +582,8 @@ class TestRunSequenceWithCalibration:
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
         sample_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_4")
-        calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
-
-        AddCalibrationToVialService(service).run(
-            exp_id,
-            AddCalibrationToVialRequest(
-                vial_tool_id=calibration_vial_id,
-                level_ng_per_ml=50.0,
-            ),
+        calibration_vial_id = _place_calibration_vial_in_rack(
+            service, exp_id, "rack_slot_2", 50.0
         )
         _load_rack_into_instrument(service, exp_id)
         RunSequenceService(service).run(
@@ -541,15 +648,10 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        physical_calibration_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-        empty_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
-        AddCalibrationToVialService(service).run(
-            exp_id,
-            AddCalibrationToVialRequest(
-                vial_tool_id=physical_calibration_id,
-                level_ng_per_ml=20.0,
-            ),
+        physical_calibration_id = _place_calibration_vial_in_rack(
+            service, exp_id, "rack_slot_1", 20.0
         )
+        empty_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
         _load_rack_into_instrument(service, exp_id)
 
         RunSequenceService(service).run(
@@ -616,14 +718,13 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        first_calibrant_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-        second_calibrant_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
+        _place_calibration_vial_in_rack(
+            service, exp_id, "rack_slot_1", 10.0
+        )
+        _place_calibration_vial_in_rack(
+            service, exp_id, "rack_slot_2", 50.0
+        )
         _place_vial_in_rack(service, exp_id, "rack_slot_3")
-        for vial_id, level in ((first_calibrant_id, 10.0), (second_calibrant_id, 50.0)):
-            AddCalibrationToVialService(service).run(
-                exp_id,
-                AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=level),
-            )
         _load_rack_into_instrument(service, exp_id)
 
         RunSequenceService(service).run(
@@ -838,11 +939,7 @@ class TestRunSequenceWithCalibration:
             service = ExperimentRuntimeService()
             exp_id = _create(service)
             _deploy_instrument_and_rack(service, exp_id)
-            vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-            AddCalibrationToVialService(service).run(
-                exp_id,
-                AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0),
-            )
+            _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 10.0)
             _load_rack_into_instrument(service, exp_id)
             RunSequenceService(service, rng=random.Random(4242)).run(
                 exp_id,
@@ -915,11 +1012,7 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService(repository=repository)
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-        AddCalibrationToVialService(service).run(
-            exp_id,
-            AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=25.0),
-        )
+        _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 25.0)
         _load_rack_into_instrument(service, exp_id)
         RunSequenceService(service).run(
             exp_id,
@@ -1096,12 +1189,8 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-        AddCalibrationToVialService(service).run(
-            exp_id,
-            AddCalibrationToVialRequest(
-                vial_tool_id=calibration_vial_id, level_ng_per_ml=10.0
-            ),
+        calibration_vial_id = _place_calibration_vial_in_rack(
+            service, exp_id, "rack_slot_1", 10.0
         )
         experiment = service._require_experiment(exp_id)
         vial = next(
@@ -1145,15 +1234,10 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService(repository=repository)
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
-        _place_vial_in_rack(service, exp_id, "rack_slot_2")
-        AddCalibrationToVialService(service).run(
-            exp_id,
-            AddCalibrationToVialRequest(
-                vial_tool_id=calibration_vial_id,
-                level_ng_per_ml=10.0,
-            ),
+        _place_calibration_vial_in_rack(
+            service, exp_id, "rack_slot_1", 10.0
         )
+        _place_vial_in_rack(service, exp_id, "rack_slot_2")
         _load_rack_into_instrument(service, exp_id)
         request = RunSequenceRequest(
             method_id=APPLE_PESTICIDES_MRM_V1_ID,
@@ -1191,15 +1275,8 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
     monkeypatch.setattr(lcmsms_routes, "experiment_service", service)
     exp_id = _create(service)
     _deploy_instrument_and_rack(service, exp_id)
-    calibration_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_1")
+    _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 10.0)
     _place_vial_in_rack(service, exp_id, "rack_slot_2")
-    AddCalibrationToVialService(service).run(
-        exp_id,
-        AddCalibrationToVialRequest(
-            vial_tool_id=calibration_vial_id,
-            level_ng_per_ml=10.0,
-        ),
-    )
     _load_rack_into_instrument(service, exp_id)
 
     response = TestClient(app).post(
@@ -1574,10 +1651,7 @@ class TestInjectionsConsumeTheVial:
     def _prepare(self, service: ExperimentRuntimeService) -> str:
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        vial_id = _place_vial_in_rack(service, exp_id)
-        AddCalibrationToVialService(service).run(
-            exp_id, AddCalibrationToVialRequest(vial_tool_id=vial_id, level_ng_per_ml=10.0)
-        )
+        _place_calibration_vial_in_rack(service, exp_id)
         _load_rack_into_instrument(service, exp_id)
         return exp_id
 

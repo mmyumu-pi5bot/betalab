@@ -1260,34 +1260,61 @@ describe("LabScene", () => {
     );
   });
 
-  it("configures and spawns a calibration point vial at the chosen level", async () => {
-    vi.stubEnv("NEXT_PUBLIC_ENABLE_DEBUG_INVENTORY", "true");
+  it("takes a ready-to-use calibration vial off the shelf at the chosen level", async () => {
     vi.mocked(createExperiment).mockResolvedValue(makeWorkbenchExperiment());
     vi.mocked(sendExperimentCommand).mockResolvedValue(makeWorkbenchExperiment());
 
     render(<PesticideWorkbench />);
 
-    const preset = await screen.findByTestId(
-      "debug-palette-preset-calibration_standard_vial",
-    );
-    expect(preset).toHaveTextContent("Calibration point vial");
+    const item = await screen.findByTestId("toolbar-item-calibration_standard_vial");
+    expect(item).toHaveTextContent("Calibration standard vial");
 
     const transfer = createDataTransfer();
-    fireEvent.dragStart(preset, { dataTransfer: transfer });
-    fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
+    fireEvent.dragStart(item, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("bench-slot-station_2"), { dataTransfer: transfer });
 
-    expect(await screen.findByText("Configure Calibration point vial")).toBeInTheDocument();
-    expect(screen.getByLabelText("Debug calibration level")).toHaveValue(100);
-    fireEvent.click(screen.getByText("Spawn"));
+    expect(await screen.findByText("Pick the calibration level")).toBeInTheDocument();
+    expect(screen.getByLabelText("Calibration level in ng/mL")).toHaveValue(10);
+    fireEvent.click(screen.getByText("Take vial"));
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(
       "experiment_pesticides",
-      "create_debug_tool_preset",
+      "place_calibration_standard_vial",
       {
-        destination_id: "station_1",
+        destination_id: "station_2",
         destination_kind: "workbench_slot",
-        preset_id: "calibration_standard_vial",
-        level_ng_per_ml: 100,
+        level_ng_per_ml: 10,
+      },
+    );
+  });
+
+  it("racks a calibration vial straight from the palette without touching the bench", async () => {
+    const experiment = makeWorkbenchExperiment({
+      workspaceWidgets: makeWorkspaceWithRackVisible(),
+    });
+    vi.mocked(createExperiment).mockResolvedValue(experiment);
+    vi.mocked(sendExperimentCommand).mockResolvedValue(experiment);
+
+    render(<PesticideWorkbench />);
+
+    const item = await screen.findByTestId("toolbar-item-calibration_standard_vial");
+    await waitFor(() => {
+      expect(screen.getByTestId("rack-illustration-slot-1")).toBeInTheDocument();
+    });
+    const transfer = createDataTransfer();
+    fireEvent.dragStart(item, { dataTransfer: transfer });
+    fireEvent.drop(screen.getByTestId("rack-illustration-slot-1"), { dataTransfer: transfer });
+
+    expect(await screen.findByText("Pick the calibration level")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Take vial"));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "place_calibration_standard_vial",
+      {
+        destination_id: "rack_slot_1",
+        destination_kind: "rack_slot",
+        level_ng_per_ml: 10,
       },
     );
   });
@@ -1309,7 +1336,7 @@ describe("LabScene", () => {
     fireEvent.drop(screen.getByTestId("bench-slot-station_1"), { dataTransfer: transfer });
 
     expect(await screen.findByText("Configure Calibration stock tube")).toBeInTheDocument();
-    expect(screen.getByLabelText("Debug calibration level")).toHaveValue(100);
+    expect(screen.getByLabelText("Debug calibration stock level")).toHaveValue(100);
     fireEvent.click(screen.getByText("Spawn"));
 
     expect(sendExperimentCommand).toHaveBeenCalledWith(

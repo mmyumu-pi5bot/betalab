@@ -76,6 +76,13 @@ export type MoveObjectPayload = {
   };
 };
 
+/** Take a ready-to-use calibration point off the standards shelf, straight onto a target. */
+export type PlaceCalibrationStandardVialPayload = {
+  level_ng_per_ml: number;
+  destination_kind: MoveObjectPayload["destination"]["kind"];
+  destination_id: string;
+};
+
 export type OpenWorkbenchToolPayload = { slot_id: string };
 
 export type PlaceReceivedBagOnWorkbenchPayload = { target_slot_id: string; tool_id: string };

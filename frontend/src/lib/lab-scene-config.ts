@@ -145,25 +145,6 @@ export const debugSeparatedSlurryTubePreset: ToolCatalogItem = {
   ],
 };
 
-export const debugCalibrationVialPreset: ToolCatalogItem = {
-  id: "calibration_standard_vial",
-  name: "Calibration point vial",
-  subtitle: "Autosampler vial · 100 ng/mL standard",
-  description:
-    "Debug autosampler vial prepared as a multi-residue calibration standard — drop it straight into the rack.",
-  accent: "rose",
-  itemType: "tool",
-  toolType: "sample_vial",
-  capacity_ml: 2,
-  allowedDropTargets: [
-    "workbench_slot",
-    "rack_slot",
-    "trash_bin",
-    "gross_balance_widget",
-    "analytical_balance_widget",
-  ],
-};
-
 export const debugCalibrationTubePreset: ToolCatalogItem = {
   id: "calibration_standard_tube",
   name: "Calibration stock tube",
@@ -207,7 +188,6 @@ export const debugToolPresets: ToolCatalogItem[] = [
   debugVortexedSlurryTubePreset,
   debugSeparatedSlurryTubePreset,
   debugPreparedExtractVialPreset,
-  debugCalibrationVialPreset,
   debugCalibrationTubePreset,
 ];
 
@@ -235,10 +215,7 @@ export type DebugToolPresetPreview = {
   produceLots: ExperimentProduceLot[];
 };
 
-const debugCalibrationPresetIds = new Set<DebugToolPresetId>([
-  "calibration_standard_vial",
-  "calibration_standard_tube",
-]);
+const debugCalibrationPresetIds = new Set<DebugToolPresetId>(["calibration_standard_tube"]);
 
 // The debug palette renders each tool preset with a small preview of what it spawns.
 // Slurry tubes show an apple-slurry fill; the calibration and prepared-extract presets
@@ -446,10 +423,10 @@ export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
   ];
 }
 
-export function buildDebugCalibrationVialDraftFields(): DropDraftField[] {
+export function buildDebugCalibrationStockDraftFields(): DropDraftField[] {
   return [
     {
-      ariaLabel: "Debug calibration level",
+      ariaLabel: "Debug calibration stock level",
       id: "level_ng_per_ml",
       inputStep: 1,
       label: "Level",
@@ -532,7 +509,7 @@ export function buildDebugToolPresetDraftFields(presetId: DebugToolPresetId): Dr
     return buildDebugPreparedExtractVialDraftFields();
   }
   if (debugCalibrationPresetIds.has(presetId)) {
-    return buildDebugCalibrationVialDraftFields();
+    return buildDebugCalibrationStockDraftFields();
   }
   return buildDebugSlurryTubeDraftFields();
 }

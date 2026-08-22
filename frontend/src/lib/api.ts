@@ -1815,17 +1815,18 @@ export async function dispensePipette(
   });
 }
 
-export async function addCalibrationToVial(
+export async function placeCalibrationStandardVial(
   experimentId: string,
   payload: MutationPayload,
 ): Promise<Experiment> {
   const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {
     method: "POST",
-    path: `/experiments/${experimentId}/lcmsms/add-calibration`,
+    path: `/experiments/${experimentId}/lcmsms/place-calibration-vial`,
     body: {
-      vial_tool_id: requireString(body, "vial_tool_id"),
       level_ng_per_ml: Number(body["level_ng_per_ml"] ?? 0),
+      destination_kind: requireString(body, "destination_kind"),
+      destination_id: requireString(body, "destination_id"),
     },
   });
 }

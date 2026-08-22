@@ -9,19 +9,18 @@ import type {
   CreateDebugProduceLotOnWorkbenchPayload,
   CreateDebugProduceLotToWidgetPayload,
   CreateDebugToolPresetPayload,
+  PlaceCalibrationStandardVialPayload,
 } from "@/types/api-payloads";
-
-type AddCalibrationToVialPayload = { vial_tool_id: string; level_ng_per_ml: number };
 
 export type DropDraft = {
   commandType:
-    | "add_calibration_to_vial"
     | "add_liquid_to_analytical_balance_tool"
     | "add_liquid_to_workbench_tool"
     | "add_liquid_to_workspace_widget"
     | "create_debug_produce_lot_on_workbench"
     | "create_debug_produce_lot_to_widget"
-    | "create_debug_tool_preset";
+    | "create_debug_tool_preset"
+    | "place_calibration_standard_vial";
   confirmLabel?: string;
   fields: DropDraftField[];
   itemId?: string;
@@ -33,13 +32,13 @@ export type DropDraft = {
 };
 
 export type DropDraftExperimentApi = {
-  addCalibrationToVial: (payload: AddCalibrationToVialPayload) => void;
   addLiquidToAnalyticalBalanceTool: (payload: AddLiquidToAnalyticalBalanceToolPayload) => void;
   addLiquidToWorkbenchTool: (payload: AddLiquidToWorkbenchToolPayload) => void;
   addLiquidToWorkspaceWidget: (payload: AddLiquidToWorkspaceWidgetPayload) => void;
   createDebugProduceLotOnWorkbench: (payload: CreateDebugProduceLotOnWorkbenchPayload) => void;
   createDebugProduceLotToWidget: (payload: CreateDebugProduceLotToWidgetPayload) => void;
   createDebugToolPreset: (payload: CreateDebugToolPresetPayload) => void;
+  placeCalibrationStandardVial: (payload: PlaceCalibrationStandardVialPayload) => void;
 };
 
 type DropDraftApi = {
@@ -77,10 +76,14 @@ export function useDropDraft(experimentApi: DropDraftExperimentApi): DropDraftAp
     const getNumericFieldValue = (fieldId: string) =>
       pendingDropDraft.fields.find((field) => field.id === fieldId)?.value ?? 0;
 
-    if (pendingDropDraft.commandType === "add_calibration_to_vial") {
-      void experimentApi.addCalibrationToVial({
-        vial_tool_id: pendingDropDraft.itemId ?? pendingDropDraft.targetId,
+    if (
+      pendingDropDraft.commandType === "place_calibration_standard_vial" &&
+      pendingDropDraft.destinationKind
+    ) {
+      void experimentApi.placeCalibrationStandardVial({
         level_ng_per_ml: getNumericFieldValue("level_ng_per_ml"),
+        destination_kind: pendingDropDraft.destinationKind,
+        destination_id: pendingDropDraft.targetId,
       });
       setPendingDropDraft(null);
       return;

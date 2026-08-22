@@ -1,4 +1,32 @@
+import type { DropDraftField } from "@/components/drop-draft-card";
 import type { LiquidCatalogItem, ToolCatalogItem, ToolbarCategory } from "@/types/workbench";
+
+/** Palette item that cannot be spawned from its id alone: it needs a level first. */
+export const CALIBRATION_STANDARD_VIAL_ITEM_ID = "calibration_standard_vial";
+
+/** The levels the standards lab keeps on the shelf, and the one most runs start from.
+ *
+ * Any level can be typed in — the presets are only the common rungs of a ladder.
+ * Fractional levels are allowed on purpose: the level ends up on the label, the label
+ * ends up in the file name, and a ladder that cannot express 2.5 ng/mL is a poorer
+ * ladder than a real one.
+ */
+export function buildCalibrationLevelDraftFields(): DropDraftField[] {
+  return [
+    {
+      ariaLabel: "Calibration level in ng/mL",
+      id: "level_ng_per_ml",
+      inputStep: 0.1,
+      label: "Level",
+      minValue: 0.1,
+      presets: [1, 5, 10, 50, 100, 500],
+      stepAmount: 10,
+      unitLabel: "ng/mL",
+      value: 10,
+      wheelStep: 5,
+    },
+  ];
+}
 
 export const labWorkflowCategories: ToolbarCategory[] = [
   {
@@ -25,6 +53,18 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         subtitle: "Injection ready",
         description: "Standard autosampler vial used to load the final extract into the chromatograph.",
         accent: "sky",
+        toolType: "sample_vial",
+        capacity_ml: 2,
+      },
+      {
+        id: "calibration_standard_vial",
+        allowedDropTargets: [],
+        itemType: "tool",
+        name: "Calibration standard vial",
+        subtitle: "Ready to use · choose the level",
+        description:
+          "Autosampler vial of multi-residue calibration standard, prepared and labelled in advance by the standards lab. Drop it on the bench or straight into the rack and pick the level in ng/mL — the internal standard is still yours to spike.",
+        accent: "rose",
         toolType: "sample_vial",
         capacity_ml: 2,
       },
@@ -89,17 +129,6 @@ export const labWorkflowCategories: ToolbarCategory[] = [
         accent: "emerald",
         liquidType: "istd_solution",
         transfer_volume_ml: 0.05,
-      },
-      {
-        id: "calibration_solution",
-        allowedDropTargets: [],
-        itemType: "liquid",
-        name: "Multi-residue stock solution",
-        subtitle: "All pesticides · free level (ng/mL)",
-        description: "Multi-residue calibration stock — drag onto an autosampler vial to prepare a calibration standard.",
-        accent: "rose",
-        liquidType: "calibration_solution",
-        transfer_volume_ml: 0,
       },
     ],
   },

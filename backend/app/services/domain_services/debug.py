@@ -43,15 +43,14 @@ _SLURRY_PRESET_LABELS = {
     _SEPARATED_SLURRY_TUBE_PRESET: "centrifuged apple slurry",
 }
 
-# Debug calibration presets that prepare a multi-residue calibration standard (a
-# calibration point) at a known concentration. The vial variant is dropped straight
-# into the rack; the tube variant is a stock the user pipettes into a rack vial (the
-# pipette carries the calibration identity across — see AspiratePipetteService).
-_CALIBRATION_VIAL_PRESET = "calibration_standard_vial"
+# Debug calibration stock: a tube of multi-residue standard at a known concentration
+# that the user pipettes into a rack vial themselves (the pipette carries the
+# calibration identity across — see AspiratePipetteService). The vial variant is not
+# a debug affordance any more: the standards shelf in the real palette hands out
+# ready-to-use calibration vials — see PlaceCalibrationStandardVialService.
 _CALIBRATION_TUBE_PRESET = "calibration_standard_tube"
-_CALIBRATION_PRESETS = frozenset({_CALIBRATION_VIAL_PRESET, _CALIBRATION_TUBE_PRESET})
+_CALIBRATION_PRESETS = frozenset({_CALIBRATION_TUBE_PRESET})
 _CALIBRATION_PRESET_TOOL_IDS = {
-    _CALIBRATION_VIAL_PRESET: "sample_vial_lcms",
     _CALIBRATION_TUBE_PRESET: "centrifuge_tube_50ml",
 }
 _DEFAULT_CALIBRATION_LEVEL_NG_PER_ML = 100.0

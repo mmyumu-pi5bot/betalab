@@ -100,7 +100,6 @@ export type DebugToolPresetId =
   | "apple_slurry_centrifuge_tube"
   | "vortexed_slurry_centrifuge_tube"
   | "separated_slurry_centrifuge_tube"
-  | "calibration_standard_vial"
   | "calibration_standard_tube"
   | "apple_extract_vial";
 

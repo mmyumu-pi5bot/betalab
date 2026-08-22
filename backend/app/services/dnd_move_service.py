@@ -549,11 +549,12 @@ def place_new_tool(
     destination_ref: DndObjectRef,
     *,
     source_label: str,
+    source_kind: str = "debug_palette",
 ) -> None:
     destination = _resolve_destination(runtime, destination_ref)
     request = DndMoveObjectRequest(
         entity=DndObjectRef(kind="tool", id=tool.id),
-        source=DndObjectRef(kind="debug_palette", id=tool.tool_id),
+        source=DndObjectRef(kind=source_kind, id=tool.tool_id),
         destination=destination_ref,
     )
     _assert_entity_can_move(get_dnd_contract("tool", tool.tool_type), tool.label, destination)
