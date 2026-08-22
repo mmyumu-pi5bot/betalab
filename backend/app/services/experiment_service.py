@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, datetime
 
-from app.domain.models import Experiment, new_id
+from app.domain.models import Experiment, SequenceRun, new_id
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
 from app.services.domain_services.acquisition_clock import advance_sequence_runs
 from app.services.domain_services.workspace import advance_workspace_cryogenics_state
@@ -17,6 +17,10 @@ from app.services.journal_service import synchronize_journal_entries
 
 
 class ExperimentNotFoundError(KeyError):
+    pass
+
+
+class SequenceRunNotFoundError(KeyError):
     pass
 
 
@@ -77,6 +81,20 @@ class ExperimentRuntimeService:
         if entity_kind == "pipette":
             return asdict(experiment.pipette)
         raise ValueError("Unknown debug inspection kind")
+
+    def get_sequence_run(self, experiment_id: str, run_id: str) -> SequenceRun:
+        """Return one recorded run without advancing or persisting the simulation.
+
+        Exporting is a read, so it shows what the instrument has recorded as of
+        the last simulation tick rather than quietly running the clock forward
+        to make more of it exist.
+        """
+        experiment = self._require_experiment(experiment_id)
+        for widget in experiment.workspace.widgets:
+            for run in widget.sequence_runs:
+                if run.id == run_id:
+                    return run
+        raise SequenceRunNotFoundError(run_id)
 
     def _require_experiment(self, experiment_id: str) -> Experiment:
         experiment = self._experiments.get(experiment_id)

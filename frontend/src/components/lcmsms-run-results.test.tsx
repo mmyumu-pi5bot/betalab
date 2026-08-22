@@ -358,3 +358,30 @@ describe("LcMsMsRunResults chart scaling", () => {
     expect(Math.min(...ys)).toBeLessThan(32);
   });
 });
+
+describe("LcMsMsRunResults result download", () => {
+  it("offers the run's archive as a direct download", () => {
+    render(<LcMsMsRunResults experimentId="exp_1" runs={[makeRun({ id: "run_7" })]} />);
+
+    const link = screen.getByRole("link", { name: /download results/i });
+    expect(link).toHaveAttribute(
+      "href",
+      "http://localhost:8000/experiments/exp_1/lcmsms/runs/run_7/results",
+    );
+  });
+
+  it("escapes identifiers rather than pasting them into the URL", () => {
+    render(<LcMsMsRunResults experimentId="exp 1/2" runs={[makeRun({ id: "run 7" })]} />);
+
+    expect(screen.getByRole("link", { name: /download results/i })).toHaveAttribute(
+      "href",
+      "http://localhost:8000/experiments/exp%201%2F2/lcmsms/runs/run%207/results",
+    );
+  });
+
+  it("offers nothing to download when the run is not addressable", () => {
+    render(<LcMsMsRunResults runs={[makeRun()]} />);
+
+    expect(screen.queryByRole("link", { name: /download results/i })).not.toBeInTheDocument();
+  });
+});

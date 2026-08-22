@@ -731,6 +731,7 @@ export function LabSceneWorkspaceCanvas({
                   ) : null}
                   <div className="mt-4">
                     <LcMsMsRunResults
+                      experimentId={experiment.id}
                       isCommandPending={ui.isCommandPending}
                       onSkip={workspaceActions.onSkipAcquisition}
                       runs={widget.sequenceRuns ?? []}

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { sequenceRunResultsUrl } from "@/lib/api";
+import { LAYER } from "@/lib/layers";
+
 import type {
   InjectionMeasurement,
   SequenceRun,
@@ -15,6 +18,8 @@ const CHART_HEIGHT = 64;
 const NOISE_HEADROOM = 8;
 
 type Props = {
+  /** Needed to address the run's result archive; omitted in isolated previews. */
+  experimentId?: string;
   isCommandPending?: boolean;
   onSkip?: () => void;
   runs: SequenceRun[];
@@ -235,7 +240,12 @@ function InjectionPanel({
   );
 }
 
-export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Props) {
+export function LcMsMsRunResults({
+  experimentId,
+  isCommandPending = false,
+  onSkip,
+  runs,
+}: Props) {
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null;
   const [selectedInjectionId, setSelectedInjectionId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -289,6 +299,17 @@ export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Pro
         {latestRun.injections.length > 1 ? "s" : ""} · {latestRun.methodSnapshot.name} v
         {latestRun.methodSnapshot.version}
       </p>
+
+      {experimentId ? (
+        <a
+          className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-2.5 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-100"
+          download
+          href={sequenceRunResultsUrl(experimentId, latestRun.id)}
+          title="Method file plus one chromatogram file per injection the instrument has finished recording."
+        >
+          Download results
+        </a>
+      ) : null}
 
       {isRunning ? (
         <div
@@ -390,7 +411,10 @@ export function LcMsMsRunResults({ isCommandPending = false, onSkip, runs }: Pro
 
       {isExpanded
         ? createPortal(
-            <div className="fixed inset-0 z-[9997] flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 flex items-center justify-center p-4"
+              style={{ zIndex: LAYER.dialog }}
+            >
               <div
                 className="absolute inset-0 bg-slate-950/70"
                 data-testid="data-viewer-backdrop"

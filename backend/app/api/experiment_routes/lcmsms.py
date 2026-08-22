@@ -1,3 +1,4 @@
+from fastapi import HTTPException, Response
 from pydantic import BaseModel
 
 from app.schemas.experiment import ExperimentSchema
@@ -16,6 +17,11 @@ from app.services.domain_services.lcmsms import (
     UnloadRackFromInstrumentRequest,
     UnloadRackFromInstrumentService,
 )
+from app.services.experiment_service import (
+    ExperimentNotFoundError,
+    SequenceRunNotFoundError,
+)
+from app.services.exports.run_bundle import build_run_bundle, run_bundle_filename
 
 from .common import experiment_service, handle_service_errors, router
 
@@ -118,4 +124,28 @@ def run_sequence(experiment_id: str, body: RunSequenceBody) -> ExperimentSchema:
                 ],
             ),
         )
+    )
+
+
+@router.get("/{experiment_id}/lcmsms/runs/{run_id}/results")
+def download_sequence_results(experiment_id: str, run_id: str) -> Response:
+    """Serve the run's result archive: the method file plus one file per injection.
+
+    A pure read. It packs what the instrument has already recorded — an
+    injection still running has no file yet — and never advances the clock to
+    make more of it exist.
+    """
+    try:
+        run = experiment_service.get_sequence_run(experiment_id, run_id)
+    except ExperimentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Experiment not found") from exc
+    except SequenceRunNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Sequence run not found") from exc
+
+    return Response(
+        content=build_run_bundle(run),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{run_bundle_filename(run)}"'
+        },
     )
