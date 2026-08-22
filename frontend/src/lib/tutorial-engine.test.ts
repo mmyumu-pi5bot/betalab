@@ -2117,4 +2117,141 @@ describe("calibration sample tutorial", () => {
       expect(result.completedStepIds).toContain("prepare-sample-vial");
     });
   });
+
+  describe("labelling the sample vial", () => {
+    // The sample vial carries no identity of its own. A rack of look-alike vials is
+    // exactly what the LIMS label exists to prevent, so the vial gets the same label
+    // the bag got — printed again, from the same reception record.
+    const SAMPLE_CODE = "S-2026-0001";
+
+    function stateWithUnlabelledVial(
+      overrides: {
+        limsPresent?: boolean;
+        printed?: boolean;
+        vialLabelled?: boolean;
+      } = {},
+    ) {
+      const { limsPresent = false, printed = false, vialLabelled = false } = overrides;
+      const vial = labTool("sample_vial", {
+        id: "sample_vial_1",
+        liquids: [{ liquidId: "acetonitrile_extraction", label: "Extract", volume_ml: 1 }],
+        injectionContext: { sourceTubeId: "extraction_tube" },
+        labels: vialLabelled
+          ? [
+              {
+                id: "label_lims_1",
+                text: SAMPLE_CODE,
+                labelKind: "lims",
+                sampleCode: SAMPLE_CODE,
+                receivedDate: "2026-08-10",
+              },
+            ]
+          : [],
+      });
+      return experiment({
+        workbench: {
+          slots: [{ id: "station_2", label: "Station 2", tool: vial }],
+        },
+        workspace: {
+          produceBasketLots: [],
+          widgets: widgetIds.map((id) =>
+            id === "lims" ? widget(id, { isPresent: limsPresent }) : widget(id),
+          ),
+        },
+        limsReception: {
+          id: "lims_1",
+          orchardName: "Verger du Clos",
+          harvestDate: "2026-08-01",
+          indicativeMassG: 1000,
+          measuredGrossMassG: 1036,
+          packagingTareMassG: 36,
+          grossMassOffsetG: 0,
+          measuredSampleMassG: null,
+          labSampleCode: SAMPLE_CODE,
+          status: "received",
+          printedLabelTicket: printed
+            ? {
+                id: "lims_ticket_1",
+                sampleCode: SAMPLE_CODE,
+                labelText: SAMPLE_CODE,
+                receivedDate: "2026-08-10",
+              }
+            : null,
+        },
+      });
+    }
+
+    const completed = calibrationSampleTutorial.steps
+      .map((entry) => entry.id)
+      .slice(
+        0,
+        calibrationSampleTutorial.steps.findIndex((entry) => entry.id === "label-sample-vial"),
+      );
+
+    it("sits in the vial chapter, right after the vial has been filled", () => {
+      const chapter = calibrationSampleTutorial.chapters.find((entry) => entry.id === "vials");
+
+      expect(chapter?.stepIds).toEqual([
+        "prepare-sample-vial",
+        "label-sample-vial",
+        "store-centrifuge",
+        "prepare-calibration-vial",
+      ]);
+    });
+
+    it("sends the learner back for the LIMS terminal it was told to store", () => {
+      const state = stateWithUnlabelledVial();
+      const tutorialStep = calibrationSampleTutorial.steps.find(
+        (entry) => entry.id === "label-sample-vial",
+      )!;
+
+      const presentation = getTutorialStepPresentation(tutorialStep, state);
+
+      expect(presentation.instruction).toContain("LIMS terminal");
+      expect(presentation.action?.kind).toBe("drag");
+    });
+
+    it("asks for a second print once the terminal is back", () => {
+      const state = stateWithUnlabelledVial({ limsPresent: true });
+      const tutorialStep = calibrationSampleTutorial.steps.find(
+        (entry) => entry.id === "label-sample-vial",
+      )!;
+
+      const presentation = getTutorialStepPresentation(tutorialStep, state);
+
+      expect(presentation.instruction).toContain("Print label");
+      expect(presentation.action?.kind).toBe("click");
+    });
+
+    it("points the printed ticket at the vial", () => {
+      const state = stateWithUnlabelledVial({ limsPresent: true, printed: true });
+      const tutorialStep = calibrationSampleTutorial.steps.find(
+        (entry) => entry.id === "label-sample-vial",
+      )!;
+
+      const presentation = getTutorialStepPresentation(tutorialStep, state);
+
+      expect(presentation.instruction).toContain("sample vial");
+      expect(tutorialStep.anchor(state)).toBe("lims-printed-ticket");
+      expect(tutorialStep.dropAnchor(state)).toBe("bench-tool-card-sample_vial_1");
+    });
+
+    it("holds until the label is on the vial, not merely printed", () => {
+      const state = stateWithUnlabelledVial({ limsPresent: true, printed: true });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, completed);
+
+      expect(result.currentStep?.id).toBe("label-sample-vial");
+      expect(result.completedStepIds).not.toContain("label-sample-vial");
+    });
+
+    it("completes once the vial carries the reception label", () => {
+      const state = stateWithUnlabelledVial({ limsPresent: true, vialLabelled: true });
+
+      const result = evaluateTutorial(calibrationSampleTutorial, state, completed);
+
+      expect(result.completedStepIds).toContain("label-sample-vial");
+      expect(result.currentStep?.id).not.toBe("label-sample-vial");
+    });
+  });
 });

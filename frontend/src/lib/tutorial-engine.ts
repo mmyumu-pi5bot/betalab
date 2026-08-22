@@ -446,6 +446,23 @@ function pendingSampleAliquotMl(experiment: Experiment) {
   return (vial ? toolLiquidVolumeMl(vial) : 0) + experiment.pipette.volumeMl;
 }
 
+// A vial is only identified once the reception label is physically on it. Printing
+// the ticket is not enough: a ticket left in the terminal identifies nothing, and a
+// rack of unlabelled look-alike vials is exactly what the label exists to prevent.
+function toolCarriesReceptionLabel(experiment: Experiment, tool: BenchToolInstance | undefined) {
+  const sampleCode = experiment.limsReception.labSampleCode;
+  if (!tool || !sampleCode) {
+    return false;
+  }
+  return (tool.labels ?? []).some(
+    (label) => label.labelKind === "lims" && label.sampleCode === sampleCode,
+  );
+}
+
+function hasLabelledSampleVial(experiment: Experiment) {
+  return toolCarriesReceptionLabel(experiment, preparedSampleVial(experiment));
+}
+
 function hasAppliedLimsLabel(experiment: Experiment) {
   const sampleCode = experiment.limsReception.labSampleCode;
   if (!sampleCode) {
@@ -1476,6 +1493,49 @@ function saltExtractionPresentation(experiment: Experiment): Partial<TutorialSte
   };
 }
 
+function labelSampleVialTarget(experiment: Experiment): TutorialTarget {
+  if (!workspaceWidget(experiment, "lims")?.isPresent) {
+    return {
+      anchor: "palette-item-lims_terminal_widget",
+      dropAnchor: workspaceCanvasAnchor,
+    };
+  }
+  if (!experiment.limsReception.printedLabelTicket) {
+    return { anchor: "lims-print-label" };
+  }
+  const vial = preparedSampleVial(experiment);
+  return {
+    anchor: "lims-printed-ticket",
+    dropAnchor: vial ? toolSourceAnchor(experiment, (tool) => tool.id === vial.id) : null,
+  };
+}
+
+function labelSampleVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
+  if (!workspaceWidget(experiment, "lims")?.isPresent) {
+    return {
+      title: "Bring the LIMS terminal back",
+      instruction:
+        "In Inventory, open Workspace equipment. Drag the highlighted LIMS terminal and drop it onto the central workspace.",
+      hint: "The reception record is still there; you only need the terminal to print from it again.",
+      action: { kind: "drag", label: "Drag to workspace" },
+    };
+  }
+  if (!experiment.limsReception.printedLabelTicket) {
+    return {
+      title: "Print a second label",
+      instruction: "Click Print label in the LIMS terminal to print the reception label again.",
+      hint: "It is the same sample code as the bag: one reception, one identity, however many containers it passes through.",
+      action: { kind: "click", label: "Click Print label" },
+    };
+  }
+  return {
+    title: "Stick the label on the sample vial",
+    instruction: "Drag the printed LIMS label and drop it onto the sample vial.",
+    hint: "The instrument reads the rack position by position, so the vial has to say what it holds. Without the label the console line comes up empty and you type the name by hand.",
+    action: { kind: "drag", label: "Drop onto the vial" },
+  };
+}
+
 function calibrationVialTarget(experiment: Experiment): TutorialTarget {
   const standard = preparedCalibrationVial(experiment);
   if (standard) {
@@ -2160,13 +2220,25 @@ const steps: TutorialStep[] = [
     presentation: sampleVialPresentation,
   }),
   step({
+    id: "label-sample-vial",
+    chapterId: "vials",
+    title: "Identify the sample vial",
+    instruction:
+      "Bring the LIMS terminal back onto the workspace, click Print label a second time, then drag the printed label onto the sample vial.",
+    hint: "The vial leaves the bench for a rack of identical vials. The label is what still says which sample it holds — and what the instrument reads to name the file it writes.",
+    prerequisites: ["prepare-sample-vial"],
+    ...fromTarget(labelSampleVialTarget),
+    isSatisfied: hasLabelledSampleVial,
+    presentation: labelSampleVialPresentation,
+  }),
+  step({
     id: "store-centrifuge",
     chapterId: "vials",
     title: "Store the centrifuge",
     instruction:
       "Drag the tube out of the centrifuge and drop it onto an empty workbench station. Then click Store in inventory in the centrifuge header.",
     hint: "The prepared sample vial retains the extract needed for the remaining steps.",
-    prerequisites: ["prepare-sample-vial"],
+    prerequisites: ["label-sample-vial"],
     ...fromTarget((experiment) => storeEquipmentTarget(experiment, "centrifuge")),
     isSatisfied: (experiment) =>
       Boolean(preparedSampleVial(experiment)) &&
@@ -2312,6 +2384,7 @@ export const calibrationSampleTutorial: TutorialDefinition = {
       title: "Vial preparation",
       stepIds: [
         "prepare-sample-vial",
+        "label-sample-vial",
         "store-centrifuge",
         "prepare-calibration-vial",
       ],
