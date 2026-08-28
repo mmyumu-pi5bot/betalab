@@ -26,9 +26,18 @@ _MIN_CHANNEL_GROUPS = 2
 #: Columns Betalab does not model. Present, always empty. See module docstring.
 _UNMODELLED = ""
 
-#: Value their own export carries on every row. Its meaning is internal to the
-#: platform, so Betalab reproduces it rather than interpreting it.
-_COMPOUND_TYPE = 3
+#: ``type`` as their export uses it: an internal standard is a 2, everything
+#: else a 3. The values themselves are internal to the platform; Betalab
+#: reproduces the distinction it observed rather than interpreting it.
+_ANALYTE_TYPE = 3
+_INTERNAL_STANDARD_TYPE = 2
+
+#: The level an internal standard carries on *every* concentration column. A
+#: calibration series varies the analytes and holds the standard constant, so
+#: its row cannot repeat the analyte ladder. Their reference file writes 100 on
+#: each level of each standard — the nominal "full" amount the ratio is read
+#: against — and Betalab writes the same.
+_INTERNAL_STANDARD_LEVEL = 100.0
 
 _IDENTITY_COLUMNS = (
     "event",
@@ -76,11 +85,8 @@ def build_method_cod_rows(method: AcquisitionMethod) -> tuple[list[str], list[li
         *_channel_columns(group_count),
         *(f"Conc.({index})" for index in range(len(levels))),
     ]
-    labels = {event.compound_id: event.compound_label for event in events}
-    rows = [
-        _build_row(index, event, group_count, levels, labels)
-        for index, event in enumerate(events)
-    ]
+    standards = {event.compound_id: event for event in events}
+    rows = [_build_row(index, event, group_count, levels, standards) for index, event in enumerate(events)]
     return header, rows
 
 
@@ -89,9 +95,15 @@ def _build_row(
     event: EventSlot,
     group_count: int,
     levels: tuple[float, ...],
-    labels: dict[str, str],
+    standards: dict[str, EventSlot],
 ) -> list[Any]:
     is_istd = event.compound_kind == "internal_standard"
+    # A standard is its own reference: their file has the standard's row point
+    # back at itself, so the two columns are never empty on a row that has one.
+    standard_id = event.compound_id if is_istd else event.internal_standard_id
+    standard = standards.get(standard_id or "")
+    standard_event = standard.event if standard is not None else _UNMODELLED
+    standard_name = standard.compound_label if standard is not None else _UNMODELLED
     quantifier = event.main_channel.transition
     retention_min = quantifier.expected_retention_time_s / 60.0
     half_window_min = quantifier.retention_window_s / 2.0 / 60.0
@@ -105,10 +117,10 @@ def _build_row(
         _UNMODELLED,  # loq
         _UNMODELLED,  # loq_unit
         _UNMODELLED,  # nb_peaks
-        _COMPOUND_TYPE,
-        _UNMODELLED,  # istd
-        "" if is_istd else labels.get(event.internal_standard_id or "", ""),
-        1 if is_istd else 0,
+        _INTERNAL_STANDARD_TYPE if is_istd else _ANALYTE_TYPE,
+        standard_event,
+        standard_name,
+        is_istd,
         _UNMODELLED,  # group
         retention_min,
         retention_min - half_window_min,
@@ -134,7 +146,7 @@ def _build_row(
             ]
         )
 
-    row.extend(levels)
+    row.extend([_INTERNAL_STANDARD_LEVEL] * len(levels) if is_istd else levels)
     return row
 
 

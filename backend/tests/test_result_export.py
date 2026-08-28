@@ -283,10 +283,47 @@ class TestMethodCodFile:
 
         analyte = rows[0]
         standard = rows[1]
-        assert analyte[header.index("is_istd")] == 0
+        assert analyte[header.index("is_istd")] is False
         assert analyte[header.index("istd_name")] == "Triphenyl phosphate-d15"
-        assert standard[header.index("is_istd")] == 1
-        assert standard[header.index("istd_name")] == ""
+        assert standard[header.index("is_istd")] is True
+        assert standard[header.index("istd_name")] == "Triphenyl phosphate-d15"
+
+    def test_an_analyte_points_at_the_event_number_of_its_internal_standard(self) -> None:
+        """Their file links the two rows by ``event``, not by name alone, and a
+        standard's row points back at itself."""
+        method = _method(("boscalid", INTERNAL_STANDARD_COMPOUND_ID))
+        header, rows = build_method_cod_rows(method)
+
+        analyte, standard = rows
+        assert standard[header.index("event")] == 2
+        assert analyte[header.index("istd")] == 2
+        assert standard[header.index("istd")] == 2
+
+    def test_a_method_without_any_internal_standard_leaves_the_link_empty(self) -> None:
+        method = _method(("boscalid",))
+        header, rows = build_method_cod_rows(method)
+
+        assert rows[0][header.index("istd")] == ""
+        assert rows[0][header.index("istd_name")] == ""
+
+    def test_the_internal_standard_is_typed_apart_from_the_analytes(self) -> None:
+        method = _method(("boscalid", INTERNAL_STANDARD_COMPOUND_ID))
+        header, rows = build_method_cod_rows(method)
+
+        assert rows[0][header.index("type")] == 3
+        assert rows[1][header.index("type")] == 2
+
+    def test_the_internal_standard_holds_one_level_across_the_whole_ladder(self) -> None:
+        """A calibration series varies the analytes and spikes the same amount of
+        standard into every level, so its row cannot repeat the ladder."""
+        method = replace(
+            _method(("boscalid", INTERNAL_STANDARD_COMPOUND_ID)),
+            calibration_levels_ng_per_ml=(1.0, 5.0, 20.0),
+        )
+        _header, rows = build_method_cod_rows(method)
+
+        assert rows[0][-3:] == [1.0, 5.0, 20.0]
+        assert rows[1][-3:] == [100.0, 100.0, 100.0]
 
     def test_columns_betalab_does_not_model_are_left_empty(self) -> None:
         """Their own reference file leaves these blank; inventing a CAS number
@@ -324,6 +361,7 @@ class TestMethodCodFile:
 
         workbook = openpyxl.load_workbook(io.BytesIO(build_method_cod_workbook(method)))
         sheet = workbook.active
+        assert sheet is not None
 
         assert [cell.value for cell in sheet[1]] == [value if value != "" else None for value in header]
         assert sheet.cell(row=2, column=header.index("name") + 1).value == "Boscalid"
