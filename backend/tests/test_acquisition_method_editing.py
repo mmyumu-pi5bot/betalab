@@ -591,7 +591,9 @@ class TestCalibrationLevels:
             )
             connection.commit()
 
-        assert repository.load("legacy").calibration_levels_ng_per_ml == ()
+        legacy_method = repository.load("legacy")
+        assert legacy_method is not None
+        assert legacy_method.calibration_levels_ng_per_ml == ()
 
     def test_duplicating_carries_the_ladder_over(self) -> None:
         service = _service()

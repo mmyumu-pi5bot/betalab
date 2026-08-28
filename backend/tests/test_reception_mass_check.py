@@ -35,6 +35,7 @@ def test_acknowledges_the_net_mass_currently_on_screen() -> None:
     AcknowledgeReceptionMassCheckService(service).run(exp_id, AcknowledgeReceptionMassCheckRequest(entry_id=None))
 
     reception = service._require_experiment(exp_id).lims_reception
+    assert reception.measured_gross_mass_g is not None
     expected_net = reception.measured_gross_mass_g - reception.packaging_tare_mass_g
     assert reception.acknowledged_net_mass_g == pytest.approx(expected_net)
 
@@ -74,6 +75,7 @@ def test_a_new_weighing_invalidates_the_acknowledgement() -> None:
 
     reception = service._require_experiment(exp_id).lims_reception
     assert reception.acknowledged_net_mass_g is not None
+    assert reception.measured_gross_mass_g is not None
     current_net = reception.measured_gross_mass_g - reception.packaging_tare_mass_g
     assert reception.acknowledged_net_mass_g != pytest.approx(current_net)
 

@@ -451,7 +451,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
     ) -> None:
         super().__init__(runtime)
         # Injectable so a test can reproduce a whole acquisition byte for byte.
-        self._rng = rng if rng is not None else random.Random()
+        self._rng = rng if rng is not None else random.Random()  # nosec B311 — simulation noise, not cryptographic use
         # Resolves built-in *and* user-authored methods; injectable for tests.
         self._resolve_method = method_resolver if method_resolver is not None else acquisition_method_service.get_method
 
@@ -479,7 +479,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         start_offset_s = 0.0
         for rack_slot in vials_in_rack:
             vial = rack_slot.tool
-            assert vial is not None  # guaranteed by the filter above
+            assert vial is not None  # nosec B101 — type narrowing, guaranteed by the filter above
             configured = configured_by_slot[rack_slot.id]
 
             for replicate_index in range(1, configured.repetitions + 1):
