@@ -66,6 +66,7 @@ class QuechersStateSchema(BaseModel):
     faults: list[str] = Field(default_factory=list)
 
     @computed_field
+    @property
     def is_usable(self) -> bool:
         return self.phase not in {"cemented", "contaminated"}
 
@@ -220,14 +221,17 @@ class SpatulaStateSchema(BaseModel):
     source_tool_id: str | None = None
 
     @computed_field
+    @property
     def allowed_load_source_tool_types(self) -> list[str]:
         return list(SPATULA_LOAD_SOURCE_TOOL_TYPES)
 
     @computed_field
+    @property
     def allowed_pour_target_tool_types(self) -> list[str]:
         return list(SPATULA_POUR_TARGET_TOOL_TYPES)
 
     @computed_field
+    @property
     def can_discard(self) -> bool:
         return self.is_loaded
 
@@ -243,33 +247,38 @@ class PipetteStateSchema(BaseModel):
     produce_lots: list[ProduceLotSchema] = Field(default_factory=list)
     produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
 
-
-
     @computed_field
+    @property
     def click_increment_mu_g(self) -> float:
         return SPATULA_CLICK_INCREMENT_MU_G
 
     @computed_field
+    @property
     def click_increment_sigma_g(self) -> float:
         return SPATULA_CLICK_INCREMENT_SIGMA_G
 
     @computed_field
+    @property
     def hold_threshold_ms(self) -> int:
         return SPATULA_HOLD_THRESHOLD_MS
 
     @computed_field
+    @property
     def hold_interval_ms(self) -> int:
         return SPATULA_HOLD_INTERVAL_MS
 
     @computed_field
+    @property
     def hold_initial_rate_g(self) -> float:
         return SPATULA_HOLD_INITIAL_RATE_G
 
     @computed_field
+    @property
     def hold_max_rate_g(self) -> float:
         return SPATULA_HOLD_MAX_RATE_G
 
     @computed_field
+    @property
     def hold_lift_rate_g_per_px(self) -> float:
         return SPATULA_HOLD_LIFT_RATE_G_PER_PX
 
@@ -288,10 +297,12 @@ class ProduceLotSchema(BaseModel):
     pesticide_residues: dict[str, float] = Field(default_factory=dict)
 
     @computed_field
+    @property
     def is_draggable(self) -> bool:
         return True
 
     @computed_field
+    @property
     def allowed_drop_targets(self) -> list[str]:
         return get_produce_lot_allowed_drop_targets()
 
@@ -303,10 +314,12 @@ class PrintedLabelTicketSchema(BaseModel):
     received_date: str = ""
 
     @computed_field
+    @property
     def is_draggable(self) -> bool:
         return True
 
     @computed_field
+    @property
     def allowed_drop_targets(self) -> list[str]:
         return get_lims_label_ticket_allowed_drop_targets()
 
@@ -319,10 +332,12 @@ class ContainerLabelSchema(BaseModel):
     received_date: str | None = None
 
     @computed_field
+    @property
     def is_draggable(self) -> bool:
         return True
 
     @computed_field
+    @property
     def allowed_drop_targets(self) -> list[str]:
         return get_sample_label_allowed_drop_targets()
 
@@ -350,12 +365,14 @@ class LimsReceptionSchema(BaseModel):
     acknowledged_net_mass_g: float | None = None
 
     @computed_field
+    @property
     def net_mass_g(self) -> float | None:
         if self.measured_gross_mass_g is None:
             return None
         return max(0.0, self.measured_gross_mass_g - self.packaging_tare_mass_g)
 
     @computed_field
+    @property
     def is_mass_check_acknowledged(self) -> bool:
         """Whether the operator vouched for the calculation currently on screen.
 
@@ -412,6 +429,7 @@ class WorkbenchToolSchema(BaseModel):
     calibration_context: CalibrationContextSchema | None = None
 
     @computed_field
+    @property
     def sample_label_text(self) -> str | None:
         lims_label = next((label for label in self.labels if label.label_kind == "lims"), None)
         if lims_label is not None:
@@ -420,38 +438,45 @@ class WorkbenchToolSchema(BaseModel):
         return manual_label.text if manual_label is not None else None
 
     @computed_field
+    @property
     def sample_label_received_date(self) -> str | None:
         lims_label = next((label for label in self.labels if label.label_kind == "lims"), None)
         return lims_label.received_date if lims_label is not None else None
 
     @computed_field
+    @property
     def allowed_drop_targets(self) -> list[str]:
         return get_tool_allowed_drop_targets(self.tool_type)
 
     @computed_field
+    @property
     def is_discardable(self) -> bool:
         return can_tool_be_discarded(self.tool_type)
 
     @computed_field
+    @property
     def is_storable(self) -> bool:
         return can_tool_be_stored(self.tool_type)
 
     @computed_field
+    @property
     def can_store(self) -> bool:
         return self.is_storable and not self._contained_entities()
 
     @computed_field
+    @property
     def can_seal(self) -> bool:
         return can_tool_seal(self.tool_type)
 
     @computed_field
+    @property
     def can_receive_produce(self) -> bool:
         return can_tool_receive_produce(self.tool_type)
 
     @computed_field
+    @property
     def can_receive_liquids(self) -> bool:
         return can_tool_receive_liquids(self.tool_type)
-
 
     def _contained_entities(self) -> list[ContainedEntitySchema]:
         return [
@@ -462,6 +487,7 @@ class WorkbenchToolSchema(BaseModel):
         ]
 
     @computed_field
+    @property
     def containment(self) -> ContainmentSchema:
         accepts: list[ContainmentRuleSchema] = []
         can_receive_contents = can_tool_receive_contents(self.tool_type, self.is_sealed)
@@ -488,6 +514,7 @@ class WorkbenchToolSchema(BaseModel):
         )
 
     @computed_field
+    @property
     def is_draggable(self) -> bool:
         return len(get_tool_allowed_drop_targets(self.tool_type)) > 0
 
@@ -500,10 +527,12 @@ class WorkbenchSlotSchema(BaseModel):
     surface_produce_fractions: list[ProduceFractionSchema] = Field(default_factory=list)
 
     @computed_field
+    @property
     def drop_target_types(self) -> list[str]:
         return ["workbench_slot"]
 
     @computed_field
+    @property
     def children(self) -> list[ContainedEntitySchema]:
         return self._contained_entities()
 
@@ -514,6 +543,7 @@ class WorkbenchSlotSchema(BaseModel):
         ]
 
     @computed_field
+    @property
     def containment(self) -> ContainmentSchema:
         children = self._contained_entities()
         remaining_capacity = max(1 - len(children), 0)
@@ -540,10 +570,12 @@ class RackSlotSchema(BaseModel):
     tool: WorkbenchToolSchema | None = None
 
     @computed_field
+    @property
     def drop_target_types(self) -> list[str]:
         return ["rack_slot"]
 
     @computed_field
+    @property
     def children(self) -> list[ContainedEntitySchema]:
         return self._contained_entities()
 
@@ -551,6 +583,7 @@ class RackSlotSchema(BaseModel):
         return [_tool_entity(self.tool)] if self.tool is not None else []
 
     @computed_field
+    @property
     def containment(self) -> ContainmentSchema:
         children = self._contained_entities()
         remaining_capacity = max(1 - len(children), 0)
@@ -569,10 +602,12 @@ class RackSchema(BaseModel):
     state: Literal["available", "loaded", "locked", "completed"] = "available"
 
     @computed_field
+    @property
     def is_draggable(self) -> bool:
         return self.state == "available"
 
     @computed_field
+    @property
     def allowed_drop_targets(self) -> list[str]:
         if not self.is_draggable:
             return []
@@ -593,6 +628,7 @@ class TrashSampleLabelEntrySchema(BaseModel):
     label: ContainerLabelSchema
 
     @computed_field
+    @property
     def sample_label_text(self) -> str:
         return self.label.text
 
@@ -629,6 +665,7 @@ class WorkspaceWidgetSchema(BaseModel):
     produce_material_states: list[ProduceMaterialStateSchema] = Field(default_factory=list, exclude=True)
 
     @computed_field
+    @property
     def drop_target_types(self) -> list[str]:
         targets: list[str] = []
         if self.widget_type == "cryogenic_grinder":
@@ -644,22 +681,27 @@ class WorkspaceWidgetSchema(BaseModel):
         return targets
 
     @computed_field
+    @property
     def is_draggable(self) -> bool:
         return self._can_store()
 
     @computed_field
+    @property
     def allowed_drop_targets(self) -> list[str]:
         return ["workspace_canvas"] if self.is_draggable else []
 
     @computed_field
+    @property
     def is_storable(self) -> bool:
         return can_workspace_widget_be_stored(self.id)
 
     @computed_field
+    @property
     def can_store(self) -> bool:
         return self._can_store()
 
     @computed_field
+    @property
     def children(self) -> list[ContainedEntitySchema]:
         return self._contained_entities()
 
@@ -671,6 +713,7 @@ class WorkspaceWidgetSchema(BaseModel):
         ]
 
     @computed_field
+    @property
     def containment(self) -> ContainmentSchema | None:
         children = self._contained_entities()
         if self.widget_type == "cryogenic_grinder":
@@ -700,16 +743,19 @@ class WorkspaceWidgetSchema(BaseModel):
         return None
 
     @computed_field
+    @property
     def grinder_can_start(self) -> bool:
         if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
             return False
         return self.grinder_start_block_reason is None
 
     @computed_field
+    @property
     def centrifuge_can_start(self) -> bool:
         return self.centrifuge_start_block_reason is None
 
     @computed_field
+    @property
     def centrifuge_start_block_reason(self) -> str | None:
         return get_centrifuge_start_block_reason(
             widget_type=self.widget_type,
@@ -718,6 +764,7 @@ class WorkspaceWidgetSchema(BaseModel):
         )
 
     @computed_field
+    @property
     def grinder_start_block_reason(self) -> str | None:
         if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
             return "not_grinder"
@@ -729,6 +776,7 @@ class WorkspaceWidgetSchema(BaseModel):
         )
 
     @computed_field
+    @property
     def grinder_display_mode(self) -> str | None:
         if self.widget_type != "cryogenic_grinder" or self.id != "grinder":
             return None
