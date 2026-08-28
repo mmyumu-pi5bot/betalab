@@ -1015,6 +1015,43 @@ class TestRunSequenceWithCalibration:
         assert reloaded.traces[0].transition == original.traces[0].transition
         assert reloaded.traces[0].acquisition == original.traces[0].acquisition
 
+    def test_roundtrip_preserves_the_declared_calibration_ladder(self, tmp_path) -> None:
+        """The ladder is part of the frozen method, so it must survive a reload.
+
+        The method file handed to the platform writes one ``Conc.(n)`` column per
+        declared level; a snapshot that loses the ladder on the way out of the
+        database exports a method with no concentration column at all.
+        """
+        repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
+        service = ExperimentRuntimeService(repository=repository)
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 25.0)
+        _load_rack_into_instrument(service, exp_id)
+        method = replace(APPLE_PESTICIDES_MRM_V1, calibration_levels_ng_per_ml=(1.0, 5.0, 20.0))
+        RunSequenceService(service, method_resolver=lambda _method_id: method).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id="rack_slot_1",
+                        sample_name="Cal 25",
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename="cal_25.mzML",
+                    )
+                ],
+            ),
+        )
+
+        reloaded_experiment = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        instrument = next(w for w in reloaded_experiment.workspace.widgets if w.id == "instrument")
+        snapshot = instrument.sequence_runs[0].method_snapshot
+
+        assert snapshot.calibration_levels_ng_per_ml == (1.0, 5.0, 20.0)
+        assert isinstance(snapshot.calibration_levels_ng_per_ml, tuple)
+
     def test_a_pre_trace_run_reloads_without_traces(self, tmp_path) -> None:
         """Explicit migration: runs acquired before traces existed keep their metadata.
 
