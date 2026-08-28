@@ -159,7 +159,7 @@ class TestInjectionDocument:
         assert measure["time"] == [1.0, 1.008333, 1.016667]
         assert set(measure["channels"]) == {"1", "2"}
         assert measure["main_channel"] == 1
-        assert len(measure["channels"]["2"]["raw_ampl"]) == len(measure["time"])
+        assert len(measure["channels"]["2"]["ampl"]) == len(measure["time"])
 
     def test_the_time_step_is_the_mean_interval_in_minutes(self) -> None:
         method = _method()
@@ -192,8 +192,8 @@ class TestInjectionDocument:
         document = build_injection_document(_injection(method), method)
 
         channel = document["measures"][0]["channels"]["1"]
-        assert channel["raw_ampl"] == [0.0, 100.0, 20.0]
-        assert "ampl" not in channel
+        assert channel["ampl"] == [0.0, 100.0, 20.0]
+        assert "raw_ampl" not in channel
         assert channel["ampl_min"] == 0.0
         assert channel["ampl_max"] == 100.0
 
@@ -224,7 +224,7 @@ class TestInjectionDocument:
         measure = document["measures"][0]
         assert measure["time"] == [1.0, 1.016667, 1.033333]
         # Interpolated onto the axis, and zero where the qualifier was not watching.
-        assert measure["channels"]["2"]["raw_ampl"] == [0.0, 30.0, 0.0]
+        assert measure["channels"]["2"]["ampl"] == [0.0, 30.0, 0.0]
 
     def test_an_empty_channel_yields_an_empty_measure_rather_than_a_gap(self) -> None:
         method = _method(("boscalid",))
@@ -238,7 +238,7 @@ class TestInjectionDocument:
         measure = document["measures"][0]
         assert measure["time"] == []
         assert measure["time_step"] == 0.0
-        assert measure["channels"]["1"]["raw_ampl"] == []
+        assert measure["channels"]["1"]["ampl"] == []
         assert measure["channels"]["1"]["ampl_max"] == 0.0
 
 

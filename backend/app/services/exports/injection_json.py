@@ -9,10 +9,10 @@ file, and this module is where Betalab plays that role.
 
 Two things are deliberately *absent* rather than empty:
 
-* **No smoothed copy.** Only ``raw_ampl`` is written. Which filter to run over
-  a trace is a processing decision, and it belongs to whoever integrates the
-  peak — writing a second, pre-filtered array would be Betalab making that
-  choice on their behalf.
+* **No smoothed copy.** ``ampl`` carries the raw trace and nothing else is
+  written beside it. Which filter to run over a trace is a processing decision,
+  and it belongs to whoever integrates the peak — writing a second,
+  pre-filtered array would be Betalab making that choice on their behalf.
 * **No peak-picking verdict.** The platform names its own strategy from its own
   configuration. A key for it here would be an instrument claiming to have
   chosen a peak, which it never does.
@@ -84,7 +84,7 @@ def _build_channel(
     transition = slot.transition
     amplitudes = _align_to_axis(trace, axis_s)
     return {
-        "raw_ampl": amplitudes,
+        "ampl": amplitudes,
         "ampl_min": min(amplitudes, default=0.0),
         "ampl_max": max(amplitudes, default=0.0),
         "segment": slot.seg_id,
