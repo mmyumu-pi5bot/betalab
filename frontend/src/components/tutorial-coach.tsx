@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { dropDraftQuantityAnchor } from "@/components/drop-draft-card";
+import { dropDraftConfirmAnchor, dropDraftQuantityAnchor } from "@/components/drop-draft-card";
 
 import {
+  getDropDraftPresentation,
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
   getMethodWalkPresentation,
@@ -14,17 +15,22 @@ import {
   getTutorialInventoryCategoryPresentation,
   getTutorialStepPresentation,
   isTutorialActionTool,
+  methodLevelsMatchLadder,
+  resolveDropDraftStage,
+  type DropDraftStage,
   type LimsTutorialField,
   type MethodWalkStage,
   type TutorialAction,
   type TutorialActionTool,
   type TutorialCountdown,
   type TutorialEvaluation,
+  type TutorialQuantity,
   type TutorialStepPresentation,
 } from "@/lib/tutorial-engine";
 import type { TutorialIntervention } from "@/lib/tutorial-action-guard";
 import { LAYER } from "@/lib/layers";
 import type { Experiment } from "@/types/experiment";
+import { translateNow, useT } from "@/lib/i18n";
 
 type TutorialCoachProps = {
   active: boolean;
@@ -97,8 +103,9 @@ function applySpotlightStyle(
 }
 
 // Anchors that only become actionable once the spatula is in hand: loading it from
-// an open container, and pouring out of it onto the balance.
-const spatulaAnchorPrefixes = ["spatula-load-powder:", "spatula-dose:"];
+// an open container, pouring out of it onto the balance, and emptying what is left
+// into the trash.
+const spatulaAnchorPrefixes = ["spatula-load-powder:", "spatula-dose:", "spatula-discard:"];
 
 function findDirectAnchor(anchor: string): HTMLElement | null {
   if (anchor.startsWith("cut-apples-")) {
@@ -144,9 +151,24 @@ type AnchorResolution = {
   accessTarget: AccessTarget;
   actionTool: TutorialActionTool | null;
   collapsedCategoryLabel: string | null;
+  dropDraftConfirmLabel: string | null;
+  dropDraftStage: DropDraftStage | null;
   limsField: LimsTutorialField | null;
   methodWalkStage: MethodWalkStage | null;
   target: HTMLElement | null;
+};
+
+// Every branch of resolveAnchor answers one sub-step and leaves the rest unset, so
+// they are spelled once here rather than re-listed as nulls in each return.
+const unresolvedAnchor: AnchorResolution = {
+  accessTarget: null,
+  actionTool: null,
+  collapsedCategoryLabel: null,
+  dropDraftConfirmLabel: null,
+  dropDraftStage: null,
+  limsField: null,
+  methodWalkStage: null,
+  target: null,
 };
 
 // An inventory item sitting in a collapsed section cannot be dragged, and its
@@ -158,7 +180,10 @@ function findCollapsedCategoryToggle(
   const category = target.closest<HTMLElement>("[data-tutorial-category]");
   const toggle = category?.querySelector<HTMLElement>('button[aria-expanded="false"]');
   return category && toggle
-    ? { label: category.dataset.tutorialCategoryLabel ?? "Inventory", toggle }
+    ? {
+        label: category.dataset.tutorialCategoryLabel ?? translateNow("coach.inventoryFallback"),
+        toggle,
+      }
     : null;
 }
 
@@ -173,12 +198,12 @@ function isActionDrivenAnchor(anchor: string) {
   );
 }
 
-// The spatula can be put down still holding powder, and a step that pours out of it
-// then reads as impossible: the balance is highlighted, holding it does nothing. The
-// loading anchor needs no equivalent, since its own step already says to take the
-// spatula first.
+// The spatula can be put down still holding powder, and a step that pours it out or
+// empties it then reads as impossible: the balance or the trash is highlighted, and
+// clicking it does nothing. The loading anchor needs no equivalent, since its own
+// step already says to take the spatula first.
 function pendingSpatulaPickup(anchor: string): TutorialActionTool | null {
-  if (!anchor.startsWith("spatula-dose:")) {
+  if (!anchor.startsWith("spatula-dose:") && !anchor.startsWith("spatula-discard:")) {
     return null;
   }
   const spatula = document.querySelector<HTMLElement>('[data-tutorial-anchor="action-spatula"]');
@@ -208,28 +233,39 @@ function isActionToolInUse(experiment: Experiment, tool: TutorialActionTool) {
 // exists only in the state that calls for it, and they are read deepest-first so
 // progress inside the modal always wins over the button that opened it — which
 // stays mounted behind the overlay.
-function resolveMethodWalk(): {
+function resolveMethodWalk(experiment: Experiment): {
   methodWalkStage: MethodWalkStage | null;
   target: HTMLElement | null;
 } {
-  // The save leaves every field exactly as it was, so only the editor's own
-  // confirmation distinguishes "saved" from "still typing".
+  const field = findDirectAnchor("method-editor-calibration-levels");
+  if (field) {
+    // The value is read off the input because nothing else records it: the method
+    // is unchanged on the server until the save lands. Levels that disagree with
+    // the rack are checked before the save is even offered — and again after it,
+    // since saving them does not make them right.
+    const declared = (field as HTMLInputElement).value ?? "";
+    if (declared.trim().length === 0) {
+      return { methodWalkStage: "levels", target: field };
+    }
+    if (!methodLevelsMatchLadder(experiment, declared)) {
+      return { methodWalkStage: "levels-mismatch", target: field };
+    }
+    // The save leaves every field exactly as it was, so only the editor's own
+    // confirmation distinguishes "saved" from "still typing".
+    const savedNotice = findDirectAnchor("method-editor-saved");
+    return savedNotice
+      ? {
+          methodWalkStage: "close-manager",
+          target: findDirectAnchor("method-manager-close") ?? savedNotice,
+        }
+      : { methodWalkStage: "save", target: findDirectAnchor("method-editor-save") ?? field };
+  }
   const saved = findDirectAnchor("method-editor-saved");
   if (saved) {
     return {
       methodWalkStage: "close-manager",
       target: findDirectAnchor("method-manager-close") ?? saved,
     };
-  }
-  const field = findDirectAnchor("method-editor-calibration-levels");
-  if (field) {
-    // A filled field means the typing is done and only the save is left. The
-    // value is read off the input because nothing else records it: the method is
-    // unchanged on the server until the save lands.
-    const isFilled = (field as HTMLInputElement).value?.trim().length > 0;
-    return isFilled
-      ? { methodWalkStage: "save", target: findDirectAnchor("method-editor-save") ?? field }
-      : { methodWalkStage: "levels", target: field };
   }
   // The editor is refusing a built-in, so duplication has to come first. The
   // notice and the Duplicate button sit in different branches of the modal, so
@@ -247,18 +283,25 @@ function resolveMethodWalk(): {
     return { methodWalkStage: "edit-tab", target: editTab };
   }
   // Out of the modal. Duplicating already pointed the console at the copy, so
-  // there is no selection left to make; what matters is whether the method now
-  // selected actually declares a ladder. The console publishes that count
-  // because it cannot be read off the select's options, and a method declaring
-  // none has to send the learner back into the manager rather than forward.
+  // there is no selection left to make; what matters is what the method now
+  // selected actually declares. The console publishes the saved ladder because it
+  // cannot be read off the select's options, and a method that declares none — or
+  // declares one the rack does not hold — has to send the learner back into the
+  // manager rather than forward into a run that would misreport every result.
   const declaringSelect = document.querySelector<HTMLElement>(
     '[data-tutorial-anchor="console-method-select"]:not([data-tutorial-declared-levels="0"])',
   );
   if (declaringSelect) {
-    return {
-      methodWalkStage: "launch",
-      target: findDirectAnchor("instrument-launch") ?? declaringSelect,
-    };
+    const declared = declaringSelect.dataset.tutorialDeclaredLevelValues ?? "";
+    return methodLevelsMatchLadder(experiment, declared)
+      ? {
+          methodWalkStage: "launch",
+          target: findDirectAnchor("instrument-launch") ?? declaringSelect,
+        }
+      : {
+          methodWalkStage: "reopen-levels",
+          target: findDirectAnchor("instrument-manage-methods") ?? declaringSelect,
+        };
   }
   // Not in the modal yet: the step's own wording still describes the whole walk.
   return {
@@ -269,24 +312,50 @@ function resolveMethodWalk(): {
   };
 }
 
+// The number sitting in the dosing box right now. Nothing else records it: the
+// draft lives in React state the coach cannot see, and the command is not sent
+// until the dialog is confirmed.
+function readDropDraftAmount(input: HTMLElement): number | null {
+  const typed = Number.parseFloat((input as HTMLInputElement).value ?? "");
+  return Number.isFinite(typed) ? typed : null;
+}
+
+// The step's amount only applies to the dialog the step is about. A dialog the
+// learner opened for something else measures something else, and is left to the
+// step's own wording rather than told to hold grams of dry ice.
+function expectedQuantityForDialog(
+  input: HTMLElement,
+  expected: TutorialQuantity | null,
+): TutorialQuantity | null {
+  const dialogUnit = input.dataset.tutorialUnit;
+  return expected && (!dialogUnit || dialogUnit === expected.unitLabel) ? expected : null;
+}
+
 function resolveAnchor(
   anchor: string,
   experiment: Experiment,
   guideActionTool: boolean,
+  expectedQuantity: TutorialQuantity | null,
 ): AnchorResolution {
   // A dosing dialog is a hard gate: it went up because a drop landed and it will
   // not clear until an amount is confirmed. Whatever the step was pointing at is
-  // therefore stale — the drag it described already happened — so the amount box
-  // takes the light until the dialog is gone.
+  // therefore stale — the drag it described already happened — so the dialog takes
+  // the light until it is gone: first the amount box, then, once the box holds the
+  // amount the step asked for, the button that sends it.
   const dropDraftQuantity = findDirectAnchor(dropDraftQuantityAnchor);
   if (dropDraftQuantity) {
+    const stage = resolveDropDraftStage(
+      readDropDraftAmount(dropDraftQuantity),
+      expectedQuantityForDialog(dropDraftQuantity, expectedQuantity),
+    );
+    const confirm = findDirectAnchor(dropDraftConfirmAnchor);
     return {
-      accessTarget: null,
-      actionTool: null,
-      collapsedCategoryLabel: null,
-      limsField: null,
-      methodWalkStage: null,
-      target: dropDraftQuantity,
+      ...unresolvedAnchor,
+      // The label is read off the button rather than assumed: the same dialog
+      // sends "Add", "Take vial" or "Spawn" depending on what was dropped.
+      dropDraftConfirmLabel: confirm?.textContent?.trim() || null,
+      dropDraftStage: stage,
+      target: stage === "confirm" && confirm ? confirm : dropDraftQuantity,
     };
   }
   if (guideActionTool && !isActionDrivenAnchor(anchor)) {
@@ -294,11 +363,8 @@ function resolveAnchor(
     const selectedAction = findSelectedActionTool();
     if (selectedAction && !isActionToolInUse(experiment, selectedAction.tool)) {
       return {
-        accessTarget: null,
+        ...unresolvedAnchor,
         actionTool: selectedAction.tool,
-        collapsedCategoryLabel: null,
-        limsField: null,
-        methodWalkStage: null,
         target: selectedAction.target,
       };
     }
@@ -309,14 +375,7 @@ function resolveAnchor(
       '[data-tutorial-anchor="lims-mass-summary"]',
     );
     if (!massSummary || massSummary.getAttribute("aria-pressed") !== "true") {
-      return {
-        accessTarget: null,
-        actionTool: null,
-        collapsedCategoryLabel: null,
-        limsField: "mass-summary",
-        methodWalkStage: null,
-        target: massSummary,
-      };
+      return { ...unresolvedAnchor, limsField: "mass-summary", target: massSummary };
     }
     const fields: Array<{
       anchor: string;
@@ -344,22 +403,12 @@ function resolveAnchor(
         `[data-tutorial-anchor="${field.anchor}"]`,
       );
       if (!input || !field.matches(input.value)) {
-        return {
-          accessTarget: null,
-          actionTool: null,
-          collapsedCategoryLabel: null,
-          limsField: field.field,
-          methodWalkStage: null,
-          target: input,
-        };
+        return { ...unresolvedAnchor, limsField: field.field, target: input };
       }
     }
     return {
-      accessTarget: null,
-      actionTool: null,
-      collapsedCategoryLabel: null,
+      ...unresolvedAnchor,
       limsField: "create-record",
-      methodWalkStage: null,
       target: document.querySelector<HTMLElement>(
         '[data-tutorial-anchor="lims-create-record"]',
       ),
@@ -370,61 +419,35 @@ function resolveAnchor(
     const collapsedCategory = findCollapsedCategoryToggle(directTarget);
     return collapsedCategory
       ? {
-          accessTarget: null,
-          actionTool: null,
+          ...unresolvedAnchor,
           collapsedCategoryLabel: collapsedCategory.label,
-          limsField: null,
-          methodWalkStage: null,
           target: collapsedCategory.toggle,
         }
-      : {
-          accessTarget: null,
-          actionTool: null,
-          collapsedCategoryLabel: null,
-          limsField: null,
-          methodWalkStage: null,
-          target: directTarget,
-        };
+      : { ...unresolvedAnchor, target: directTarget };
   }
   if (anchor === "instrument-manage-methods-next") {
-    const walk = resolveMethodWalk();
+    const walk = resolveMethodWalk(experiment);
     return {
-      accessTarget: null,
-      actionTool: null,
-      collapsedCategoryLabel: null,
-      limsField: null,
+      ...unresolvedAnchor,
       methodWalkStage: walk.methodWalkStage,
       target: walk.target,
     };
   }
   if (anchor === "basket-received-bag" || anchor.startsWith("basket-produce-")) {
     return {
+      ...unresolvedAnchor,
       accessTarget: "basket",
-      actionTool: null,
-      collapsedCategoryLabel: null,
-      limsField: null,
-      methodWalkStage: null,
       target: document.querySelector<HTMLElement>('[data-testid="basket-open-button"]'),
     };
   }
   if (anchor.startsWith("trash-tool-") || anchor.startsWith("trash-produce-lot-")) {
     return {
+      ...unresolvedAnchor,
       accessTarget: "trash",
-      actionTool: null,
-      collapsedCategoryLabel: null,
-      limsField: null,
-      methodWalkStage: null,
       target: document.querySelector<HTMLElement>('[data-testid="trash-dropzone"]'),
     };
   }
-  return {
-    accessTarget: null,
-    actionTool: null,
-    collapsedCategoryLabel: null,
-    limsField: null,
-    methodWalkStage: null,
-    target: null,
-  };
+  return unresolvedAnchor;
 }
 
 type TutorialActionKind = TutorialAction["kind"];
@@ -703,17 +726,16 @@ function TutorialDropSpotlight({ anchor }: { anchor: string }) {
 function getAccessTargetPresentation(accessTarget: Exclude<AccessTarget, null>) {
   return accessTarget === "basket"
     ? {
-        action: { kind: "click" as const, label: "Click the highlighted basket" },
-        hint: "The tutorial will highlight the required item as soon as the container is open.",
-        instruction:
-          "Click the highlighted Produce basket to open it. The sample bag or apples will then appear inside.",
-        title: "Open the Produce basket",
+        action: { kind: "click" as const, label: translateNow("coach.openBasket.label") },
+        hint: translateNow("coach.openBasket.hint"),
+        instruction: translateNow("coach.openBasket.instruction"),
+        title: translateNow("coach.openBasket.title"),
       }
     : {
-        action: { kind: "click" as const, label: "Click the highlighted trash" },
-        hint: "The tutorial will highlight the required item as soon as the container is open.",
-        instruction: "Click the highlighted Trash to open it. The item to recover will then appear inside.",
-        title: "Open the Trash",
+        action: { kind: "click" as const, label: translateNow("coach.openTrash.label") },
+        hint: translateNow("coach.openBasket.hint"),
+        instruction: translateNow("coach.openTrash.instruction"),
+        title: translateNow("coach.openTrash.title"),
       };
 }
 
@@ -726,6 +748,9 @@ function resolvePresentation({
   actionTool,
   collapsedCategoryLabel,
   currentStepPresentation,
+  dropDraftConfirmLabel,
+  dropDraftStage,
+  expectedQuantity,
   experiment,
   intervention,
   limsField,
@@ -736,6 +761,9 @@ function resolvePresentation({
   actionTool: TutorialActionTool | null;
   collapsedCategoryLabel: string | null;
   currentStepPresentation: TutorialStepPresentation | null;
+  dropDraftConfirmLabel: string | null;
+  dropDraftStage: DropDraftStage | null;
+  expectedQuantity: TutorialQuantity | null;
   experiment: Experiment;
   intervention: TutorialIntervention | null;
   limsField: LimsTutorialField | null;
@@ -749,6 +777,15 @@ function resolvePresentation({
       instruction: intervention.instruction,
       title: intervention.title,
     };
+  }
+  // An open dosing dialog outranks everything else: the step's own wording still
+  // describes the drag that put it there.
+  if (dropDraftStage && expectedQuantity) {
+    return getDropDraftPresentation(
+      dropDraftStage,
+      expectedQuantity,
+      dropDraftConfirmLabel ?? translateNow("draft.add"),
+    );
   }
   if (actionTool) {
     return getTutorialActionToolPresentation(actionTool);
@@ -783,6 +820,7 @@ export function TutorialCoach({
   onRestart,
   onResume,
 }: TutorialCoachProps) {
+  const t = useT();
   const badgeRef = useRef<HTMLSpanElement | null>(null);
   // Keyed on the resolved element, not on the anchor: a single step walks through
   // several targets (put the tool away, open the inventory section, then the item),
@@ -792,6 +830,8 @@ export function TutorialCoach({
   const [accessTarget, setAccessTarget] = useState<AccessTarget>(null);
   const [actionTool, setActionTool] = useState<TutorialActionTool | null>(null);
   const [collapsedCategoryLabel, setCollapsedCategoryLabel] = useState<string | null>(null);
+  const [dropDraftConfirmLabel, setDropDraftConfirmLabel] = useState<string | null>(null);
+  const [dropDraftStage, setDropDraftStage] = useState<DropDraftStage | null>(null);
   const [limsField, setLimsField] = useState<LimsTutorialField | null>(null);
   const [methodWalkStage, setMethodWalkStage] = useState<MethodWalkStage | null>(null);
   const [pickupTool, setPickupTool] = useState<TutorialActionTool | null>(null);
@@ -805,6 +845,21 @@ export function TutorialCoach({
   const dropAnchor = intervention
     ? null
     : evaluation.currentStep?.dropAnchor?.(evaluation.experiment) ?? null;
+  const stepQuantity = intervention
+    ? null
+    : evaluation.currentStep?.expectedQuantity?.(evaluation.experiment) ?? null;
+  // Rebuilt from its own two values: the step hands back a fresh object on every
+  // render, and the spotlight effect would tear itself down and re-observe the
+  // whole document each time that identity changed.
+  const expectedAmount = stepQuantity?.amount ?? null;
+  const expectedUnitLabel = stepQuantity?.unitLabel ?? null;
+  const expectedQuantity = useMemo(
+    () =>
+      expectedAmount !== null && expectedUnitLabel !== null
+        ? { amount: expectedAmount, unitLabel: expectedUnitLabel }
+        : null,
+    [expectedAmount, expectedUnitLabel],
+  );
   useEffect(() => {
     if (!active || !anchor) {
       revealedTargetRef.current = null;
@@ -820,7 +875,12 @@ export function TutorialCoach({
 
     const update = () => {
       const spotlight = spotlightRef.current;
-      const resolution = resolveAnchor(anchor, evaluation.experiment, guideActionTool);
+      const resolution = resolveAnchor(
+        anchor,
+        evaluation.experiment,
+        guideActionTool,
+        expectedQuantity,
+      );
       const target = resolution.target;
       setAccessTarget((current) =>
         current === resolution.accessTarget ? current : resolution.accessTarget,
@@ -830,6 +890,12 @@ export function TutorialCoach({
       );
       setCollapsedCategoryLabel((current) =>
         current === resolution.collapsedCategoryLabel ? current : resolution.collapsedCategoryLabel,
+      );
+      setDropDraftConfirmLabel((current) =>
+        current === resolution.dropDraftConfirmLabel ? current : resolution.dropDraftConfirmLabel,
+      );
+      setDropDraftStage((current) =>
+        current === resolution.dropDraftStage ? current : resolution.dropDraftStage,
       );
       setLimsField((current) => current === resolution.limsField ? current : resolution.limsField);
       setMethodWalkStage((current) =>
@@ -867,7 +933,12 @@ export function TutorialCoach({
     };
 
     const revealTargetOnce = () => {
-      const target = resolveAnchor(anchor, evaluation.experiment, guideActionTool).target;
+      const target = resolveAnchor(
+        anchor,
+        evaluation.experiment,
+        guideActionTool,
+        expectedQuantity,
+      ).target;
       if (!target || revealedTargetRef.current === target) {
         return;
       }
@@ -906,13 +977,16 @@ export function TutorialCoach({
       window.removeEventListener("scroll", handleViewportChange, true);
       document.removeEventListener("input", handleFormInput, true);
     };
-  }, [active, anchor, evaluation.experiment, guideActionTool]);
+  }, [active, anchor, evaluation.experiment, expectedQuantity, guideActionTool]);
 
   const displayedPresentation = resolvePresentation({
     accessTarget,
     actionTool,
     collapsedCategoryLabel,
     currentStepPresentation,
+    dropDraftConfirmLabel,
+    dropDraftStage,
+    expectedQuantity,
     experiment: evaluation.experiment,
     intervention,
     limsField,
@@ -927,13 +1001,13 @@ export function TutorialCoach({
   if (!active) {
     return (
       <button
-        aria-label="Resume tutorial"
+        aria-label={t("coach.resume")}
         className="fixed bottom-5 right-5 rounded-full border-2 border-amber-400 bg-white px-5 py-3 text-sm font-semibold text-sky-800 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_18px_42px_rgba(15,23,42,0.2)] transition hover:border-amber-500 hover:bg-amber-50"
         onClick={onResume}
         style={{ zIndex: LAYER.coachPanel }}
         type="button"
       >
-        Resume tutorial
+        {t("coach.resume")}
       </button>
     );
   }
@@ -970,7 +1044,7 @@ export function TutorialCoach({
       </div>
 
       <aside
-        aria-label="Guided tutorial"
+        aria-label={t("coach.title")}
         aria-live="polite"
         className="fixed inset-x-3 bottom-3 max-h-[min(70vh,34rem)] overflow-y-auto rounded-[1.6rem] border-2 border-amber-400 bg-white/95 p-5 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_24px_80px_rgba(15,23,42,0.28)] backdrop-blur md:inset-x-auto md:bottom-5 md:right-5 md:w-[24rem]"
         style={{ zIndex: LAYER.coachPanel }}
@@ -978,20 +1052,23 @@ export function TutorialCoach({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">
-              Guided tutorial
+              {t("coach.title")}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              {evaluation.currentChapter.title} · {evaluation.progressPercent}%
+              {t("coach.chapterProgress", {
+                chapter: t(evaluation.currentChapter.title),
+                percent: evaluation.progressPercent,
+              })}
             </p>
           </div>
           {evaluation.isComplete ? null : (
             <button
-              aria-label="Pause tutorial"
+              aria-label={t("coach.pause")}
               className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
               onClick={onPause}
               type="button"
             >
-              Pause
+              {t("coach.pauseShort")}
             </button>
           )}
         </div>
@@ -1067,31 +1144,31 @@ export function TutorialCoach({
           </div>
         ) : (
           <div className="mt-5">
-            <h2 className="text-lg font-semibold text-emerald-800">Tutorial complete</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              The calibration point and sample have been acquired. Switch this experiment to
-              free mode to keep working without the coach, or restart the tutorial.
-            </p>
+            <h2 className="text-lg font-semibold text-emerald-800">{t("coach.complete")}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{t("coach.completeBody")}</p>
             <button
               className="mt-4 w-full rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
               onClick={onFinish}
               type="button"
             >
-              Switch to free mode
+              {t("coach.switchToFreeMode")}
             </button>
           </div>
         )}
 
         <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <span className="text-xs text-slate-500">
-            {evaluation.completedStepIds.length}/{evaluation.totalStepCount} objectives
+            {t("coach.objectives", {
+              done: evaluation.completedStepIds.length,
+              total: evaluation.totalStepCount,
+            })}
           </span>
           <button
             className="text-xs font-semibold text-rose-700 transition hover:text-rose-900"
             onClick={() => void onRestart()}
             type="button"
           >
-            Restart
+            {t("coach.restart")}
           </button>
         </div>
       </aside>

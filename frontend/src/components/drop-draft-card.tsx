@@ -8,6 +8,11 @@ import { TemperatureIndicator } from "@/components/temperature-indicator";
 //: at has already happened and the only thing left to do is type and confirm.
 export const dropDraftQuantityAnchor = "drop-draft-quantity";
 
+//: The button that actually sends the dose. The coach spotlights it as a second
+//: beat, once the amount in the box is the one the step asked for, so typing and
+//: sending never read as a single move.
+export const dropDraftConfirmAnchor = "drop-draft-confirm";
+
 export type DropDraftField = {
   ariaLabel: string;
   id: string;
@@ -99,6 +104,7 @@ export function DropDraftForm({
         ) : null}
         <button
           className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+          data-tutorial-anchor={dropDraftConfirmAnchor}
           onClick={onConfirm}
           type="button"
         >

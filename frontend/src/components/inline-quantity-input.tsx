@@ -78,6 +78,10 @@ export function InlineQuantityInput({
         aria-label={ariaLabel}
         className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0 text-right text-[11px] font-semibold text-slate-900 outline-none transition focus:border-slate-400"
         data-tutorial-anchor={tutorialAnchor}
+        // Published alongside the anchor so the coach can tell the dialog it is
+        // guiding from one the learner opened for something else: an amount in
+        // grams has no business being typed into a box measured in mL.
+        data-tutorial-unit={tutorialAnchor ? unitLabel : undefined}
         draggable={false}
         min={0}
         onBlur={(event) => {

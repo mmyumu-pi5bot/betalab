@@ -1,3 +1,5 @@
+import { translateNow, type MessageKey, type MessageParams } from "@/lib/i18n";
+import { enMessages } from "@/lib/i18n/messages/en";
 import type { Experiment } from "@/types/experiment";
 import type {
   BenchToolInstance,
@@ -7,21 +9,38 @@ import type {
 
 export const CALIBRATION_SAMPLE_TUTORIAL_ID = "calibration-sample-v1";
 
+/** A message the tutorial shows, named by catalogue key and resolved on display. */
+export type TutorialText = MessageKey | { key: MessageKey; params: MessageParams };
+
+function textKey(text: TutorialText): MessageKey {
+  return typeof text === "string" ? text : text.key;
+}
+
+export function resolveTutorialText(text: TutorialText): string {
+  return typeof text === "string" ? translateNow(text) : translateNow(text.key, text.params);
+}
+
 export type TutorialChapter = {
   id: string;
-  title: string;
+  title: MessageKey;
   stepIds: string[];
 };
 
 export type TutorialStep = {
   id: string;
   chapterId: string;
-  title: string;
-  instruction: string;
-  hint: string;
+  // Catalogue references, not text: the steps are built once at module load,
+  // while the language can change at any point afterwards.
+  title: TutorialText;
+  instruction: TutorialText;
+  hint: TutorialText;
   prerequisites: string[];
   anchor: (experiment: Experiment) => string | null;
   dropAnchor?: (experiment: Experiment) => string | null;
+  // The amount the dosing dialog this step opens is waiting for, when the step
+  // asks for one. It is what lets the coach tell a half-typed box from a box the
+  // learner can send.
+  expectedQuantity?: (experiment: Experiment) => TutorialQuantity | null;
   isSatisfied: (experiment: Experiment) => boolean;
   // A step the learner may have to redo. Completion is otherwise permanent — it is
   // persisted across reloads, and several steps stop being satisfied by design once
@@ -34,22 +53,24 @@ export type TutorialStep = {
 // A step that ends in a drag has two places to point at: the item to pick up and
 // the place to release it. Both come out of the same branching resolver so the
 // highlighted source and destination can never describe different sub-steps.
-export type TutorialTarget = {
+type TutorialTarget = {
   anchor: string;
   dropAnchor?: string | null;
+  expectedQuantity?: TutorialQuantity | null;
 };
 
 function fromTarget(resolve: (experiment: Experiment) => TutorialTarget) {
   return {
     anchor: (experiment: Experiment) => resolve(experiment).anchor,
     dropAnchor: (experiment: Experiment) => resolve(experiment).dropAnchor ?? null,
+    expectedQuantity: (experiment: Experiment) => resolve(experiment).expectedQuantity ?? null,
   };
 }
 
-export type TutorialStepPresentation = Pick<
-  TutorialStep,
-  "title" | "instruction" | "hint"
-> & {
+export type TutorialStepPresentation = {
+  title: string;
+  instruction: string;
+  hint: string;
   action?: TutorialAction;
   // A hard time limit the simulation starts enforcing the moment this step's action
   // lands. Carried apart from the instruction because a deadline buried in a
@@ -83,7 +104,7 @@ export function getTutorialCountdown(experiment: Experiment): TutorialCountdown 
     1,
   );
   return {
-    label: "Seal the tube and start the vortex",
+    label: translateNow("tutorial.gettutorialcountdown.label"),
     remainingSeconds: Math.max((1 - progress) * cementationWindowSeconds, 0),
     totalSeconds: cementationWindowSeconds,
   };
@@ -94,6 +115,67 @@ export type TutorialAction = {
   label: string;
 };
 
+/**
+ * An amount a dosing dialog is waiting for. A drop that opens such a dialog is
+ * really two gestures — type the value, then send it — and rolling them into one
+ * instruction hides the only moment where a wrong amount can still be caught.
+ */
+export type TutorialQuantity = {
+  amount: number;
+  unitLabel: string;
+};
+
+/** Which half of an open dosing dialog the learner still has to do. */
+export type DropDraftStage = "amount" | "confirm";
+
+// The dialog sends exactly what the box holds, so there is no band of "close
+// enough" to honour: the tolerance only absorbs the float error of parsing a
+// value like 0.005 back out of the input.
+const quantityTolerance = 1e-9;
+
+function formatTutorialQuantity(quantity: TutorialQuantity) {
+  return `${quantity.amount} ${quantity.unitLabel}`;
+}
+
+/**
+ * Null when the step never named an amount: the coach then leaves the dialog
+ * alone and keeps showing the step's own wording, as it did before amounts were
+ * spelled out.
+ */
+export function resolveDropDraftStage(
+  typedAmount: number | null,
+  expected: TutorialQuantity | null,
+): DropDraftStage | null {
+  if (!expected) {
+    return null;
+  }
+  return typedAmount !== null && Math.abs(typedAmount - expected.amount) <= quantityTolerance
+    ? "confirm"
+    : "amount";
+}
+
+export function getDropDraftPresentation(
+  stage: DropDraftStage,
+  expected: TutorialQuantity,
+  confirmLabel: string,
+): TutorialStepPresentation {
+  const amount = formatTutorialQuantity(expected);
+  if (stage === "confirm") {
+    return {
+      title: translateNow("coach.dropDraft.confirm.title"),
+      instruction: translateNow("coach.dropDraft.confirm.instruction", { p0: amount, p1: confirmLabel }),
+      hint: translateNow("coach.dropDraft.confirm.hint"),
+      action: { kind: "click", label: translateNow("coach.dropDraft.confirm.label", { p0: confirmLabel }) },
+    };
+  }
+  return {
+    title: translateNow("coach.dropDraft.amount.title"),
+    instruction: translateNow("coach.dropDraft.amount.instruction", { p0: amount, p1: confirmLabel }),
+    hint: translateNow("coach.dropDraft.amount.hint"),
+    action: { kind: "type", label: translateNow("coach.dropDraft.amount.label", { p0: amount }) },
+  };
+}
+
 export type LimsTutorialField =
   | "mass-summary"
   | "orchard"
@@ -103,10 +185,10 @@ export type LimsTutorialField =
 
 export type TutorialActionTool = "knife" | "pipette" | "spatula";
 
-const tutorialActionTools: Record<TutorialActionTool, { key: string; name: string }> = {
-  knife: { key: "K", name: "Stainless steel knife" },
-  pipette: { key: "P", name: "Micropipette" },
-  spatula: { key: "S", name: "Powder spatula" },
+const tutorialActionTools: Record<TutorialActionTool, { key: string; nameKey: MessageKey }> = {
+  knife: { key: "K", nameKey: "tutorial.tool.knife" },
+  pipette: { key: "P", nameKey: "tutorial.tool.pipette" },
+  spatula: { key: "S", nameKey: "tutorial.tool.spatula" },
 };
 
 export function isTutorialActionTool(value: string): value is TutorialActionTool {
@@ -116,14 +198,13 @@ export function isTutorialActionTool(value: string): value is TutorialActionTool
 export function getTutorialActionToolPresentation(
   tool: TutorialActionTool,
 ): TutorialStepPresentation {
-  const { key, name } = tutorialActionTools[tool];
+  const { key, nameKey } = tutorialActionTools[tool];
+  const name = translateNow(nameKey);
   return {
-    title: `Put the ${name} away`,
-    instruction:
-      `The ${name} is still in hand, and drag and drop stays disabled while a tool is selected. ` +
-      `Click the highlighted ${name} in Actions, or press ${key}, to put it away.`,
-    hint: "As soon as no tool is selected, the tutorial highlights what to drag for this step.",
-    action: { kind: "click", label: `Click it again or press ${key}` },
+    title: translateNow("tutorial.gettutorialactiontoolpresentation.title", { p0: name }),
+    instruction: translateNow("tutorial.gettutorialactiontoolpresentation.instruction", { p0: name, p1: name, p2: key }),
+    hint: translateNow("tutorial.gettutorialactiontoolpresentation.hint"),
+    action: { kind: "click", label: translateNow("tutorial.gettutorialactiontoolpresentation.label", { p0: key }) },
   };
 }
 
@@ -133,14 +214,13 @@ export function getTutorialActionToolPresentation(
 export function getTutorialActionToolPickupPresentation(
   tool: TutorialActionTool,
 ): TutorialStepPresentation {
-  const { key, name } = tutorialActionTools[tool];
+  const { key, nameKey } = tutorialActionTools[tool];
+  const name = translateNow(nameKey);
   return {
-    title: `Pick the ${name} back up`,
-    instruction:
-      `The ${name} still holds what was left of the last pour, but it is not in hand. ` +
-      `Click the highlighted ${name} in Actions, or press ${key}, to take it again.`,
-    hint: `Pouring stops when you release, so the ${name} keeps whatever it has left.`,
-    action: { kind: "click", label: `Click it or press ${key}` },
+    title: translateNow("tutorial.gettutorialactiontoolpickuppresentation.title", { p0: name }),
+    instruction: translateNow("tutorial.gettutorialactiontoolpickuppresentation.instruction", { p0: name, p1: name, p2: key }),
+    hint: translateNow("tutorial.gettutorialactiontoolpickuppresentation.hint", { p0: name }),
+    action: { kind: "click", label: translateNow("tutorial.gettutorialactiontoolpickuppresentation.label", { p0: key }) },
   };
 }
 
@@ -152,16 +232,14 @@ export function getTutorialInventoryCategoryPresentation(
   label: string,
 ): TutorialStepPresentation {
   return {
-    title: `Open the ${label} section`,
-    instruction:
-      `The item for this step is in the ${label} section of the Inventory, and that section ` +
-      "is collapsed. Click the highlighted header to expand it.",
-    hint: "The tutorial will highlight the item to use as soon as the section is open.",
-    action: { kind: "click", label: `Click the highlighted ${label} header` },
+    title: translateNow("tutorial.gettutorialinventorycategorypresentation.title", { p0: label }),
+    instruction: translateNow("tutorial.gettutorialinventorycategorypresentation.instruction", { p0: label }),
+    hint: translateNow("tutorial.gettutorialinventorycategorypresentation.hint"),
+    action: { kind: "click", label: translateNow("tutorial.gettutorialinventorycategorypresentation.label", { p0: label }) },
   };
 }
 
-export type LimsTutorialValues = {
+type LimsTutorialValues = {
   orchardName: string;
   harvestDate: string;
   indicativeMassG: number;
@@ -170,10 +248,10 @@ export type LimsTutorialValues = {
   packagingTareMassG: number;
 };
 
-export type TutorialDefinition = {
+type TutorialDefinition = {
   id: string;
   version: 1;
-  title: string;
+  title: MessageKey;
   chapters: TutorialChapter[];
   steps: TutorialStep[];
   isComplete: (experiment: Experiment) => boolean;
@@ -372,11 +450,106 @@ function extractionTube(experiment: Experiment) {
   return candidates.find((tool) => !trashedToolIds.has(tool.id)) ?? candidates[0];
 }
 
-function preparedCalibrationVial(experiment: Experiment) {
-  return allTools(experiment).find(
+// A real batch runs a full ladder: one point forces the curve through the origin
+// and the result is only as good as that assumption. But preparing five standards
+// is the same five gestures repeated, and repeating them is not what the tutorial
+// teaches — what it teaches is that a standard is taken labelled, spiked with the
+// same ISTD dose as the sample, capped and declared. One point carries all of that,
+// and free mode is where a learner builds the series out to as many rungs as they
+// want. Everything that branches on the ladder reads this array rather than
+// counting to five, so lengthening it is a one-line change — only the wording
+// that names the rungs lives in the tutorial catalog.
+//
+// The rung is the top of the range rather than the middle. The residues a lot can
+// carry span three decades — chlorpyrifos-methyl sits near 1 ug/kg, captan can reach
+// 1500 — so a single point at 500 still leaves a compound above it in roughly two
+// lots out of three: meeting a result outside the calibrated range stays the normal
+// case rather than a rarity, which is the situation a dilution answers.
+export const CALIBRATION_LADDER_NG_PER_ML: readonly number[] = [500];
+
+function calibrationVials(experiment: Experiment) {
+  return allTools(experiment).filter(
     (tool) =>
       tool.toolType === "sample_vial" &&
       (tool.calibrationContext?.levelNgPerMl ?? 0) > 0,
+  );
+}
+
+function preparedCalibrationVial(experiment: Experiment, levelNgPerMl: number) {
+  return calibrationVials(experiment).find(
+    (tool) => tool.calibrationContext?.levelNgPerMl === levelNgPerMl,
+  );
+}
+
+/** The rung the learner still has to prepare, or undefined once the ladder is complete. */
+function nextCalibrationLevel(experiment: Experiment): number | undefined {
+  return CALIBRATION_LADDER_NG_PER_ML.find((level) => !spikedCalibrationVial(experiment, level));
+}
+
+function calibrationLevelsOf(tools: readonly BenchToolInstance[]): number[] {
+  const levels = tools
+    .map((tool) => tool.calibrationContext?.levelNgPerMl ?? 0)
+    .filter((level) => level > 0);
+  // Two vials at the same level are two injections of one point, not two points:
+  // the method declares one concentration column per level, not per vial.
+  return [...new Set(levels)].sort((left, right) => left - right);
+}
+
+/**
+ * The rungs the run will actually carry, ascending.
+ *
+ * The rack is what answers this once the batch is staged: those are the vials the
+ * needle will draw from, and the method has to declare them and nothing else. A
+ * standard that was taken off the shelf and then discarded — the wrong level
+ * picked by mistake — is not part of the curve, so reading the bench at large
+ * would declare a rung that was never injected and rescale every result computed
+ * against it. Before staging there is no rack to read, so the vials on hand
+ * answer instead, and an empty bench falls back to the ladder the tutorial is
+ * about to walk.
+ */
+function preparedLadderLevels(experiment: Experiment): readonly number[] {
+  const staged = calibrationLevelsOf(
+    experiment.rack.slots.flatMap((slot) => (slot.tool ? [slot.tool] : [])),
+  );
+  if (staged.length > 0) {
+    return staged;
+  }
+  const discardedIds = new Set(experiment.trash.children.map((tool) => tool.id));
+  const onHand = calibrationLevelsOf(
+    calibrationVials(experiment).filter((vial) => !discardedIds.has(vial.id)),
+  );
+  return onHand.length > 0 ? onHand : CALIBRATION_LADDER_NG_PER_ML;
+}
+
+/** The ladder as the learner has to retype it into the method editor. */
+function preparedLadderText(experiment: Experiment): string {
+  return preparedLadderLevels(experiment).join(", ");
+}
+
+// The field is free text — "1, 10, 50, 200, 500", "1 10 50 200 500", a stray
+// trailing comma — so it is read as the numbers it contains rather than compared
+// as a string.
+function parseDeclaredLevels(text: string): number[] {
+  return text
+    .split(/[,;\s]+/)
+    .filter((token) => token.length > 0)
+    .map((token) => Number.parseFloat(token))
+    .filter((level) => Number.isFinite(level));
+}
+
+/**
+ * Whether a declared ladder describes the standards actually in the rack. The
+ * order is not part of the answer: the method file numbers its concentration
+ * columns in the order given, but what makes the curve right is which
+ * concentrations are in it. A wrong or missing rung is what silently rescales
+ * every result computed against the run.
+ */
+export function methodLevelsMatchLadder(experiment: Experiment, declared: string): boolean {
+  const expected = preparedLadderLevels(experiment);
+  const typed = parseDeclaredLevels(declared).sort((left, right) => left - right);
+  return (
+    typed.length === expected.length &&
+    typed.every((level, index) => Math.abs(level - expected[index]) <= 1e-9)
   );
 }
 
@@ -393,11 +566,20 @@ function preparedCalibrationVial(experiment: Experiment) {
 // numbers. The dialog offers the tube's 0.05 mL, so this has to be typed.
 const calibrationIstdVolumeMl = 0.005;
 
-function spikedCalibrationVial(experiment: Experiment) {
-  const vial = preparedCalibrationVial(experiment);
+function spikedCalibrationVial(experiment: Experiment, levelNgPerMl: number) {
+  const vial = preparedCalibrationVial(experiment, levelNgPerMl);
   return vial?.liquids.some((liquid) => liquid.liquidId === "istd_solution")
     ? vial
     : undefined;
+}
+
+/** Every rung prepared *and* spiked: an unspiked standard breaks the ISTD ratio. */
+function spikedCalibrationLadder(experiment: Experiment) {
+  return CALIBRATION_LADDER_NG_PER_ML.map((level) => spikedCalibrationVial(experiment, level));
+}
+
+function hasCompleteCalibrationLadder(experiment: Experiment) {
+  return spikedCalibrationLadder(experiment).every(Boolean);
 }
 
 // The autosampler needle cannot reach the last 0.05 mL of a vial, so an aliquot at or
@@ -549,6 +731,8 @@ export type MethodWalkStage =
   | "duplicate"
   | "edit-tab"
   | "levels"
+  | "levels-mismatch"
+  | "reopen-levels"
   | "save"
   | "close-manager"
   | "launch";
@@ -559,60 +743,66 @@ export function getMethodWalkPresentation(
 ): TutorialStepPresentation {
   if (stage === "edit-tab") {
     return {
-      title: "Open the method editor",
-      instruction: "Click the highlighted Edit tab to open the editor for this method.",
-      hint: "The Details tab only shows the method; the concentration ladder is edited on Edit.",
-      action: { kind: "click", label: "Open Edit" },
+      title: translateNow("tutorial.getmethodwalkpresentation.title"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction"),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint"),
+      action: { kind: "click", label: translateNow("tutorial.getmethodwalkpresentation.label") },
     };
   }
   if (stage === "duplicate") {
     return {
-      title: "Duplicate the method first",
-      instruction:
-        "This is a built-in method and cannot be edited. Click the highlighted Duplicate method to obtain an editable copy, then edit the copy.",
-      hint: "The copy keeps every transition of the original — only its identity changes.",
-      action: { kind: "click", label: "Duplicate method" },
+      title: translateNow("tutorial.getmethodwalkpresentation.title2"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction2"),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint2"),
+      action: { kind: "click", label: translateNow("tutorial.getmethodwalkpresentation.label2") },
     };
   }
   if (stage === "save") {
     return {
-      title: "Save the method",
-      instruction:
-        "Click the highlighted Save as new version to store the copy with its calibration ladder.",
-      hint: "Nothing is written until you save: leaving the editor now would lose the level you typed.",
-      action: { kind: "click", label: "Save as new version" },
+      title: translateNow("tutorial.getmethodwalkpresentation.title3"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction3"),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint3"),
+      action: { kind: "click", label: translateNow("tutorial.getmethodwalkpresentation.label3") },
     };
   }
   if (stage === "close-manager") {
     return {
-      title: "Close the method manager",
-      instruction:
-        "The method is saved. Close the highlighted method manager to get back to the acquisition console.",
-      hint: "The console still has to be pointed at the copy — the manager does not switch it for you.",
-      action: { kind: "click", label: "Close the manager" },
+      title: translateNow("tutorial.getmethodwalkpresentation.title4"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction4"),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint4"),
+      action: { kind: "click", label: translateNow("tutorial.getmethodwalkpresentation.label4") },
     };
   }
   if (stage === "launch") {
     return {
-      title: "Launch the acquisition",
-      instruction:
-        "The method is saved and the console is already pointed at it — duplicating switched the selection for you. Click Launch acquisition to record the sequence.",
-      hint: "The declared ladder only reaches the method file through a run: the step confirms itself once the sequence starts.",
-      action: { kind: "click", label: "Launch acquisition" },
+      title: translateNow("tutorial.getmethodwalkpresentation.title5"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction5"),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint5"),
+      action: { kind: "click", label: translateNow("tutorial.getmethodwalkpresentation.label5") },
     };
   }
-  const level = preparedCalibrationVial(experiment)?.calibrationContext?.levelNgPerMl;
-  const levelText = level ? `${level}` : "the level you prepared";
+  const levelText = preparedLadderText(experiment);
+  if (stage === "levels-mismatch") {
+    return {
+      title: translateNow("tutorial.getmethodwalkpresentation.title7"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction7", { p0: levelText }),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint7", { p0: levelText }),
+      action: { kind: "type", label: translateNow("tutorial.getmethodwalkpresentation.label7", { p0: levelText }) },
+    };
+  }
+  if (stage === "reopen-levels") {
+    return {
+      title: translateNow("tutorial.getmethodwalkpresentation.title8"),
+      instruction: translateNow("tutorial.getmethodwalkpresentation.instruction8", { p0: levelText }),
+      hint: translateNow("tutorial.getmethodwalkpresentation.hint8"),
+      action: { kind: "click", label: translateNow("tutorial.getmethodwalkpresentation.label8") },
+    };
+  }
   return {
-    title: "Type the calibration level",
-    instruction:
-      `Click the highlighted Calibration levels field and enter exactly: ${levelText}. ` +
-      "Then click Save as new version, and select the copy as the acquisition method.",
-    hint:
-      level
-        ? `Your standard was prepared at ${level} ng/mL. Nothing checks the two against each other — whatever you type here is what the exported method file will claim was in the vial.`
-        : "Nothing checks this against the vial: whatever you type here is what the exported method file will claim was in the standard.",
-    action: { kind: "type", label: `Type ${levelText}` },
+    title: translateNow("tutorial.getmethodwalkpresentation.title6"),
+    instruction: translateNow("tutorial.getmethodwalkpresentation.instruction6", { p0: levelText }),
+    hint: translateNow("tutorial.getmethodwalkpresentation.hint6", { p0: levelText }),
+    action: { kind: "type", label: translateNow("tutorial.getmethodwalkpresentation.label6", { p0: levelText }) },
   };
 }
 
@@ -626,57 +816,53 @@ export function getLimsTutorialFieldPresentation(
   const netMass = values.measuredNetMassG?.toFixed(1) ?? "the calculated";
   if (field === "mass-summary") {
     return {
-      title: "Review the reception weighing",
-      instruction:
-        `Click the highlighted mass summary and review the calculation: ${grossMass} g − ${packagingTareMass} g = ${netMass} g. ` +
-        "The balance measured the sealed bag; subtracting the known bag tare gives the actual mass received.",
-      hint: `The declared mass on the field label is ${values.indicativeMassG} g. It is a reference value and may differ slightly from the measured net mass of ${netMass} g.`,
-      action: { kind: "click", label: "Review the mass calculation" },
+      title: translateNow("tutorial.getlimstutorialfieldpresentation.title"),
+      instruction: translateNow("tutorial.getlimstutorialfieldpresentation.instruction", { p0: grossMass, p1: packagingTareMass, p2: netMass }),
+      hint: translateNow("tutorial.getlimstutorialfieldpresentation.hint", { p0: values.indicativeMassG, p1: netMass }),
+      action: { kind: "click", label: translateNow("tutorial.getlimstutorialfieldpresentation.label") },
     };
   }
   if (field === "orchard") {
     return {
-      title: "Enter the orchard / producer",
-      instruction: `Click the highlighted field and enter exactly: ${values.orchardName}. This value comes from the field label on the sample bag.`,
-      hint: `The Gross balance currently reads ${grossMass} g. Keep the bag on it while completing the LIMS record.`,
-      action: { kind: "type", label: `Type ${values.orchardName}` },
+      title: translateNow("tutorial.getlimstutorialfieldpresentation.title2"),
+      instruction: translateNow("tutorial.getlimstutorialfieldpresentation.instruction2", { p0: values.orchardName }),
+      hint: translateNow("tutorial.getlimstutorialfieldpresentation.hint2", { p0: grossMass }),
+      action: { kind: "type", label: translateNow("tutorial.getlimstutorialfieldpresentation.label2", { p0: values.orchardName }) },
     };
   }
   if (field === "harvest-date") {
     return {
-      title: "Enter the harvest date",
-      instruction: `Click the highlighted date field and enter ${values.harvestDate}, as printed on the sample bag label.`,
-      hint: "Use the field-label date, not today's date or the experiment creation date.",
-      action: { kind: "type", label: `Enter ${values.harvestDate}` },
+      title: translateNow("tutorial.getlimstutorialfieldpresentation.title3"),
+      instruction: translateNow("tutorial.getlimstutorialfieldpresentation.instruction3", { p0: values.harvestDate }),
+      hint: translateNow("tutorial.getlimstutorialfieldpresentation.hint3"),
+      action: { kind: "type", label: translateNow("tutorial.getlimstutorialfieldpresentation.label3", { p0: values.harvestDate }) },
     };
   }
   if (field === "indicative-mass") {
     return {
-      title: "Enter the declared mass",
-      instruction: `Click the highlighted field and enter ${values.indicativeMassG} g. This is the approximate net mass declared on the bag label.`,
-      hint: `Do not copy the ${grossMass} g gross reading or the ${netMass} g calculated net mass here. This field preserves what the sender declared.`,
-      action: { kind: "type", label: `Type ${values.indicativeMassG}` },
+      title: translateNow("tutorial.getlimstutorialfieldpresentation.title4"),
+      instruction: translateNow("tutorial.getlimstutorialfieldpresentation.instruction4", { p0: values.indicativeMassG }),
+      hint: translateNow("tutorial.getlimstutorialfieldpresentation.hint4", { p0: grossMass, p1: netMass }),
+      action: { kind: "type", label: translateNow("tutorial.getlimstutorialfieldpresentation.label4", { p0: values.indicativeMassG }) },
     };
   }
   return {
-    title: "Create the LIMS record",
-    instruction:
-      "Leave Sample mass empty for now, then click the highlighted Create LIMS record button.",
-    hint: `The LIMS keeps the ${grossMass} g measured gross mass, the ${packagingTareMass} g bag tare, and the ${netMass} g calculated received net mass. Sample mass will be measured later on the Analytical balance.`,
-    action: { kind: "click", label: "Click Create LIMS record" },
+    title: translateNow("tutorial.getlimstutorialfieldpresentation.title5"),
+    instruction: translateNow("tutorial.getlimstutorialfieldpresentation.instruction5"),
+    hint: translateNow("tutorial.getlimstutorialfieldpresentation.hint5", { p0: grossMass, p1: packagingTareMass, p2: netMass }),
+    action: { kind: "click", label: translateNow("tutorial.getlimstutorialfieldpresentation.label5") },
   };
 }
 
 function registerSamplePresentation(experiment: Experiment): TutorialStepPresentation {
   if (!workspaceWidget(experiment, "lims")?.isPresent) {
     return {
-      title: "Deploy the LIMS terminal",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the highlighted LIMS terminal and drop it onto the central workspace.",
+      title: translateNow("tutorial.registersamplepresentation.title"),
+      instruction: translateNow("tutorial.registersamplepresentation.instruction"),
       hint: hasSampleBagOnGrossBalance(experiment)
         ? "Keep the bag on the balance while you deploy and complete the LIMS terminal."
         : "After deploying the terminal, return the sample bag to the Gross balance before entering the LIMS data.",
-      action: { kind: "drag", label: "Drag to workspace" },
+      action: { kind: "drag", label: translateNow("tutorial.registersamplepresentation.label") },
     };
   }
 
@@ -691,39 +877,37 @@ function registerSamplePresentation(experiment: Experiment): TutorialStepPresent
             ? "Drag the sample bag from its workbench station and drop it onto the Gross balance."
             : "Locate the sample bag, then drag it and drop it onto the Gross balance.";
     return {
-      title: "Return the sample bag to the Gross balance",
+      title: translateNow("tutorial.registersamplepresentation.title2"),
       instruction: sourceInstruction,
-      hint: "Keep the bag on the balance until the LIMS record is complete and its printed label has been applied.",
-      action: { kind: "drag", label: "Drag onto the balance" },
+      hint: translateNow("tutorial.registersamplepresentation.hint"),
+      action: { kind: "drag", label: translateNow("tutorial.registersamplepresentation.label2") },
     };
   }
 
   if (!experiment.limsReception.labSampleCode) {
     const values = getLimsTutorialValues(experiment);
     return {
-      title: "Create the LIMS record",
-      instruction:
-        `Review the reception mass calculation. Then enter Orchard / producer: ${values.orchardName}. Enter Harvest date: ${values.harvestDate}. Enter Declared mass from bag label: ${values.indicativeMassG} g. Leave Sample mass empty for now. Then click Create LIMS record.`,
-      hint: `The LIMS automatically keeps the ${values.measuredGrossMassG?.toFixed(1) ?? "current"} g gross reading and calculates ${values.measuredNetMassG?.toFixed(1) ?? "the net mass"} g after subtracting the ${values.packagingTareMassG.toFixed(1)} g bag tare.`,
-      action: { kind: "type", label: "Enter the values, then click" },
+      title: translateNow("tutorial.registersamplepresentation.title3"),
+      instruction: translateNow("tutorial.registersamplepresentation.instruction2", { p0: values.orchardName, p1: values.harvestDate, p2: values.indicativeMassG }),
+      hint: translateNow("tutorial.registersamplepresentation.hint2", { p0: values.measuredGrossMassG?.toFixed(1) ?? "current", p1: values.measuredNetMassG?.toFixed(1) ?? "the net mass", p2: values.packagingTareMassG.toFixed(1) }),
+      action: { kind: "type", label: translateNow("tutorial.registersamplepresentation.label3") },
     };
   }
 
   if (!experiment.limsReception.printedLabelTicket) {
     return {
-      title: "Print the LIMS label",
-      instruction: "In the LIMS terminal, click Print label.",
-      hint: "The printed label will appear in the LIMS terminal and can then be dragged.",
-      action: { kind: "click", label: "Click Print label" },
+      title: translateNow("tutorial.registersamplepresentation.title4"),
+      instruction: translateNow("tutorial.registersamplepresentation.instruction3"),
+      hint: translateNow("tutorial.registersamplepresentation.hint3"),
+      action: { kind: "click", label: translateNow("tutorial.registersamplepresentation.label4") },
     };
   }
 
   return {
-    title: "Apply the LIMS label",
-    instruction:
-      "Drag the printed LIMS label from the terminal and drop it directly onto the sample bag on the Gross balance.",
-    hint: "Once the label is attached, you can move the bag away and store the balance.",
-    action: { kind: "drag", label: "Drag label onto bag" },
+    title: translateNow("tutorial.registersamplepresentation.title5"),
+    instruction: translateNow("tutorial.registersamplepresentation.instruction4"),
+    hint: translateNow("tutorial.registersamplepresentation.hint4"),
+    action: { kind: "drag", label: translateNow("tutorial.registersamplepresentation.label5") },
   };
 }
 
@@ -768,16 +952,16 @@ function extractionEquipmentPresentation(
 ): Partial<TutorialStepPresentation> {
   if (!workspaceWidget(experiment, widgetId)?.isPresent) {
     return {
-      title: `Deploy the ${equipmentName}`,
-      instruction: `In Inventory, open Workspace equipment. Drag the highlighted ${equipmentName} and drop it onto the central workspace.`,
+      title: translateNow("tutorial.extractionequipmentpresentation.title", { p0: equipmentName }),
+      instruction: translateNow("tutorial.extractionequipmentpresentation.instruction", { p0: equipmentName }),
     };
   }
   const tube = extractionTube(experiment);
   if (!toolIsInWidget(experiment, widgetId, tube)) {
     return {
-      title: `Return the extraction tube to the ${equipmentName}`,
-      instruction: `Locate the extraction tube at the highlighted location, then drag it and drop it into the ${equipmentName}.`,
-      hint: "Moving a required item away does not reset progress; the tutorial will keep pointing to its current location.",
+      title: translateNow("tutorial.extractionequipmentpresentation.title2", { p0: equipmentName }),
+      instruction: translateNow("tutorial.extractionequipmentpresentation.instruction2", { p0: equipmentName }),
+      hint: translateNow("tutorial.extractionequipmentpresentation.hint"),
     };
   }
   const widget = workspaceWidget(experiment, widgetId);
@@ -787,8 +971,8 @@ function extractionEquipmentPresentation(
   ) {
     return {
       title: widgetId === "vortex" ? "Wait for vortex mixing" : "Wait for phase separation",
-      instruction: "Watch the highlighted progress bar. Leave the extraction tube inside until it reaches 100%.",
-      action: { kind: "wait", label: "Wait for 100%" },
+      instruction: translateNow("tutorial.extractionequipmentpresentation.instruction3"),
+      action: { kind: "wait", label: translateNow("tutorial.extractionequipmentpresentation.label") },
     };
   }
   return widgetId === "vortex"
@@ -798,13 +982,13 @@ function extractionEquipmentPresentation(
           ? "Click the highlighted Start vortex button."
           : "Click the highlighted Close button on the extraction tube before starting the mixer.",
         action: tube?.isSealed
-          ? { kind: "click", label: "Click Start vortex" }
-          : { kind: "click", label: "Click Close" },
+          ? { kind: "click", label: translateNow("tutorial.extractionequipmentpresentation.label2") }
+          : { kind: "click", label: translateNow("tutorial.extractionequipmentpresentation.label3") },
       }
     : {
-        title: "Start the centrifuge cycle",
-        instruction: "Click the highlighted Start the centrifuge button.",
-        action: { kind: "click", label: "Click Start centrifuge" },
+        title: translateNow("tutorial.extractionequipmentpresentation.title3"),
+        instruction: translateNow("tutorial.extractionequipmentpresentation.instruction4"),
+        action: { kind: "click", label: translateNow("tutorial.extractionequipmentpresentation.label4") },
       };
 }
 
@@ -838,21 +1022,19 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
   if (vial && experiment.pipette.volumeMl <= 0) {
     const tube = extractionTube(experiment);
     if (toolIsInWidget(experiment, "centrifuge", tube)) {
-      return workbenchPlacementPresentation(experiment, "extraction tube", {
-        title: "Take the tube out of the centrifuge",
-        instruction:
-          "Drag the separated extraction tube out of the Centrifuge and drop it onto an empty workbench station. Pipetting is done at the bench, not inside the instrument.",
-        hint: "The separated phases stay in place as long as the tube is moved gently.",
-        action: { kind: "drag", label: "Drag the tube to the bench" },
+      return workbenchPlacementPresentation(experiment, "tutorial.item.extractionTube", {
+        title: translateNow("tutorial.samplevialpresentation.title"),
+        instruction: translateNow("tutorial.samplevialpresentation.instruction"),
+        hint: translateNow("tutorial.samplevialpresentation.hint"),
+        action: { kind: "drag", label: translateNow("tutorial.samplevialpresentation.label") },
       });
     }
     if (tube?.isSealed) {
       return {
-        title: "Open the extraction tube",
-        instruction:
-          "Click the highlighted Open button on the extraction tube. The micropipette cannot aspirate through a sealed cap.",
-        hint: "Only the supernatant is drawn; the settled pellet stays at the bottom of the tube.",
-        action: { kind: "click", label: "Click Open" },
+        title: translateNow("tutorial.samplevialpresentation.title2"),
+        instruction: translateNow("tutorial.samplevialpresentation.instruction2"),
+        hint: translateNow("tutorial.samplevialpresentation.hint2"),
+        action: { kind: "click", label: translateNow("tutorial.samplevialpresentation.label2") },
       };
     }
   }
@@ -863,22 +1045,17 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
     if (experiment.pipette.volumeMl > 0) {
       if (pendingSampleAliquotMl(experiment) < minimumInjectableAliquotMl) {
         return {
-          title: "Draw more extract before dispensing",
-          instruction:
-            `The micropipette holds ${experiment.pipette.volumeMl.toFixed(2)} mL, which ` +
-            "would leave the vial too shallow for the autosampler needle to reach. Press " +
-            "and hold on the extraction tube again until the pipette reads about 1.00 mL.",
-          hint: "A quick click commits a single 0.05 mL step. Keep the button held down and watch the volume climb.",
-          action: { kind: "click", label: "Hold on the tube to draw more" },
+          title: translateNow("tutorial.samplevialpresentation.title3"),
+          instruction: translateNow("tutorial.samplevialpresentation.instruction3", { p0: experiment.pipette.volumeMl.toFixed(2) }),
+          hint: translateNow("tutorial.samplevialpresentation.hint3"),
+          action: { kind: "click", label: translateNow("tutorial.samplevialpresentation.label3") },
         };
       }
       return {
         title: shortVial ? "Add more extract to the vial" : "Transfer extract into the Autosampler vial",
-        instruction:
-          "The micropipette now contains extract. Press and hold on the highlighted " +
-          "Autosampler vial to dispense it, and release once the pipette is empty.",
-        hint: "The micropipette icon shows how much liquid is currently loaded.",
-        action: { kind: "click", label: "Hold on the vial to dispense" },
+        instruction: translateNow("tutorial.samplevialpresentation.instruction4"),
+        hint: translateNow("tutorial.samplevialpresentation.hint4"),
+        action: { kind: "click", label: translateNow("tutorial.samplevialpresentation.label4") },
       };
     }
     return {
@@ -890,17 +1067,16 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
           "1.00 mL, and dispense it into the same vial."
         : "Click Micropipette in Actions, or press P. Then press and hold on the separated " +
           "extraction tube until the pipette reads about 1.00 mL, and release.",
-      hint: "A quick click only draws 0.05 mL — hold until the volume gets there. How much you take does not change the measured concentration, but it must be enough to inject.",
+      hint: translateNow("tutorial.samplevialpresentation.hint5"),
       action: shortVial
-        ? { kind: "click", label: "Hold on the tube to draw 1.00 mL" }
-        : { kind: "keyboard", label: "Click pipette or press P" },
+        ? { kind: "click", label: translateNow("tutorial.samplevialpresentation.label5") }
+        : { kind: "keyboard", label: translateNow("tutorial.samplevialpresentation.label6") },
     };
   }
-  return workbenchPlacementPresentation(experiment, "Autosampler vial", {
-    title: "Deploy an Autosampler vial",
-    instruction:
-      "In Inventory, open Containers. Drag an Autosampler vial and drop it onto an empty workbench station.",
-    hint: "After placing the vial, use the Micropipette to transfer the separated extract into it.",
+  return workbenchPlacementPresentation(experiment, "tutorial.item.autosamplerVial", {
+    title: translateNow("tutorial.samplevialpresentation.title4"),
+    instruction: translateNow("tutorial.samplevialpresentation.instruction5"),
+    hint: translateNow("tutorial.samplevialpresentation.hint6"),
   });
 }
 
@@ -920,16 +1096,17 @@ function stageVialsTarget(experiment: Experiment): TutorialTarget {
         }
       : { anchor: `seal-tool-${sampleVial?.id}` };
   }
-  const calibrationVial = preparedCalibrationVial(experiment);
-  if (!toolIsInRack(experiment, calibrationVial)) {
-    return calibrationVial?.isSealed
+  const ladder = spikedCalibrationLadder(experiment);
+  const calibrationVial = ladder.find((vial) => !toolIsInRack(experiment, vial));
+  if (calibrationVial) {
+    return calibrationVial.isSealed
       ? {
           anchor: toolSourceAnchor(experiment, (tool) => tool.id === calibrationVial.id),
           dropAnchor: "widget-rack",
         }
-      : { anchor: `seal-tool-${calibrationVial?.id}` };
+      : { anchor: `seal-tool-${calibrationVial.id}` };
   }
-  const openRackVial = [sampleVial, calibrationVial].find((tool) => !tool?.isSealed);
+  const openRackVial = [sampleVial, ...ladder].find((tool) => !tool?.isSealed);
   if (openRackVial) {
     return { anchor: `seal-tool-${openRackVial.id}` };
   }
@@ -939,30 +1116,32 @@ function stageVialsTarget(experiment: Experiment): TutorialTarget {
 function stageVialsPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   if (!workspaceWidget(experiment, "rack")?.isPresent) {
     return {
-      title: "Deploy the Autosampler rack",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the Autosampler rack and drop it onto the central workspace.",
+      title: translateNow("tutorial.stagevialspresentation.title"),
+      instruction: translateNow("tutorial.stagevialspresentation.instruction"),
     };
   }
   const vials = [
-    { tool: preparedSampleVial(experiment), name: "sample vial" },
-    { tool: preparedCalibrationVial(experiment), name: "calibration vial" },
+    { tool: preparedSampleVial(experiment), name: translateNow("tutorial.item.sampleVial") },
+    ...CALIBRATION_LADDER_NG_PER_ML.map((level) => ({
+      tool: spikedCalibrationVial(experiment, level),
+      name: translateNow("tutorial.item.standardAtLevel", { p0: level }),
+    })),
   ];
   const missing = vials.find(({ tool }) => !toolIsInRack(experiment, tool));
   if (missing) {
     return missing.tool?.isSealed
       ? {
-          title: `Return the ${missing.name} to the rack`,
-          instruction: `Drag the highlighted ${missing.name} and drop it into an empty rack position.`,
+          title: translateNow("tutorial.stagevialspresentation.title2", { p0: missing.name }),
+          instruction: translateNow("tutorial.stagevialspresentation.instruction2", { p0: missing.name }),
         }
       : {
-          title: `Seal and stage the ${missing.name}`,
-          instruction: `At the highlighted location, click Close on the ${missing.name}. Then drag it into an empty rack position.`,
+          title: translateNow("tutorial.stagevialspresentation.title3", { p0: missing.name }),
+          instruction: translateNow("tutorial.stagevialspresentation.instruction3", { p0: missing.name }),
         };
   }
   return {
-    title: "Check both staged vials",
-    instruction: "Make sure both rack vials are sealed. Close any vial that is still open.",
+    title: translateNow("tutorial.stagevialspresentation.title4"),
+    instruction: translateNow("tutorial.stagevialspresentation.instruction4"),
   };
 }
 
@@ -1019,24 +1198,22 @@ function storeGrossBalanceTarget(experiment: Experiment): TutorialTarget {
 function weighReceptionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   if (!workspaceWidget(experiment, "gross_balance")?.isPresent) {
     return {
-      title: "Deploy the Gross balance",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the highlighted Gross balance and drop it onto the central workspace.",
-      action: { kind: "drag", label: "Drag to workspace" },
+      title: translateNow("tutorial.weighreceptionpresentation.title"),
+      instruction: translateNow("tutorial.weighreceptionpresentation.instruction"),
+      action: { kind: "drag", label: translateNow("tutorial.weighreceptionpresentation.label") },
     };
   }
   if (!hasSampleBagOnGrossBalance(experiment)) {
     return {
-      title: "Place the sample bag on the Gross balance",
-      instruction:
-        "Locate the highlighted sample bag, then drag it and drop it onto the Gross balance.",
-      action: { kind: "drag", label: "Drag bag onto balance" },
+      title: translateNow("tutorial.weighreceptionpresentation.title2"),
+      instruction: translateNow("tutorial.weighreceptionpresentation.instruction2"),
+      action: { kind: "drag", label: translateNow("tutorial.weighreceptionpresentation.label2") },
     };
   }
   return {
-    title: "Wait for the gross mass",
-    instruction: "Leave the bag on the Gross balance while its mass is recorded.",
-    action: { kind: "wait", label: "Wait for the mass" },
+    title: translateNow("tutorial.weighreceptionpresentation.title3"),
+    instruction: translateNow("tutorial.weighreceptionpresentation.instruction3"),
+    action: { kind: "wait", label: translateNow("tutorial.weighreceptionpresentation.label3") },
   };
 }
 
@@ -1047,6 +1224,16 @@ function weighReceptionPresentation(experiment: Experiment): Partial<TutorialSte
 // spread it leaves is roughly ±5 %, against ±20 % when the cycle is started at
 // −45 °C. Waiting costs about 40 s of simulated time at a 1:1 dry-ice ratio.
 const grinderReadyTemperatureC = -70;
+
+// A 1:1 ratio is a target, not a specification: rounding to the nearest 100 g
+// keeps the value the learner has to type readable.
+function grinderDryIceMassG(grinder: ExperimentWorkspaceWidget | undefined): number {
+  const appleMassG = (grinder?.produceLots ?? []).reduce(
+    (total, produceLot) => total + produceLot.totalMassG,
+    0,
+  );
+  return Math.max(100, Math.round(appleMassG / 100) * 100);
+}
 
 function grindSampleTarget(experiment: Experiment): TutorialTarget {
   const grinder = workspaceWidget(experiment, "grinder");
@@ -1063,7 +1250,11 @@ function grindSampleTarget(experiment: Experiment): TutorialTarget {
     };
   }
   if (!(grinder.liquids ?? []).some((liquid) => liquid.liquidId === "dry_ice_pellets")) {
-    return { anchor: "palette-item-dry_ice_pellets", dropAnchor: "widget-grinder" };
+    return {
+      anchor: "palette-item-dry_ice_pellets",
+      dropAnchor: "widget-grinder",
+      expectedQuantity: { amount: grinderDryIceMassG(grinder), unitLabel: "g" },
+    };
   }
   const lot = grinder.produceLots?.[0];
   if ((grinder.grinderRunRemainingMs ?? 0) > 0) {
@@ -1079,60 +1270,49 @@ function grindSamplePresentation(experiment: Experiment): Partial<TutorialStepPr
   const grinder = workspaceWidget(experiment, "grinder");
   if (!grinder?.isPresent) {
     return {
-      title: "Deploy the Cryogenic grinder",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the Cryogenic grinder and drop it onto the central workspace.",
-      action: { kind: "drag", label: "Drag to workspace" },
+      title: translateNow("tutorial.grindsamplepresentation.title"),
+      instruction: translateNow("tutorial.grindsamplepresentation.instruction"),
+      action: { kind: "drag", label: translateNow("tutorial.grindsamplepresentation.label") },
     };
   }
   if (!(grinder.produceLots ?? []).length) {
     return {
-      title: "Load the cut apples into the grinder",
-      instruction:
-        "Drag the cut apples from the highlighted location and drop them into the Cryogenic grinder.",
-      action: { kind: "drag", label: "Drag apples into grinder" },
+      title: translateNow("tutorial.grindsamplepresentation.title2"),
+      instruction: translateNow("tutorial.grindsamplepresentation.instruction2"),
+      action: { kind: "drag", label: translateNow("tutorial.grindsamplepresentation.label2") },
     };
   }
   if (!(grinder.liquids ?? []).some((liquid) => liquid.liquidId === "dry_ice_pellets")) {
-    const appleMassG = (grinder.produceLots ?? []).reduce(
-      (total, produceLot) => total + produceLot.totalMassG,
-      0,
-    );
-    // A 1:1 ratio is a target, not a specification: rounding to the nearest 100 g
-    // keeps the value the learner has to type readable.
-    const dryIceMassG = Math.max(100, Math.round(appleMassG / 100) * 100);
-    const formattedDryIceMassG = dryIceMassG.toFixed(0);
+    const formattedDryIceMassG = grinderDryIceMassG(grinder).toFixed(0);
     return {
-      title: "Add Dry ice pellets",
-      instruction:
-        `In Inventory, open Reagents & materials. Drag Dry ice pellets into the Cryogenic grinder. In the dosing dialog, enter ${formattedDryIceMassG} g—roughly the mass of the apples—then confirm.`,
-      hint:
-        `Using a 1:1 dry-ice-to-apple mass ratio cools the lot gradually. Do not start the grinder while the temperature is above −${Math.abs(grinderReadyTemperatureC)} °C — a warmer start grinds the apples granular instead of fine.`,
-      action: { kind: "drag", label: `Add ${formattedDryIceMassG} g dry ice` },
+      title: translateNow("tutorial.grindsamplepresentation.title3"),
+      instruction: translateNow("tutorial.grindsamplepresentation.instruction3", { p0: formattedDryIceMassG }),
+      hint: translateNow("tutorial.grindsamplepresentation.hint", { p0: Math.abs(grinderReadyTemperatureC) }),
+      action: { kind: "drag", label: translateNow("tutorial.grindsamplepresentation.label3", { p0: formattedDryIceMassG }) },
     };
   }
   if ((grinder.grinderRunRemainingMs ?? 0) > 0) {
     return {
-      title: "Wait for grinding to finish",
-      instruction: "Watch the highlighted progress bar. Do not remove the apples while the grinder is running.",
-      hint: "The tutorial will continue automatically when the material becomes ground.",
-      action: { kind: "wait", label: "Wait for 100%" },
+      title: translateNow("tutorial.grindsamplepresentation.title4"),
+      instruction: translateNow("tutorial.grindsamplepresentation.instruction4"),
+      hint: translateNow("tutorial.grindsamplepresentation.hint2"),
+      action: { kind: "wait", label: translateNow("tutorial.grindsamplepresentation.label4") },
     };
   }
   const lot = grinder.produceLots?.[0];
   if ((lot?.temperatureC ?? 20) > grinderReadyTemperatureC) {
     return {
-      title: "Wait for the apples to become cryogenic",
-      instruction: `Watch the highlighted thermometer. Wait until it reads −${Math.abs(grinderReadyTemperatureC)} °C or colder before starting the grinder.`,
-      hint: "The temperature falls over simulation ticks after the dry ice is added. Grinding a warmer lot leaves it granular, and a granular lot makes the weighed test portion unrepresentative.",
-      action: { kind: "wait", label: `Wait until −${Math.abs(grinderReadyTemperatureC)} °C` },
+      title: translateNow("tutorial.grindsamplepresentation.title5"),
+      instruction: translateNow("tutorial.grindsamplepresentation.instruction5", { p0: Math.abs(grinderReadyTemperatureC) }),
+      hint: translateNow("tutorial.grindsamplepresentation.hint3"),
+      action: { kind: "wait", label: translateNow("tutorial.grindsamplepresentation.label5", { p0: Math.abs(grinderReadyTemperatureC) }) },
     };
   }
   return {
-    title: "Start the grinder cycle",
-    instruction: "The apples are cold enough. Click the highlighted red power button on the grinder.",
-    hint: "After clicking, watch the progress indicator and leave the contents inside the grinder.",
-    action: { kind: "click", label: "Click power" },
+    title: translateNow("tutorial.grindsamplepresentation.title6"),
+    instruction: translateNow("tutorial.grindsamplepresentation.instruction6"),
+    hint: translateNow("tutorial.grindsamplepresentation.hint4"),
+    action: { kind: "click", label: translateNow("tutorial.grindsamplepresentation.label6") },
   };
 }
 
@@ -1188,49 +1368,35 @@ function spentExtractionTubePresentation(
   const hint =
     "Only this tube is lost. The ground sample is still in the storage jar, so a new " +
     "10 g test portion is all it takes to start the extraction over.";
-  const action: TutorialAction = { kind: "drag", label: "Discard the tube" };
+  const action: TutorialAction = { kind: "drag", label: translateNow("tutorial.spentextractiontubepresentation.label") };
 
   if (faults.includes("vortexed_open")) {
     return {
-      title: "The extraction tube is lost",
-      instruction:
-        "This tube was vortexed before being sealed, so its contents sprayed out and its " +
-        "walls are contaminated. Nothing can be extracted from it now. Discard it in the " +
-        "trash, then weigh a fresh test portion.",
+      title: translateNow("tutorial.spentextractiontubepresentation.title"),
+      instruction: translateNow("tutorial.spentextractiontubepresentation.instruction"),
       hint,
       action,
     };
   }
   if (faults.includes("vortexed_without_salts")) {
     return {
-      title: "The extraction tube is lost",
-      instruction:
-        "This tube was vortexed before the QuEChERS salts were added, so the sample bound " +
-        "to its walls instead of partitioning into the solvent. Discard it in the trash, " +
-        "then weigh a fresh test portion.",
+      title: translateNow("tutorial.spentextractiontubepresentation.title2"),
+      instruction: translateNow("tutorial.spentextractiontubepresentation.instruction2"),
       hint,
       action,
     };
   }
   if (faults.includes("dry_salts_wetted")) {
     return {
-      title: "The QuEChERS salts set hard",
-      instruction:
-        "The QuEChERS salts were already sitting in this dry tube when the solvent arrived, " +
-        "so they caked on contact instead of dissolving with the sample. Add the solvent " +
-        "first and the salts last. Discard this tube in the trash, then weigh a fresh test " +
-        "portion.",
+      title: translateNow("tutorial.spentextractiontubepresentation.title3"),
+      instruction: translateNow("tutorial.spentextractiontubepresentation.instruction3"),
       hint,
       action,
     };
   }
   return {
-    title: "The QuEChERS salts set hard",
-    instruction:
-      "Adding the QuEChERS salts starts an exothermic reaction, and the tube has to be " +
-      "sealed and vortexed within 15 seconds. Past that the salts cake solid around the " +
-      "sample and no extract can be recovered. Discard this tube in the trash, then weigh " +
-      "a fresh test portion — and this time deploy the Vortex mixer before adding the salts.",
+    title: translateNow("tutorial.spentextractiontubepresentation.title4"),
+    instruction: translateNow("tutorial.spentextractiontubepresentation.instruction4"),
     hint,
     action,
   };
@@ -1295,9 +1461,8 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
   }
   if (!workspaceWidget(experiment, "analytical_balance")?.isPresent) {
     return {
-      title: "Deploy the Analytical balance",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the Analytical balance and drop it onto the central workspace.",
+      title: translateNow("tutorial.analyticalweighingpresentation.title"),
+      instruction: translateNow("tutorial.analyticalweighingpresentation.instruction"),
     };
   }
   const tubeOnPan = analyticalBalanceTubeOnPan(experiment);
@@ -1307,11 +1472,10 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
     !analyticalTubeTareIsValid(experiment)
   ) {
     return {
-      title: "Replace the compromised tube",
-      instruction:
-        "This tube was tared after powder had already been added, so its Net reading can no longer teach the weighing correctly. Discard it, then deploy a fresh 50 mL tube from Inventory.",
-      hint: "The tutorial will ignore this compromised tube after it reaches the trash and point to a replacement.",
-      action: { kind: "drag", label: "Discard this tube" },
+      title: translateNow("tutorial.analyticalweighingpresentation.title2"),
+      instruction: translateNow("tutorial.analyticalweighingpresentation.instruction2"),
+      hint: translateNow("tutorial.analyticalweighingpresentation.hint"),
+      action: { kind: "drag", label: translateNow("tutorial.analyticalweighingpresentation.label") },
     };
   }
   const tube = analyticalWeighingTube(experiment);
@@ -1328,9 +1492,8 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
   }
   if (!toolIsInWidget(experiment, "analytical_balance", tube)) {
     return {
-      title: "Return the tube to the Analytical balance",
-      instruction:
-        "Drag the highlighted 50 mL tube and drop it onto the Analytical balance.",
+      title: translateNow("tutorial.analyticalweighingpresentation.title3"),
+      instruction: translateNow("tutorial.analyticalweighingpresentation.instruction3"),
     };
   }
   if (!analyticalTubeTareIsValid(experiment)) {
@@ -1338,19 +1501,47 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
       title: hasCompromisedAnalyticalTube(experiment)
         ? "Tare the replacement tube"
         : "Tare the tube",
-      instruction:
-        "The replacement tube is empty. Click Tare now so Net returns to 0.000 g before adding any powder.",
-      action: { kind: "click", label: "Click Tare" },
+      instruction: translateNow("tutorial.analyticalweighingpresentation.instruction4"),
+      action: { kind: "click", label: translateNow("tutorial.analyticalweighingpresentation.label2") },
     };
   }
   return {
-    title: "Add the test portion",
+    title: translateNow("tutorial.analyticalweighingpresentation.title4"),
     instruction: experiment.spatula.isLoaded
       ? "The spatula contains powder. Click and hold the tube on the Analytical balance until Net reaches about 10.000 g; release before 10.2 g."
       : "Click the highlighted Powder spatula in Actions, or press S. Then click the powder in the HDPE container to load it.",
     action: experiment.spatula.isLoaded
-      ? { kind: "click", label: "Hold to dose about 10.000 g" }
-      : { kind: "keyboard", label: "Click spatula or press S" },
+      ? { kind: "click", label: translateNow("tutorial.analyticalweighingpresentation.label3") }
+      : { kind: "keyboard", label: translateNow("tutorial.analyticalweighingpresentation.label4") },
+  };
+}
+
+// Whatever is left on the spatula once the portion is dosed is waste: powder never
+// goes back into the stock jar, and a tool held full blocks every drag that comes
+// next while the coach stays quiet about it — a loaded tool reads as mid-transfer.
+// The dosing has happened as soon as a tube carries the portion, and it stays
+// happened once that tube has moved on — wetted into slurry, salted, cemented or
+// thrown away. Read this way the step can be re-derived from a late experiment
+// instead of coming back to ask for an emptying nothing can perform any more.
+function testPortionHasBeenDosed(experiment: Experiment) {
+  return allTools(experiment).some(
+    (tool) =>
+      carriesTestPortion(tool) ||
+      isSpentExtractionTube(tool) ||
+      (tool.toolType === "centrifuge_tube" && tool.quechersState != null),
+  );
+}
+
+function putSpatulaAwayTarget(): TutorialTarget {
+  return { anchor: `spatula-discard:${trashAnchor}` };
+}
+
+function putSpatulaAwayPresentation(): Partial<TutorialStepPresentation> {
+  return {
+    title: translateNow("tutorial.putspatulaawaypresentation.title"),
+    instruction: translateNow("tutorial.putspatulaawaypresentation.instruction"),
+    hint: translateNow("tutorial.putspatulaawaypresentation.hint"),
+    action: { kind: "click", label: translateNow("tutorial.putspatulaawaypresentation.label") },
   };
 }
 
@@ -1359,6 +1550,13 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
 // mid-twenties, with enough headroom that the tube can warm on the bench while the
 // learner aims the salt packet and still lose nothing.
 const chilledExtractionTemperatureC = 1;
+
+// The two doses the extraction tube is built from. Both are the palette's own
+// suggested volumes, so the dialog already opens on the right number — naming
+// them here is what lets the coach say so instead of leaving the learner to
+// guess whether the suggestion is the one the step meant.
+const extractionIstdVolumeMl = 0.05;
+const extractionSolventVolumeMl = 10;
 
 function extractionTubeTemperatureC(tube: BenchToolInstance | undefined) {
   return tube?.quechersState?.temperatureC ?? 20;
@@ -1369,10 +1567,18 @@ function extractionPreparationTarget(experiment: Experiment): TutorialTarget {
   const tubeAnchor = toolSourceAnchor(experiment, (tool) => tool.id === tube?.id);
   const liquids = tube?.liquids ?? [];
   if (!liquids.some((liquid) => liquid.liquidId === "istd_solution")) {
-    return { anchor: "palette-item-istd_solution", dropAnchor: tubeAnchor };
+    return {
+      anchor: "palette-item-istd_solution",
+      dropAnchor: tubeAnchor,
+      expectedQuantity: { amount: extractionIstdVolumeMl, unitLabel: "mL" },
+    };
   }
   if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
-    return { anchor: "palette-item-acetonitrile_extraction", dropAnchor: tubeAnchor };
+    return {
+      anchor: "palette-item-acetonitrile_extraction",
+      dropAnchor: tubeAnchor,
+      expectedQuantity: { amount: extractionSolventVolumeMl, unitLabel: "mL" },
+    };
   }
   // The salts start a 15 s countdown to cementation, so the mixer has to be standing
   // on the workspace before they go in. Fetching it from the Inventory afterwards
@@ -1416,21 +1622,17 @@ function extractionPreparationPresentation(experiment: Experiment): Partial<Tuto
   const tube = extractionTube(experiment);
   const liquids = tube?.liquids ?? [];
   if (!liquids.some((liquid) => liquid.liquidId === "istd_solution")) {
-    return { title: "Add the ISTD solution", instruction: "Drag the highlighted ISTD solution onto the extraction tube. Keep 0.05 mL in the dialog, then click Confirm.", action: { kind: "drag", label: "Add 0.05 mL ISTD" } };
+    return { title: translateNow("tutorial.extractionpreparationpresentation.title"), instruction: translateNow("tutorial.extractionpreparationpresentation.instruction"), action: { kind: "drag", label: translateNow("tutorial.extractionpreparationpresentation.label") } };
   }
   if (!liquids.some((liquid) => liquid.liquidId === "acetonitrile_extraction" && liquid.volume_ml >= 9.5)) {
-    return { title: "Add the extraction solvent", instruction: "Drag the highlighted Acetonitrile onto the same tube. Enter 10 mL in the dialog, then click Confirm.", action: { kind: "drag", label: "Add 10 mL acetonitrile" } };
+    return { title: translateNow("tutorial.extractionpreparationpresentation.title2"), instruction: translateNow("tutorial.extractionpreparationpresentation.instruction2"), action: { kind: "drag", label: translateNow("tutorial.extractionpreparationpresentation.label2") } };
   }
   return {
-    title: "Deploy the Vortex mixer before the salts",
-    instruction:
-      "The salts come last, and they start an exothermic reaction the moment they " +
-      "touch the solvent: from then on you have 15 seconds to seal the tube and start " +
-      "the mixer. Deploy the Vortex mixer now so it is waiting. In Inventory, open " +
-      "Workspace equipment, then drag it onto the central workspace.",
-    hint: "Miss that window and the salts cake solid, taking the extraction with them.",
-    deadline: "15 seconds to vortex once the salts are in",
-    action: { kind: "drag", label: "Drag to workspace" },
+    title: translateNow("tutorial.extractionpreparationpresentation.title3"),
+    instruction: translateNow("tutorial.extractionpreparationpresentation.instruction3"),
+    hint: translateNow("tutorial.extractionpreparationpresentation.hint"),
+    deadline: translateNow("tutorial.extractionpreparationpresentation.deadline"),
+    action: { kind: "drag", label: translateNow("tutorial.extractionpreparationpresentation.label3") },
   };
 }
 
@@ -1438,58 +1640,43 @@ function chillExtractionPresentation(experiment: Experiment): Partial<TutorialSt
   const tube = extractionTube(experiment);
   if (toolIsInWidget(experiment, "ice_bath", tube)) {
     return {
-      title: "Wait for the tube to come down",
-      instruction:
-        "Watch the temperature on the tube standing in the ice bath. Leave it there " +
-        `until it reads under ${chilledExtractionTemperatureC} °C.`,
-      hint: "Nothing is degrading yet. The cold is being banked against the heat the salts are about to release.",
-      action: { kind: "wait", label: `Wait for under ${chilledExtractionTemperatureC} °C` },
+      title: translateNow("tutorial.chillextractionpresentation.title"),
+      instruction: translateNow("tutorial.chillextractionpresentation.instruction", { p0: chilledExtractionTemperatureC }),
+      hint: translateNow("tutorial.chillextractionpresentation.hint"),
+      action: { kind: "wait", label: translateNow("tutorial.chillextractionpresentation.label", { p0: chilledExtractionTemperatureC }) },
     };
   }
   if (!workspaceWidget(experiment, "ice_bath")?.isPresent) {
     return {
-      title: "Deploy the ice bath before the salts",
-      instruction:
-        "The salts release the same exotherm whatever the tube starts at, so the only " +
-        "way to keep the peak low is to start low. In Inventory, open MISC, then drag " +
-        "the Ice bath onto the central workspace.",
-      hint:
-        "Above 30 °C the residues start breaking down, and they do not all break down at " +
-        "the same rate. The internal standard does not degrade at all, so the ratio cannot " +
-        "correct any of it.",
-      action: { kind: "drag", label: "Drag to workspace" },
+      title: translateNow("tutorial.chillextractionpresentation.title2"),
+      instruction: translateNow("tutorial.chillextractionpresentation.instruction2"),
+      hint: translateNow("tutorial.chillextractionpresentation.hint2"),
+      action: { kind: "drag", label: translateNow("tutorial.chillextractionpresentation.label2") },
     };
   }
   return {
-    title: "Chill the tube in the ice bath",
-    instruction:
-      "Drag the extraction tube into the ice bath and leave it there until it reads " +
-      `under ${chilledExtractionTemperatureC} °C.`,
-    hint: "Salted from room temperature the tube peaks near 45 °C and loses residues even on a perfect run to the mixer.",
-    action: { kind: "drag", label: "Drag the tube into the ice bath" },
+    title: translateNow("tutorial.chillextractionpresentation.title3"),
+    instruction: translateNow("tutorial.chillextractionpresentation.instruction3", { p0: chilledExtractionTemperatureC }),
+    hint: translateNow("tutorial.chillextractionpresentation.hint3"),
+    action: { kind: "drag", label: translateNow("tutorial.chillextractionpresentation.label3") },
   };
 }
 
 function saltExtractionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   if (toolIsInWidget(experiment, "ice_bath", extractionTube(experiment))) {
-    return workbenchPlacementPresentation(experiment, "chilled tube", {
-      title: "Take the chilled tube back out",
-      instruction:
-        "Drag the tube out of the ice bath and drop it onto an empty workbench station. " +
-        "The salts cannot be poured in while the tube is standing in the ice.",
-      hint: "Out of the ice the tube climbs back slowly, so there is time to aim — the rush starts when the salts go in.",
-      action: { kind: "drag", label: "Drag the tube out of the ice bath" },
+    return workbenchPlacementPresentation(experiment, "tutorial.item.chilledTube", {
+      title: translateNow("tutorial.saltextractionpresentation.title"),
+      instruction: translateNow("tutorial.saltextractionpresentation.instruction"),
+      hint: translateNow("tutorial.saltextractionpresentation.hint"),
+      action: { kind: "drag", label: translateNow("tutorial.saltextractionpresentation.label") },
     });
   }
   return {
-    title: "Add the QuEChERS salts",
-    instruction:
-      "Drag the highlighted QuEChERS salts packet onto the extraction tube and confirm " +
-      "the addition. The countdown starts on confirmation: you then have 15 seconds to " +
-      "seal the tube, drop it into the Vortex mixer and start the cycle.",
-    hint: "Know where you are going before you confirm: seal the tube, drag it into the mixer, click Start vortex.",
-    deadline: "15 seconds start the moment you confirm",
-    action: { kind: "drag", label: "Add the salts packet" },
+    title: translateNow("tutorial.saltextractionpresentation.title2"),
+    instruction: translateNow("tutorial.saltextractionpresentation.instruction2"),
+    hint: translateNow("tutorial.saltextractionpresentation.hint2"),
+    deadline: translateNow("tutorial.saltextractionpresentation.deadline"),
+    action: { kind: "drag", label: translateNow("tutorial.saltextractionpresentation.label2") },
   };
 }
 
@@ -1513,57 +1700,80 @@ function labelSampleVialTarget(experiment: Experiment): TutorialTarget {
 function labelSampleVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   if (!workspaceWidget(experiment, "lims")?.isPresent) {
     return {
-      title: "Bring the LIMS terminal back",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the highlighted LIMS terminal and drop it onto the central workspace.",
-      hint: "The reception record is still there; you only need the terminal to print from it again.",
-      action: { kind: "drag", label: "Drag to workspace" },
+      title: translateNow("tutorial.labelsamplevialpresentation.title"),
+      instruction: translateNow("tutorial.labelsamplevialpresentation.instruction"),
+      hint: translateNow("tutorial.labelsamplevialpresentation.hint"),
+      action: { kind: "drag", label: translateNow("tutorial.labelsamplevialpresentation.label") },
     };
   }
   if (!experiment.limsReception.printedLabelTicket) {
     return {
-      title: "Print a second label",
-      instruction: "Click Print label in the LIMS terminal to print the reception label again.",
-      hint: "It is the same sample code as the bag: one reception, one identity, however many containers it passes through.",
-      action: { kind: "click", label: "Click Print label" },
+      title: translateNow("tutorial.labelsamplevialpresentation.title2"),
+      instruction: translateNow("tutorial.labelsamplevialpresentation.instruction2"),
+      hint: translateNow("tutorial.labelsamplevialpresentation.hint2"),
+      action: { kind: "click", label: translateNow("tutorial.labelsamplevialpresentation.label2") },
     };
   }
   return {
-    title: "Stick the label on the sample vial",
-    instruction: "Drag the printed LIMS label and drop it onto the sample vial.",
-    hint: "The instrument reads the rack position by position, so the vial has to say what it holds. Without the label the console line comes up empty and you type the name by hand.",
-    action: { kind: "drag", label: "Drop onto the vial" },
+    title: translateNow("tutorial.labelsamplevialpresentation.title3"),
+    instruction: translateNow("tutorial.labelsamplevialpresentation.instruction3"),
+    hint: translateNow("tutorial.labelsamplevialpresentation.hint3"),
+    action: { kind: "drag", label: translateNow("tutorial.labelsamplevialpresentation.label3") },
   };
 }
 
 function calibrationVialTarget(experiment: Experiment): TutorialTarget {
-  const standard = preparedCalibrationVial(experiment);
+  const level = nextCalibrationLevel(experiment);
+  if (level === undefined) {
+    return workbenchPlacementTarget(experiment, "palette-item-calibration_standard_vial");
+  }
+  const standard = preparedCalibrationVial(experiment, level);
   if (standard) {
     return {
       anchor: "palette-item-istd_solution",
       dropAnchor: toolSourceAnchor(experiment, (tool) => tool.id === standard.id),
+      expectedQuantity: { amount: calibrationIstdVolumeMl, unitLabel: "mL" },
     };
   }
-  return workbenchPlacementTarget(experiment, "palette-item-calibration_standard_vial");
+  // The vial dialog opens on 10 ng/mL whichever rung is next, so every level but
+  // that one has to be typed or picked before the vial can be taken.
+  return {
+    ...workbenchPlacementTarget(experiment, "palette-item-calibration_standard_vial"),
+    expectedQuantity: { amount: level, unitLabel: "ng/mL" },
+  };
 }
 
 function calibrationVialPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
-  if (preparedCalibrationVial(experiment)) {
+  const level = nextCalibrationLevel(experiment);
+  if (level === undefined) {
     return {
-      title: "Spike the standard with the ISTD",
-      instruction:
-        `Drag the highlighted ISTD solution onto the calibration vial. Replace the `
-        + `suggested volume with ${calibrationIstdVolumeMl} mL, then click Confirm.`,
-      hint: "The standard needs the same ISTD concentration as the sample, not the same volume: the tube took 0.05 mL into 10 mL of solvent, and this vial holds 1 mL. Ten times too much here would bias every ratio by ten.",
-      action: { kind: "drag", label: `Add ${calibrationIstdVolumeMl} mL ISTD` },
+      title: translateNow("tutorial.calibrationvialpresentation.title3"),
+      instruction: translateNow("tutorial.calibrationvialpresentation.instruction3", {
+        p0: preparedLadderText(experiment),
+      }),
+      hint: translateNow("tutorial.calibrationvialpresentation.hint3"),
     };
   }
-  return workbenchPlacementPresentation(experiment, "Calibration standard vial", {
-    title: "Take a calibration point off the shelf",
-    instruction:
-      "In Inventory, open Containers. Drag the highlighted Calibration standard vial onto an empty workbench station, set the level to 10 ng/mL, then click Take vial.",
-    hint: "Nobody dilutes a standard at the bench on the morning of a batch: the levels are prepared, dispensed and labelled in advance. The label already says which level is in the vial.",
-    action: { kind: "drag", label: "Take a 10 ng/mL vial" },
+  const done = CALIBRATION_LADDER_NG_PER_ML.indexOf(level);
+  const total = CALIBRATION_LADDER_NG_PER_ML.length;
+  if (preparedCalibrationVial(experiment, level)) {
+    return {
+      title: translateNow("tutorial.calibrationvialpresentation.title", { p0: level }),
+      instruction: translateNow("tutorial.calibrationvialpresentation.instruction", { p0: calibrationIstdVolumeMl, p1: level }),
+      hint: translateNow("tutorial.calibrationvialpresentation.hint"),
+      action: { kind: "drag", label: translateNow("tutorial.calibrationvialpresentation.label", { p0: calibrationIstdVolumeMl }) },
+    };
+  }
+  return workbenchPlacementPresentation(experiment, "tutorial.item.calibrationStandardVial", {
+    // Counting the rungs out loud only helps while there is more than one to
+    // count: "point 1 of 1" reads as a stutter, not as progress.
+    title:
+      total > 1
+        ? translateNow("tutorial.calibrationvialpresentation.title2", { p0: done + 1, p1: total })
+        : translateNow("tutorial.calibrationvialpresentation.title4", { p0: level }),
+    instruction: translateNow("tutorial.calibrationvialpresentation.instruction2", { p0: level }),
+    hint: translateNow("tutorial.calibrationvialpresentation.hint2", { p0: level }),
+    action: { kind: "drag", label: translateNow("tutorial.calibrationvialpresentation.label2", { p0: level }) },
   });
 }
 
@@ -1596,25 +1806,25 @@ function workbenchPlacementTarget(experiment: Experiment, anchor: string): Tutor
     : { anchor: addWorkbenchStationAnchor };
 }
 
-function addWorkbenchStationPresentation(itemName: string): Partial<TutorialStepPresentation> {
+function addWorkbenchStationPresentation(itemNameKey: MessageKey): Partial<TutorialStepPresentation> {
   return {
-    title: "Add a workbench station",
-    instruction:
-      `There is no empty station for the ${itemName}. ` +
-      "Click the highlighted + button in the Workbench header to add one.",
-    hint: "Once the new station appears, the tutorial points back to the item to place.",
-    action: { kind: "click", label: "Click +" },
+    title: translateNow("tutorial.addworkbenchstationpresentation.title"),
+    instruction: translateNow("tutorial.addworkbenchstationpresentation.instruction", {
+      p0: translateNow(itemNameKey),
+    }),
+    hint: translateNow("tutorial.addworkbenchstationpresentation.hint"),
+    action: { kind: "click", label: translateNow("tutorial.addworkbenchstationpresentation.label") },
   };
 }
 
 function workbenchPlacementPresentation(
   experiment: Experiment,
-  itemName: string,
+  itemNameKey: MessageKey,
   presentation: Partial<TutorialStepPresentation>,
 ): Partial<TutorialStepPresentation> {
   return hasEmptyWorkbenchStation(experiment)
     ? presentation
-    : addWorkbenchStationPresentation(itemName);
+    : addWorkbenchStationPresentation(itemNameKey);
 }
 
 function storeGrinderTarget(experiment: Experiment): TutorialTarget {
@@ -1647,23 +1857,21 @@ function storeGrinderPresentation(experiment: Experiment): Partial<TutorialStepP
   const grinder = workspaceWidget(experiment, "grinder");
   if ((grinder?.produceLots ?? []).length > 0) {
     if (!storageContainer(experiment) && !hasEmptyWorkbenchStation(experiment)) {
-      return addWorkbenchStationPresentation("storage jar");
+      return addWorkbenchStationPresentation("tutorial.item.storageJar");
     }
     return storageContainer(experiment)
       ? {
-          title: "Transfer the ground powder",
-          instruction:
-            "Drag the ground powder out of the grinder and drop it into the HDPE storage container. Then store the empty grinder.",
+          title: translateNow("tutorial.storegrinderpresentation.title"),
+          instruction: translateNow("tutorial.storegrinderpresentation.instruction"),
         }
       : {
-          title: "Deploy an HDPE storage container",
-          instruction:
-            "In Inventory, open Containers. Drag the Wide-neck HDPE jar and drop it onto an empty workbench station.",
+          title: translateNow("tutorial.storegrinderpresentation.title2"),
+          instruction: translateNow("tutorial.storegrinderpresentation.instruction2"),
         };
   }
   return {
-    title: "Store the empty grinder",
-    instruction: "Click Store in inventory in the Cryogenic grinder header.",
+    title: translateNow("tutorial.storegrinderpresentation.title3"),
+    instruction: translateNow("tutorial.storegrinderpresentation.instruction3"),
   };
 }
 
@@ -1679,48 +1887,55 @@ function storeExtractionEquipmentPresentation(
   experiment: Experiment,
 ): Partial<TutorialStepPresentation> {
   return workspaceWidget(experiment, "vortex")?.isPresent
-    ? storeEquipmentPresentation(experiment, "vortex", "Vortex mixer", "mixed extraction tube")
-    : storeEquipmentPresentation(experiment, "ice_bath", "Ice bath", "tube");
+    ? storeEquipmentPresentation(
+        experiment,
+        "vortex",
+        "widget.vortex_mixer",
+        "tutorial.item.mixedExtractionTube",
+      )
+    : storeEquipmentPresentation(experiment, "ice_bath", "widget.ice_bath", "tutorial.item.tube");
 }
 
 function storeEquipmentPresentation(
   experiment: Experiment,
   widgetId: "gross_balance" | "analytical_balance" | "vortex" | "centrifuge" | "ice_bath",
-  equipmentName: string,
-  itemName: string,
+  equipmentNameKey: MessageKey,
+  itemNameKey: MessageKey,
 ): Partial<TutorialStepPresentation> {
+  const itemName = translateNow(itemNameKey);
+  const equipmentName = translateNow(equipmentNameKey);
   return workspaceWidget(experiment, widgetId)?.tool
-    ? workbenchPlacementPresentation(experiment, itemName, {
-        title: `Remove the ${itemName}`,
-        instruction: `Drag the ${itemName} out of the ${equipmentName} and drop it onto an empty workbench station.`,
-        hint: `The ${equipmentName} can only be stored after it is empty.`,
-        action: { kind: "drag", label: `Drag out the ${itemName}` },
+    ? workbenchPlacementPresentation(experiment, itemNameKey, {
+        title: translateNow("tutorial.storeequipmentpresentation.title", { p0: itemName }),
+        instruction: translateNow("tutorial.storeequipmentpresentation.instruction", { p0: itemName, p1: equipmentName }),
+        hint: translateNow("tutorial.storeequipmentpresentation.hint", { p0: equipmentName }),
+        action: { kind: "drag", label: translateNow("tutorial.storeequipmentpresentation.label", { p0: itemName }) },
       })
     : {
-        title: `Store the ${equipmentName}`,
-        instruction: `Click Store in inventory in the ${equipmentName} header.`,
-        action: { kind: "click", label: "Click Store in inventory" },
+        title: translateNow("tutorial.storeequipmentpresentation.title2", { p0: equipmentName }),
+        instruction: translateNow("tutorial.storeequipmentpresentation.instruction2", { p0: equipmentName }),
+        action: { kind: "click", label: translateNow("tutorial.storeequipmentpresentation.label2") },
       };
 }
 
 function inferTutorialAction(instruction: string): TutorialAction {
   const normalized = instruction.toLowerCase();
   if (normalized.includes("wait") || normalized.includes("watch")) {
-    return { kind: "wait", label: "Wait and watch" };
+    return { kind: "wait", label: translateNow("tutorial.infertutorialaction.label") };
   }
   if (normalized.includes("enter") || normalized.includes("fill")) {
-    return { kind: "type", label: "Enter the requested values" };
+    return { kind: "type", label: translateNow("tutorial.infertutorialaction.label2") };
   }
   if (normalized.includes("press ")) {
-    return { kind: "keyboard", label: "Use the keyboard shortcut" };
+    return { kind: "keyboard", label: translateNow("tutorial.infertutorialaction.label3") };
   }
   if (normalized.includes("drag")) {
-    return { kind: "drag", label: "Drag and drop" };
+    return { kind: "drag", label: translateNow("tutorial.infertutorialaction.label4") };
   }
   if (normalized.includes("click") || normalized.includes("select")) {
-    return { kind: "click", label: "Click the highlighted control" };
+    return { kind: "click", label: translateNow("tutorial.infertutorialaction.label5") };
   }
-  return { kind: "inspect", label: "Follow the highlighted area" };
+  return { kind: "inspect", label: translateNow("tutorial.infertutorialaction.label6") };
 }
 
 function declareCalibrationLevelsTarget(experiment: Experiment): TutorialTarget {
@@ -1742,8 +1957,17 @@ function declareCalibrationLevelsTarget(experiment: Experiment): TutorialTarget 
  * rather than leaving the learner waiting on a tick that cannot come earlier.
  */
 function declaredCalibrationLadder(experiment: Experiment) {
+  // Only the *shape* is checked here, never the values: once the sequence has run,
+  // the platform records what the method claimed and nothing in it compares that
+  // to the vials — a method file can claim a level that was never injected, and
+  // only the reprocessing platform downstream will notice. That gap is the lesson,
+  // so the tutorial closes it where a teacher would, in front of the learner:
+  // the coach refuses to move past the field, or past the console, while the
+  // declared ladder disagrees with the rack (see methodLevelsMatchLadder).
   return sequenceRuns(experiment).some(
-    (run) => (run.methodSnapshot?.calibrationLevelsNgPerMl ?? []).length > 0,
+    (run) =>
+      (run.methodSnapshot?.calibrationLevelsNgPerMl ?? []).length >=
+      CALIBRATION_LADDER_NG_PER_ML.length,
   );
 }
 
@@ -1752,25 +1976,22 @@ function declareCalibrationLevelsPresentation(
 ): Partial<TutorialStepPresentation> {
   if (!workspaceWidget(experiment, "instrument")?.isPresent) {
     return {
-      title: "Deploy the LC-MS/MS",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the LC-MS/MS and drop it onto the central workspace.",
+      title: translateNow("tutorial.declarecalibrationlevelspresentation.title"),
+      instruction: translateNow("tutorial.declarecalibrationlevelspresentation.instruction"),
     };
   }
   if (experiment.rack.state !== "loaded") {
     return {
-      title: "Load the rack into the LC-MS/MS",
-      instruction: "Drag the highlighted loaded rack and drop it into the LC-MS/MS.",
+      title: translateNow("tutorial.declarecalibrationlevelspresentation.title2"),
+      instruction: translateNow("tutorial.declarecalibrationlevelspresentation.instruction2"),
     };
   }
-  const level = preparedCalibrationVial(experiment)?.calibrationContext?.levelNgPerMl;
-  const levelText = level ? `${level} ng/mL` : "the level you prepared";
+  const levelText = `${preparedLadderText(experiment)} ng/mL`;
   return {
-    title: "Declare the calibration level in the method",
-    instruction:
-      `Open the acquisition console and click Manage methods. A built-in method cannot be edited, so duplicate it first, then type ${levelText} into Calibration levels and save the copy. Select that copy as the acquisition method.`,
-    hint: `Nothing checks this against the vial. Whatever you type here is what the exported method file will claim was in the standard — declare ${levelText}, the level you actually prepared.`,
-    action: { kind: "click", label: "Manage methods" },
+    title: translateNow("tutorial.declarecalibrationlevelspresentation.title3"),
+    instruction: translateNow("tutorial.declarecalibrationlevelspresentation.instruction3", { p0: levelText }),
+    hint: translateNow("tutorial.declarecalibrationlevelspresentation.hint", { p0: levelText }),
+    action: { kind: "click", label: translateNow("tutorial.declarecalibrationlevelspresentation.label") },
   };
 }
 
@@ -1789,22 +2010,20 @@ function launchSequenceTarget(experiment: Experiment): TutorialTarget {
 function launchSequencePresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   if (!workspaceWidget(experiment, "instrument")?.isPresent) {
     return {
-      title: "Deploy the LC-MS/MS",
-      instruction:
-        "In Inventory, open Workspace equipment. Drag the LC-MS/MS and drop it onto the central workspace.",
+      title: translateNow("tutorial.launchsequencepresentation.title"),
+      instruction: translateNow("tutorial.launchsequencepresentation.instruction"),
     };
   }
   if (experiment.rack.state !== "loaded") {
     return {
-      title: "Load the rack into the LC-MS/MS",
-      instruction: "Drag the highlighted loaded rack and drop it into the LC-MS/MS.",
+      title: translateNow("tutorial.launchsequencepresentation.title2"),
+      instruction: translateNow("tutorial.launchsequencepresentation.instruction2"),
     };
   }
   return {
-    title: "Launch the acquisition",
-    instruction:
-      "Click Open acquisition console. Verify that one row is the calibration vial and one row is the sample vial, then click Launch acquisition.",
-    action: { kind: "click", label: "Open console, then launch" },
+    title: translateNow("tutorial.launchsequencepresentation.title3"),
+    instruction: translateNow("tutorial.launchsequencepresentation.instruction3"),
+    action: { kind: "click", label: translateNow("tutorial.launchsequencepresentation.label") },
   };
 }
 
@@ -1817,27 +2036,26 @@ function rackIsInInstrument(experiment: Experiment) {
 function cleanupAcquisitionPresentation(experiment: Experiment): Partial<TutorialStepPresentation> {
   if (rackIsInInstrument(experiment)) {
     return {
-      title: "Unload the rack",
-      instruction: "In the LC-MS/MS, click Unload rack.",
-      action: { kind: "click", label: "Click Unload rack" },
+      title: translateNow("tutorial.cleanupacquisitionpresentation.title"),
+      instruction: translateNow("tutorial.cleanupacquisitionpresentation.instruction"),
+      action: { kind: "click", label: translateNow("tutorial.cleanupacquisitionpresentation.label") },
     };
   }
   if (experiment.rack.slots.some((slot) => slot.tool)) {
     return {
-      title: "Empty the Autosampler rack",
-      instruction:
-        "Drag both vials out of the rack and place them on the workbench or in the trash.",
+      title: translateNow("tutorial.cleanupacquisitionpresentation.title2"),
+      instruction: translateNow("tutorial.cleanupacquisitionpresentation.instruction2"),
     };
   }
   if (workspaceWidget(experiment, "rack")?.isPresent) {
     return {
-      title: "Store the empty rack",
-      instruction: "Click Store in inventory in the Autosampler rack header.",
+      title: translateNow("tutorial.cleanupacquisitionpresentation.title3"),
+      instruction: translateNow("tutorial.cleanupacquisitionpresentation.instruction3"),
     };
   }
   return {
-    title: "Store the LC-MS/MS",
-    instruction: "Click Store in inventory in the LC-MS/MS header.",
+    title: translateNow("tutorial.cleanupacquisitionpresentation.title4"),
+    instruction: translateNow("tutorial.cleanupacquisitionpresentation.instruction4"),
   };
 }
 
@@ -1973,10 +2191,9 @@ const steps: TutorialStep[] = [
   step({
     id: "weigh-received-sample",
     chapterId: "reception",
-    title: "Weigh the received sample bag",
-    instruction:
-      "In Inventory, open Workspace equipment. Drag the highlighted Gross balance and drop it onto the central workspace. Then open the Produce basket, drag the sample bag, and drop it onto the balance.",
-    hint: "Dropping the bag onto the balance automatically records its gross mass.",
+    title: "tutorial.weigh-received-sample.title",
+    instruction: "tutorial.weigh-received-sample.instruction",
+    hint: "tutorial.weigh-received-sample.hint",
     ...fromTarget(weighReceptionTarget),
     isSatisfied: (experiment) => (experiment.limsReception.measuredGrossMassG ?? 0) > 0,
     presentation: weighReceptionPresentation,
@@ -1984,10 +2201,9 @@ const steps: TutorialStep[] = [
   step({
     id: "register-and-label-sample",
     chapterId: "reception",
-    title: "Register and identify the sample",
-    instruction:
-      "Fill in the LIMS form, click Create LIMS record, and then click Print label.",
-    hint: "Drag the printed LIMS label and drop it directly onto the sample bag.",
+    title: "tutorial.register-and-label-sample.title",
+    instruction: "tutorial.register-and-label-sample.instruction",
+    hint: "tutorial.register-and-label-sample.hint",
     prerequisites: ["weigh-received-sample"],
     ...fromTarget(registerSampleTarget),
     isSatisfied: (experiment) => hasAppliedLimsLabel(experiment),
@@ -1996,10 +2212,9 @@ const steps: TutorialStep[] = [
   step({
     id: "store-gross-balance",
     chapterId: "reception",
-    title: "Store the receiving balance",
-    instruction:
-      "Drag the sample bag off the balance and drop it onto an empty workbench station. Then click Store in inventory in the balance header.",
-    hint: "The Store in inventory button becomes available once the weighing pan is empty.",
+    title: "tutorial.store-gross-balance.title",
+    instruction: "tutorial.store-gross-balance.instruction",
+    hint: "tutorial.store-gross-balance.hint",
     prerequisites: ["register-and-label-sample"],
     ...fromTarget(storeGrossBalanceTarget),
     isSatisfied: (experiment) =>
@@ -2009,70 +2224,67 @@ const steps: TutorialStep[] = [
     presentation: (experiment) =>
       workspaceWidget(experiment, "lims")?.isPresent
         ? {
-            title: "Store the LIMS terminal",
-            instruction: "Click the highlighted Store in inventory button in the top-right corner of the LIMS terminal.",
-            hint: "The LIMS record and printed label stay saved after the terminal is stored.",
-            action: { kind: "click", label: "Click the top-right button" },
+            title: translateNow("tutorial.store-gross-balance.title2"),
+            instruction: translateNow("tutorial.store-gross-balance.instruction2"),
+            hint: translateNow("tutorial.store-gross-balance.hint2"),
+            action: { kind: "click", label: translateNow("tutorial.store-gross-balance.label") },
           }
         : storeEquipmentPresentation(
             experiment,
             "gross_balance",
-            "Gross balance",
-            "sample bag",
+            "widget.gross_balance",
+            "tutorial.item.sampleBag",
           ),
   }),
   step({
     id: "cut-sample",
     chapterId: "sample-preparation",
-    title: "Cut the apples",
-    instruction:
-      "Drag a Cutting board from Inventory and drop it onto an empty workbench station. Drag the apples from the sample bag onto the board, click Stainless steel knife in Actions, and then click the apples.",
-    hint: "Clicking the apples while the knife is active changes their material state to cut.",
+    title: "tutorial.cut-sample.title",
+    instruction: "tutorial.cut-sample.instruction",
+    hint: "tutorial.cut-sample.hint",
     prerequisites: ["store-gross-balance"],
     ...fromTarget(cutSampleTarget),
     isSatisfied: (experiment) => hasMaterialState(experiment, ["cut", "ground", "slurry"]),
     presentation: (experiment) => {
       const board = allTools(experiment).find((tool) => tool.toolType === "cutting_board");
       if (!board) {
-        return workbenchPlacementPresentation(experiment, "Cutting board", {
-          title: "Deploy a Cutting board",
-          instruction: "In Inventory, open MISC. Drag a Cutting board and drop it onto an empty workbench station.",
-          action: { kind: "drag", label: "Drag board to workbench" },
+        return workbenchPlacementPresentation(experiment, "tutorial.item.cuttingBoard", {
+          title: translateNow("tutorial.cut-sample.title2"),
+          instruction: translateNow("tutorial.cut-sample.instruction2"),
+          action: { kind: "drag", label: translateNow("tutorial.cut-sample.label") },
         });
       }
       if (!(board.produceLots ?? []).some((lot) => (lot.materialState ?? materialStateForLot(experiment, lot.id)) === "whole")) {
         const bag = sampleBagContainingWholeProduce(experiment);
         if (bag?.isSealed) {
           return {
-            title: "Open the sample bag",
-            instruction:
-              "Click the highlighted Open button on the sample bag. The apples cannot be dragged while the bag is sealed.",
-            hint: "After the bag opens, the tutorial will highlight the apples inside it.",
-            action: { kind: "click", label: "Click Open" },
+            title: translateNow("tutorial.cut-sample.title3"),
+            instruction: translateNow("tutorial.cut-sample.instruction3"),
+            hint: translateNow("tutorial.cut-sample.hint2"),
+            action: { kind: "click", label: translateNow("tutorial.cut-sample.label2") },
           };
         }
         return {
-          title: "Place the apples on the Cutting board",
-          instruction: "Drag the highlighted apples themselves—not the bag—and drop them onto the Cutting board.",
-          hint: "The sample bag stays behind. Only the apple lot moves onto the preparation board.",
-          action: { kind: "drag", label: "Drag the apples" },
+          title: translateNow("tutorial.cut-sample.title4"),
+          instruction: translateNow("tutorial.cut-sample.instruction4"),
+          hint: translateNow("tutorial.cut-sample.hint3"),
+          action: { kind: "drag", label: translateNow("tutorial.cut-sample.label3") },
         };
       }
       return {
-        title: "Select the Stainless steel knife",
-        instruction: "Click the highlighted knife in Actions, or press K on your keyboard. Then click the apples on the Cutting board to cut them.",
-        hint: "The knife button remains active until you click it again or select another action.",
-        action: { kind: "keyboard", label: "Click knife or press K" },
+        title: translateNow("tutorial.cut-sample.title5"),
+        instruction: translateNow("tutorial.cut-sample.instruction5"),
+        hint: translateNow("tutorial.cut-sample.hint4"),
+        action: { kind: "keyboard", label: translateNow("tutorial.cut-sample.label4") },
       };
     },
   }),
   step({
     id: "grind-sample",
     chapterId: "sample-preparation",
-    title: "Cryogenically homogenize the sample",
-    instruction:
-      "Drag the highlighted Cryogenic grinder from Inventory and drop it onto the central workspace. Then drag the cut apples and Dry ice pellets into the grinder and click Start grinder.",
-    hint: "Wait for the cycle to finish and for the material state to become ground.",
+    title: "tutorial.grind-sample.title",
+    instruction: "tutorial.grind-sample.instruction",
+    hint: "tutorial.grind-sample.hint",
     prerequisites: ["cut-sample"],
     ...fromTarget(grindSampleTarget),
     isSatisfied: (experiment) => hasMaterialState(experiment, ["ground", "slurry"]),
@@ -2081,10 +2293,9 @@ const steps: TutorialStep[] = [
   step({
     id: "store-grinder",
     chapterId: "sample-preparation",
-    title: "Empty and store the grinder",
-    instruction:
-      "Drag an HDPE storage container from Inventory onto an empty workbench station. Transfer the ground powder into it, then click Store in inventory in the grinder header.",
-    hint: "The grinder must be empty before Store in inventory becomes available.",
+    title: "tutorial.store-grinder.title",
+    instruction: "tutorial.store-grinder.instruction",
+    hint: "tutorial.store-grinder.hint",
     prerequisites: ["grind-sample"],
     ...fromTarget(storeGrinderTarget),
     isSatisfied: (experiment) =>
@@ -2095,10 +2306,9 @@ const steps: TutorialStep[] = [
   step({
     id: "weigh-test-portion",
     chapterId: "sample-preparation",
-    title: "Prepare the test portion",
-    instruction:
-      "Drag the highlighted Analytical balance from Inventory and drop it onto the central workspace. Place a 50 mL tube on it, click Tare, then use the Powder spatula action to add approximately 10.000 g of powder.",
-    hint: "The total mass shown for the tube must reach at least 9.5 g.",
+    title: "tutorial.weigh-test-portion.title",
+    instruction: "tutorial.weigh-test-portion.instruction",
+    hint: "tutorial.weigh-test-portion.hint",
     prerequisites: ["store-grinder"],
     ...fromTarget(analyticalWeighingTarget),
     isSatisfied: hasTestPortion,
@@ -2106,13 +2316,28 @@ const steps: TutorialStep[] = [
     presentation: analyticalWeighingPresentation,
   }),
   step({
+    id: "put-spatula-away",
+    chapterId: "sample-preparation",
+    title: "tutorial.put-spatula-away.title",
+    instruction: "tutorial.put-spatula-away.instruction",
+    hint: "tutorial.put-spatula-away.hint",
+    prerequisites: ["weigh-test-portion"],
+    ...fromTarget(putSpatulaAwayTarget),
+    isSatisfied: (experiment) =>
+      testPortionHasBeenDosed(experiment) && !experiment.spatula.isLoaded,
+    // Loading the spatula again — for a second portion, or a replacement tube —
+    // puts the leftover back in the learner's hand, and the drags that follow back
+    // behind it.
+    isInvalidated: (experiment) => experiment.spatula.isLoaded,
+    presentation: putSpatulaAwayPresentation,
+  }),
+  step({
     id: "store-analytical-balance",
     chapterId: "sample-preparation",
-    title: "Store the analytical balance",
-    instruction:
-      "Drag the weighed tube off the analytical balance and drop it onto an empty workbench station. Then click Store in inventory in the balance header.",
-    hint: "The test portion remains in the tube; only the empty balance is stored.",
-    prerequisites: ["weigh-test-portion"],
+    title: "tutorial.store-analytical-balance.title",
+    instruction: "tutorial.store-analytical-balance.instruction",
+    hint: "tutorial.store-analytical-balance.hint",
+    prerequisites: ["put-spatula-away"],
     ...fromTarget((experiment) => storeEquipmentTarget(experiment, "analytical_balance")),
     isSatisfied: (experiment) =>
       hasTestPortion(experiment) &&
@@ -2122,17 +2347,16 @@ const steps: TutorialStep[] = [
       storeEquipmentPresentation(
         experiment,
         "analytical_balance",
-        "Analytical balance",
-        "weighed tube",
+        "widget.analytical_balance",
+        "tutorial.item.weighedTube",
       ),
   }),
   step({
     id: "prepare-extraction",
     chapterId: "extraction",
-    title: "Prepare the QuEChERS extraction",
-    instruction:
-      "Drag the ISTD solution onto the tube and confirm the volume. Repeat with acetonitrile to add 10 mL. Then deploy the Vortex mixer onto the workspace so it is waiting.",
-    hint: "Add the ISTD before the solvent to preserve the correct analytical provenance. The mixer is deployed now because the salts leave only 15 seconds to reach it.",
+    title: "tutorial.prepare-extraction.title",
+    instruction: "tutorial.prepare-extraction.instruction",
+    hint: "tutorial.prepare-extraction.hint",
     prerequisites: ["store-analytical-balance"],
     ...fromTarget(extractionPreparationTarget),
     isSatisfied: hasStagedExtraction,
@@ -2142,10 +2366,9 @@ const steps: TutorialStep[] = [
   step({
     id: "chill-extraction",
     chapterId: "extraction",
-    title: "Chill the tube before the salts",
-    instruction:
-      "Deploy the Ice bath from the MISC section of the Inventory, then drag the extraction tube into it and leave it until it reads under 1 °C.",
-    hint: "The salts add the same rise whatever the tube starts at. From room temperature that lands near 45 °C, well above the 30 °C where residues start breaking down.",
+    title: "tutorial.chill-extraction.title",
+    instruction: "tutorial.chill-extraction.instruction",
+    hint: "tutorial.chill-extraction.hint",
     prerequisites: ["prepare-extraction"],
     ...fromTarget(chillExtractionTarget),
     isSatisfied: hasChilledExtraction,
@@ -2155,10 +2378,9 @@ const steps: TutorialStep[] = [
   step({
     id: "salt-extraction",
     chapterId: "extraction",
-    title: "Add the QuEChERS salts",
-    instruction:
-      "Drag the chilled tube out of the ice bath onto an empty workbench station, then drag the QuEChERS salt packet onto it and confirm.",
-    hint: "Confirming starts the 15 second countdown to cementation. Know where the mixer is before you click.",
+    title: "tutorial.salt-extraction.title",
+    instruction: "tutorial.salt-extraction.instruction",
+    hint: "tutorial.salt-extraction.hint",
     prerequisites: ["chill-extraction"],
     ...fromTarget(saltExtractionTarget),
     isSatisfied: hasSaltedExtraction,
@@ -2168,10 +2390,9 @@ const steps: TutorialStep[] = [
   step({
     id: "vortex-extract",
     chapterId: "extraction",
-    title: "Vortex the extraction",
-    instruction:
-      "Drag and drop the sealed extraction tube into the Vortex mixer waiting on the workspace, then click Start vortex. The salts are already reacting, so do it now.",
-    hint: "Wait until the vortex cycle is complete before removing the tube.",
+    title: "tutorial.vortex-extract.title",
+    instruction: "tutorial.vortex-extract.instruction",
+    hint: "tutorial.vortex-extract.hint",
     prerequisites: ["salt-extraction"],
     ...fromTarget((experiment) =>
       extractionEquipmentTarget(experiment, "vortex", "vortex_mixer_widget")),
@@ -2182,9 +2403,9 @@ const steps: TutorialStep[] = [
   step({
     id: "store-vortex",
     chapterId: "extraction",
-    title: "Store the vortex mixer and the ice bath",
-    instruction: "Drag the mixed tube out of the vortex mixer and drop it onto an empty workbench station. Then click Store in inventory in the mixer header, and again in the ice bath header.",
-    hint: "The centrifuge takes over in the next step, and the cold no longer protects anything once the residues are in the solvent.",
+    title: "tutorial.store-vortex.title",
+    instruction: "tutorial.store-vortex.instruction",
+    hint: "tutorial.store-vortex.hint",
     prerequisites: ["vortex-extract"],
     ...fromTarget(storeExtractionEquipmentTarget),
     isSatisfied: (experiment) =>
@@ -2196,10 +2417,9 @@ const steps: TutorialStep[] = [
   step({
     id: "separate-extract",
     chapterId: "extraction",
-    title: "Centrifuge the extract",
-    instruction:
-      "Drag the highlighted Centrifuge from Inventory and drop it onto the central workspace. Drag the vortexed tube into the centrifuge and click Start the centrifuge.",
-    hint: "Wait for the cycle to finish and for the extract phase to become separated.",
+    title: "tutorial.separate-extract.title",
+    instruction: "tutorial.separate-extract.instruction",
+    hint: "tutorial.separate-extract.hint",
     prerequisites: ["store-vortex"],
     ...fromTarget((experiment) =>
       extractionEquipmentTarget(experiment, "centrifuge", "centrifuge_widget")),
@@ -2210,10 +2430,9 @@ const steps: TutorialStep[] = [
   step({
     id: "prepare-sample-vial",
     chapterId: "vials",
-    title: "Prepare the sample vial",
-    instruction:
-      "Drag an Autosampler vial from Inventory onto an empty workbench station. Select Micropipette in Actions, click the separated tube to aspirate, then click the vial to dispense.",
-    hint: "The vial becomes a sample vial when it receives extract from the separated tube.",
+    title: "tutorial.prepare-sample-vial.title",
+    instruction: "tutorial.prepare-sample-vial.instruction",
+    hint: "tutorial.prepare-sample-vial.hint",
     prerequisites: ["separate-extract"],
     ...fromTarget(sampleVialTarget),
     isSatisfied: hasInjectableSampleVial,
@@ -2222,10 +2441,9 @@ const steps: TutorialStep[] = [
   step({
     id: "label-sample-vial",
     chapterId: "vials",
-    title: "Identify the sample vial",
-    instruction:
-      "Bring the LIMS terminal back onto the workspace, click Print label a second time, then drag the printed label onto the sample vial.",
-    hint: "The vial leaves the bench for a rack of identical vials. The label is what still says which sample it holds — and what the instrument reads to name the file it writes.",
+    title: "tutorial.label-sample-vial.title",
+    instruction: "tutorial.label-sample-vial.instruction",
+    hint: "tutorial.label-sample-vial.hint",
     prerequisites: ["prepare-sample-vial"],
     ...fromTarget(labelSampleVialTarget),
     isSatisfied: hasLabelledSampleVial,
@@ -2234,10 +2452,9 @@ const steps: TutorialStep[] = [
   step({
     id: "store-centrifuge",
     chapterId: "vials",
-    title: "Store the centrifuge",
-    instruction:
-      "Drag the tube out of the centrifuge and drop it onto an empty workbench station. Then click Store in inventory in the centrifuge header.",
-    hint: "The prepared sample vial retains the extract needed for the remaining steps.",
+    title: "tutorial.store-centrifuge.title",
+    instruction: "tutorial.store-centrifuge.instruction",
+    hint: "tutorial.store-centrifuge.hint",
     prerequisites: ["label-sample-vial"],
     ...fromTarget((experiment) => storeEquipmentTarget(experiment, "centrifuge")),
     isSatisfied: (experiment) =>
@@ -2247,36 +2464,45 @@ const steps: TutorialStep[] = [
       storeEquipmentPresentation(
         experiment,
         "centrifuge",
-        "Centrifuge",
-        "separated extraction tube",
+        "widget.centrifuge",
+        "tutorial.item.separatedExtractionTube",
       ),
   }),
   step({
     id: "prepare-calibration-vial",
     chapterId: "vials",
-    title: "Prepare a calibration point",
-    instruction:
-      `Drag a Calibration standard vial from Containers onto the workbench and pick a level greater than zero. Then drag the ISTD solution onto that vial and set it to ${calibrationIstdVolumeMl} mL.`,
-    hint: "The vial arrives prepared and labelled by the standards lab, but uncapped and unspiked: the internal standard is still yours to add. Any positive level works here; the tutorial needs a single calibration point. The standard needs the same internal standard concentration as the sample, otherwise the two injections cannot be compared through the ISTD.",
+    title: "tutorial.prepare-calibration-vial.title",
+    instruction: {
+      key: "tutorial.prepare-calibration-vial.instruction",
+      params: {
+        p0: calibrationIstdVolumeMl,
+        p1: CALIBRATION_LADDER_NG_PER_ML.join(", "),
+      },
+    },
+    hint: "tutorial.prepare-calibration-vial.hint",
     prerequisites: ["store-centrifuge"],
     ...fromTarget(calibrationVialTarget),
-    isSatisfied: (experiment) => Boolean(spikedCalibrationVial(experiment)),
+    isSatisfied: hasCompleteCalibrationLadder,
     presentation: calibrationVialPresentation,
   }),
   step({
     id: "stage-vials",
     chapterId: "acquisition",
-    title: "Stage both vials for the sequence",
-    instruction:
-      "Drag the highlighted Autosampler rack from Inventory and drop it onto the central workspace. Seal both vials, then drag and drop each vial into an empty rack position.",
-    hint: "The physical provenance of each vial allows the system to distinguish the sample from the calibration point.",
+    title: "tutorial.stage-vials.title",
+    instruction: "tutorial.stage-vials.instruction",
+    hint: "tutorial.stage-vials.hint",
     prerequisites: ["prepare-calibration-vial"],
     ...fromTarget(stageVialsTarget),
     isSatisfied: (experiment) => {
       const rackTools = experiment.rack.slots.flatMap((slot) => (slot.tool ? [slot.tool] : []));
+      const sealedLevels = new Set(
+        rackTools
+          .filter((tool) => Boolean(tool.calibrationContext) && Boolean(tool.isSealed))
+          .map((tool) => tool.calibrationContext?.levelNgPerMl),
+      );
       return (
         rackTools.some((tool) => Boolean(tool.injectionContext) && Boolean(tool.isSealed)) &&
-        rackTools.some((tool) => Boolean(tool.calibrationContext) && Boolean(tool.isSealed))
+        CALIBRATION_LADDER_NG_PER_ML.every((level) => sealedLevels.has(level))
       );
     },
     presentation: stageVialsPresentation,
@@ -2284,10 +2510,9 @@ const steps: TutorialStep[] = [
   step({
     id: "declare-calibration-levels",
     chapterId: "acquisition",
-    title: "Declare the calibration level in the method",
-    instruction:
-      "Drag the highlighted LC-MS/MS from Inventory and drop it onto the central workspace. Load the rack, open the console and click Manage methods. Duplicate the built-in method, type the level you prepared into Calibration levels, and save the copy.",
-    hint: "The exported method file gets one concentration column per level declared here, and none at all if you declare nothing. This step confirms itself when the sequence starts.",
+    title: "tutorial.declare-calibration-levels.title",
+    instruction: "tutorial.declare-calibration-levels.instruction",
+    hint: "tutorial.declare-calibration-levels.hint",
     prerequisites: ["stage-vials"],
     ...fromTarget(declareCalibrationLevelsTarget),
     isSatisfied: declaredCalibrationLadder,
@@ -2296,10 +2521,9 @@ const steps: TutorialStep[] = [
   step({
     id: "launch-sequence",
     chapterId: "acquisition",
-    title: "Load and start the sequence",
-    instruction:
-      "Drag the highlighted LC-MS/MS from Inventory and drop it onto the central workspace. Drag and drop the loaded rack into the instrument, open the console, check both rows, and click Launch acquisition.",
-    hint: "The sequence must contain one calibration injection and one sample injection.",
+    title: "tutorial.launch-sequence.title",
+    instruction: "tutorial.launch-sequence.instruction",
+    hint: "tutorial.launch-sequence.hint",
     prerequisites: ["declare-calibration-levels"],
     ...fromTarget(launchSequenceTarget),
     isSatisfied: (experiment) => sequenceRuns(experiment).length > 0,
@@ -2308,10 +2532,9 @@ const steps: TutorialStep[] = [
   step({
     id: "review-results",
     chapterId: "acquisition",
-    title: "Review the results",
-    instruction:
-      "Wait for both injections to finish, then compare the calibration point and sample results.",
-    hint: "You can follow the active injection directly on the instrument illustration.",
+    title: "tutorial.review-results.title",
+    instruction: "tutorial.review-results.instruction",
+    hint: "tutorial.review-results.hint",
     prerequisites: ["launch-sequence"],
     anchor: () => "instrument-screen",
     isSatisfied: completedCalibrationAndSampleRun,
@@ -2321,20 +2544,19 @@ const steps: TutorialStep[] = [
         ? Math.round((run.elapsedS / run.totalDurationS) * 100)
         : 0;
       return {
-        title: "Wait for both injections",
-        instruction: `Watch the highlighted instrument screen. Acquisition is ${progress}% complete; wait until both the calibration and sample injections finish.`,
-        hint: "Do not unload the rack during acquisition. Results open automatically as the injections complete.",
-        action: { kind: "wait", label: `Wait — ${progress}% complete` },
+        title: translateNow("tutorial.review-results.title2"),
+        instruction: translateNow("tutorial.review-results.instruction2", { p0: progress }),
+        hint: translateNow("tutorial.review-results.hint2"),
+        action: { kind: "wait", label: translateNow("tutorial.review-results.label", { p0: progress }) },
       };
     },
   }),
   step({
     id: "store-acquisition-equipment",
     chapterId: "acquisition",
-    title: "Clear the acquisition workspace",
-    instruction:
-      "Click Unload rack from LC-MS/MS, drag both vials out of the rack, and place them on the workbench or in the trash. Then click Store in inventory for the empty rack and the LC-MS/MS.",
-    hint: "The results remain available after the equipment is stored.",
+    title: "tutorial.store-acquisition-equipment.title",
+    instruction: "tutorial.store-acquisition-equipment.instruction",
+    hint: "tutorial.store-acquisition-equipment.hint",
     prerequisites: ["review-results"],
     ...fromTarget(cleanupAcquisitionTarget),
     isSatisfied: completedRunAndStoredAcquisitionEquipment,
@@ -2345,11 +2567,11 @@ const steps: TutorialStep[] = [
 export const calibrationSampleTutorial: TutorialDefinition = {
   id: CALIBRATION_SAMPLE_TUTORIAL_ID,
   version: 1,
-  title: "1 calibration point + 1 sample",
+  title: "tutorial.definition.title",
   chapters: [
     {
       id: "reception",
-      title: "Sample reception",
+      title: "tutorial.reception.title",
       stepIds: [
         "weigh-received-sample",
         "register-and-label-sample",
@@ -2358,7 +2580,7 @@ export const calibrationSampleTutorial: TutorialDefinition = {
     },
     {
       id: "sample-preparation",
-      title: "Sample preparation",
+      title: "tutorial.sample-preparation.title",
       stepIds: [
         "cut-sample",
         "grind-sample",
@@ -2369,7 +2591,7 @@ export const calibrationSampleTutorial: TutorialDefinition = {
     },
     {
       id: "extraction",
-      title: "QuEChERS extraction",
+      title: "tutorial.extraction.title",
       stepIds: [
         "prepare-extraction",
         "chill-extraction",
@@ -2381,7 +2603,7 @@ export const calibrationSampleTutorial: TutorialDefinition = {
     },
     {
       id: "vials",
-      title: "Vial preparation",
+      title: "tutorial.vials.title",
       stepIds: [
         "prepare-sample-vial",
         "label-sample-vial",
@@ -2391,7 +2613,7 @@ export const calibrationSampleTutorial: TutorialDefinition = {
     },
     {
       id: "acquisition",
-      title: "Rack and acquisition",
+      title: "tutorial.acquisition.title",
       stepIds: [
         "stage-vials",
         "declare-calibration-levels",
@@ -2416,12 +2638,14 @@ export function getTutorialStepPresentation(
   experiment: Experiment,
 ): TutorialStepPresentation {
   const dynamicPresentation = tutorialStep.presentation?.(experiment);
-  const instruction = dynamicPresentation?.instruction ?? tutorialStep.instruction;
+  const instruction = dynamicPresentation?.instruction ?? resolveTutorialText(tutorialStep.instruction);
   return {
-    title: tutorialStep.title,
+    title: resolveTutorialText(tutorialStep.title),
     instruction,
-    hint: tutorialStep.hint,
-    action: inferTutorialAction(instruction),
+    hint: resolveTutorialText(tutorialStep.hint),
+    // Inferred from the English wording so the guessed action stays the same in
+    // every language; a presentation that needs another action states it itself.
+    action: inferTutorialAction(enMessages[textKey(tutorialStep.instruction)]),
     ...dynamicPresentation,
   };
 }

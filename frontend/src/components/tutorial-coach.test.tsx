@@ -5,6 +5,7 @@ import { TutorialCoach } from "@/components/tutorial-coach";
 import {
   calibrationSampleTutorial,
   evaluateTutorial,
+  type TutorialEvaluation,
 } from "@/lib/tutorial-engine";
 import type { Experiment } from "@/types/experiment";
 
@@ -352,6 +353,154 @@ describe("TutorialCoach", () => {
     quantity.remove();
   });
 
+  it("walks a dosing dialog in two beats: type the amount, then send it", () => {
+    // The grinder holds 480 g of cut apples, so the step asks for 500 g of dry ice.
+    // The dialog opens on the palette's own 1000 g, which is the wrong amount and
+    // exactly the mistake this second beat exists to catch.
+    const grindStep = calibrationSampleTutorial.steps.find(
+      (step) => step.id === "grind-sample",
+    )!;
+    const experiment: Experiment = {
+      ...emptyExperiment(),
+      workspace: {
+        produceBasketLots: [],
+        widgets: [
+          {
+            id: "grinder",
+            widgetType: "workbench",
+            label: "Cryogenic grinder",
+            isDraggable: true,
+            allowedDropTargets: [],
+            isStorable: true,
+            canStore: true,
+            anchor: "top-left",
+            offsetX: 0,
+            offsetY: 0,
+            isPresent: true,
+            isTrashed: false,
+            produceLots: [
+              {
+                id: "lot_1",
+                label: "Cut apples",
+                produceType: "apple",
+                totalMassG: 480,
+                unitCount: 3,
+                isDraggable: true,
+                allowedDropTargets: [],
+                materialState: "cut",
+                temperatureC: 20,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const evaluation: TutorialEvaluation = {
+      ...evaluateTutorial(calibrationSampleTutorial, experiment),
+      currentStep: grindStep,
+      experiment,
+    };
+
+    const quantity = document.createElement("input");
+    quantity.dataset.tutorialAnchor = "drop-draft-quantity";
+    quantity.dataset.tutorialUnit = "g";
+    quantity.value = "1000";
+    quantity.getBoundingClientRect = () =>
+      ({ bottom: 320, height: 20, left: 400, right: 470, top: 300, width: 70 }) as DOMRect;
+    document.body.appendChild(quantity);
+
+    const confirm = document.createElement("button");
+    confirm.dataset.tutorialAnchor = "drop-draft-confirm";
+    confirm.textContent = "Add";
+    confirm.getBoundingClientRect = () =>
+      ({ bottom: 380, height: 30, left: 420, right: 480, top: 350, width: 60 }) as DOMRect;
+    document.body.appendChild(confirm);
+
+    const { rerender } = render(
+      <TutorialCoach
+        active
+        evaluation={evaluation}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Set the amount/)).toBeInTheDocument();
+    expect(screen.getByText(/Set the highlighted box to 500 g/)).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      height: "36px",
+      left: "392px",
+      top: "292px",
+    });
+
+    quantity.value = "500";
+    fireEvent.input(quantity);
+    rerender(
+      <TutorialCoach
+        active
+        evaluation={evaluation}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Confirm the amount/)).toBeInTheDocument();
+    expect(screen.getByText(/Click the highlighted Add button/)).toBeInTheDocument();
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      height: "46px",
+      left: "412px",
+      top: "342px",
+    });
+
+    quantity.remove();
+    confirm.remove();
+  });
+
+  it("leaves a dialog opened for something else to the step's own wording", () => {
+    // Same step, but the box measures mL: the learner dropped a reagent of their
+    // own. Telling them to type 500 g into it would be worse than saying nothing.
+    const grindStep = calibrationSampleTutorial.steps.find(
+      (step) => step.id === "grind-sample",
+    )!;
+    const experiment = emptyExperiment();
+    const evaluation: TutorialEvaluation = {
+      ...evaluateTutorial(calibrationSampleTutorial, experiment),
+      currentStep: grindStep,
+      experiment,
+    };
+
+    const quantity = document.createElement("input");
+    quantity.dataset.tutorialAnchor = "drop-draft-quantity";
+    quantity.dataset.tutorialUnit = "mL";
+    quantity.value = "10";
+    quantity.getBoundingClientRect = () =>
+      ({ bottom: 320, height: 20, left: 400, right: 470, top: 300, width: 70 }) as DOMRect;
+    document.body.appendChild(quantity);
+
+    render(
+      <TutorialCoach
+        active
+        evaluation={evaluation}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/Set the amount/)).not.toBeInTheDocument();
+    // Still spotlighted, as it was before the step named an amount: the dialog
+    // is what stands between the learner and the next move either way.
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+      display: "block",
+      left: "392px",
+      top: "292px",
+    });
+
+    quantity.remove();
+  });
+
   it("moves the spotlight to the launch button once the acquisition console is open", async () => {
     const openConsole = document.createElement("button");
     openConsole.dataset.tutorialAnchor = "instrument-open-console";
@@ -563,8 +712,17 @@ describe("TutorialCoach", () => {
 
     expect(screen.getByText(/Type the calibration level/i)).toBeInTheDocument();
 
-    // A filled field means the typing is done; saving is what is left.
-    field.value = "10";
+    // Levels that do not describe the rack never reach the save: the ladder is
+    // what every concentration in the run is computed against.
+    field.value = "50";
+    fireEvent.input(field);
+    await waitFor(() =>
+      expect(screen.getByText(/not the levels you prepared/i)).toBeInTheDocument(),
+    );
+
+    // The rung the rack actually holds means the typing is done; saving is what
+    // is left.
+    field.value = "500";
     fireEvent.input(field);
     await waitFor(() =>
       expect(screen.getByText(/Save the method/i)).toBeInTheDocument(),
@@ -584,9 +742,18 @@ describe("TutorialCoach", () => {
     save.remove();
     const select = anchored("console-method-select", "select");
     select.setAttribute("data-tutorial-declared-levels", "1");
+    select.setAttribute("data-tutorial-declared-level-values", "500");
     await waitFor(() =>
       expect(screen.getByText(/Launch the acquisition/i)).toBeInTheDocument(),
     );
+
+    // A saved copy whose ladder disagrees with the rack is caught at the console
+    // too: the run would report every concentration against the wrong curve.
+    select.setAttribute("data-tutorial-declared-level-values", "5000");
+    await waitFor(() =>
+      expect(screen.getByText(/declares the wrong levels/i)).toBeInTheDocument(),
+    );
+    select.setAttribute("data-tutorial-declared-level-values", "500");
 
     // A copy that declares nothing sends the learner back into the manager.
     select.setAttribute("data-tutorial-declared-levels", "0");
@@ -1262,6 +1429,60 @@ describe("TutorialCoach", () => {
 
     spatula.remove();
     powderJar.remove();
+  });
+
+  it("routes the spatula emptying through the trash, spatula first", async () => {
+    const spatula = document.createElement("button");
+    spatula.dataset.tutorialAnchor = "action-spatula";
+    spatula.setAttribute("aria-pressed", "false");
+    spatula.getBoundingClientRect = () =>
+      ({ bottom: 100, height: 40, left: 20, right: 100, top: 60, width: 80 }) as DOMRect;
+    const trash = document.createElement("button");
+    trash.dataset.testid = "trash-dropzone";
+    trash.getBoundingClientRect = () =>
+      ({ bottom: 260, height: 60, left: 500, right: 580, top: 200, width: 80 }) as DOMRect;
+    document.body.append(spatula, trash);
+
+    const state = emptyExperiment();
+    state.spatula = { isLoaded: true, sourceToolId: "powder_jar" };
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "put-spatula-away",
+    )!;
+    render(
+      <TutorialCoach
+        active
+        evaluation={{
+          completedStepIds: [],
+          currentChapter: calibrationSampleTutorial.chapters[1],
+          currentStep: step,
+          experiment: state,
+          isComplete: false,
+          progressPercent: 50,
+          totalStepCount: calibrationSampleTutorial.steps.length,
+        }}
+        onPause={vi.fn()}
+        onRestart={vi.fn()}
+        onResume={vi.fn()}
+      />,
+    );
+
+    // The trash only empties a spatula that is in hand, so a spatula put down still
+    // loaded has to be picked back up before the click means anything.
+    expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({ left: "12px", top: "52px" });
+    expect(screen.getByText("Pick the Powder spatula back up")).toBeInTheDocument();
+
+    spatula.setAttribute("aria-pressed", "true");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tutorial-spotlight")).toHaveStyle({
+        left: "492px",
+        top: "192px",
+      });
+    });
+    expect(screen.getByText("Discard the leftover powder")).toBeInTheDocument();
+
+    spatula.remove();
+    trash.remove();
   });
 
   it("asks for the loaded spatula to be picked back up before dosing", async () => {

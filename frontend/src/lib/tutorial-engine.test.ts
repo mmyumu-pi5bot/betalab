@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CALIBRATION_LADDER_NG_PER_ML,
   CALIBRATION_SAMPLE_TUTORIAL_ID,
   calibrationSampleTutorial,
   evaluateTutorial,
+  getDropDraftPresentation,
   getLimsTutorialFieldPresentation,
   getLimsTutorialValues,
+  getMethodWalkPresentation,
   getTutorialStepPresentation,
+  methodLevelsMatchLadder,
+  resolveDropDraftStage,
+  resolveTutorialText,
 } from "@/lib/tutorial-engine";
 import type { Experiment } from "@/types/experiment";
 import type { BenchToolInstance, ExperimentWorkspaceWidget } from "@/types/workbench";
@@ -77,9 +83,30 @@ function calibrationVial(overrides: Record<string, unknown> = {}) {
   return labTool("sample_vial", {
     id: "cal-vial",
     capacity_ml: 2,
-    calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] },
+    calibrationContext: { levelNgPerMl: CALIBRATION_LADDER_NG_PER_ML[0], compoundIds: ["boscalid"] },
     ...overrides,
   });
+}
+
+/**
+ * One workbench slot per rung, so the whole series exists at once. The levels
+ * default to the tutorial's own ladder; passing others stands in for a learner
+ * who built a longer series in free mode.
+ */
+function calibrationLadderSlots(
+  options: { spiked?: boolean; levels?: readonly number[] } = {},
+) {
+  const { spiked = true, levels = CALIBRATION_LADDER_NG_PER_ML } = options;
+  return levels.map((level, index) => ({
+    id: `station_cal_${index}`,
+    label: `Station ${index + 1}`,
+    tool: labTool("sample_vial", {
+      id: `cal-vial-${level}`,
+      capacity_ml: 2,
+      calibrationContext: { levelNgPerMl: level, compoundIds: ["boscalid"] },
+      liquids: spiked ? [istdLiquid()] : [],
+    }),
+  }));
 }
 
 function widget(
@@ -140,6 +167,10 @@ function experiment(overrides: Partial<Experiment> = {}): Experiment {
   };
 }
 
+// Step text is stored as catalogue keys; these assertions are about the English
+// wording the learner reads, so they resolve it the way the coach does.
+const text = resolveTutorialText;
+
 describe("calibration sample tutorial", () => {
   it("gives explicit UI actions for the first reception steps", () => {
     const weigh = calibrationSampleTutorial.steps.find(
@@ -152,14 +183,14 @@ describe("calibration sample tutorial", () => {
       (entry) => entry.id === "store-gross-balance",
     );
 
-    expect(weigh?.instruction).toContain("Drag");
-    expect(weigh?.instruction).toContain("drop");
-    expect(weigh?.hint).toContain("automatically records");
-    expect(register?.instruction).toContain("Create LIMS record");
-    expect(register?.instruction).toContain("Print label");
-    expect(register?.hint).toContain("Drag");
-    expect(store?.instruction).toContain("Drag");
-    expect(store?.instruction).toContain("Store in inventory");
+    expect(text(weigh!.instruction)).toContain("Drag");
+    expect(text(weigh!.instruction)).toContain("drop");
+    expect(text(weigh!.hint)).toContain("automatically records");
+    expect(text(register!.instruction)).toContain("Create LIMS record");
+    expect(text(register!.instruction)).toContain("Print label");
+    expect(text(register!.hint)).toContain("Drag");
+    expect(text(store!.instruction)).toContain("Drag");
+    expect(text(store!.instruction)).toContain("Store in inventory");
   });
 
   it("explains drag and drop whenever equipment must be deployed", () => {
@@ -176,8 +207,8 @@ describe("calibration sample tutorial", () => {
       const tutorialStep = calibrationSampleTutorial.steps.find(
         (entry) => entry.id === stepId,
       );
-      expect(tutorialStep?.instruction, stepId).toContain("Drag");
-      expect(tutorialStep?.instruction, stepId).toContain("drop");
+      expect(text(tutorialStep!.instruction), stepId).toContain("Drag");
+      expect(text(tutorialStep!.instruction), stepId).toContain("drop");
     }
   });
 
@@ -1127,6 +1158,100 @@ describe("calibration sample tutorial", () => {
     expect(tutorialStep.isSatisfied(state)).toBe(true);
   });
 
+  it("asks to empty the spatula before the drags that follow the weighing", () => {
+    const weighedTube = labTool("centrifuge_tube", {
+      id: "weighed_tube",
+      produceFractions: [
+        {
+          id: "powder_1",
+          produceLotId: "lot_1",
+          produceMaterialStateId: "ground_1",
+          massG: 10,
+        },
+      ],
+    });
+    const state = experiment({
+      analyticalBalance: { tareMassG: 12, taredToolId: "weighed_tube" },
+      spatula: { isLoaded: true, sourceToolId: "jar_1" },
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "analytical_balance",
+            tool: id === "analytical_balance" ? weighedTube : undefined,
+          }),
+        ),
+      },
+    });
+
+    const completedThroughGrinding = [
+      "weigh-received-sample",
+      "register-and-label-sample",
+      "store-gross-balance",
+      "cut-sample",
+      "grind-sample",
+      "store-grinder",
+    ];
+    const holdingLeftover = evaluateTutorial(
+      calibrationSampleTutorial,
+      state,
+      completedThroughGrinding,
+    );
+
+    // Storing the balance starts with a drag, and a drag is dead while the spatula
+    // is in hand. The tutorial used to go straight there and leave the learner
+    // clicking a highlighted tube that would not move.
+    expect(holdingLeftover.completedStepIds).toContain("weigh-test-portion");
+    expect(holdingLeftover.currentStep?.id).toBe("put-spatula-away");
+    expect(holdingLeftover.currentStep?.anchor(state)).toBe("spatula-discard:trash-dropzone");
+    expect(getTutorialStepPresentation(holdingLeftover.currentStep!, state).action).toEqual({
+      kind: "click",
+      label: "Click the Trash",
+    });
+
+    const emptied = evaluateTutorial(
+      calibrationSampleTutorial,
+      { ...state, spatula: { isLoaded: false, sourceToolId: null } },
+      completedThroughGrinding,
+    );
+
+    expect(emptied.completedStepIds).toContain("put-spatula-away");
+    expect(emptied.currentStep?.id).toBe("store-analytical-balance");
+  });
+
+  it("does not credit the spatula step to a learner who has not weighed anything", () => {
+    const untouched = evaluateTutorial(calibrationSampleTutorial, experiment());
+
+    // The spatula starts empty, and an objective nobody has reached must not count
+    // towards the progress bar.
+    expect(untouched.completedStepIds).not.toContain("put-spatula-away");
+  });
+
+  // A tube that has moved on — wetted, salted, thrown away — is proof the dosing
+  // happened, so the step stays satisfied instead of reappearing with nothing left
+  // to empty.
+  it("keeps the spatula step behind once the extraction line has moved on", () => {
+    const extracted = experiment({
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: labTool("centrifuge_tube", {
+              containsSlurry: true,
+              quechersState: { saltsAdded: true, phase: "mixed", faults: [], isUsable: true },
+            }),
+          },
+        ],
+      },
+    });
+    const step = calibrationSampleTutorial.steps.find(
+      (entry) => entry.id === "put-spatula-away",
+    )!;
+
+    expect(step.isSatisfied(extracted)).toBe(true);
+  });
+
   it("guides final cleanup from the instrument while the rack is loaded", () => {
     const state = experiment({
       rack: { ...experiment().rack, state: "loaded" },
@@ -1278,6 +1403,77 @@ describe("calibration sample tutorial", () => {
     expect(step?.anchor(state)).toBe("palette-item-istd_solution");
   });
 
+  it("names the amount each dosing dialog is waiting for", () => {
+    const grinding = experiment({
+      workspace: {
+        produceBasketLots: [],
+        widgets: widgetIds.map((id) =>
+          widget(id, {
+            isPresent: id === "grinder",
+            produceLots: id === "grinder"
+              ? [{ id: "lot_1", label: "Cut apples", produceType: "apple", totalMassG: 480, unitCount: 3, isDraggable: true, allowedDropTargets: [], materialState: "cut", temperatureC: 20 }]
+              : undefined,
+          }),
+        ),
+      },
+    });
+    const grindStep = calibrationSampleTutorial.steps.find(
+      (candidate) => candidate.id === "grind-sample",
+    )!;
+
+    // Rounded to the nearest 100 g, the same value the instruction spells out:
+    // a coach checking the box against another number would never let go.
+    expect(grindStep.anchor(grinding)).toBe("palette-item-dry_ice_pellets");
+    expect(grindStep.expectedQuantity?.(grinding)).toEqual({ amount: 500, unitLabel: "g" });
+    expect(getTutorialStepPresentation(grindStep, grinding).instruction).toContain("500");
+  });
+
+  it("walks the extraction doses in order, one amount at a time", () => {
+    const tube = labTool("centrifuge_tube", { produceLots: [{ id: "portion", label: "Powder", produceType: "apple", totalMassG: 10, unitCount: 1, isDraggable: true, allowedDropTargets: [], materialState: "ground" }] });
+    const withPortion = experiment({
+      workbench: { slots: [{ id: "station_1", label: "Station 1", tool: tube }] },
+    });
+    const withIstd = experiment({
+      workbench: {
+        slots: [
+          {
+            id: "station_1",
+            label: "Station 1",
+            tool: { ...tube, liquids: [istdLiquid()] },
+          },
+        ],
+      },
+    });
+    const step = calibrationSampleTutorial.steps.find(
+      (candidate) => candidate.id === "prepare-extraction",
+    )!;
+
+    expect(step.expectedQuantity?.(withPortion)).toEqual({ amount: 0.05, unitLabel: "mL" });
+    expect(step.expectedQuantity?.(withIstd)).toEqual({ amount: 10, unitLabel: "mL" });
+  });
+
+  it("names the calibration level to pick, then the ISTD dose to type over it", () => {
+    const noVialYet = experiment({
+      workbench: { slots: [{ id: "station_1", label: "Station 1", tool: null }] },
+    });
+    const unspiked = experiment({
+      workbench: {
+        slots: [{ id: "station_1", label: "Station 1", tool: calibrationVial({ liquids: [] }) }],
+      },
+    });
+    const step = calibrationSampleTutorial.steps.find(
+      (candidate) => candidate.id === "prepare-calibration-vial",
+    )!;
+
+    // The dialog opens on 10 ng/mL whichever rung is next, so the first rung is
+    // one the learner has to change before taking the vial.
+    expect(step.expectedQuantity?.(noVialYet)).toEqual({
+      amount: CALIBRATION_LADDER_NG_PER_ML[0],
+      unitLabel: "ng/mL",
+    });
+    expect(step.expectedQuantity?.(unspiked)).toEqual({ amount: 0.005, unitLabel: "mL" });
+  });
+
   it("asks for a tenth of the tube's ISTD dose in the 1 mL standard", () => {
     const state = experiment({
       workbench: {
@@ -1298,22 +1494,53 @@ describe("calibration sample tutorial", () => {
     expect(presentation.action).toEqual({ kind: "drag", label: "Add 0.005 mL ISTD" });
   });
 
-  it("completes the standard once it is spiked with the ISTD", () => {
+  it("completes the series only once every level is spiked with the ISTD", () => {
+    const partial = experiment({
+      workbench: { slots: calibrationLadderSlots().slice(0, -1) },
+    });
+    const complete = experiment({ workbench: { slots: calibrationLadderSlots() } });
+
+    expect(evaluateTutorial(calibrationSampleTutorial, partial).completedStepIds).not.toContain(
+      "prepare-calibration-vial",
+    );
+    expect(evaluateTutorial(calibrationSampleTutorial, complete).completedStepIds).toContain(
+      "prepare-calibration-vial",
+    );
+  });
+
+  it("points at the rung still missing", () => {
     const state = experiment({
       workbench: {
         slots: [
-          {
-            id: "station_1",
-            label: "Station 1",
-            tool: calibrationVial({ liquids: [istdLiquid()] }),
-          },
+          ...calibrationLadderSlots().slice(0, -1),
+          { id: "station_free", label: "Station 9", tool: null },
         ],
       },
     });
+    const step = calibrationSampleTutorial.steps.find(
+      (candidate) => candidate.id === "prepare-calibration-vial",
+    );
 
-    const result = evaluateTutorial(calibrationSampleTutorial, state);
+    const presentation = getTutorialStepPresentation(step!, state);
 
-    expect(result.completedStepIds).toContain("prepare-calibration-vial");
+    expect(presentation.instruction).toContain(`${CALIBRATION_LADDER_NG_PER_ML.at(-1)} ng/mL`);
+  });
+
+  // The tutorial teaches what a standard is, not how to repeat the same three
+  // gestures five times: it walks one point, and free mode is where a learner
+  // builds the series out.
+  it("walks a single standard, at the top of the range", () => {
+    expect(CALIBRATION_LADDER_NG_PER_ML).toEqual([500]);
+  });
+
+  it("an unspiked level does not count, however many are on the bench", () => {
+    const state = experiment({
+      workbench: { slots: calibrationLadderSlots({ spiked: false }) },
+    });
+
+    expect(
+      evaluateTutorial(calibrationSampleTutorial, state).completedStepIds,
+    ).not.toContain("prepare-calibration-vial");
   });
 
   it("credits an out-of-order calibration without skipping missing prerequisites", () => {
@@ -1331,11 +1558,14 @@ describe("calibration sample tutorial", () => {
       isDraggable: true,
       allowedDropTargets: [],
       liquids: [istdLiquid()],
-      calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] },
+      calibrationContext: { levelNgPerMl: CALIBRATION_LADDER_NG_PER_ML[0], compoundIds: ["boscalid"] },
     };
     const state = experiment({
       workbench: {
-        slots: [{ id: "station_1", label: "Station 1", tool: calibrationTool }],
+        slots: [
+          { id: "station_1", label: "Station 1", tool: calibrationTool },
+          ...calibrationLadderSlots().slice(1),
+        ],
       },
     });
 
@@ -1413,10 +1643,10 @@ describe("calibration sample tutorial", () => {
     it("is satisfied once a run carries a method that declares a ladder", () => {
       const tutorialStep = stepById("declare-calibration-levels");
 
-      expect(tutorialStep.isSatisfied(withRun([10]))).toBe(true);
+      expect(tutorialStep.isSatisfied(withRun([...CALIBRATION_LADDER_NG_PER_ML]))).toBe(true);
     });
 
-    it("is not satisfied by a method that declares none", () => {
+    it("is not satisfied by a method that declares no level at all", () => {
       const tutorialStep = stepById("declare-calibration-levels");
 
       expect(tutorialStep.isSatisfied(withRun([]))).toBe(false);
@@ -2253,5 +2483,149 @@ describe("calibration sample tutorial", () => {
       expect(result.completedStepIds).toContain("label-sample-vial");
       expect(result.currentStep?.id).not.toBe("label-sample-vial");
     });
+  });
+});
+
+describe("dosing dialog phases", () => {
+  const dryIce = { amount: 500, unitLabel: "g" };
+
+  it("keeps the learner on the box until it holds the amount the step asked for", () => {
+    expect(resolveDropDraftStage(1000, dryIce)).toBe("amount");
+    expect(resolveDropDraftStage(null, dryIce)).toBe("amount");
+    expect(resolveDropDraftStage(500, dryIce)).toBe("confirm");
+  });
+
+  // Parsing 0.005 back out of the input must not read as "not there yet", which
+  // is the one place a strict equality would strand the learner.
+  it("accepts a fractional amount read back from the input", () => {
+    expect(resolveDropDraftStage(Number.parseFloat("0.005"), { amount: 0.005, unitLabel: "mL" }))
+      .toBe("confirm");
+  });
+
+  it("leaves a dialog no step named an amount for to the step's own wording", () => {
+    expect(resolveDropDraftStage(12, null)).toBeNull();
+  });
+
+  it("asks to type first, then to press the dialog's own button", () => {
+    const typing = getDropDraftPresentation("amount", dryIce, "Add");
+    expect(typing.action).toEqual({ kind: "type", label: "Enter 500 g" });
+    expect(typing.instruction).toContain("500 g");
+
+    const confirming = getDropDraftPresentation("confirm", dryIce, "Add");
+    expect(confirming.action).toEqual({ kind: "click", label: "Click Add" });
+    expect(confirming.instruction).toContain("Add");
+  });
+
+  // The same dialog confirms with "Take vial" when a calibration standard was
+  // dropped, so the button is quoted rather than assumed.
+  it("quotes the button the open dialog actually shows", () => {
+    const confirming = getDropDraftPresentation(
+      "confirm",
+      { amount: 1, unitLabel: "ng/mL" },
+      "Take vial",
+    );
+    expect(confirming.action).toEqual({ kind: "click", label: "Click Take vial" });
+  });
+});
+
+describe("declared calibration ladder", () => {
+  // No vials in the state: the tutorial falls back to the ladder it walks the
+  // learner through, which is what the standards will be prepared at.
+  const state = experiment();
+
+  it("accepts the prepared rung however it is typed", () => {
+    expect(methodLevelsMatchLadder(state, "500")).toBe(true);
+    expect(methodLevelsMatchLadder(state, " 500 ")).toBe(true);
+    expect(methodLevelsMatchLadder(state, "500.0")).toBe(true);
+  });
+
+  it("rejects a ladder the rack cannot back", () => {
+    expect(methodLevelsMatchLadder(state, "50")).toBe(false);
+    expect(methodLevelsMatchLadder(state, "5000")).toBe(false);
+    expect(methodLevelsMatchLadder(state, "500, 1000")).toBe(false);
+    expect(methodLevelsMatchLadder(state, "")).toBe(false);
+    expect(methodLevelsMatchLadder(state, "five hundred")).toBe(false);
+  });
+
+  // The scenario: a learner takes the 10 and the 50 by mistake, bins them, and
+  // stages the 500 the tutorial asked for. Only the 500 is injected, so only the
+  // 500 may be declared.
+  it("ignores a standard that was taken by mistake and discarded", () => {
+    const wrongLevelsBinned = experiment({
+      rack: {
+        ...experiment().rack,
+        slots: [
+          {
+            id: "rack_1",
+            label: "A1",
+            tool: calibrationVial({ id: "cal-500", calibrationContext: { levelNgPerMl: 500, compoundIds: ["boscalid"] } }),
+          },
+        ],
+      },
+      trash: {
+        ...experiment().trash,
+        children: [
+          calibrationVial({ id: "cal-10", calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] } }),
+          calibrationVial({ id: "cal-50", calibrationContext: { levelNgPerMl: 50, compoundIds: ["boscalid"] } }),
+        ],
+      },
+    });
+
+    expect(methodLevelsMatchLadder(wrongLevelsBinned, "500")).toBe(true);
+    expect(methodLevelsMatchLadder(wrongLevelsBinned, "10, 50, 500")).toBe(false);
+    expect(getMethodWalkPresentation(wrongLevelsBinned, "levels-mismatch").action).toEqual({
+      kind: "type",
+      label: "Correct the levels to 500",
+    });
+  });
+
+  // A standard still on the bench before staging counts, since it is on its way
+  // into the rack; one in the bin does not, wherever the batch stands.
+  it("falls back to the vials on hand while the rack is still empty", () => {
+    const onBench = experiment({
+      workbench: { slots: calibrationLadderSlots({ levels: [1, 500] }) },
+      trash: {
+        ...experiment().trash,
+        children: [
+          calibrationVial({ id: "cal-10", calibrationContext: { levelNgPerMl: 10, compoundIds: ["boscalid"] } }),
+        ],
+      },
+    });
+
+    expect(methodLevelsMatchLadder(onBench, "1, 500")).toBe(true);
+    expect(methodLevelsMatchLadder(onBench, "1, 10, 500")).toBe(false);
+  });
+
+  // Two vials at the same level are two injections of one point.
+  it("declares a level once however many vials carry it", () => {
+    const duplicated = experiment({
+      workbench: { slots: calibrationLadderSlots({ levels: [500, 500] }) },
+    });
+
+    expect(methodLevelsMatchLadder(duplicated, "500")).toBe(true);
+    expect(methodLevelsMatchLadder(duplicated, "500, 500")).toBe(false);
+  });
+
+  // Free mode is where a learner builds the series out, and the check follows the
+  // rack rather than the single rung the tutorial walks.
+  it("reads the rungs off the vials the learner actually prepared", () => {
+    const twoRungs = experiment({
+      workbench: { slots: calibrationLadderSlots({ levels: [1, 500] }) },
+    });
+
+    expect(methodLevelsMatchLadder(twoRungs, "1, 500")).toBe(true);
+    // The order only fixes which concentration column is which in the export;
+    // what makes the curve right is the set of concentrations in it.
+    expect(methodLevelsMatchLadder(twoRungs, "500, 1")).toBe(true);
+    expect(methodLevelsMatchLadder(twoRungs, "500")).toBe(false);
+  });
+
+  it("names the ladder to retype when the field disagrees with the rack", () => {
+    const mismatch = getMethodWalkPresentation(state, "levels-mismatch");
+    expect(mismatch.instruction).toContain("500");
+    expect(mismatch.action).toEqual({ kind: "type", label: "Correct the levels to 500" });
+
+    const saved = getMethodWalkPresentation(state, "reopen-levels");
+    expect(saved.action).toEqual({ kind: "click", label: "Open Manage methods" });
   });
 });
