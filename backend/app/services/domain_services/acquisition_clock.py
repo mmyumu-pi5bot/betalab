@@ -7,17 +7,24 @@ faithful but unplayable, so Betalab runs the same schedule at
 compressed — the instrument seconds recorded in the traces stay real, only the
 wall clock spent watching them shrinks.
 
+The factor is a playability setting, not a physical one: it is the whole answer
+to "the wait is too long", and *Skip to end* stays there for the learner who
+does not want to watch at all rather than as the way through.
+
 The traces themselves are produced in full when the sequence starts. This
 module only moves ``SequenceRun.elapsed_s`` forward, which is what readers use
 to reveal each chromatogram as it is recorded.
 """
+
 from __future__ import annotations
 
 from app.domain.models import Experiment, SequenceRun
 
 #: Instrument seconds elapsed per wall-clock second. A 12-minute run therefore
-#: takes about 24 seconds to watch, and a five-vial sequence about two minutes.
-ACQUISITION_TIME_ACCELERATION = 30.0
+#: takes about 12 seconds to watch, and the tutorial's two injections about 25.
+#: That is long enough to see each chromatogram drawn — which is the point of
+#: watching at all — and short enough not to be an interruption.
+ACQUISITION_TIME_ACCELERATION = 60.0
 
 
 def is_sequence_complete(run: SequenceRun) -> bool:
