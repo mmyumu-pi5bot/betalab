@@ -57,7 +57,7 @@ def _ctx(
 
 def _ratio(ctx: InjectionContext) -> float:
     random.seed(20260808)
-    responses = _compute_sample_responses(None, ctx)
+    responses = _compute_sample_responses(ctx)
     return responses[COMPOUND] / responses[INTERNAL_STANDARD_COMPOUND_ID]
 
 
@@ -88,58 +88,44 @@ class TestDrawingTheSamplingError:
 
     def test_the_draw_stays_within_physical_bounds(self) -> None:
         random.seed(3)
-        draws = [
-            PhysicalSimulationService.draw_sampling_representativeness(0.0)
-            for _ in range(500)
-        ]
+        draws = [PhysicalSimulationService.draw_sampling_representativeness(0.0) for _ in range(500)]
 
-        assert all(
-            PhysicalSimulationService.sampling_factor_min
-            <= draw
-            <= PhysicalSimulationService.sampling_factor_max
-            for draw in draws
-        )
+        assert all(PhysicalSimulationService.sampling_factor_min <= draw <= PhysicalSimulationService.sampling_factor_max for draw in draws)
 
 
 class TestSamplingErrorReachesTheSignal:
     def test_a_biased_aliquot_scales_the_pesticide_response(self) -> None:
         random.seed(20260808)
-        full = _compute_sample_responses(None, _ctx(sampling_representativeness=1.0))
+        full = _compute_sample_responses(_ctx(sampling_representativeness=1.0))
         random.seed(20260808)
-        half = _compute_sample_responses(None, _ctx(sampling_representativeness=0.5))
+        half = _compute_sample_responses(_ctx(sampling_representativeness=0.5))
 
         assert half[COMPOUND] == pytest.approx(full[COMPOUND] * 0.5, rel=0.02)
 
     def test_the_internal_standard_never_carries_the_sampling_error(self) -> None:
         random.seed(20260808)
-        full = _compute_sample_responses(None, _ctx(sampling_representativeness=1.0))
+        full = _compute_sample_responses(_ctx(sampling_representativeness=1.0))
         random.seed(20260808)
-        half = _compute_sample_responses(None, _ctx(sampling_representativeness=0.5))
+        half = _compute_sample_responses(_ctx(sampling_representativeness=0.5))
 
         # The ISTD is pipetted into the tube after the powder was weighed.
-        assert half[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(
-            full[INTERNAL_STANDARD_COMPOUND_ID], rel=0.02
-        )
+        assert half[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(full[INTERNAL_STANDARD_COMPOUND_ID], rel=0.02)
 
     def test_the_ratio_cannot_correct_a_sampling_error(self) -> None:
-        assert _ratio(_ctx(sampling_representativeness=0.5)) == pytest.approx(
-            _ratio(_ctx(sampling_representativeness=1.0)) * 0.5, rel=0.02
-        )
+        assert _ratio(_ctx(sampling_representativeness=0.5)) == pytest.approx(_ratio(_ctx(sampling_representativeness=1.0)) * 0.5, rel=0.02)
 
     def test_the_ratio_still_corrects_a_solvent_volume_error(self) -> None:
         """Contrast: dilution hits both channels, so it cancels. Sampling does not."""
-        assert _ratio(
-            _ctx(sampling_representativeness=1.0, extract_true_volume_ml=12.0)
-        ) == pytest.approx(
+        assert _ratio(_ctx(sampling_representativeness=1.0, extract_true_volume_ml=12.0)) == pytest.approx(
             _ratio(_ctx(sampling_representativeness=1.0, extract_true_volume_ml=10.0)),
             rel=0.02,
         )
 
     def test_an_extract_with_no_recorded_bias_is_unaffected(self) -> None:
         random.seed(20260808)
-        unknown = _compute_sample_responses(None, _ctx(sampling_representativeness=None))
+        unknown = _compute_sample_responses(_ctx(sampling_representativeness=None))
         random.seed(20260808)
-        neutral = _compute_sample_responses(None, _ctx(sampling_representativeness=1.0))
+        neutral = _compute_sample_responses(_ctx(sampling_representativeness=1.0))
 
         assert unknown[COMPOUND] == pytest.approx(neutral[COMPOUND], rel=1e-9)
 
@@ -237,9 +223,7 @@ class TestDirtRaisesTheBackground:
         assert PhysicalSimulationService.background_scale(0.01, 402.0) < 1.1
 
     def test_a_contaminated_fraction_lifts_the_background_visibly(self) -> None:
-        contaminated = (
-            PhysicalSimulationService.contaminated_fraction_impurity_mg * 0.1
-        )
+        contaminated = PhysicalSimulationService.contaminated_fraction_impurity_mg * 0.1
 
         assert PhysicalSimulationService.background_scale(contaminated, 402.0) > 1.2
 

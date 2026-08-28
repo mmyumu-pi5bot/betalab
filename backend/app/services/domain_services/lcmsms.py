@@ -503,11 +503,12 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                     foreign_matter_mg = 0.0
                 else:
                     status = "ok"
-                    responses = _compute_sample_responses(vial, vial.injection_context)
+                    responses = _compute_sample_responses(vial.injection_context)
                     foreign_matter_mg = vial.injection_context.foreign_matter_mass_mg
 
                 if not is_dry:
                     _draw_injection_volume(vial, configured.injection_volume_ul)
+                responses = _as_this_injection_shows_it(responses)
                 injection_id = new_id("inj")
                 # An empty vial is still injected and still records every channel:
                 # the run produces flat traces rather than no data at all.
@@ -771,6 +772,31 @@ class PlaceCalibrationStandardVialService(WriteDomainService[PlaceCalibrationSta
         )
 
 
+def _as_this_injection_shows_it(responses: dict[str, float]) -> dict[str, float]:
+    """What the detector reports for one injection of a vial it already knows.
+
+    Everything up to here is the chemistry: what the vial holds. This is the
+    instrument's own contribution, and it is the reason two injections of the
+    same vial never give the same area twice.
+
+    Drawn once per injection for the spray and once more per compound, because
+    an internal standard removes the first and cannot touch the second. A run
+    whose standards all landed on the line is a run whose channel draws happened
+    to agree — it stays possible, and that is the point: a calibration is a
+    measurement too, and some come out better than others.
+    """
+    spray = PhysicalSimulationService.draw_injection_response()
+    return {
+        compound_id: round(
+            PhysicalSimulationService.saturated_response(concentration)
+            * spray
+            * PhysicalSimulationService.draw_channel_response(),
+            6,
+        )
+        for compound_id, concentration in responses.items()
+    }
+
+
 def _compute_calibration_responses(vial: WorkbenchTool, ctx: CalibrationContext) -> dict[str, float]:
     """Extract concentration seen by the detector for a calibration standard.
 
@@ -800,21 +826,14 @@ def _compute_calibration_responses(vial: WorkbenchTool, ctx: CalibrationContext)
     # was added to it, so nothing dilutes it.
     dilution = calibrant_v / total_v if total_v > 0 and istd_v > 0 else 1.0
 
-    responses = {
-        compound_id: round(true_level * dilution * random.gauss(1.0, ENV_NOISE_SIGMA), 6)
-        for compound_id in ctx.compound_ids
-    }
+    responses = {compound_id: round(true_level * dilution * random.gauss(1.0, ENV_NOISE_SIGMA), 6) for compound_id in ctx.compound_ids}
     if istd_v > 0 and total_v > 0:
         istd_conc = istd_v * ISTD_REFERENCE_CONC_NG_PER_ML / total_v
-        responses[INTERNAL_STANDARD_COMPOUND_ID] = round(
-            istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6
-        )
+        responses[INTERNAL_STANDARD_COMPOUND_ID] = round(istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6)
     return responses
 
 
-def _compute_sample_responses(
-    vial: WorkbenchTool, ctx: InjectionContext
-) -> dict[str, float]:
+def _compute_sample_responses(ctx: InjectionContext) -> dict[str, float]:
     """Apply the two-tier variance model to get per-compound detector responses.
 
     Returns the concentration reaching the detector for each compound, plus the
@@ -822,7 +841,6 @@ def _compute_sample_responses(
     downstream of this — ratios, calibration curves, concentrations — belongs to
     the analysis application, not to Betalab.
     """
-    del vial  # physics lives entirely in the injection context
     responses: dict[str, float] = {}
     extraction_result = ctx.extraction_result
 
@@ -842,17 +860,11 @@ def _compute_sample_responses(
     if not extract_true_v:
         extract_true_v = ctx.extract_volume_ml or 1.0
     istd_true_v = ctx.istd_true_volume_ml if ctx.istd_true_volume_ml is not None else ctx.istd_volume_ml
-    sample_true_mass_g = (
-        ctx.sample_true_mass_g
-        if ctx.sample_true_mass_g is not None
-        else ctx.sample_mass_g
-    )
+    sample_true_mass_g = ctx.sample_true_mass_g if ctx.sample_true_mass_g is not None else ctx.sample_mass_g
 
     # How much sample each injected millilitre carries. A calibration standard
     # in pure solvent has none, which is why it is never suppressed.
-    matrix_load = PhysicalSimulationService.matrix_load_g_per_ml(
-        sample_true_mass_g, extract_true_v
-    )
+    matrix_load = PhysicalSimulationService.matrix_load_g_per_ml(sample_true_mass_g, extract_true_v)
 
     for compound_id, true_effective_ug_per_kg in ctx.effective_residues_ug_per_kg.items():
         # Pesticide amount in the extract, in nanograms. µg/kg times grams already

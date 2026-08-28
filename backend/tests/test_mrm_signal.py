@@ -9,10 +9,12 @@ import pytest
 
 from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1, MrmTransition
 from app.domain.mrm_reference import (
+    COMPOUND_PEAK_PROFILES,
     INTERNAL_STANDARD_COMPOUND_ID,
     MRM_REFERENCE_CATALOG,
     MZ_MATCH_TOLERANCE,
     find_reference_transition,
+    peak_profile_for,
 )
 from app.services.domain_services.mrm_signal import (
     BASELINE_COUNTS,
@@ -22,7 +24,6 @@ from app.services.domain_services.mrm_signal import (
     MZ_PLATEAU_DA,
     NOMINAL_INJECTION_VOLUME_UL,
     PEAK_SIGMA_S,
-    QUALIFIER_RESPONSE_RATIO,
     RESPONSE_COUNTS_PER_CONCENTRATION_UNIT,
     _effective_peak_sigma_s,
     _filter_transmission,
@@ -43,41 +44,41 @@ def _method_with(*transitions: MrmTransition):
 
 
 def _transition(compound_id: str, role: str = "quantifier") -> MrmTransition:
-    return next(
-        t
-        for t in APPLE_PESTICIDES_MRM_V1.transitions
-        if t.compound_id == compound_id and t.role == role
-    )
+    return next(t for t in APPLE_PESTICIDES_MRM_V1.transitions if t.compound_id == compound_id and t.role == role)
 
 
 def _peak_height(trace) -> float:
     return max(trace.intensities) - BASELINE_COUNTS
 
 
+def _peak_centre_s(trace) -> float:
+    """Intensity-weighted centre of the peak.
+
+    The discrete apex is a poor estimator of when a compound eluted: the top of
+    a peak is flat to within the noise, so the highest recorded point wanders by
+    a few tenths of a second. The centroid averages that away, and tails both
+    channels the same way since they share a profile.
+    """
+    weights = [max(value - BASELINE_COUNTS, 0.0) for value in trace.intensities]
+    return sum(time_s * weight for time_s, weight in zip(trace.times_s, weights, strict=False)) / sum(weights)
+
+
 class TestTraceStructure:
     def test_produces_one_trace_per_declared_transition(self) -> None:
-        traces = generate_transition_traces(
-            "inj_1", APPLE_PESTICIDES_MRM_V1, {}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", APPLE_PESTICIDES_MRM_V1, {}, _rng())
 
         assert len(traces) == len(APPLE_PESTICIDES_MRM_V1.transitions)
-        assert [t.transition.id for t in traces] == [
-            t.id for t in APPLE_PESTICIDES_MRM_V1.transitions
-        ]
+        assert [t.transition.id for t in traces] == [t.id for t in APPLE_PESTICIDES_MRM_V1.transitions]
 
     def test_each_trace_carries_the_injection_and_the_transition_snapshot(self) -> None:
-        traces = generate_transition_traces(
-            "inj_42", APPLE_PESTICIDES_MRM_V1, {}, _rng()
-        )
+        traces = generate_transition_traces("inj_42", APPLE_PESTICIDES_MRM_V1, {}, _rng())
 
         assert all(trace.injection_id == "inj_42" for trace in traces)
         assert traces[0].transition == APPLE_PESTICIDES_MRM_V1.transitions[0]
 
     def test_time_and_intensity_axes_stay_aligned_inside_the_declared_window(self) -> None:
         transition = _transition("boscalid")
-        traces = generate_transition_traces(
-            "inj_1", APPLE_PESTICIDES_MRM_V1, {}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", APPLE_PESTICIDES_MRM_V1, {}, _rng())
 
         trace = next(t for t in traces if t.transition.id == transition.id)
         half_width = transition.retention_window_s / 2.0
@@ -132,28 +133,39 @@ class TestSignalDependsOnPhysicalContent:
 
     def test_peak_elutes_at_the_reference_retention_time(self) -> None:
         transition = _transition("boscalid")
-        reference = next(
-            t for t in MRM_REFERENCE_CATALOG
-            if t.compound_id == "boscalid" and t.role == "quantifier"
-        )
-        traces = generate_transition_traces(
-            "inj_1", _method_with(transition), {"boscalid": 3.0}, _rng()
-        )
+        reference = next(t for t in MRM_REFERENCE_CATALOG if t.compound_id == "boscalid" and t.role == "quantifier")
+        traces = generate_transition_traces("inj_1", _method_with(transition), {"boscalid": 3.0}, _rng())
 
         trace = traces[0]
         apex_index = trace.intensities.index(max(trace.intensities))
-        assert trace.times_s[apex_index] == pytest.approx(
-            reference.expected_retention_time_s, abs=10.0
+        assert trace.times_s[apex_index] == pytest.approx(reference.expected_retention_time_s, abs=10.0)
+
+    def test_a_compound_elutes_at_one_time_on_every_channel_watching_it(self) -> None:
+        """Quantifier and qualifier are the same molecules leaving the column.
+
+        The run-to-run drift belongs to the injection, so both channels move
+        together. What separates them is the duty cycle alone: the instrument
+        measures one at a time, so their apexes can land one cycle apart and no
+        further. A qualifier that drifted on its own would read as a second
+        compound and break the ion ratio.
+        """
+        method = _method_with(
+            _transition("thiacloprid", "quantifier"),
+            _transition("thiacloprid", "qualifier"),
         )
+
+        traces = generate_transition_traces("inj_1", method, {"thiacloprid": 3.0}, _rng())
+
+        quantifier, qualifier = (_peak_centre_s(trace) for trace in traces)
+        cycle_s = sum(t.dwell_time_ms + INTERSCAN_DELAY_MS for t in method.transitions) / 1000.0
+        assert quantifier == pytest.approx(qualifier, abs=cycle_s)
 
 
 class TestNumericTransitionMatching:
     def test_mass_pair_matching_no_reference_channel_yields_baseline(self) -> None:
         nonsense = replace(_transition("boscalid"), q1_mz=901.4, q3_mz=412.7)
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(nonsense), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(nonsense), {"boscalid": 5.0}, _rng())
 
         trace = traces[0]
         assert trace.acquisition.matched_reference_transition is False
@@ -347,12 +359,10 @@ class TestQuantifierAndQualifier:
         quantifier = _transition("boscalid", "quantifier")
         qualifier = _transition("boscalid", "qualifier")
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(quantifier, qualifier), {"boscalid": 3.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(quantifier, qualifier), {"boscalid": 3.0}, _rng())
 
         ratio = _peak_height(traces[1]) / _peak_height(traces[0])
-        assert ratio == pytest.approx(QUALIFIER_RESPONSE_RATIO, rel=0.1)
+        assert ratio == pytest.approx(peak_profile_for("boscalid").ion_ratio, rel=0.1)
 
     def test_the_internal_standard_gets_its_own_channel(self) -> None:
         istd = _transition(INTERNAL_STANDARD_COMPOUND_ID)
@@ -470,8 +480,9 @@ class TestInjectionVolume:
     def test_doubling_the_volume_doubles_what_reaches_the_column(self) -> None:
         assert self._area(10.0) == pytest.approx(self._area(5.0) * 2, rel=0.1)
 
-    def test_a_modest_injection_is_not_broadened(self) -> None:
-        assert _effective_peak_sigma_s(5.0, 0.4) == pytest.approx(PEAK_SIGMA_S, rel=0.02)
+    def test_a_modest_injection_barely_broadens_the_band(self) -> None:
+        """The nominal 5 uL costs a few percent, not a visible widening."""
+        assert _effective_peak_sigma_s(5.0, 0.4) == pytest.approx(PEAK_SIGMA_S, rel=0.06)
 
     def test_a_large_injection_widens_the_band(self) -> None:
         assert _effective_peak_sigma_s(100.0, 0.4) > PEAK_SIGMA_S * 2
@@ -480,7 +491,7 @@ class TestInjectionVolume:
         """Ten times the material, nowhere near ten times the height."""
         gain = _peak_height(self._trace(50.0)) / _peak_height(self._trace(5.0))
 
-        assert 5.0 < gain < 9.0
+        assert 2.5 < gain < 5.0
 
     def test_the_area_still_follows_the_volume_when_the_peak_spreads(self) -> None:
         """Broadening spreads the material, it does not destroy it."""
@@ -488,3 +499,84 @@ class TestInjectionVolume:
 
     def test_a_faster_flow_sweeps_the_injected_band_through_sooner(self) -> None:
         assert _effective_peak_sigma_s(50.0, 0.8) < _effective_peak_sigma_s(50.0, 0.4)
+
+
+class TestCompoundPeakProfiles:
+    """Two compounds must not produce the same peak twice."""
+
+    def _trace(self, compound_id: str, role: str = "quantifier"):
+        transition = _transition(compound_id, role)
+        traces = generate_transition_traces(
+            "inj_1",
+            _method_with(transition),
+            {compound_id: 5.0},
+            _rng(),
+        )
+        return traces[0]
+
+    def _width_at_half_height(self, trace) -> float:
+        half = (max(trace.intensities) - BASELINE_COUNTS) / 2.0 + BASELINE_COUNTS
+        above = [time for time, value in zip(trace.times_s, trace.intensities, strict=True) if value >= half]
+        return above[-1] - above[0]
+
+    def test_every_catalog_compound_declares_a_profile(self) -> None:
+        assert {reference.compound_id for reference in MRM_REFERENCE_CATALOG} == set(COMPOUND_PEAK_PROFILES)
+
+    def test_a_late_pyrethroid_is_broader_than_an_early_neonicotinoid(self) -> None:
+        assert self._width_at_half_height(self._trace("deltamethrin")) > self._width_at_half_height(
+            self._trace("acetamiprid")
+        )
+
+    def test_the_peak_rises_faster_than_it_falls(self) -> None:
+        """A tailing compound spends longer coming down than going up."""
+        trace = self._trace("pyrimicarb")
+        apex_index = trace.intensities.index(max(trace.intensities))
+        apex_s = trace.times_s[apex_index]
+        half = (max(trace.intensities) - BASELINE_COUNTS) / 2.0 + BASELINE_COUNTS
+        above = [time for time, value in zip(trace.times_s, trace.intensities, strict=True) if value >= half]
+
+        assert above[-1] - apex_s > apex_s - above[0]
+
+    def test_a_symmetric_compound_stays_symmetric(self) -> None:
+        trace = self._trace("chlorpyrifos_methyl")
+        apex_index = trace.intensities.index(max(trace.intensities))
+        apex_s = trace.times_s[apex_index]
+        half = (max(trace.intensities) - BASELINE_COUNTS) / 2.0 + BASELINE_COUNTS
+        above = [time for time, value in zip(trace.times_s, trace.intensities, strict=True) if value >= half]
+
+        assert (above[-1] - apex_s) == pytest.approx(apex_s - above[0], abs=1.0)
+
+    def test_the_ion_ratio_is_a_property_of_the_compound(self) -> None:
+        """The identity check is worthless if every compound shares one ratio."""
+        ratios = {
+            compound_id: _peak_height(self._trace(compound_id, "qualifier"))
+            / _peak_height(self._trace(compound_id, "quantifier"))
+            for compound_id in ("acetamiprid", "captan", "deltamethrin", "lambda_cyhalothrin")
+        }
+
+        assert len(set(round(ratio, 2) for ratio in ratios.values())) == len(ratios)
+        for compound_id, ratio in ratios.items():
+            assert ratio == pytest.approx(peak_profile_for(compound_id).ion_ratio, rel=0.1)
+
+    def test_the_profile_moves_the_shape_and_leaves_the_area_alone(self) -> None:
+        """Quantification integrates, so a profile must not rewrite the amount.
+
+        Height and width may differ between compounds; the area a same response
+        produces must not, or the cosmetics would silently bias the result.
+        """
+        areas = {}
+        for compound_id in ("acetamiprid", "captan", "deltamethrin", "boscalid"):
+            trace = self._trace(compound_id)
+            interval = trace.acquisition.sampling_interval_s
+            areas[compound_id] = sum(max(value - BASELINE_COUNTS, 0.0) for value in trace.intensities) * interval
+
+        reference = areas["acetamiprid"]
+        for compound_id, area in areas.items():
+            assert area == pytest.approx(reference, rel=0.05), compound_id
+
+    def test_a_peak_no_longer_fills_its_whole_acquisition_window(self) -> None:
+        """A peak that never returns to baseline cannot be integrated by eye."""
+        for compound_id in ("acetamiprid", "captan", "deltamethrin"):
+            trace = self._trace(compound_id)
+            window_s = _transition(compound_id).retention_window_s
+            assert self._width_at_half_height(trace) < window_s / 4.0, compound_id

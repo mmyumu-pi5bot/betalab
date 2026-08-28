@@ -913,6 +913,56 @@ propres à chaque analyte, plutôt que d'un seul étalon universel.
 Un composé dont le catalogue ignore le temps d'élution reçoit la matrice moyenne
 du run, jamais celle du volume mort où la suppression est maximale.
 
+#### Variabilité d'injection et saturation du détecteur
+
+Tout ce qui précède décrit ce que la fiole contient. Vient ensuite ce que
+l'instrument en fait, et qui change d'une injection à l'autre : deux injections
+de la même fiole ne rendent jamais deux fois la même aire.
+
+Deux termes, séparés parce que l'étalon interne les traite différemment :
+
+| Terme | σ | Portée | Corrigé par le rapport ISTD ? |
+|---|---:|---|---|
+| `injection_response_relative_sigma` | 3,5 % | Tous les canaux d'une injection | **Oui** — l'ISTD est mesuré dans la même injection |
+| `channel_response_relative_sigma` | 3,5 % | Un composé dans une injection | **Non** — l'ISTD tire le sien |
+
+Le premier est le spray : formation des gouttelettes, aiguille encrassée, volume
+réellement prélevé. Il bouge tous les canaux ensemble, donc le rapport le divise
+— c'est la raison d'être de l'étalon interne. Le second est le canal : chaque
+composé concourt pour la charge à son propre instant d'élution et s'intègre sur
+son propre pic. L'ISTD sort ailleurs et n'en partage rien, donc **aucun rapport
+ne l'enlève** : c'est le plancher de répétabilité d'une mesure, et donc de la
+qualité qu'une droite d'étalonnage peut atteindre.
+
+Ces deux termes, ajoutés aux 3 % de préparation d'un étalon
+(`calibration_prep_relative_sigma`), donnent sur une gamme cinq points 1→500 :
+
+| R² affiché à 3 décimales | Fréquence |
+|---|---:|
+| 1.000 | 37 % |
+| 0.999 | 29 % |
+| 0.998 | 13 % |
+| ≤ 0.997 | 21 % |
+
+Une belle gamme reste possible — c'est un tirage qui tombe bien, pas une
+garantie. Le R² lui-même est un mauvais juge sur trois décades : la somme des
+carrés est écrasée par le point haut, et une gamme à 0,9999 peut porter ±20 %
+d'erreur sur son point bas. Les résidus par niveau sont le vrai diagnostic.
+
+**Saturation du détecteur.** L'électrospray se dispute une quantité finie de
+charge : passé une certaine concentration, ajouter de l'analyte cesse d'ajouter
+du signal en proportion.
+
+```
+réponse = conc / (1 + conc / detector_half_response_ng_per_ml)
+```
+
+Avec `detector_half_response_ng_per_ml = 9500`, l'effet est invisible aux
+concentrations de travail (< 1 % jusqu'à 50 ng/mL) et fait tomber le point à
+500 ng/mL environ 5 % sous la droite tracée par les points bas. C'est ce qui
+fait du point haut un vrai plafond : un résultat au-dessus ne se rattrape pas en
+prolongeant la droite, il se dilue.
+
 #### Contamination et impuretés — ligne de base
 
 Les impuretés de contact (`impurity_mass_mg`) et les fractions posées sur une

@@ -1,9 +1,11 @@
 """Tests for LC-MS/MS domain services: calibration preparation and sequence execution."""
+
 from __future__ import annotations
 
 import json
 import random
 import sqlite3
+import statistics
 from dataclasses import replace
 
 import pytest
@@ -40,6 +42,7 @@ from app.services.domain_services.lcmsms import (
     RunSequenceService,
     UnloadRackFromInstrumentRequest,
     UnloadRackFromInstrumentService,
+    _as_this_injection_shows_it,
     _compute_calibration_responses,
     _compute_sample_responses,
     _reference_retention_time_s,
@@ -410,8 +413,75 @@ class TestDrawPreparedLevel:
 
 
 # ---------------------------------------------------------------------------
+# _as_this_injection_shows_it — the instrument's own contribution
+# ---------------------------------------------------------------------------
+
+
+class TestInjectionVariability:
+    """Two injections of one vial are two measurements, not one repeated."""
+
+    @staticmethod
+    def _rsd(values: list[float]) -> float:
+        mean = statistics.fmean(values)
+        return statistics.stdev(values) / mean
+
+    def test_the_same_vial_does_not_give_the_same_response_twice(self) -> None:
+        prepared = {"boscalid": 100.0}
+        random.seed(4)
+
+        first = _as_this_injection_shows_it(prepared)
+        second = _as_this_injection_shows_it(prepared)
+
+        assert first["boscalid"] != second["boscalid"]
+
+    def test_the_istd_ratio_is_tighter_than_the_raw_response(self) -> None:
+        """The spray moves every channel together, so a ratio divides it out.
+
+        What is left is the part the ISTD cannot see — each compound competing
+        for charge on its own — and that is the floor on how repeatable a
+        measurement can be, however good the internal standard is.
+        """
+        prepared = {"boscalid": 100.0, INTERNAL_STANDARD_COMPOUND_ID: 0.5}
+        random.seed(11)
+        drawn = [_as_this_injection_shows_it(prepared) for _ in range(400)]
+
+        raw = self._rsd([shown["boscalid"] for shown in drawn])
+        ratio = self._rsd([shown["boscalid"] / shown[INTERNAL_STANDARD_COMPOUND_ID] for shown in drawn])
+
+        assert 0.0 < ratio < raw
+
+    def test_an_empty_vial_stays_empty(self) -> None:
+        assert _as_this_injection_shows_it({}) == {}
+
+
+class TestDetectorSaturation:
+    def test_a_working_concentration_is_read_off_the_linear_part(self) -> None:
+        # Samples and the lower standards live here: the bend must not show.
+        for concentration in (1.0, 10.0, 50.0):
+            shown = PhysicalSimulationService.saturated_response(concentration)
+            assert shown == pytest.approx(concentration, rel=0.01)
+
+    def test_the_top_of_a_wide_ladder_falls_under_the_line_it_draws(self) -> None:
+        """A curve fitted on the low points over-predicts its own top point.
+
+        This is what makes the highest standard a real ceiling rather than an
+        arbitrary one: a result above it cannot be recovered by extending the
+        line, because the line is not where the detector is any more.
+        """
+        slope = PhysicalSimulationService.saturated_response(10.0) / 10.0
+        top = PhysicalSimulationService.saturated_response(500.0)
+
+        droop = 1.0 - top / (slope * 500.0)
+        assert 0.02 < droop < 0.10
+
+    def test_nothing_in_an_empty_vial_saturates(self) -> None:
+        assert PhysicalSimulationService.saturated_response(0.0) == 0.0
+
+
+# ---------------------------------------------------------------------------
 # _compute_calibration_compounds — true-level-driven signal scatter
 # ---------------------------------------------------------------------------
+
 
 class TestComputeCalibrationResponses:
     def test_response_follows_the_truly_prepared_level_not_the_declared_one(self) -> None:
@@ -1428,7 +1498,7 @@ class TestSampleResponseInvariants:
         )
 
         random.seed(SEED)
-        responses = _compute_sample_responses(_make_vial(), ctx)
+        responses = _compute_sample_responses(ctx)
 
         expected = (100.0 * 10.0) / (0.05 * 100.0)
         assert self._ratio(responses) == pytest.approx(expected, rel=0.02)
@@ -1439,9 +1509,9 @@ class TestSampleResponseInvariants:
         ctx_biased = _make_ctx(extract_nominal=10.0, extract_true=8.0)
 
         random.seed(SEED)
-        nominal = _compute_sample_responses(_make_vial(), ctx_nominal)
+        nominal = _compute_sample_responses(ctx_nominal)
         random.seed(SEED)
-        biased = _compute_sample_responses(_make_vial(), ctx_biased)
+        biased = _compute_sample_responses(ctx_biased)
 
         # Both channels rise together, so the ratio is untouched. Cancellation is
         # near-perfect rather than exact because suppression depends on retention
@@ -1457,14 +1527,12 @@ class TestSampleResponseInvariants:
         undersampled = _make_ctx(sample_mass_g=10.0, sample_true_mass_g=8.0)
 
         random.seed(SEED)
-        baseline_responses = _compute_sample_responses(_make_vial(), baseline)
+        baseline_responses = _compute_sample_responses(baseline)
         random.seed(SEED)
-        undersampled_responses = _compute_sample_responses(_make_vial(), undersampled)
+        undersampled_responses = _compute_sample_responses(undersampled)
 
         # Less sample really was weighed, and no ISTD ratio can hide it.
-        assert self._ratio(undersampled_responses) / self._ratio(baseline_responses) == (
-            pytest.approx(0.8, rel=1e-3)
-        )
+        assert self._ratio(undersampled_responses) / self._ratio(baseline_responses) == (pytest.approx(0.8, rel=1e-3))
 
     def test_istd_pipetting_error_biases_the_ratio_inv2(self) -> None:
         istd_nominal = 0.05
@@ -1474,17 +1542,13 @@ class TestSampleResponseInvariants:
         ctx_biased = _make_ctx(istd_nominal=istd_nominal, istd_true=istd_true)
 
         random.seed(SEED)
-        baseline_responses = _compute_sample_responses(_make_vial(), ctx_baseline)
+        baseline_responses = _compute_sample_responses(ctx_baseline)
         random.seed(SEED)
-        biased_responses = _compute_sample_responses(_make_vial(), ctx_biased)
+        biased_responses = _compute_sample_responses(ctx_biased)
 
         # Too little ISTD delivered → its channel is weaker → the ratio inflates.
-        assert self._ratio(biased_responses) / self._ratio(baseline_responses) == (
-            pytest.approx(istd_nominal / istd_true, rel=1e-4)
-        )
-        assert biased_responses["boscalid"] == pytest.approx(
-            baseline_responses["boscalid"], rel=1e-4
-        )
+        assert self._ratio(biased_responses) / self._ratio(baseline_responses) == (pytest.approx(istd_nominal / istd_true, rel=1e-4))
+        assert biased_responses["boscalid"] == pytest.approx(baseline_responses["boscalid"], rel=1e-4)
 
     def test_without_istd_the_response_carries_the_full_bias_inv4(self) -> None:
         """INV4: no ISTD channel, so extraction and solvent errors stay visible."""
@@ -1506,16 +1570,14 @@ class TestSampleResponseInvariants:
         )
 
         random.seed(SEED)
-        responses = _compute_sample_responses(_make_vial(), ctx)
+        responses = _compute_sample_responses(ctx)
 
         assert INTERNAL_STANDARD_COMPOUND_ID not in responses
         suppression = PhysicalSimulationService.matrix_suppression_factor(
             PhysicalSimulationService.matrix_load_g_per_ml(10.0, extract_true),
             _reference_retention_time_s("boscalid"),
         )
-        expected = (
-            true_effective * 10.0 * extraction_manip * suppression
-        ) / extract_true
+        expected = (true_effective * 10.0 * extraction_manip * suppression) / extract_true
         assert responses["boscalid"] == pytest.approx(expected, rel=0.02)
 
     def test_the_residue_amount_is_expressed_in_the_same_unit_as_the_istd_amount(
@@ -1542,7 +1604,7 @@ class TestSampleResponseInvariants:
         )
 
         random.seed(SEED)
-        responses = _compute_sample_responses(_make_vial(), ctx)
+        responses = _compute_sample_responses(ctx)
 
         suppression = PhysicalSimulationService.matrix_suppression_factor(
             PhysicalSimulationService.matrix_load_g_per_ml(10.0, 10.0),
@@ -1552,7 +1614,7 @@ class TestSampleResponseInvariants:
         assert responses["boscalid"] == pytest.approx(100.0 * suppression, rel=0.02)
 
     def test_returns_no_quantification_only_raw_responses(self) -> None:
-        responses = _compute_sample_responses(_make_vial(), _make_ctx())
+        responses = _compute_sample_responses(_make_ctx())
 
         assert set(responses) == {"boscalid", INTERNAL_STANDARD_COMPOUND_ID}
         assert all(isinstance(value, float) for value in responses.values())

@@ -47,19 +47,52 @@ class ThermalSurroundings:
 
 
 class PhysicalSimulationService:
-    extraction_manip_mu = 0.92      # mean extraction efficiency (8% mean loss)
-    extraction_manip_sigma = 0.04   # std dev (technician variability)
+    extraction_manip_mu = 0.92  # mean extraction efficiency (8% mean loss)
+    extraction_manip_sigma = 0.04  # std dev (technician variability)
     extraction_manip_min = 0.60
     extraction_manip_max = 1.05
     spilled_extraction_manip_factor = 0.05  # ~95% of the extract sprays out of an open tube
 
-    dispense_relative_sigma = 0.012   # ~1.2% relative dispensing/pipetting precision
+    dispense_relative_sigma = 0.012  # ~1.2% relative dispensing/pipetting precision
     dispense_factor_min = 0.90
     dispense_factor_max = 1.10
 
-    calibration_prep_relative_sigma = 0.02   # ~2% relative concentration-prep precision for standards
-    calibration_prep_factor_min = 0.94
-    calibration_prep_factor_max = 1.06
+    # A certified standard solution carries a few percent on its certificate, and
+    # a ladder is a serial dilution: each level is its own weighing and its own
+    # transfer, so the levels do not share their error. This is what stops a
+    # calibration curve from being a straight line through five exact points.
+    calibration_prep_relative_sigma = 0.03  # ~3% relative concentration-prep precision for standards
+    calibration_prep_factor_min = 0.91
+    calibration_prep_factor_max = 1.09
+
+    # No injection is a copy of the one before it. Two terms, kept apart because
+    # an internal standard treats them very differently:
+    #
+    # - the spray. How much of the eluate ionises depends on the source at that
+    #   moment — droplet formation, a needle that has seen a hundred injections,
+    #   the exact volume the autosampler drew. It moves every channel of the
+    #   injection together, so an ISTD ratio divides it straight back out. This
+    #   is the term internal standards exist to remove.
+    # - the channel. Each compound competes for charge on its own, reaches the
+    #   source in its own instant, and is integrated off its own peak. The ISTD
+    #   elutes elsewhere and does not share any of that, so no ratio removes it.
+    #   This is the floor on how good a calibration curve can be.
+    #
+    # Both are pedagogical placeholders in their exact value, but their *sizes*
+    # are what a sequence of replicate injections shows on a real instrument:
+    # a few percent on the raw area, a little less once ratioed.
+    injection_response_relative_sigma = 0.035
+    channel_response_relative_sigma = 0.035
+    response_factor_min = 0.80
+    response_factor_max = 1.20
+
+    #: Concentration at which the source gives half of what a linear detector
+    #: would. Electrospray is a competition for a finite amount of charge: past
+    #: some concentration, adding analyte stops adding signal in proportion, and
+    #: the top of a calibration curve bends. Placed so the top of the tutorial
+    #: ladder sits a few percent under the line its lower points draw — enough to
+    #: read on a residual plot, not enough to notice at working concentrations.
+    detector_half_response_ng_per_ml = 9500.0
 
     grinder_cycle_duration_seconds = 30.0
     grinder_optimal_temperature_c = -40.0
@@ -290,9 +323,7 @@ class PhysicalSimulationService:
         rise_seconds = self.quechers_heat_rise_seconds
         if state.reaction_elapsed_seconds <= rise_seconds:
             ratio = state.reaction_elapsed_seconds / rise_seconds
-            state.temperature_c = (
-                state.start_temperature_c + self.quechers_exotherm_delta_c * ratio
-            )
+            state.temperature_c = state.start_temperature_c + self.quechers_exotherm_delta_c * ratio
         else:
             # Once the salts are spent the tube is just a warm object standing
             # somewhere: it relaxes towards whatever surrounds it, not back down
@@ -304,20 +335,12 @@ class PhysicalSimulationService:
                 # only for the part of the tick that came after it -- otherwise a
                 # tick landing a millisecond past the peak would cool for its whole
                 # length and swallow the top of the exotherm.
-                state.temperature_c = (
-                    state.start_temperature_c + self.quechers_exotherm_delta_c
-                )
+                state.temperature_c = state.start_temperature_c + self.quechers_exotherm_delta_c
                 cooling_seconds = state.reaction_elapsed_seconds - rise_seconds
             else:
                 cooling_seconds = elapsed_seconds
-            cooling_progress = 1.0 - math.exp(
-                -self.quechers_cooling_rate_per_second
-                * surroundings.exchange_multiplier
-                * cooling_seconds
-            )
-            state.temperature_c += (
-                surroundings.temperature_c - state.temperature_c
-            ) * cooling_progress
+            cooling_progress = 1.0 - math.exp(-self.quechers_cooling_rate_per_second * surroundings.exchange_multiplier * cooling_seconds)
+            state.temperature_c += (surroundings.temperature_c - state.temperature_c) * cooling_progress
 
         if state.phase == "reacting":
             state.cementation_progress = min(
@@ -367,9 +390,7 @@ class PhysicalSimulationService:
             weighted += capacity * fraction.temperature_c
         for liquid in tool.liquids:
             volume_ml = liquid.true_volume_ml if liquid.true_volume_ml is not None else liquid.volume_ml
-            capacity = (
-                volume_ml * cls.solvent_density_g_per_ml * cls.solvent_specific_heat_j_per_g_k
-            )
+            capacity = volume_ml * cls.solvent_density_g_per_ml * cls.solvent_specific_heat_j_per_g_k
             thermal_mass += capacity
             weighted += capacity * liquid.temperature_c
         body_capacity = cls.container_body_thermal_mass_j_per_k.get(tool.tool_type, 0.0)
@@ -662,6 +683,38 @@ class PhysicalSimulationService:
         factor = random.gauss(1.0, cls.calibration_prep_relative_sigma)
         factor = max(cls.calibration_prep_factor_min, min(cls.calibration_prep_factor_max, factor))
         return nominal_ng_per_ml * factor
+
+    @classmethod
+    def draw_injection_response(cls) -> float:
+        """Response factor shared by every channel of one injection.
+
+        Cancels out of an internal-standard ratio, since the ISTD is measured in
+        the same injection and moves with it.
+        """
+        factor = random.gauss(1.0, cls.injection_response_relative_sigma)
+        return max(cls.response_factor_min, min(cls.response_factor_max, factor))
+
+    @classmethod
+    def draw_channel_response(cls) -> float:
+        """Response factor specific to one compound in one injection.
+
+        Survives an internal-standard ratio: the ISTD draws its own.
+        """
+        factor = random.gauss(1.0, cls.channel_response_relative_sigma)
+        return max(cls.response_factor_min, min(cls.response_factor_max, factor))
+
+    @classmethod
+    def saturated_response(cls, concentration_ng_per_ml: float) -> float:
+        """Concentration the detector behaves as if it saw.
+
+        Below the half-response concentration this is very nearly the identity,
+        which is where samples and the lower standards live. It bends only at the
+        top of a wide ladder — the reason a result above the highest standard has
+        to be diluted back into the range rather than read off an extrapolation.
+        """
+        if concentration_ng_per_ml <= 0:
+            return 0.0
+        return concentration_ng_per_ml / (1.0 + concentration_ng_per_ml / cls.detector_half_response_ng_per_ml)
 
     def advance_grinding_widget(
         self,

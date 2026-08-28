@@ -32,9 +32,12 @@ from math import ceil, cos, exp, pi, sqrt
 from app.domain.acquisition_methods import AcquisitionMethod, MrmTransition
 from app.domain.models import TraceAcquisitionMetadata, TransitionTrace
 from app.domain.mrm_reference import (
+    DEFAULT_PEAK_PROFILE,
     MZ_MATCH_TOLERANCE,
+    CompoundPeakProfile,
     ReferenceTransition,
     find_reference_transition,
+    peak_profile_for,
 )
 from app.services.physical_simulation_service import PhysicalSimulationService
 
@@ -53,15 +56,24 @@ NOMINAL_INJECTION_VOLUME_UL = 5.0
 #: on how strongly the compound retains.
 SOLVENT_MISMATCH_BROADENING = 4.0
 
-#: Chromatographic peak half-width, identical for every compound. A
-#: **pedagogical placeholder**: real peaks differ per compound and broaden
-#: through the run.
-PEAK_SIGMA_S = 9.0
+#: Band half-width shared by the whole method, before a compound's own
+#: :class:`~app.domain.mrm_reference.CompoundPeakProfile` widens or narrows it.
+#:
+#: 3 s puts the peak at roughly 7 s wide at half height, which is what a
+#: 100 x 2.1 mm, 1.8 um C18 run at 0.4 mL/min actually delivers. It also keeps
+#: the peak clear of the edges of a 60 s acquisition window: a peak that filled
+#: its own window would never return to baseline, and the learner could not see
+#: where the integration should start and stop.
+#:
+#: A **pedagogical placeholder** in its exact value, but the order of magnitude
+#: is not free: raising it much past 5 s reproduces the unrealistically wide
+#: peaks this constant used to produce.
+PEAK_SIGMA_S = 3.0
 
-#: A qualifier channel is intentionally weaker than its quantifier. The constant
-#: ratio is what makes the qualifier/quantifier ion ratio a usable identity check.
-#: A **pedagogical placeholder**: a real ratio is a property of each compound.
-QUALIFIER_RESPONSE_RATIO = 0.35
+#: Ion ratio used for a compound that has no profile of its own. Every compound
+#: in the reference catalog does have one, so this is the fallback for a channel
+#: addressed outside it.
+QUALIFIER_RESPONSE_RATIO = DEFAULT_PEAK_PROFILE.ion_ratio
 
 #: How far the collision energy may drift from the tuned value before the
 #: fragment yield collapses. At one sigma the channel keeps ~61 % of its
@@ -90,7 +102,10 @@ BASELINE_COUNTS = 120.0
 BASELINE_NOISE_SIGMA = 35.0
 #: Shot-like noise proportional to the peak, so tall peaks are noisier in absolute terms.
 PEAK_NOISE_RELATIVE_SIGMA = 0.02
-#: Run-to-run drift of the elution time.
+#: Run-to-run drift of the elution time, drawn once per compound per injection.
+#: A compound elutes once, so every channel watching it shares the draw: the
+#: quantifier and its qualifier are the same molecules leaving the column
+#: together.
 RETENTION_JITTER_SIGMA_S = 1.5
 
 #: Serialization budget, not physics. The whole experiment is re-encoded to JSON
@@ -106,8 +121,9 @@ MAX_POINTS_PER_INJECTION = 8_000
 MAX_ACQUISITION_CYCLES = 200_000
 
 
-def _role_scale(reference: ReferenceTransition) -> float:
-    return 1.0 if reference.role == "quantifier" else QUALIFIER_RESPONSE_RATIO
+def _role_scale(reference: ReferenceTransition, profile: CompoundPeakProfile) -> float:
+    """Quantifier at full response, qualifier at the compound's own ion ratio."""
+    return 1.0 if reference.role == "quantifier" else profile.ion_ratio
 
 
 def _fragmentation_yield(declared: MrmTransition, reference: ReferenceTransition) -> float:
@@ -123,20 +139,57 @@ def _fragmentation_yield(declared: MrmTransition, reference: ReferenceTransition
     return exp(-(drift * drift) / (2.0 * FRAGMENTATION_CE_SIGMA_V * FRAGMENTATION_CE_SIGMA_V))
 
 
-def _effective_peak_sigma_s(injection_volume_ul: float, flow_ml_per_min: float) -> float:
-    """Peak width once the injected band is added to the column's own.
+def _effective_peak_sigma_s(
+    injection_volume_ul: float,
+    flow_ml_per_min: float,
+    width_factor: float = 1.0,
+) -> float:
+    """Peak width once the injected band is added to the compound's own.
 
     A peak is never narrower than the plug that produced it. Variances add, so a
     small injection disappears into the column's own band and a large one starts
     to dominate it — which is the whole trade-off of turning the injection
     volume up: more analyte on column, but spread over more time.
+
+    ``width_factor`` is the compound's share of that: a late, strongly retained
+    pyrethroid leaves the column wider than an early neonicotinoid, and only the
+    column band scales with it. The injected plug does not — it is the same
+    volume of liquid whatever is dissolved in it.
     """
+    column_sigma_s = PEAK_SIGMA_S * width_factor
     if flow_ml_per_min <= 0:
-        return PEAK_SIGMA_S
+        return column_sigma_s
     flow_ul_per_s = flow_ml_per_min * 1000.0 / 60.0
     plug_duration_s = max(injection_volume_ul, 0.0) / flow_ul_per_s
     band_sigma_s = plug_duration_s / sqrt(12.0) * SOLVENT_MISMATCH_BROADENING
-    return sqrt(PEAK_SIGMA_S**2 + band_sigma_s**2)
+    return sqrt(column_sigma_s**2 + band_sigma_s**2)
+
+
+def _tailed_gaussian(offset_s: float, sigma_s: float, tailing_factor: float) -> float:
+    """Peak shape at ``offset_s`` from the apex, as a fraction of the apex.
+
+    A bi-gaussian: the same curve on both sides of the apex, but the trailing
+    half is ``tailing_factor`` times wider than the leading one. Real tailing
+    comes from a slow desorption process and is better described by an
+    exponentially modified gaussian; this reproduces the part a learner reads
+    off the screen — the peak rises faster than it falls — at a fraction of the
+    cost, and is a **pedagogical placeholder** for the real shape.
+    """
+    half_width = sigma_s * tailing_factor if offset_s > 0 else sigma_s
+    return exp(-(offset_s * offset_s) / (2.0 * half_width * half_width))
+
+
+def _apex_from_area(sigma_s: float, tailing_factor: float) -> float:
+    """Convert the response into the apex height that preserves the peak *area*.
+
+    Quantification integrates, so the area is what has to carry the amount
+    injected: a compound that elutes broad or drags must lose exactly as much
+    height as it gains width, or its profile would silently rewrite its
+    concentration. Normalising here is what lets the profiles above be pure
+    cosmetics as far as the numbers are concerned.
+    """
+    mean_half_width = sigma_s * (1.0 + tailing_factor) / 2.0
+    return PEAK_SIGMA_S / mean_half_width
 
 
 def _filter_transmission(offset_da: float) -> float:
@@ -278,28 +331,36 @@ def generate_transition_traces(
     # material is spread over more time. That is the trade-off of turning the
     # injection volume up.
     volume_scale = injection_volume_ul / NOMINAL_INJECTION_VOLUME_UL
-    peak_sigma_s = _effective_peak_sigma_s(
-        injection_volume_ul, method.liquid_chromatography.flow_ml_per_min
-    )
-    area_to_height = PEAK_SIGMA_S / peak_sigma_s
+    flow_ml_per_min = method.liquid_chromatography.flow_ml_per_min
     schedule = acquisition_schedule(method)
+
+    # One draw per compound, shared by every channel that watches it. The drift
+    # belongs to the injection — the gradient starts a moment early, the column
+    # is a degree warmer — not to the channel: two transitions of one compound
+    # are the same molecules leaving the column at the same instant, and only
+    # the duty cycle separates the moments they are *measured*, by milliseconds.
+    # Drawing per channel pulled a qualifier seconds away from its quantifier,
+    # which reads as two compounds and destroys the ion ratio a reviewer reads
+    # at the apex.
+    retention_drift_s: dict[str, float] = {}
 
     traces: list[TransitionTrace] = []
     for transition in method.transitions:
         times_s = schedule[transition.id]
-        reference = find_reference_transition(
-            transition.q1_mz, transition.q3_mz, transition.polarity
-        )
-        response = (
-            compound_responses.get(reference.compound_id, 0.0) if reference is not None else 0.0
-        )
+        reference = find_reference_transition(transition.q1_mz, transition.q3_mz, transition.polarity)
+        response = compound_responses.get(reference.compound_id, 0.0) if reference is not None else 0.0
+        # The shape belongs to the compound the channel truly watches, not to the
+        # one the method names: a transition addressing the wrong molecule sees
+        # that molecule's peak, tailing and all.
+        profile = peak_profile_for(reference.compound_id) if reference is not None else DEFAULT_PEAK_PROFILE
+        peak_sigma_s = _effective_peak_sigma_s(injection_volume_ul, flow_ml_per_min, profile.width_factor)
         peak_height = (
             response
-            * _role_scale(reference)
+            * _role_scale(reference, profile)
             * _fragmentation_yield(transition, reference)
             * _mass_transmission(transition, reference)
             * volume_scale
-            * area_to_height
+            * _apex_from_area(peak_sigma_s, profile.tailing_factor)
             * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT
             if reference is not None
             else 0.0
@@ -307,26 +368,21 @@ def generate_transition_traces(
         # Even a perfectly configured channel records nothing when the vial does
         # not contain the compound; the difference between "wrong masses" and
         # "compound absent" lives in the metadata, not in the signal.
-        centre_s = (
-            reference.expected_retention_time_s + rng.gauss(0.0, RETENTION_JITTER_SIGMA_S)
-            if reference is not None
-            else 0.0
-        )
+        centre_s = 0.0
+        if reference is not None:
+            if reference.compound_id not in retention_drift_s:
+                retention_drift_s[reference.compound_id] = rng.gauss(0.0, RETENTION_JITTER_SIGMA_S)
+            centre_s = reference.expected_retention_time_s + retention_drift_s[reference.compound_id]
 
         intensities: list[float] = []
         for time_s in times_s:
             # Background follows the matrix: a dirty extract lifts the trace near
             # the void and again among the waxes, and takes its noise with it.
-            dirt = PhysicalSimulationService.background_scale(
-                foreign_matter_mass_mg, time_s
-            )
-            intensity = BASELINE_COUNTS * dirt + rng.gauss(
-                0.0, BASELINE_NOISE_SIGMA * dirt
-            )
+            dirt = PhysicalSimulationService.background_scale(foreign_matter_mass_mg, time_s)
+            intensity = BASELINE_COUNTS * dirt + rng.gauss(0.0, BASELINE_NOISE_SIGMA * dirt)
             if peak_height > 0.0:
                 offset = time_s - centre_s
-                gaussian = exp(-(offset * offset) / (2.0 * peak_sigma_s * peak_sigma_s))
-                peak = peak_height * gaussian
+                peak = peak_height * _tailed_gaussian(offset, peak_sigma_s, profile.tailing_factor)
                 if peak > 0.0:
                     peak += rng.gauss(0.0, peak * PEAK_NOISE_RELATIVE_SIGMA)
                 intensity += peak

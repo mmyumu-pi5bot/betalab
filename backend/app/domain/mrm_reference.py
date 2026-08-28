@@ -381,3 +381,67 @@ def find_reference_transition(
             best = candidate
             best_distance = distance
     return best
+
+
+@dataclass(frozen=True, slots=True)
+class CompoundPeakProfile:
+    """What makes one compound's chromatogram look unlike its neighbour's.
+
+    Three properties, all read by the signal generator and none of them
+    instrumental settings the technician can reach: they belong to the molecule
+    and the column, the way a retention time does.
+
+    .. warning::
+       Like every value in this module these are **educational placeholders**.
+       They are plausible in magnitude and internally consistent — bases tail,
+       late eluters are broader, ion ratios differ per compound — but none of
+       them was measured. Do not reuse them as analytical reference data.
+    """
+
+    #: Multiplies the shared band width. Late, strongly retained compounds leave
+    #: the column broader than early ones.
+    width_factor: float
+    #: How much wider the trailing half of the peak is than the leading half. 1.0
+    #: is a symmetric gaussian; above it the peak drags, which is what a basic
+    #: compound interacting with residual silanols actually does on C18.
+    tailing_factor: float
+    #: Qualifier response as a fraction of the quantifier. This is the ion ratio
+    #: an analyst checks to confirm identity, so it has to be a property of the
+    #: compound rather than one number shared by the whole method.
+    ion_ratio: float
+
+
+#: Fallback for a compound with no profile of its own: symmetric, average width,
+#: and the ion ratio the whole method used before profiles existed.
+DEFAULT_PEAK_PROFILE = CompoundPeakProfile(width_factor=1.0, tailing_factor=1.0, ion_ratio=0.35)
+
+#: One entry per compound in :data:`MRM_REFERENCE_CATALOG`. Keyed by compound so
+#: the quantifier and the qualifier of one molecule can never drift apart: they
+#: are the same peak seen on two channels, and a shape that differed between
+#: them would be physically meaningless.
+COMPOUND_PEAK_PROFILES: dict[str, CompoundPeakProfile] = {
+    # Neonicotinoids and the carbamate: basic, early eluting, visibly tailing.
+    "imidacloprid": CompoundPeakProfile(0.95, 1.35, 0.42),
+    "acetamiprid": CompoundPeakProfile(0.90, 1.30, 0.34),
+    "thiacloprid": CompoundPeakProfile(0.92, 1.28, 0.51),
+    "pyrimicarb": CompoundPeakProfile(0.88, 1.45, 0.28),
+    # Contact fungicides: neutral, close to symmetric.
+    "captan": CompoundPeakProfile(1.15, 1.10, 0.62),
+    "dithianon": CompoundPeakProfile(1.05, 1.15, 0.23),
+    "spirotetramat": CompoundPeakProfile(1.00, 1.12, 0.47),
+    # SDHI fungicides: neutral amides, the best-behaved peaks of the method.
+    "boscalid": CompoundPeakProfile(1.02, 1.06, 0.55),
+    "fluxapyroxad": CompoundPeakProfile(1.00, 1.05, 0.38),
+    # Organophosphate: neutral, broad, symmetric.
+    "chlorpyrifos_methyl": CompoundPeakProfile(1.10, 1.04, 0.66),
+    # Pyrethroids: last off the column and the broadest of the run.
+    "lambda_cyhalothrin": CompoundPeakProfile(1.30, 1.20, 0.19),
+    "deltamethrin": CompoundPeakProfile(1.35, 1.25, 0.31),
+    # The internal standard has no qualifier channel, so its ion ratio is unused.
+    INTERNAL_STANDARD_COMPOUND_ID: CompoundPeakProfile(0.95, 1.08, 0.35),
+}
+
+
+def peak_profile_for(compound_id: str) -> CompoundPeakProfile:
+    """Return the peak profile of ``compound_id``, or the neutral default."""
+    return COMPOUND_PEAK_PROFILES.get(compound_id, DEFAULT_PEAK_PROFILE)
