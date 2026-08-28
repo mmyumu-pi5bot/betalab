@@ -1,66 +1,66 @@
 # Betalab
 
-Betalab est un prototype de simulation web oriente chromatographie LC-MS/MS.
+Betalab is a web-based simulation prototype focused on LC-MS/MS chromatography.
 
-L'objectif de la V1 est de permettre a un utilisateur de:
+The goal of V1 is to let a user:
 
-- preparer des fioles de `Std 1`, `Std 2` et `Sample`
-- transferer ces preparations dans des vials
-- placer les vials dans un rack autosampler
-- lancer une sequence de runs simules
-- visualiser des resultats simplifies par transitions
+- prepare `Std 1`, `Std 2` and `Sample` flasks
+- transfer those preparations into vials
+- place the vials in an autosampler rack
+- run a sequence of simulated runs
+- visualize simplified results by transitions
 
 ## Architecture
 
-Le projet est volontairement separe en deux applications.
+The project is deliberately split into two applications.
 
-- `frontend/`: interface utilisateur en `Next.js`
-- `backend/`: moteur de simulation et API en `FastAPI`
+- `frontend/`: user interface built with `Next.js`
+- `backend/`: simulation engine and API built with `FastAPI`
 
-Cette separation permet de:
+This separation makes it possible to:
 
-- garder la logique metier dans un backend Python
-- changer l'interface sans jeter le moteur
-- preparer une evolution vers des exports de donnees plus riches
+- keep the business logic in a Python backend
+- change the interface without throwing away the engine
+- prepare for richer data exports down the line
 
-## Etat Du Repo
+## Repo Status
 
-Le repo contient actuellement:
+The repo currently contains:
 
-- un squelette `FastAPI` avec un moteur d'experiments en memoire
-- un squelette `Next.js` avec une premiere GUI statique basee sur l'etat attendu
-- de la documentation produit et architecture
+- a `FastAPI` skeleton with an in-memory experiment engine
+- a `Next.js` skeleton with a first static GUI based on the expected state
+- product and architecture documentation
 
-Ce n'est pas encore une application executable sans installer les dependances.
+It is not yet an application you can run without installing the dependencies.
 
-## Approche De Dev
+## Development Approach
 
-Le projet suit maintenant une approche TDD pour les nouvelles features:
+The project now follows a TDD approach for new features:
 
-- ecriture du test en premier
-- implementation ensuite
-- verification via tests unitaires au fur et a mesure
+- write the test first
+- implement afterwards
+- verify through unit tests as you go
 
-Le code deja pose avant cette decision est progressivement couvert par des tests de caracterisation dans `backend/tests/`.
+Code written before this decision is progressively covered by characterization tests in `backend/tests/`.
 
 ## Documents
 
-Documents a lire en priorite:
+Documents to read first:
 
 - [CHROMATO_V1_DIRECTION.md](./docs/CHROMATO_V1_DIRECTION.md)
 - [CHROMATO_GUI_CONCEPT.md](./docs/CHROMATO_GUI_CONCEPT.md)
 
-Le document [LAB_SIMULATION_BLUEPRINT.md](./docs/LAB_SIMULATION_BLUEPRINT.md) reste utile comme point de depart, mais il n'est plus le cadrage principal du projet.
+The [LAB_SIMULATION_BLUEPRINT.md](./docs/LAB_SIMULATION_BLUEPRINT.md) document is still useful as a starting point, but it is no longer the project's main framing.
 
 ## Backend
 
-Le backend expose une API simple orientee experiment:
+The backend exposes a simple experiment-oriented API:
 
 - `POST /experiments`
 - `GET /experiments/{experiment_id}`
 - `POST /experiments/{experiment_id}/commands`
 
-Les commandes metier prevues pour la V1 sont:
+The business commands planned for V1 are:
 
 - `create_flask`
 - `add_liquid`
@@ -70,16 +70,16 @@ Les commandes metier prevues pour la V1 sont:
 
 ## Frontend
 
-Le frontend est pense comme une GUI de poste de travail:
+The frontend is designed as a lab workbench GUI:
 
-- paillasse de preparation
-- fioles et vials
-- rack autosampler
-- panneau de resultats
+- preparation bench
+- flasks and vials
+- autosampler rack
+- results panel
 
-## Demarrage Prevu
+## Planned Startup
 
-Quand les dependances seront installees:
+Once the dependencies are installed:
 
 ### Backend
 
@@ -89,7 +89,7 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Tests backend:
+Backend tests:
 
 ```bash
 cd backend
@@ -104,16 +104,16 @@ pnpm install
 pnpm dev
 ```
 
-Notes de dev frontend:
+Frontend dev notes:
 
-- `pnpm dev` est le serveur de reference pour le frontend local et pour les tests E2E.
-- Le serveur local utilise `.next-dev`, les tests E2E `.next-e2e`, et le build de production `.next`. Cette isolation evite qu'un build ou un test E2E corrompe le cache du live reload.
-- Les tests E2E reutilisent toujours un serveur deja disponible sur leur port local.
-- Pour reinitialiser exceptionnellement tous les caches Next.js: `pnpm clean:next`.
+- `pnpm dev` is the reference server for both the local frontend and the E2E tests.
+- The local server uses `.next-dev`, the E2E tests use `.next-e2e`, and the production build uses `.next`. This isolation prevents a build or an E2E test from corrupting the live-reload cache.
+- The E2E tests always reuse a server already available on their local port.
+- To reset all Next.js caches in exceptional cases: `pnpm clean:next`.
 
-## Prochaines Etapes
+## Next Steps
 
-1. Brancher le frontend sur l'API backend
-2. Rendre les commandes metier interactives
-3. Enrichir la simulation des transitions et chromatogrammes
-4. Introduire des scenarios de matrice et de solvants
+1. Wire the frontend to the backend API
+2. Make the business commands interactive
+3. Enrich the simulation of transitions and chromatograms
+4. Introduce matrix and solvent scenarios
