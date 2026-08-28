@@ -1,8 +1,8 @@
 """One sequence run, packed as the archive the platform ingests.
 
-The archive holds the method file once and one chromatogram file per injection
-— the same pairing the platform expects, and the same shape as the sample
-exports it produces itself.
+The archive holds the method file once, the sample data of the batch once, and
+one chromatogram file per injection — the same grouping the platform expects,
+and the same shape as the sample exports it produces itself.
 
 An injection appears once *it* has finished, not once the run has. That is how
 a real instrument behaves: each file lands as its own acquisition ends, so a
@@ -16,6 +16,7 @@ import json
 import zipfile
 
 from app.domain.models import InjectionMeasurement, SequenceRun
+from app.services.exports.batch_infos import BATCH_INFOS_FILENAME, build_batch_infos_document
 from app.services.exports.injection_json import build_injection_document
 from app.services.exports.method_cod import build_method_cod_workbook
 
@@ -32,12 +33,15 @@ def run_bundle_filename(run: SequenceRun) -> str:
 def build_run_bundle(run: SequenceRun) -> bytes:
     """Pack the method file and every finished injection into a zip archive."""
     method = run.method_snapshot
+    recorded = [injection for injection in run.injections if is_injection_recorded(run, injection)]
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(f"{method.id}.cod.xlsx", build_method_cod_workbook(method))
-        for injection in run.injections:
-            if not is_injection_recorded(run, injection):
-                continue
+        archive.writestr(
+            BATCH_INFOS_FILENAME,
+            json.dumps(build_batch_infos_document(recorded), ensure_ascii=False),
+        )
+        for injection in recorded:
             document = build_injection_document(injection, method)
             archive.writestr(
                 f"{injection.output_filename}.json",

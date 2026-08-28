@@ -35,6 +35,7 @@ from app.domain.models import (
     QuechersState,
     Rack,
     RackSlot,
+    SampleWeighing,
     SequenceRun,
     SpatulaState,
     TraceAcquisitionMetadata,
@@ -564,6 +565,12 @@ def _deserialize_transition_trace(schema: TransitionTraceSchema) -> TransitionTr
     )
 
 
+def _deserialize_sample_weighing(schema) -> SampleWeighing | None:
+    if schema is None:
+        return None
+    return SampleWeighing(sample_mass_g=schema.sample_mass_g, extract_volume_ml=schema.extract_volume_ml)
+
+
 def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
     workspace = Workspace(
         widgets=[
@@ -613,6 +620,7 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                                 replicate_index=injection.replicate_index,
                                 output_filename=injection.output_filename,
                                 start_offset_s=injection.start_offset_s,
+                                weighing=_deserialize_sample_weighing(injection.weighing),
                             )
                             for injection in run.injections
                         ],
@@ -755,6 +763,7 @@ def _deserialize_injection_context(context_schema) -> InjectionContext | None:
         istd_reference_conc_ng_per_ml=context_schema.istd_reference_conc_ng_per_ml,
         extract_true_volume_ml=context_schema.extract_true_volume_ml,
         istd_true_volume_ml=context_schema.istd_true_volume_ml,
+        weighing=_deserialize_sample_weighing(context_schema.weighing),
     )
 
 

@@ -1662,6 +1662,93 @@ class TestDebugPreparedExtractVial:
         assert max(max(trace.intensities) for trace in injection.traces) > BASELINE_COUNTS * 3
 
 
+class TestTheWeighingTravelsWithTheInjection:
+    """The archive reports a residue, and that division needs the weighing.
+
+    The vial it came from may be drained or discarded long before the archive is
+    downloaded, so the figures are frozen onto the injection when the sequence
+    starts — exactly as the method itself is.
+    """
+
+    def _extract_vial_in_rack(self, service: ExperimentRuntimeService, exp_id: str, slot_id: str) -> None:
+        CreateDebugToolPresetService(service).run(
+            exp_id,
+            CreateDebugToolPresetRequest(
+                preset_id="apple_extract_vial",
+                destination_kind="rack_slot",
+                destination_id=slot_id,
+            ),
+        )
+
+    def _launch(self, service: ExperimentRuntimeService, exp_id: str, lines: list[tuple[str, str]]) -> None:
+        RunSequenceService(service).run(
+            exp_id,
+            RunSequenceRequest(
+                method_id=APPLE_PESTICIDES_MRM_V1_ID,
+                injections=[
+                    AcquisitionSequenceLineRequest(
+                        rack_slot_id=slot_id,
+                        sample_name=filename,
+                        injection_volume_ul=5.0,
+                        repetitions=1,
+                        output_filename=filename,
+                    )
+                    for slot_id, filename in lines
+                ],
+            ),
+        )
+
+    def _injections(self, service: ExperimentRuntimeService, exp_id: str):
+        exp = service._require_experiment(exp_id)
+        instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
+        return instrument.sequence_runs[-1].injections
+
+    def test_a_sample_injection_carries_the_mass_and_volume_of_its_extraction(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        self._extract_vial_in_rack(service, exp_id, "rack_slot_1")
+        LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
+
+        self._launch(service, exp_id, [("rack_slot_1", "01_apple.mzML")])
+
+        weighing = self._injections(service, exp_id)[0].weighing
+        assert weighing is not None
+        assert weighing.sample_mass_g == 10.0
+        assert weighing.extract_volume_ml == 10.0
+
+    def test_a_calibration_standard_carries_no_weighing_at_all(self) -> None:
+        """Nothing was put on a balance to make a standard, so there is nothing
+        to report — and a neutral placeholder would be a weighing that never
+        happened."""
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        _place_calibration_vial_in_rack(service, exp_id)
+        _load_rack_into_instrument(service, exp_id)
+
+        self._launch(service, exp_id, [("rack_slot_1", "01_cal.mzML")])
+
+        assert self._injections(service, exp_id)[0].weighing is None
+
+    def test_the_snapshot_survives_the_vial_being_emptied_afterwards(self) -> None:
+        service = ExperimentRuntimeService()
+        exp_id = _create(service)
+        _deploy_instrument_and_rack(service, exp_id)
+        self._extract_vial_in_rack(service, exp_id, "rack_slot_1")
+        LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
+        self._launch(service, exp_id, [("rack_slot_1", "01_apple.mzML")])
+
+        exp = service._require_experiment(exp_id)
+        vial = exp.rack.slots[0].tool
+        assert vial is not None
+        vial.injection_context = None
+
+        weighing = self._injections(service, exp_id)[0].weighing
+        assert weighing is not None
+        assert weighing.sample_mass_g == 10.0
+
+
 class TestInjectionsConsumeTheVial:
     """An injection really withdraws liquid: a vial cannot be re-run forever."""
 

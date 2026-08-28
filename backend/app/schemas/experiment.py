@@ -84,6 +84,11 @@ class CalibrationContextSchema(BaseModel):
     true_level_ng_per_ml: float | None = Field(default=None, exclude=True)
 
 
+class SampleWeighingSchema(BaseModel):
+    sample_mass_g: float
+    extract_volume_ml: float
+
+
 class InjectionContextSchema(BaseModel):
     source_tube_id: str
     sample_mass_g: float
@@ -96,6 +101,7 @@ class InjectionContextSchema(BaseModel):
     foreign_matter_mass_mg: float = 0.0
     extract_true_volume_ml: float | None = Field(default=None, exclude=True)
     istd_true_volume_ml: float | None = Field(default=None, exclude=True)
+    weighing: SampleWeighingSchema | None = None
 
 
 class TraceAcquisitionMetadataSchema(BaseModel):
@@ -128,6 +134,7 @@ class InjectionMeasurementSchema(BaseModel):
     replicate_index: int = 1
     output_filename: str = ""
     start_offset_s: float = 0.0
+    weighing: SampleWeighingSchema | None = None
 
 
 class SequenceRunSchema(BaseModel):

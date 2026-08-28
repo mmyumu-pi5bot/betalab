@@ -472,6 +472,23 @@ def test_dispensing_plain_solvent_into_extract_vial_is_allowed() -> None:
     assert sum(liquid.volume_ml for liquid in vial.liquids) == pytest.approx(0.1)
 
 
+def test_an_aliquot_still_reports_the_test_portion_that_was_weighed() -> None:
+    """Splitting the extract rescales the vial's own mass and volume, which keeps
+    the concentration right but must not rewrite the balance reading: 10 g
+    weighed into 10 mL stays 10 g in 10 mL however small the aliquot is."""
+    service, experiment_id, tube_id, vial_id = _prepared_experiment()
+    AspiratePipetteService(service).run(experiment_id, AspiratePipetteRequest(source_tool_id=tube_id, delta_volume_ml=0.8))
+
+    updated = DispensePipetteService(service).run(experiment_id, DispensePipetteRequest(target_tool_id=vial_id, delta_volume_ml=0.3))
+
+    vial = updated.workbench.slots[1].tool
+    assert vial is not None and vial.injection_context is not None
+    weighing = vial.injection_context.weighing
+    assert weighing is not None
+    assert weighing.sample_mass_g == pytest.approx(10.0)
+    assert weighing.extract_volume_ml == pytest.approx(10.0)
+
+
 def test_reaspiration_from_intermediate_tube_keeps_provenance() -> None:
     service, experiment_id, tube_id, vial_id = _prepared_experiment()
     AddWorkbenchSlotService(service).run(experiment_id, EmptyWorkbenchRequest())

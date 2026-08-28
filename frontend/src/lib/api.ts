@@ -27,6 +27,7 @@ import type {
   ToolbarItem,
   TraceAcquisitionMetadata,
   InjectionMeasurement,
+  SampleWeighing,
   TransitionTrace,
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
@@ -2209,6 +2210,7 @@ function normalizeBenchTool(
         istdReferenceConcNgPerMl: Number(
           raw.istdReferenceConcNgPerMl ?? raw.istd_reference_conc_ng_per_ml ?? 100,
         ),
+        weighing: normalizeSampleWeighing(raw.weighing),
       };
     })(),
     calibrationContext: (() => {
@@ -2766,6 +2768,7 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
           replicateIndex: Number(inj.replicateIndex ?? inj.replicate_index ?? 1),
           outputFilename: String(inj.outputFilename ?? inj.output_filename ?? ""),
           startOffsetS: Number(inj.startOffsetS ?? inj.start_offset_s ?? 0),
+          weighing: normalizeSampleWeighing(inj.weighing),
           traces: Array.isArray(inj.traces)
             ? (inj.traces as Record<string, unknown>[]).map(normalizeTransitionTrace)
             : [],
@@ -2774,7 +2777,16 @@ function normalizeSequenceRuns(raw: unknown): import("@/types/workbench").Sequen
   }));
 }
 
-export function normalizeTransitionTrace(raw: Record<string, unknown>): TransitionTrace {
+function normalizeSampleWeighing(raw: unknown): SampleWeighing | null {
+  if (!raw || typeof raw !== "object") return null;
+  const weighing = raw as Record<string, unknown>;
+  return {
+    sampleMassG: Number(weighing.sampleMassG ?? weighing.sample_mass_g ?? 0),
+    extractVolumeMl: Number(weighing.extractVolumeMl ?? weighing.extract_volume_ml ?? 0),
+  };
+}
+
+function normalizeTransitionTrace(raw: Record<string, unknown>): TransitionTrace {
   const acquisition = (raw.acquisition ?? {}) as Record<string, unknown>;
   return {
     injectionId: String(raw.injectionId ?? raw.injection_id ?? ""),

@@ -66,6 +66,8 @@ def _scaled_injection_context(
     context_true_extract_volume_ml = context.extract_true_volume_ml if context.extract_true_volume_ml is not None else context.extract_volume_ml
     return InjectionContext(
         source_tube_id=context.source_tube_id,
+        # Rides along untouched: an aliquot does not re-weigh the test portion.
+        weighing=context.weighing,
         sample_mass_g=round(
             sample_mass_g if sample_mass_g is not None else context.sample_mass_g * ratio,
             4,
@@ -88,26 +90,15 @@ def _scaled_injection_context(
 
 
 def _merge_injection_context(base: InjectionContext, addition: InjectionContext) -> None:
-    base_true_sample_mass_g = (
-        base.sample_true_mass_g
-        if base.sample_true_mass_g is not None
-        else base.sample_mass_g
-    )
-    addition_true_sample_mass_g = (
-        addition.sample_true_mass_g
-        if addition.sample_true_mass_g is not None
-        else addition.sample_mass_g
-    )
-    base_true_extract_volume_ml = (
-        base.extract_true_volume_ml
-        if base.extract_true_volume_ml is not None
-        else base.extract_volume_ml
-    )
-    addition_true_extract_volume_ml = (
-        addition.extract_true_volume_ml
-        if addition.extract_true_volume_ml is not None
-        else addition.extract_volume_ml
-    )
+    """Add ``addition``'s extract to ``base``, which always comes from one tube.
+
+    Both the pipette and the vial refuse contents from a second tube, so the two
+    contexts describe the same test portion and ``base.weighing`` still holds.
+    """
+    base_true_sample_mass_g = base.sample_true_mass_g if base.sample_true_mass_g is not None else base.sample_mass_g
+    addition_true_sample_mass_g = addition.sample_true_mass_g if addition.sample_true_mass_g is not None else addition.sample_mass_g
+    base_true_extract_volume_ml = base.extract_true_volume_ml if base.extract_true_volume_ml is not None else base.extract_volume_ml
+    addition_true_extract_volume_ml = addition.extract_true_volume_ml if addition.extract_true_volume_ml is not None else addition.extract_volume_ml
     base.sample_mass_g = round(base.sample_mass_g + addition.sample_mass_g, 4)
     base.sample_true_mass_g = round(
         base_true_sample_mass_g + addition_true_sample_mass_g,

@@ -20,10 +20,12 @@ import pytest
 from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1
 from app.domain.models import (
     InjectionMeasurement,
+    SampleWeighing,
     TraceAcquisitionMetadata,
     TransitionTrace,
 )
 from app.domain.mrm_reference import INTERNAL_STANDARD_COMPOUND_ID
+from app.services.exports.batch_infos import NOMINAL_EXTRACT_VOLUME_ML, build_batch_infos_document
 from app.services.exports.injection_json import build_injection_document
 from app.services.exports.method_cod import COD_BASE_COLUMNS, build_method_cod_rows, build_method_cod_workbook
 from app.services.exports.run_bundle import build_run_bundle
@@ -68,6 +70,71 @@ def _injection(method, output_filename="cal_1.00 ng_mL.mzML"):
         output_filename=output_filename,
         start_offset_s=0.0,
     )
+
+
+def _weighed(injection, sample_mass_g=5.2, extract_volume_ml=10.4):
+    injection.weighing = SampleWeighing(sample_mass_g=sample_mass_g, extract_volume_ml=extract_volume_ml)
+    return injection
+
+
+class TestBatchInfos:
+    """The sample data that turns a concentration in a vial into a residue.
+
+    The platform divides by ``weight`` and multiplies by its own configured
+    ``vol_sol_ext``; ``dilution_factor`` is the dimensionless multiplier that
+    reconciles that constant with the volume actually poured in the tube.
+    """
+
+    def test_an_analysis_is_keyed_and_named_as_the_injection_file_is(self) -> None:
+        method = _method()
+        injection = _weighed(_injection(method, "01_Apple.mzML"))
+
+        document = build_batch_infos_document([injection])
+
+        analyses = document["batch_infos"]["analyses_infos"]
+        assert list(analyses) == ["01_apple"]
+        assert analyses["01_apple"]["name"] == "01_apple"
+
+    def test_the_weight_is_the_mass_the_operator_declared(self) -> None:
+        method = _method()
+        injection = _weighed(_injection(method, "01_apple.mzML"), sample_mass_g=5.2)
+
+        document = build_batch_infos_document([injection])
+
+        assert document["batch_infos"]["analyses_infos"]["01_apple"]["weight"] == 5.2
+
+    def test_the_dilution_factor_expresses_the_poured_volume_in_nominal_units(self) -> None:
+        method = _method()
+        nominal = _weighed(_injection(method, "01_nominal.mzML"), extract_volume_ml=NOMINAL_EXTRACT_VOLUME_ML)
+        doubled = _weighed(_injection(method, "02_doubled.mzML"), extract_volume_ml=NOMINAL_EXTRACT_VOLUME_ML * 2)
+
+        analyses = build_batch_infos_document([nominal, doubled])["batch_infos"]["analyses_infos"]
+
+        assert analyses["01_nominal"]["dilution_factor"] == 1.0
+        assert analyses["02_doubled"]["dilution_factor"] == 2.0
+
+    def test_the_final_factor_is_neutral_because_the_default_formula_ignores_it(self) -> None:
+        method = _method()
+
+        analyses = build_batch_infos_document([_weighed(_injection(method, "01_apple.mzML"))])["batch_infos"]["analyses_infos"]
+
+        assert analyses["01_apple"]["final_factor"] == 1.0
+
+    def test_an_injection_with_nothing_on_a_balance_behind_it_is_left_out(self) -> None:
+        """A calibration standard was never weighed, so it has no entry at all —
+        neutral figures would be a weighing the platform never performed."""
+        method = _method()
+        standard = _injection(method, "01_cal.mzML")
+        sample = _weighed(_injection(method, "02_apple.mzML"))
+
+        analyses = build_batch_infos_document([standard, sample])["batch_infos"]["analyses_infos"]
+
+        assert list(analyses) == ["02_apple"]
+
+    def test_a_batch_of_standards_alone_still_yields_the_document(self) -> None:
+        document = build_batch_infos_document([_injection(_method(), "01_cal.mzML")])
+
+        assert document == {"batch_infos": {"analyses_infos": {}}}
 
 
 class TestInjectionDocument:
@@ -288,6 +355,7 @@ class TestRunBundle:
             "01_apple.mzML.json",
             "02_cal.mzML.json",
             f"{method.id}.cod.xlsx",
+            "batch_infos.json",
         ]
 
     def test_the_bundled_json_is_the_injection_document(self) -> None:
@@ -310,7 +378,20 @@ class TestRunBundle:
 
         archive = zipfile.ZipFile(io.BytesIO(build_run_bundle(run)))
 
-        assert sorted(archive.namelist()) == ["01_apple.mzML.json", f"{method.id}.cod.xlsx"]
+        assert sorted(archive.namelist()) == ["01_apple.mzML.json", f"{method.id}.cod.xlsx", "batch_infos.json"]
+
+    def test_the_batch_file_describes_the_injections_already_written(self) -> None:
+        method = _method()
+        first = _weighed(_injection(method, "01_apple.mzML"))
+        second = _weighed(_injection(method, "02_apple.mzML"))
+        second.start_offset_s = 720.0
+        run = self._run(method, [first, second])
+        run.elapsed_s = 900.0
+
+        archive = zipfile.ZipFile(io.BytesIO(build_run_bundle(run)))
+        document = json.loads(archive.read("batch_infos.json"))
+
+        assert list(document["batch_infos"]["analyses_infos"]) == ["01_apple"]
 
     def test_the_method_file_travels_even_before_any_injection_finished(self) -> None:
         method = _method()
@@ -319,7 +400,7 @@ class TestRunBundle:
 
         archive = zipfile.ZipFile(io.BytesIO(build_run_bundle(run)))
 
-        assert archive.namelist() == [f"{method.id}.cod.xlsx"]
+        assert sorted(archive.namelist()) == [f"{method.id}.cod.xlsx", "batch_infos.json"]
 
 
 class TestResultDownloadRoute:

@@ -487,6 +487,11 @@ export type InjectionContext = {
   extractionResult: QuechersExtractionResult | null;
   istdVolumeMl: number | null;
   istdReferenceConcNgPerMl: number;
+  /**
+   * The weighing at the scale of the tube, unaffected by every later split of
+   * the extract. `null` on an extract prepared before the field existed.
+   */
+  weighing: SampleWeighing | null;
 };
 
 export type TraceAcquisitionMetadata = {
@@ -510,6 +515,13 @@ export type TransitionTrace = {
   acquisition: TraceAcquisitionMetadata;
 };
 
+export type SampleWeighing = {
+  /** Mass of apple powder the operator weighed into the extraction tube, in g. */
+  sampleMassG: number;
+  /** Acetonitrile the operator believes they poured, in mL. */
+  extractVolumeMl: number;
+};
+
 export type InjectionMeasurement = {
   id: string;
   vialId: string;
@@ -523,6 +535,12 @@ export type InjectionMeasurement = {
   outputFilename: string;
   /** When this injection starts, in instrument seconds since the sequence began. */
   startOffsetS: number;
+  /**
+   * What the operator declared for the sample behind this vial, frozen when the
+   * sequence started. `null` when nothing was weighed — a calibration standard,
+   * or a vial that never held an extract.
+   */
+  weighing: SampleWeighing | null;
 };
 
 export type MrmTransition = {

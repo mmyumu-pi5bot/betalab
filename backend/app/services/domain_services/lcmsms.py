@@ -21,6 +21,7 @@ from app.domain.models import (
     ProduceMaterialState,
     QuechersExtractionResult,
     RackSlot,
+    SampleWeighing,
     SequenceRun,
     WorkbenchTool,
     new_id,
@@ -280,6 +281,8 @@ def build_extract_injection_context(
             else None
         ),
         istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
+        # The tube's own figures, deliberately not scaled by ``volume_ratio``.
+        weighing=SampleWeighing(sample_mass_g=total_sample_mass_g, extract_volume_ml=total_extract_volume_ml),
         foreign_matter_mass_mg=round(foreign_matter_mg * volume_ratio, 6),
         extract_true_volume_ml=round(
             extract_true_volume_ml if extract_true_volume_ml is not None else extract_volume_ml,
@@ -542,6 +545,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                             configured.repetitions,
                         ),
                         start_offset_s=start_offset_s,
+                        weighing=_sample_weighing(vial.injection_context),
                     )
                 )
                 start_offset_s += method.runtime_s
@@ -564,6 +568,24 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
             injection_count=len(injections),
             duration=f"{run.total_duration_s:.0f}",
         )
+
+
+def _sample_weighing(context: InjectionContext | None) -> SampleWeighing | None:
+    """Freeze the figures the operator declared for the sample behind a vial.
+
+    A calibration standard has no context and therefore no weighing: nothing was
+    put on a balance, so there is nothing to report to the analysis platform.
+
+    Falls back to the vial's own mass and volume when the tube-level pair is
+    missing — an extract merged from two tubes, or a run persisted before the
+    pair existed. The two describe the same extract at different scales, so the
+    residue comes out the same either way; only the printed weighing differs.
+    """
+    if context is None:
+        return None
+    if context.weighing is not None:
+        return context.weighing
+    return SampleWeighing(sample_mass_g=context.sample_mass_g, extract_volume_ml=context.extract_volume_ml)
 
 
 def _validate_acquisition_sequence(
@@ -732,6 +754,8 @@ def apply_prepared_extract(
         istd_volume_ml=round(vial_istd_volume_ml, 4) if vial_istd_volume_ml > 0 else None,
         istd_true_volume_ml=vial_istd_volume_ml if vial_istd_volume_ml > 0 else None,
         istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
+        # What the caller says was weighed into the tube, before the aliquot.
+        weighing=SampleWeighing(sample_mass_g=sample_mass_g, extract_volume_ml=extract_volume_ml),
     )
 
 

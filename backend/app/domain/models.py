@@ -166,6 +166,22 @@ class QuechersExtractionResult:
 
 
 @dataclass
+class SampleWeighing:
+    """What the operator wrote down for one weighed sample.
+
+    These are the *declared* figures, not the hidden true ones: the analysis
+    platform divides by the mass the technician believes they weighed, so a
+    portion misread on the balance or a solvent volume misjudged in the tube
+    biases the reported residue exactly as it would in a real laboratory.
+    """
+
+    #: Mass of apple powder the operator weighed into the extraction tube, in g.
+    sample_mass_g: float
+    #: Acetonitrile the operator believes they poured, in mL.
+    extract_volume_ml: float
+
+
+@dataclass
 class InjectionContext:
     """Extraction metadata snapshotted when extract is poured from a centrifuge tube to a vial.
 
@@ -186,8 +202,17 @@ class InjectionContext:
     # plus a nominal credit for fractions left on a dirty bench. It raises the
     # detector background without competing for charge.
     foreign_matter_mass_mg: float = 0.0
-    extract_true_volume_ml: float | None = None   # hidden true acetonitrile volume; None -> falls back to extract_volume_ml
-    istd_true_volume_ml: float | None = None       # hidden true ISTD volume; None -> falls back to istd_volume_ml
+    extract_true_volume_ml: float | None = None  # hidden true acetonitrile volume; None -> falls back to extract_volume_ml
+    istd_true_volume_ml: float | None = None  # hidden true ISTD volume; None -> falls back to istd_volume_ml
+    #: The weighing as it happened, at the scale of the *tube*. The fields above
+    #: are rescaled every time the extract is split, which keeps the
+    #: concentration right but turns a 10 g test portion into "1 g" once a 1 mL
+    #: aliquot is in the vial. A report has to show the balance reading, so this
+    #: pair rides along unscaled. ``None`` only on an extract prepared before
+    #: this field existed, which the export handles by falling back to the pair
+    #: above — the same extract at a different scale, so the residue is
+    #: unaffected and only the printed weighing differs.
+    weighing: SampleWeighing | None = None
 
 
 @dataclass
@@ -251,6 +276,11 @@ class InjectionMeasurement:
     output_filename: str = ""
     #: When this injection starts, in instrument seconds since the sequence began.
     start_offset_s: float = 0.0
+    #: Snapshotted when the sequence starts, because the vial it came from may
+    #: be emptied or discarded before the archive is downloaded. ``None`` when
+    #: nothing was weighed behind this injection — a calibration standard, or a
+    #: vial holding no extract at all.
+    weighing: SampleWeighing | None = None
 
 
 @dataclass
