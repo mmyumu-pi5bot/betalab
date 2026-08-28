@@ -3353,6 +3353,8 @@ def test_discard_workbench_surface_produce_lot_preserves_structured_origin() -> 
 
 def test_move_grinder_produce_lot_to_workbench_tool() -> None:
     service = ExperimentRuntimeService()
+    fixed_now = datetime(2026, 1, 1, tzinfo=UTC)
+    service._now_fn = lambda: fixed_now
     experiment = service.create_experiment()
 
     created = apply_command(
@@ -3408,6 +3410,8 @@ def test_move_grinder_produce_lot_to_workbench_tool() -> None:
 
 def test_move_grinder_ground_produce_lot_to_open_storage_jar() -> None:
     service = ExperimentRuntimeService()
+    fixed_now = datetime(2026, 1, 1, tzinfo=UTC)
+    service._now_fn = lambda: fixed_now
     experiment = service.create_experiment()
 
     created = apply_command(

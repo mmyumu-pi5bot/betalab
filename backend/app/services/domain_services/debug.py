@@ -27,6 +27,9 @@ from app.services.helpers.tool_liquids import ACETONITRILE_ID
 from app.services.helpers.workbench import build_workbench_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
 from app.services.transfer import GrinderProduceLotTarget, WorkbenchProduceLotTarget
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import produce_ref, slot_ref, text_ref, tool_ref
+from app.services.journal_service import record_journal
 
 _physical_simulation_service = PhysicalSimulationService()
 
@@ -120,10 +123,13 @@ class CreateDebugProduceLotOnWorkbenchService(WriteDomainService[CreateDebugProd
         target = WorkbenchProduceLotTarget(slot_id=request.target_slot_id)
         target.validate(experiment)
         placement = target.place(experiment, produce_lot)
-        set_lot_fraction_temperatures(
-            experiment, produce_lot.id, produce_lot_temperature_c(request.temperature_c)
+        set_lot_fraction_temperatures(experiment, produce_lot.id, produce_lot_temperature_c(request.temperature_c))
+        record_journal(
+            experiment,
+            JournalCode.DEBUG_PRODUCE_SPAWNED_ON,
+            produce=produce_ref(produce_lot),
+            target=text_ref(placement.target_label),
         )
-        experiment.audit_log.append(f"Debug preset {produce_lot.label} spawned on {placement.target_label}.")
 
 
 class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduceLotToWidgetRequest]):
@@ -151,10 +157,13 @@ class CreateDebugProduceLotToWidgetService(WriteDomainService[CreateDebugProduce
             target = GrinderProduceLotTarget(widget_id=request.widget_id)
         target.validate(experiment)
         placement = target.place(experiment, produce_lot)
-        set_lot_fraction_temperatures(
-            experiment, produce_lot.id, produce_lot_temperature_c(request.temperature_c)
+        set_lot_fraction_temperatures(experiment, produce_lot.id, produce_lot_temperature_c(request.temperature_c))
+        record_journal(
+            experiment,
+            JournalCode.DEBUG_PRODUCE_SPAWNED_IN,
+            produce=produce_ref(produce_lot),
+            target=text_ref(placement.target_label),
         )
-        experiment.audit_log.append(f"Debug preset {produce_lot.label} spawned in {placement.target_label}.")
 
 
 class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetRequest]):
@@ -192,8 +201,12 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
                 location_id=slot.id,
             )
             _apply_slurry_extract_preset(request.preset_id, tool)
-            experiment.audit_log.append(
-                f"Debug {_SLURRY_PRESET_LABELS[request.preset_id]} added to {tool.label} on {slot.label}."
+            record_journal(
+                experiment,
+                JournalCode.DEBUG_SLURRY_ADDED,
+                preset=_SLURRY_PRESET_LABELS[request.preset_id],
+                tool=tool_ref(tool),
+                location=slot_ref(slot),
             )
             return
 
@@ -236,8 +249,12 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
                 raise ValueError(f"Open {slot.tool.label} before adding a calibration standard.")
             container = slot.tool
             apply_calibration_standard(experiment, container, level_ng_per_ml)
-            experiment.audit_log.append(
-                f"Debug calibration standard {level_ng_per_ml} ng/mL added to {container.label} on {slot.label}."
+            record_journal(
+                experiment,
+                JournalCode.DEBUG_CALIBRATION_ADDED,
+                level=level_ng_per_ml,
+                tool=tool_ref(container),
+                location=slot_ref(slot),
             )
             return
 
@@ -269,8 +286,11 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
                 raise ValueError(f"Open {slot.tool.label} before adding a prepared extract.")
             vial = slot.tool
             apply_prepared_extract(experiment, vial, **apply_kwargs)
-            experiment.audit_log.append(
-                f"Debug apple extract added to {vial.label} on {slot.label}."
+            record_journal(
+                experiment,
+                JournalCode.DEBUG_EXTRACT_ADDED,
+                tool=tool_ref(vial),
+                location=slot_ref(slot),
             )
             return
 
@@ -315,6 +335,7 @@ def _fill_tool_with_debug_slurry(
     produce_lot = ProduceLot(
         id=new_id("produce"),
         label="Apple",
+        label_code="apple",
         produce_type="apple",
         total_mass_g=produce_mass_g,
         unit_count=None,
@@ -400,6 +421,7 @@ def _build_debug_produce_lot(
         return ProduceLot(
             id=new_id("produce"),
             label="Apple powder lot",
+            label_code="apple_powder_lot",
             produce_type="apple",
             total_mass_g=total_mass_g if total_mass_g is not None else 2450.0,
             unit_count=None,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -294,6 +294,8 @@ class ProduceLotSchema(BaseModel):
     produce_type: str
     total_mass_g: float
     unit_count: int | None = None
+    label_code: str | None = None
+    label_index: int | None = None
     pesticide_residues: dict[str, float] = Field(default_factory=dict)
 
     @computed_field
@@ -822,6 +824,10 @@ class JournalEventSchema(BaseModel):
     category: Literal["system", "manipulation", "simulation", "layout"]
     severity: Literal["info", "warning", "error"]
     message: str
+    #: What happened and to what, so a client can phrase the entry in its own
+    #: language. Absent on entries recorded before the journal was structured.
+    code: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExperimentSchema(BaseModel):
@@ -854,6 +860,14 @@ class ExperimentSummarySchema(BaseModel):
     run_count: int = 0
 
 
+class LastJournalEventSchema(BaseModel):
+    """The most recent journal line of an experiment, as shown in the list."""
+
+    message: str
+    code: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
 class ExperimentListEntrySchema(BaseModel):
     id: str
     name: str
@@ -862,6 +876,7 @@ class ExperimentListEntrySchema(BaseModel):
     snapshot_version: int
     updated_at: datetime
     last_audit_entry: str | None = None
+    last_journal_event: LastJournalEventSchema | None = None
     summary: ExperimentSummarySchema = Field(default_factory=ExperimentSummarySchema)
 
 

@@ -29,6 +29,17 @@ from app.services.helpers.produce_material_states import (
 )
 from app.services.physical_simulation_service import PhysicalSimulationService, ThermalSurroundings
 from app.services.received_sample_generation import build_received_sampling_bag
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import (
+    liquid_id_ref,
+    liquid_ref,
+    produce_ref,
+    slot_ref,
+    text_ref,
+    tool_ref,
+    widget_ref,
+)
+from app.services.journal_service import record_journal
 
 physical_simulation_service = PhysicalSimulationService()
 
@@ -92,10 +103,10 @@ class AddWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetLayoutRequest]
 
         if not widget.is_present:
             widget.is_present = True
-            experiment.audit_log.append(f"{widget.label} added to workspace.")
+            record_journal(experiment, JournalCode.WIDGET_ADDED, widget=widget_ref(widget))
             return
 
-        experiment.audit_log.append(f"{widget.label} repositioned in workspace.")
+        record_journal(experiment, JournalCode.WIDGET_REPOSITIONED, widget=widget_ref(widget))
 
 
 class MoveWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetLayoutRequest]):
@@ -108,7 +119,7 @@ class MoveWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetLayoutRequest
             raise ValueError(f"{widget.label} must be added to the workspace before moving it.")
 
         _apply_widget_layout_request(widget, request)
-        experiment.audit_log.append(f"{widget.label} moved in workspace.")
+        record_journal(experiment, JournalCode.WIDGET_MOVED, widget=widget_ref(widget))
 
 
 class StoreWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetRequest]):
@@ -128,12 +139,16 @@ class StoreWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetRequest]):
 
         if not widget.is_present and widget.is_trashed:
             widget.is_trashed = False
-            experiment.audit_log.append(f"{widget.label} moved from trash to inventory.")
+            record_journal(
+                experiment,
+                JournalCode.WIDGET_RESTORED_TO_INVENTORY,
+                widget=widget_ref(widget),
+            )
             return
 
         widget.is_present = False
         widget.is_trashed = False
-        experiment.audit_log.append(f"{widget.label} stored in inventory.")
+        record_journal(experiment, JournalCode.WIDGET_STORED, widget=widget_ref(widget))
 
 
 def _is_workspace_widget_empty(widget: WorkspaceWidget) -> bool:
@@ -147,7 +162,11 @@ class CreateReceivedSamplingBagService(WriteDomainService[CreateReceivedSampling
     def _run(self, experiment: Experiment, request: CreateReceivedSamplingBagRequest) -> None:
         new_bag = build_received_sampling_bag(label="Received sampling bag")
         experiment.basket_tools.append(new_bag)
-        experiment.audit_log.append(f"{new_bag.produce_lots[0].label} created in a received sampling bag.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_LOT_CREATED_IN_BAG,
+            produce=produce_ref(new_bag.produce_lots[0]),
+        )
 
 
 class CreateProduceLotService(WriteDomainService[CreateProduceLotRequest]):
@@ -164,6 +183,8 @@ class CreateProduceLotService(WriteDomainService[CreateProduceLotRequest]):
         produce_lot = ProduceLot(
             id=new_id("produce"),
             label=f"Apple lot {apple_lot_count + 1}",
+            label_code="apple_lot",
+            label_index=apple_lot_count + 1,
             produce_type=produce_type,
             unit_count=12,
             total_mass_g=2450.0,
@@ -176,7 +197,11 @@ class CreateProduceLotService(WriteDomainService[CreateProduceLotRequest]):
             produce_lot.id,
             pesticide_degradation_factors={cid: 1.0 for cid in produce_lot.pesticide_residues},
         )
-        experiment.audit_log.append(f"{produce_lot.label} created in Produce basket.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_LOT_CREATED_IN_BASKET,
+            produce=produce_ref(produce_lot),
+        )
 
 
 class CreateOrInitProduceLotService(WriteDomainService[CreateProduceLotRequest]):
@@ -196,6 +221,8 @@ class CreateOrInitProduceLotService(WriteDomainService[CreateProduceLotRequest])
         produce_lot = ProduceLot(
             id=new_id("produce"),
             label=f"Apple lot {apple_lot_count + 1}",
+            label_code="apple_lot",
+            label_index=apple_lot_count + 1,
             produce_type=produce_type,
             unit_count=12,
             total_mass_g=2450.0,
@@ -212,7 +239,11 @@ class CreateOrInitProduceLotService(WriteDomainService[CreateProduceLotRequest])
         new_bag.produce_lots.clear()
         new_bag.produce_lots.append(produce_lot)
         experiment.basket_tools.append(new_bag)
-        experiment.audit_log.append(f"{produce_lot.label} created in Produce basket.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_LOT_CREATED_IN_BASKET,
+            produce=produce_ref(produce_lot),
+        )
 
 
 class AddLiquidToWorkspaceWidgetService(WriteDomainService[AddLiquidToWorkspaceWidgetRequest]):
@@ -242,11 +273,21 @@ class AddLiquidToWorkspaceWidgetService(WriteDomainService[AddLiquidToWorkspaceW
                     accent=liquid_definition.accent,
                 )
             )
-            experiment.audit_log.append(f"{liquid_definition.name} added to {widget.label}.")
+            record_journal(
+                experiment,
+                JournalCode.WIDGET_LIQUID_ADDED,
+                liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+                widget=widget_ref(widget),
+            )
             return
 
         existing_liquid.volume_ml = round_volume(existing_liquid.volume_ml + added_mass_g)
-        experiment.audit_log.append(f"{liquid_definition.name} increased in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.WIDGET_LIQUID_INCREASED,
+            liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+            widget=widget_ref(widget),
+        )
 
 
 class UpdateWorkspaceWidgetLiquidVolumeService(WriteDomainService[UpdateWorkspaceWidgetLiquidVolumeRequest]):
@@ -260,10 +301,21 @@ class UpdateWorkspaceWidgetLiquidVolumeService(WriteDomainService[UpdateWorkspac
         liquid_entry.volume_ml = round_volume(max(float(request.volume_ml), 0.0))
         if liquid_entry.volume_ml <= 0:
             widget.liquids = [liquid for liquid in widget.liquids if liquid.id != request.liquid_entry_id]
-            experiment.audit_log.append(f"{liquid_entry.name} removed from {widget.label}.")
+            record_journal(
+                experiment,
+                JournalCode.WIDGET_LIQUID_REMOVED,
+                liquid=liquid_ref(liquid_entry),
+                widget=widget_ref(widget),
+            )
             return
 
-        experiment.audit_log.append(f"{liquid_entry.name} adjusted to {format_volume(liquid_entry.volume_ml)} g in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.WIDGET_LIQUID_ADJUSTED,
+            liquid=liquid_ref(liquid_entry),
+            mass=format_volume(liquid_entry.volume_ml),
+            widget=widget_ref(widget),
+        )
 
 
 class RemoveLiquidFromWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetLiquidRequest]):
@@ -274,7 +326,12 @@ class RemoveLiquidFromWorkspaceWidgetService(WriteDomainService[WorkspaceWidgetL
         widget = _find_grinder_widget(experiment, request.widget_id)
         liquid_entry = find_workspace_widget_liquid(widget, request.liquid_entry_id)
         widget.liquids = [liquid for liquid in widget.liquids if liquid.id != liquid_entry.id]
-        experiment.audit_log.append(f"{liquid_entry.name} removed from {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.WIDGET_LIQUID_REMOVED,
+            liquid=liquid_ref(liquid_entry),
+            widget=widget_ref(widget),
+        )
 
 
 class StartGrinderCycleService(WriteDomainService[WorkspaceWidgetRequest]):
@@ -312,7 +369,12 @@ class StartGrinderCycleService(WriteDomainService[WorkspaceWidgetRequest]):
         widget.grinder_run_duration_ms = cycle_duration_ms
         widget.grinder_run_remaining_ms = cycle_duration_ms
         widget.grinder_fault = None
-        experiment.audit_log.append(f"{produce_lot.label} grinding started in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.GRINDING_STARTED,
+            produce=produce_ref(produce_lot),
+            widget=widget_ref(widget),
+        )
 
 
 class CompleteGrinderCycleService(WriteDomainService[WorkspaceWidgetRequest]):
@@ -456,8 +518,18 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
                 )
                 if pressure_event is not None and pressure_event.fault == "pressure_pop":
                     first_lot_label = slot.tool.produce_lots[0].label if slot.tool.produce_lots else "the sample"
-                    experiment.audit_log.append(
-                        f"{slot.tool.label} popped open on {slot.label} at {format_volume(pressure_event.pressure_bar)} bar; {format_volume(pressure_event.lost_mass_g)} g of {first_lot_label} was lost."
+                    record_journal(
+                        experiment,
+                        JournalCode.TOOL_POPPED_OPEN,
+                        tool=tool_ref(slot.tool),
+                        location=slot_ref(slot),
+                        pressure=format_volume(pressure_event.pressure_bar),
+                        lost_mass=format_volume(pressure_event.lost_mass_g),
+                        produce=(
+                            produce_ref(slot.tool.produce_lots[0])
+                            if slot.tool.produce_lots
+                            else text_ref(first_lot_label)
+                        ),
                     )
             else:
                 physical_simulation_service.warm_produce_lots(
@@ -501,7 +573,12 @@ def complete_grinder_cycle(experiment: Experiment, widget_id: str) -> None:
     widget.grinder_fault = None
     widget.liquids = [liquid for liquid in widget.liquids if liquid.liquid_id != "dry_ice_pellets"]
     sync_canonical_produce_model(experiment)
-    experiment.audit_log.append(f"{produce_lot.label} ground in {widget.label}.")
+    record_journal(
+        experiment,
+        JournalCode.GRINDING_COMPLETED,
+        produce=produce_ref(produce_lot),
+        widget=widget_ref(widget),
+    )
 
 
 def _apply_widget_layout_request(widget: WorkspaceWidget, request: WorkspaceWidgetLayoutRequest) -> None:
@@ -531,7 +608,12 @@ def _discard_jammed_grinder_contents(
     )
     widget.liquids = []
     sync_canonical_produce_model(experiment)
-    experiment.audit_log.append(f"{produce_lot.label} jammed {widget.label} motor and became waste.")
+    record_journal(
+        experiment,
+        JournalCode.GRINDER_JAMMED,
+        produce=produce_ref(produce_lot),
+        widget=widget_ref(widget),
+    )
 
 
 def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> None:
@@ -547,7 +629,12 @@ def _complete_vortex_cycle(experiment: Experiment, widget: WorkspaceWidget) -> N
     is_mixed = widget.tool.contents_homogeneity >= 0.9
     for fraction in widget.tool.produce_fractions:
         fraction.is_mixed = is_mixed
-    experiment.audit_log.append(f"{widget.tool.label} successfully vortexed on {widget.label}.")
+    record_journal(
+        experiment,
+        JournalCode.VORTEX_COMPLETED,
+        tool=tool_ref(widget.tool),
+        widget=widget_ref(widget),
+    )
 
 
 def _complete_centrifuge_cycle(experiment: Experiment, widget: WorkspaceWidget) -> None:
@@ -557,7 +644,12 @@ def _complete_centrifuge_cycle(experiment: Experiment, widget: WorkspaceWidget) 
         return
     widget.tool.quechers_state.phase = "separated"
     widget.tool.quechers_state.separation_progress = 1.0
-    experiment.audit_log.append(f"{widget.tool.label} separated in {widget.label}.")
+    record_journal(
+        experiment,
+        JournalCode.CENTRIFUGE_COMPLETED,
+        tool=tool_ref(widget.tool),
+        widget=widget_ref(widget),
+    )
 
 
 def _remove_widget_produce_lot(widget: WorkspaceWidget, produce_lot_id: str) -> ProduceLot:

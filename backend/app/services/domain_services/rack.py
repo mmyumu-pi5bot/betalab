@@ -10,6 +10,9 @@ from app.services.helpers.lookups import (
     find_workbench_slot,
 )
 from app.services.helpers.workbench import build_workbench_tool
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import slot_ref, tool_ref
+from app.services.journal_service import record_journal
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +64,12 @@ class PlaceToolInRackSlotService(WriteDomainService[PlaceToolInRackSlotRequest])
             raise ValueError("Only autosampler vials can be placed in the rack.")
 
         rack_slot.tool = tool
-        experiment.audit_log.append(f"{rack_slot.tool.label} placed in {rack_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_PLACED_IN_SLOT,
+            tool=tool_ref(rack_slot.tool),
+            target=slot_ref(rack_slot),
+        )
 
 
 class PlaceWorkbenchToolInRackSlotService(WriteDomainService[PlaceWorkbenchToolInRackSlotRequest]):
@@ -81,7 +89,13 @@ class PlaceWorkbenchToolInRackSlotService(WriteDomainService[PlaceWorkbenchToolI
 
         rack_slot.tool = source_slot.tool
         source_slot.tool = None
-        experiment.audit_log.append(f"{rack_slot.tool.label} moved from {source_slot.label} to {rack_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(rack_slot.tool),
+            source=slot_ref(source_slot),
+            target=slot_ref(rack_slot),
+        )
 
 
 class MoveRackToolBetweenSlotsService(WriteDomainService[MoveRackToolBetweenSlotsRequest]):
@@ -99,7 +113,13 @@ class MoveRackToolBetweenSlotsService(WriteDomainService[MoveRackToolBetweenSlot
 
         target_slot.tool = source_slot.tool
         source_slot.tool = None
-        experiment.audit_log.append(f"{target_slot.tool.label} moved from {source_slot.label} to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(target_slot.tool),
+            source=slot_ref(source_slot),
+            target=slot_ref(target_slot),
+        )
 
 
 class RemoveRackToolToWorkbenchSlotService(WriteDomainService[RemoveRackToolToWorkbenchSlotRequest]):
@@ -117,7 +137,13 @@ class RemoveRackToolToWorkbenchSlotService(WriteDomainService[RemoveRackToolToWo
 
         target_slot.tool = rack_slot.tool
         rack_slot.tool = None
-        experiment.audit_log.append(f"{target_slot.tool.label} moved from {rack_slot.label} to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(target_slot.tool),
+            source=slot_ref(rack_slot),
+            target=slot_ref(target_slot),
+        )
 
 
 class DiscardRackToolService(WriteDomainService[DiscardRackToolRequest]):
@@ -133,7 +159,12 @@ class DiscardRackToolService(WriteDomainService[DiscardRackToolRequest]):
         rack_slot.tool = None
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = rack_slot.label
-        experiment.audit_log.append(f"{discarded_tool.label} discarded from {rack_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(discarded_tool),
+            source=slot_ref(rack_slot),
+        )
 
 
 class RestoreTrashedToolToRackSlotService(WriteDomainService[RestoreTrashedToolToRackSlotRequest]):
@@ -152,4 +183,9 @@ class RestoreTrashedToolToRackSlotService(WriteDomainService[RestoreTrashedToolT
         rack_slot.tool = tool
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
-        experiment.audit_log.append(f"{rack_slot.tool.label} restored from trash to {rack_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_RESTORED_FROM_TRASH,
+            tool=tool_ref(rack_slot.tool),
+            target=slot_ref(rack_slot),
+        )

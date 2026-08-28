@@ -15,6 +15,9 @@ from app.services.helpers.lookups import (
 from app.services.helpers.produce_material_states import get_material_state_name
 from app.services.helpers.workbench import build_workbench_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import slot_ref, tool_ref, widget_ref, widget_type_ref
+from app.services.journal_service import record_journal
 
 _VORTEX_CYCLE_DURATION_MS = 3000.0
 physical_simulation_service = PhysicalSimulationService()
@@ -99,13 +102,13 @@ class VortexServiceBase(WriteDomainService[object]):
         experiment: Experiment,
         tool: WorkbenchTool,
         *,
-        action_verb: str = "placed on",
+        journal_code: JournalCode = JournalCode.TOOL_PLACED_ON_EQUIPMENT,
     ) -> None:
         self._validate_compatible_tool(tool)
         widget = self._find_vortex_widget(experiment)
         self._validate_vortex_empty(widget)
         widget.tool = tool
-        experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
+        record_journal(experiment, journal_code, tool=tool_ref(tool), widget=widget_ref(widget))
 
     def take_tool_from_vortex(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_vortex_widget(experiment)
@@ -121,7 +124,11 @@ class VortexServiceBase(WriteDomainService[object]):
 class PlaceToolOnVortexService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: PlaceToolOnVortexRequest) -> None:
         new_tool = build_workbench_tool(request.tool_id)
-        self.place_tool_on_vortex(experiment, new_tool, action_verb="placed on")
+        self.place_tool_on_vortex(
+            experiment,
+            new_tool,
+            journal_code=JournalCode.TOOL_PLACED_ON_EQUIPMENT,
+        )
 
 
 class MoveWorkbenchToolToVortexService(VortexServiceBase):
@@ -131,7 +138,11 @@ class MoveWorkbenchToolToVortexService(VortexServiceBase):
             raise ValueError(f"Place a tool on {source_slot.label} before moving it.")
         moved_tool = source_slot.tool
         source_slot.tool = None
-        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class MoveRackToolToVortexService(VortexServiceBase):
@@ -141,13 +152,21 @@ class MoveRackToolToVortexService(VortexServiceBase):
             raise ValueError(f"{rack_slot.label} does not contain a tool.")
         moved_tool = rack_slot.tool
         rack_slot.tool = None
-        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class RestoreTrashedToolToVortexService(VortexServiceBase):
     def _run(self, experiment: Experiment, request: RestoreTrashedToolToVortexRequest) -> None:
         tool = find_trash_tool(experiment.trash, request.trash_tool_id)
-        self.place_tool_on_vortex(experiment, tool, action_verb="restored to")
+        self.place_tool_on_vortex(
+            experiment,
+            tool,
+            journal_code=JournalCode.TOOL_RESTORED_TO_EQUIPMENT,
+        )
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
 
@@ -159,7 +178,13 @@ class MoveVortexToolToWorkbenchService(VortexServiceBase):
             raise ValueError(f"{target_slot.label} already contains a tool.")
         moved_tool = self.take_tool_from_vortex(experiment)
         target_slot.tool = moved_tool
-        experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(moved_tool),
+            source=widget_type_ref("vortex_mixer", "Vortex mixer"),
+            target=slot_ref(target_slot),
+        )
 
 
 class DiscardVortexToolService(VortexServiceBase):
@@ -167,7 +192,12 @@ class DiscardVortexToolService(VortexServiceBase):
         discarded_tool = self.take_tool_from_vortex(experiment)
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Vortex mixer"
-        experiment.audit_log.append(f"{discarded_tool.label} discarded from Vortex mixer.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(discarded_tool),
+            source=widget_type_ref("vortex_mixer", "Vortex mixer"),
+        )
 
 
 class CloseVortexToolService(VortexServiceBase):
@@ -180,7 +210,12 @@ class CloseVortexToolService(VortexServiceBase):
         tool.is_sealed = True
         tool.closure_fault = None
         tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
-        experiment.audit_log.append(f"{tool.label} sealed on {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_SEALED,
+            tool=tool_ref(tool),
+            location=widget_ref(widget),
+        )
 
 
 class OpenVortexToolService(VortexServiceBase):
@@ -197,13 +232,22 @@ class OpenVortexToolService(VortexServiceBase):
         tool.is_sealed = False
         tool.closure_fault = None
         if vent_event is not None and vent_event.lost_mass_g > 0:
-            experiment.audit_log.append(
-                f"{tool.label} vented at {format_volume(vent_event.pressure_bar)} bar on {widget.label}; "
-                f"{format_volume(vent_event.lost_mass_g)} g of powder was lost."
+            record_journal(
+                experiment,
+                JournalCode.TOOL_VENTED,
+                tool=tool_ref(tool),
+                pressure=format_volume(vent_event.pressure_bar),
+                location=widget_ref(widget),
+                lost_mass=format_volume(vent_event.lost_mass_g),
             )
             return
 
-        experiment.audit_log.append(f"{tool.label} opened on {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_OPENED,
+            tool=tool_ref(tool),
+            location=widget_ref(widget),
+        )
 
 
 class MoveAnalyticalBalanceToolToVortexService(VortexServiceBase):
@@ -213,7 +257,11 @@ class MoveAnalyticalBalanceToolToVortexService(VortexServiceBase):
             raise ValueError("Analytical balance does not contain a tool.")
         moved_tool = analytical_balance.tool
         analytical_balance.tool = None
-        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class MoveGrossBalanceToolToVortexService(VortexServiceBase):
@@ -223,7 +271,11 @@ class MoveGrossBalanceToolToVortexService(VortexServiceBase):
             raise ValueError("Gross balance does not contain a tool.")
         moved_tool = gross_balance.tool
         gross_balance.tool = None
-        self.place_tool_on_vortex(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_vortex(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class MoveVortexToolToAnalyticalBalanceService(VortexServiceBase):
@@ -233,7 +285,13 @@ class MoveVortexToolToAnalyticalBalanceService(VortexServiceBase):
             raise ValueError("Analytical balance already contains a tool.")
         moved_tool = self.take_tool_from_vortex(experiment)
         analytical_balance.tool = moved_tool
-        experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(moved_tool),
+            source=widget_type_ref("vortex_mixer", "Vortex mixer"),
+            target=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class MoveVortexToolToGrossBalanceService(VortexServiceBase):
@@ -243,7 +301,13 @@ class MoveVortexToolToGrossBalanceService(VortexServiceBase):
             raise ValueError("Gross balance already contains a tool.")
         moved_tool = self.take_tool_from_vortex(experiment)
         gross_balance.tool = moved_tool
-        experiment.audit_log.append(f"{moved_tool.label} moved from Vortex mixer to Gross balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(moved_tool),
+            source=widget_type_ref("vortex_mixer", "Vortex mixer"),
+            target=widget_type_ref("gross_balance", "Gross balance"),
+        )
 
 
 class StartVortexCycleService(VortexServiceBase):
@@ -270,15 +334,19 @@ class StartVortexCycleService(VortexServiceBase):
             state.phase = "contaminated"
             state.faults = faults
             if "vortexed_open" in faults:
-                experiment.audit_log.append(
-                    f"{widget.tool.label} was vortexed without being sealed; its contents spilled and it is unusable."
+                record_journal(
+                    experiment,
+                    JournalCode.VORTEXED_UNSEALED,
+                    tool=tool_ref(widget.tool),
                 )
             elif "vortexed_without_salts" in faults:
-                experiment.audit_log.append(
-                    f"{widget.tool.label} was vortexed without QuEChERS salts; its walls are contaminated and it is unusable."
+                record_journal(
+                    experiment,
+                    JournalCode.VORTEXED_WITHOUT_SALTS,
+                    tool=tool_ref(widget.tool),
                 )
         elif state.phase == "reacting":
             state.phase = "mixing"
         widget.vortex_run_duration_ms = _VORTEX_CYCLE_DURATION_MS
         widget.vortex_run_remaining_ms = _VORTEX_CYCLE_DURATION_MS
-        experiment.audit_log.append(f"Vortex mixer started with {widget.tool.label}.")
+        record_journal(experiment, JournalCode.VORTEX_STARTED, tool=tool_ref(widget.tool))

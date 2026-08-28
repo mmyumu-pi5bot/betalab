@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 from app.domain.models import Experiment
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import tool_ref, widget_type_ref
+from app.services.journal_service import record_journal
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,4 +34,9 @@ class DiscardBasketToolService(WriteDomainService[DiscardBasketToolRequest]):
         discarded_tool = experiment.basket_tools.pop(tool_index)
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Produce basket"
-        experiment.audit_log.append(f"{discarded_tool.label} discarded from Produce basket.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(discarded_tool),
+            source=widget_type_ref("produce_basket", "Produce basket"),
+        )

@@ -8,6 +8,9 @@ from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import find_workspace_widget, format_volume
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import tool_ref, widget_ref
+from app.services.journal_service import record_journal
 
 CENTRIFUGE_CYCLE_DURATION_MS = 10_000.0
 CENTRIFUGE_SPEED_RPM = 4_000
@@ -35,7 +38,7 @@ class CentrifugeServiceBase(WriteDomainService[object]):
         experiment: Experiment,
         tool: WorkbenchTool,
         *,
-        action_verb: str = "placed in",
+        journal_code: JournalCode = JournalCode.TOOL_PLACED_IN_EQUIPMENT,
     ) -> None:
         if tool.tool_type != "centrifuge_tube":
             raise ValueError(f"{tool.label} cannot be centrifuged (only centrifuge tubes).")
@@ -45,7 +48,7 @@ class CentrifugeServiceBase(WriteDomainService[object]):
         if widget.tool is not None:
             raise ValueError(f"{widget.label} already contains a tube.")
         widget.tool = tool
-        experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
+        record_journal(experiment, journal_code, tool=tool_ref(tool), widget=widget_ref(widget))
 
     def take_tool(self, experiment: Experiment) -> WorkbenchTool:
         widget = self.find_widget(experiment)
@@ -90,20 +93,19 @@ class StartCentrifugeCycleService(CentrifugeServiceBase):
             # an unsealed tube no longer blocks the cycle, it just ruins the result).
             if "centrifuged_open" not in state.faults:
                 state.faults.append("centrifuged_open")
-            tool.quechers_extraction_result = (
-                physical_simulation_service.generate_spilled_extraction_result(tool)
-            )
-            experiment.audit_log.append(
-                f"{tool.label} was centrifuged without being sealed; most of the extract "
-                f"sprayed out and the result will be badly compromised."
-            )
+            tool.quechers_extraction_result = physical_simulation_service.generate_spilled_extraction_result(tool)
+            record_journal(experiment, JournalCode.CENTRIFUGED_UNSEALED, tool=tool_ref(tool))
         state.phase = "separating"
         state.separation_progress = 0.0
         widget.centrifuge_run_duration_ms = CENTRIFUGE_CYCLE_DURATION_MS
         widget.centrifuge_run_remaining_ms = CENTRIFUGE_CYCLE_DURATION_MS
         widget.centrifuge_speed_rpm = CENTRIFUGE_SPEED_RPM
-        experiment.audit_log.append(
-            f"{widget.label} started with {tool.label} at {CENTRIFUGE_SPEED_RPM} rpm."
+        record_journal(
+            experiment,
+            JournalCode.CENTRIFUGE_STARTED,
+            widget=widget_ref(widget),
+            tool=tool_ref(tool),
+            rpm=CENTRIFUGE_SPEED_RPM,
         )
 
 
@@ -121,7 +123,12 @@ class CloseCentrifugeToolService(CentrifugeServiceBase):
         tool.is_sealed = True
         tool.closure_fault = None
         tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
-        experiment.audit_log.append(f"{tool.label} sealed in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_SEALED_IN,
+            tool=tool_ref(tool),
+            location=widget_ref(widget),
+        )
 
 
 class OpenCentrifugeToolService(CentrifugeServiceBase):
@@ -142,10 +149,19 @@ class OpenCentrifugeToolService(CentrifugeServiceBase):
         tool.is_sealed = False
         tool.closure_fault = None
         if vent_event is not None and vent_event.lost_mass_g > 0:
-            experiment.audit_log.append(
-                f"{tool.label} vented at {format_volume(vent_event.pressure_bar)} bar in {widget.label}; "
-                f"{format_volume(vent_event.lost_mass_g)} g of powder was lost."
+            record_journal(
+                experiment,
+                JournalCode.TOOL_VENTED_IN,
+                tool=tool_ref(tool),
+                pressure=format_volume(vent_event.pressure_bar),
+                location=widget_ref(widget),
+                lost_mass=format_volume(vent_event.lost_mass_g),
             )
             return
 
-        experiment.audit_log.append(f"{tool.label} opened in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_OPENED_IN,
+            tool=tool_ref(tool),
+            location=widget_ref(widget),
+        )

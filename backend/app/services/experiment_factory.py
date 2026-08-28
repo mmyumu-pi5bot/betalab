@@ -18,11 +18,13 @@ from app.domain.models import (
     WorkspaceWidget,
     new_id,
 )
+from app.domain.journal_codes import JournalCode
+from app.services.journal_service import record_journal
 from app.services.received_sample_generation import build_received_sampling_bag
 
 
 def build_experiment(name: str = "Untitled experiment") -> Experiment:
-    return Experiment(
+    experiment = Experiment(
         id=new_id("experiment"),
         name=name,
         status=ExperimentStatus.PREPARING,
@@ -170,8 +172,7 @@ def build_experiment(name: str = "Untitled experiment") -> Experiment:
         pipette=PipetteState(),
         analytical_balance=AnalyticalBalanceState(),
         last_simulation_at=datetime.now(UTC),
-        audit_log=[
-            "Experiment created",
-            "Receive the grower bag, weigh it, then register it in the LIMS.",
-        ],
     )
+    record_journal(experiment, JournalCode.EXPERIMENT_CREATED)
+    record_journal(experiment, JournalCode.EXPERIMENT_FIRST_STEP)
+    return experiment

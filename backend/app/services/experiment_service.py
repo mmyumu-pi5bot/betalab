@@ -14,6 +14,8 @@ from app.services.experiment_repository import ExperimentRepository, InMemoryExp
 from app.services.helpers.lookups import find_experiment_tool
 from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
 from app.services.journal_service import synchronize_journal_entries
+from app.domain.journal_codes import JournalCode
+from app.services.journal_service import record_journal
 
 
 class ExperimentNotFoundError(KeyError):
@@ -55,7 +57,7 @@ class ExperimentRuntimeService:
         duplicate.name = f"{source.name[:73].rstrip()} (copy)"
         duplicate.snapshot_version = 0
         duplicate.last_simulation_at = self._now_fn()
-        duplicate.audit_log.append(f"Duplicated from {source.id}.")
+        record_journal(duplicate, JournalCode.EXPERIMENT_DUPLICATED, source_id=source.id)
         self._experiments[duplicate.id] = duplicate
         return self._persist_mutation_and_to_schema(duplicate)
 

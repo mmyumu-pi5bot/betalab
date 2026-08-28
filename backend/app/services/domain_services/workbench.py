@@ -50,6 +50,9 @@ from app.services.helpers.workbench import (
     require_slot_tool,
 )
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import liquid_ref, produce_ref, slot_ref, text_ref, tool_ref
+from app.services.journal_service import record_journal
 
 physical_simulation_service = PhysicalSimulationService()
 SPATULA_CAPACITY_G = 5.0
@@ -150,7 +153,7 @@ class AddWorkbenchSlotService(WriteDomainService[EmptyWorkbenchRequest]):
                 label=f"Station {next_index}",
             )
         )
-        experiment.audit_log.append(f"Station {next_index} added to workbench.")
+        record_journal(experiment, JournalCode.STATION_ADDED, index=next_index)
 
 
 class RemoveWorkbenchSlotService(WriteDomainService[WorkbenchSlotRequest]):
@@ -163,7 +166,7 @@ class RemoveWorkbenchSlotService(WriteDomainService[WorkbenchSlotRequest]):
             raise ValueError(f"{slot.label} must be empty before it can be removed.")
 
         experiment.workbench.slots = [existing_slot for existing_slot in experiment.workbench.slots if existing_slot.id != slot.id]
-        experiment.audit_log.append(f"{slot.label} removed from workbench.")
+        record_journal(experiment, JournalCode.STATION_REMOVED, slot=slot_ref(slot))
 
 
 class PlaceToolOnWorkbenchService(WriteDomainService[PlaceToolOnWorkbenchRequest]):
@@ -176,7 +179,12 @@ class PlaceToolOnWorkbenchService(WriteDomainService[PlaceToolOnWorkbenchRequest
             raise ValueError(f"{slot.label} already contains a tool")
 
         slot.tool = build_workbench_tool(request.tool_id)
-        experiment.audit_log.append(f"{slot.tool.label} placed on {slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_PLACED,
+            tool=tool_ref(slot.tool),
+            target=slot_ref(slot),
+        )
 
 
 class MoveToolBetweenWorkbenchSlotsService(WriteDomainService[MoveToolBetweenWorkbenchSlotsRequest]):
@@ -197,7 +205,13 @@ class MoveToolBetweenWorkbenchSlotsService(WriteDomainService[MoveToolBetweenWor
         moved_tool = source_slot.tool
         source_slot.tool = None
         target_slot.tool = moved_tool
-        experiment.audit_log.append(f"{moved_tool.label} moved from {source_slot.label} to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(moved_tool),
+            source=slot_ref(source_slot),
+            target=slot_ref(target_slot),
+        )
 
 
 class DiscardWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -215,7 +229,12 @@ class DiscardWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
         slot.tool = None
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = slot.label
-        experiment.audit_log.append(f"{discarded_tool.label} discarded from {slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(discarded_tool),
+            source=slot_ref(slot),
+        )
 
 
 class StoreWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -233,7 +252,7 @@ class StoreWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
 
         stored_tool = slot.tool
         slot.tool = None
-        experiment.audit_log.append(f"{stored_tool.label} stored in inventory.")
+        record_journal(experiment, JournalCode.TOOL_STORED, tool=tool_ref(stored_tool))
 
 
 class DiscardToolFromPaletteService(WriteDomainService[DiscardToolFromPaletteRequest]):
@@ -246,7 +265,12 @@ class DiscardToolFromPaletteService(WriteDomainService[DiscardToolFromPaletteReq
             raise ValueError(f"{discarded_tool.label} must be stored in inventory instead of discarded.")
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Palette"
-        experiment.audit_log.append(f"{discarded_tool.label} discarded from Palette.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(discarded_tool),
+            source=text_ref("Palette"),
+        )
 
 
 class DiscardSampleLabelFromPaletteService(WriteDomainService[DiscardSampleLabelFromPaletteRequest]):
@@ -261,7 +285,7 @@ class DiscardSampleLabelFromPaletteService(WriteDomainService[DiscardSampleLabel
                 label=build_manual_label(text=""),
             )
         )
-        experiment.audit_log.append("Manual label discarded from Palette.")
+        record_journal(experiment, JournalCode.LABEL_DISCARDED, source=text_ref("Palette"))
 
 
 class RestoreTrashedToolToWorkbenchSlotService(WriteDomainService[RestoreTrashedToolToWorkbenchSlotRequest]):
@@ -278,7 +302,12 @@ class RestoreTrashedToolToWorkbenchSlotService(WriteDomainService[RestoreTrashed
         target_slot.tool = tool
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
-        experiment.audit_log.append(f"{target_slot.tool.label} restored from trash to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_RESTORED_FROM_TRASH,
+            tool=tool_ref(target_slot.tool),
+            target=slot_ref(target_slot),
+        )
 
 
 class AddLiquidToWorkbenchToolService(WriteDomainService[AddLiquidToWorkbenchToolRequest]):
@@ -332,7 +361,12 @@ class RemoveLiquidFromWorkbenchToolService(WriteDomainService[WorkbenchLiquidReq
         )
         liquid_entry = find_tool_liquid(tool, request.liquid_entry_id)
         remove_liquid_from_tool(tool, liquid_entry)
-        experiment.audit_log.append(f"{liquid_entry.name} removed from {tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIQUID_REMOVED,
+            liquid=liquid_ref(liquid_entry),
+            target=tool_ref(tool),
+        )
 
 
 class UpdateWorkbenchLiquidVolumeService(WriteDomainService[UpdateWorkbenchLiquidVolumeRequest]):
@@ -363,13 +397,24 @@ class UpdateWorkbenchLiquidVolumeService(WriteDomainService[UpdateWorkbenchLiqui
         liquid_entry.volume_ml = round_volume(min(requested_volume, max_allowed_volume))
         if liquid_entry.volume_ml <= 0:
             remove_liquid_from_tool(tool, liquid_entry)
-            experiment.audit_log.append(f"{liquid_entry.name} removed from {tool.label}.")
+            record_journal(
+                experiment,
+                JournalCode.LIQUID_REMOVED,
+                liquid=liquid_ref(liquid_entry),
+                target=tool_ref(tool),
+            )
             return
 
         error_factor = previous_true_volume / previous_nominal_volume if previous_nominal_volume > 0 else 1.0
         liquid_entry.true_volume_ml = round(liquid_entry.volume_ml * error_factor, 6)
 
-        experiment.audit_log.append(f"{liquid_entry.name} adjusted to {format_volume(liquid_entry.volume_ml)} mL in {tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIQUID_ADJUSTED,
+            liquid=liquid_ref(liquid_entry),
+            volume=format_volume(liquid_entry.volume_ml),
+            target=tool_ref(tool),
+        )
 
 
 def _tool_contains_slurry(experiment: Experiment, tool: WorkbenchTool) -> bool:
@@ -487,7 +532,12 @@ class CutWorkbenchProduceLotService(WriteDomainService[WorkbenchProduceLotReques
 
         set_material_state_name(experiment.produce_material_states, produce_lot.id, "cut")
         sync_canonical_produce_model(experiment)
-        experiment.audit_log.append(f"{produce_lot.label} cut on {origin_label}.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_CUT,
+            produce=produce_ref(produce_lot),
+            location=text_ref(origin_label),
+        )
 
 
 class ApplySampleLabelToWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -498,7 +548,12 @@ class ApplySampleLabelToWorkbenchToolService(WriteDomainService[WorkbenchSlotReq
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "adding a sample label")
         tool.labels.append(build_manual_label())
-        experiment.audit_log.append(f"Manual label applied to {tool.label} on {slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.MANUAL_LABEL_APPLIED,
+            tool=tool_ref(tool),
+            location=slot_ref(slot),
+        )
 
 
 class UpdateWorkbenchToolSampleLabelTextService(WriteDomainService[UpdateWorkbenchToolSampleLabelTextRequest]):
@@ -515,10 +570,15 @@ class UpdateWorkbenchToolSampleLabelTextService(WriteDomainService[UpdateWorkben
         next_text = request.sample_label_text.strip()
         label.text = next_text
         if next_text:
-            experiment.audit_log.append(f"Sample label updated to {next_text} on {tool.label}.")
+            record_journal(
+                experiment,
+                JournalCode.SAMPLE_LABEL_UPDATED,
+                text=next_text,
+                tool=tool_ref(tool),
+            )
             return
 
-        experiment.audit_log.append(f"Sample label cleared on {tool.label}.")
+        record_journal(experiment, JournalCode.SAMPLE_LABEL_CLEARED, tool=tool_ref(tool))
 
 
 class DiscardSampleLabelFromWorkbenchToolService(WriteDomainService[WorkbenchSampleLabelRequest]):
@@ -536,7 +596,7 @@ class DiscardSampleLabelFromWorkbenchToolService(WriteDomainService[WorkbenchSam
                 label=label,
             )
         )
-        experiment.audit_log.append(f"Label discarded from {tool.label}.")
+        record_journal(experiment, JournalCode.LABEL_DISCARDED, source=tool_ref(tool))
 
 
 class CloseWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -552,7 +612,12 @@ class CloseWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
         tool.is_sealed = True
         tool.closure_fault = None
         tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
-        experiment.audit_log.append(f"{tool.label} sealed on {slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_SEALED,
+            tool=tool_ref(tool),
+            location=slot_ref(slot),
+        )
 
 
 class OpenWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -572,12 +637,22 @@ class OpenWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
         tool.is_sealed = False
         tool.closure_fault = None
         if vent_event is not None and vent_event.lost_mass_g > 0:
-            experiment.audit_log.append(
-                f"{tool.label} vented at {format_volume(vent_event.pressure_bar)} bar on {slot.label}; {format_volume(vent_event.lost_mass_g)} g of powder was lost."
+            record_journal(
+                experiment,
+                JournalCode.TOOL_VENTED,
+                tool=tool_ref(tool),
+                pressure=format_volume(vent_event.pressure_bar),
+                location=slot_ref(slot),
+                lost_mass=format_volume(vent_event.lost_mass_g),
             )
             return
 
-        experiment.audit_log.append(f"{tool.label} opened on {slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_OPENED,
+            tool=tool_ref(tool),
+            location=slot_ref(slot),
+        )
 
 
 class LoadSpatulaFromWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -615,7 +690,7 @@ class LoadSpatulaFromWorkbenchToolService(WriteDomainService[WorkbenchSlotReques
             loaded_mass_g=loaded_mass_g,
             material_states=experiment.produce_material_states,
         )
-        experiment.audit_log.append(f"Spatula loaded from {tool.label}.")
+        record_journal(experiment, JournalCode.SPATULA_LOADED, source=tool_ref(tool))
 
 
 class PourSpatulaIntoWorkbenchToolService(WriteDomainService[PourSpatulaIntoWorkbenchToolRequest]):
@@ -657,7 +732,7 @@ class PourSpatulaIntoWorkbenchToolService(WriteDomainService[PourSpatulaIntoWork
             location_id=slot.id,
         )
 
-        experiment.audit_log.append(f"Powder transferred into {tool.label}.")
+        record_journal(experiment, JournalCode.SPATULA_POURED, target=tool_ref(tool))
 
 
 class DiscardSpatulaService(WriteDomainService[None]):
@@ -672,4 +747,4 @@ class DiscardSpatulaService(WriteDomainService[None]):
         experiment.spatula.is_loaded = False
         experiment.spatula.produce_fractions = []
         experiment.spatula.source_tool_id = None
-        experiment.audit_log.append(f"Spatula discarded ({round(total_loaded_g, 3)} g).")
+        record_journal(experiment, JournalCode.SPATULA_DISCARDED, mass=round(total_loaded_g, 3))

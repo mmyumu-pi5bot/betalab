@@ -51,7 +51,13 @@ class JournalEvent:
     occurred_at: datetime
     category: JournalEventCategory
     severity: JournalEventSeverity
+    #: English wording, kept for the audit log and for clients that do not know
+    #: the code.
     message: str
+    #: What happened, and the entities it happened to. A client renders the
+    #: sentence in its own language from these rather than from `message`.
+    code: str | None = None
+    params: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -522,6 +528,11 @@ class ProduceLot:
     produce_type: str
     total_mass_g: float
     unit_count: int | None = None
+    #: How the label was built, so a client can render it in its own language.
+    #: `label` stays the English rendering for logs and for clients that do not
+    #: know the code.
+    label_code: str | None = None
+    label_index: int | None = None
     # Immutable residue profile set at lot creation (µg/kg per compound).
     pesticide_residues: dict[str, float] = field(default_factory=dict)
 
@@ -557,6 +568,10 @@ class Experiment:
     lims_entries: list[LimsReception] = field(default_factory=list)
     snapshot_version: int = 0
     audit_log: list[str] = field(default_factory=list)
+    #: Structured counterparts of audit entries not yet mirrored into the
+    #: journal, each paired with the audit index it belongs to. Drained by
+    #: `synchronize_journal_entries`, so it is always empty when persisted.
+    pending_journal_records: list[tuple[int, str, dict[str, object]]] = field(default_factory=list)
     journal_entries: list[JournalEvent] = field(default_factory=list)
 
 

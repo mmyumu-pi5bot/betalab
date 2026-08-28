@@ -53,6 +53,7 @@ from app.schemas.experiment import (
     ExperimentListEntrySchema,
     ExperimentSchema,
     ExperimentSummarySchema,
+    LastJournalEventSchema,
     TransitionTraceSchema,
 )
 from app.services.acquisition_method_repository import deserialize_acquisition_method
@@ -130,13 +131,17 @@ class SqliteExperimentRepository:
     def save(self, experiment: Experiment) -> None:
         payload = json.dumps(_serialize_experiment(experiment), sort_keys=True)
         now = datetime.now(UTC).isoformat()
-        last_audit_entry = next(
-            (
-                entry.message
-                for entry in reversed(experiment.journal_entries)
-                if entry.category != JournalEventCategory.LAYOUT
-            ),
+        last_entry = next(
+            (entry for entry in reversed(experiment.journal_entries) if entry.category != JournalEventCategory.LAYOUT),
             None,
+        )
+        last_audit_entry = last_entry.message if last_entry is not None else None
+        # Stored structured as well as rendered, so the experiment list can show
+        # that line in the reader's language rather than only in English.
+        last_journal_event = (
+            json.dumps({"code": last_entry.code, "params": last_entry.params}, sort_keys=True)
+            if last_entry is not None and last_entry.code is not None
+            else None
         )
         summary = _build_experiment_summary(experiment)
         with self._connect() as connection:
@@ -151,13 +156,14 @@ class SqliteExperimentRepository:
                     status,
                     last_simulation_at,
                     last_audit_entry,
+                    last_journal_event,
                     workbench_tool_count,
                     rack_tool_count,
                     material_count,
                     run_count,
                     payload
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     name = excluded.name,
                     updated_at = excluded.updated_at,
@@ -165,6 +171,7 @@ class SqliteExperimentRepository:
                     status = excluded.status,
                     last_simulation_at = excluded.last_simulation_at,
                     last_audit_entry = excluded.last_audit_entry,
+                    last_journal_event = excluded.last_journal_event,
                     workbench_tool_count = excluded.workbench_tool_count,
                     rack_tool_count = excluded.rack_tool_count,
                     material_count = excluded.material_count,
@@ -180,6 +187,7 @@ class SqliteExperimentRepository:
                     experiment.status.value,
                     experiment.last_simulation_at.isoformat(),
                     last_audit_entry,
+                    last_journal_event,
                     summary.workbench_tool_count,
                     summary.rack_tool_count,
                     summary.material_count,
@@ -208,6 +216,7 @@ class SqliteExperimentRepository:
                 """
                 SELECT id, COALESCE(name, 'Untitled experiment'), updated_at,
                        snapshot_version, status, last_simulation_at, last_audit_entry,
+                       last_journal_event,
                        COALESCE(workbench_tool_count, 0), COALESCE(rack_tool_count, 0),
                        COALESCE(material_count, 0), COALESCE(run_count, 0)
                 FROM experiments
@@ -224,6 +233,10 @@ class SqliteExperimentRepository:
                 snapshot_version=snapshot_version,
                 updated_at=datetime.fromisoformat(updated_at),
                 last_audit_entry=last_audit_entry,
+                last_journal_event=_deserialize_last_journal_event(
+                    last_journal_event,
+                    last_audit_entry,
+                ),
                 summary=ExperimentSummarySchema(
                     workbench_tool_count=workbench_tool_count,
                     rack_tool_count=rack_tool_count,
@@ -239,6 +252,7 @@ class SqliteExperimentRepository:
                 status,
                 last_simulation_at,
                 last_audit_entry,
+                last_journal_event,
                 workbench_tool_count,
                 rack_tool_count,
                 material_count,
@@ -292,6 +306,7 @@ class SqliteExperimentRepository:
         self._ensure_column(connection, "status", "TEXT")
         self._ensure_column(connection, "last_simulation_at", "TEXT")
         self._ensure_column(connection, "last_audit_entry", "TEXT")
+        self._ensure_column(connection, "last_journal_event", "TEXT")
         self._ensure_column(connection, "name", "TEXT")
         self._ensure_column(connection, "workbench_tool_count", "INTEGER")
         self._ensure_column(connection, "rack_tool_count", "INTEGER")
@@ -406,6 +421,27 @@ def _summary_metadata_from_payload(payload: dict) -> tuple[str, ExperimentSummar
     )
 
 
+def _deserialize_last_journal_event(
+    stored: str | None,
+    message: str | None,
+) -> LastJournalEventSchema | None:
+    """The list's last journal line, structured when the row carries it.
+
+    Rows written before the journal was structured only have the rendered
+    message; they come back with no code, and a client renders them as-is.
+    """
+    if message is None:
+        return None
+    if stored is None:
+        return LastJournalEventSchema(message=message)
+    event = json.loads(stored)
+    return LastJournalEventSchema(
+        message=message,
+        code=event.get("code"),
+        params=event.get("params") or {},
+    )
+
+
 def _deserialize_experiment(payload: dict) -> Experiment:
     schema = ExperimentSchema.model_validate(payload)
     journal_entries = [
@@ -415,6 +451,8 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             category=JournalEventCategory(entry.category),
             severity=JournalEventSeverity(entry.severity),
             message=entry.message,
+            code=entry.code,
+            params=entry.params,
         )
         for entry in schema.journal_entries
     ]

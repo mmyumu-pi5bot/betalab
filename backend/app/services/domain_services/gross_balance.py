@@ -30,6 +30,9 @@ from app.services.transfer import (
     ProduceLotPlacement,
     ProduceLotRemoval,
 )
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import produce_ref, text_ref, tool_ref, widget_ref, widget_type_ref
+from app.services.journal_service import record_journal
 
 _TARE_BY_TOOL_TYPE_G: dict[str, float] = {
     "volumetric_flask": 140,
@@ -113,13 +116,13 @@ class GrossBalanceServiceBase(WriteDomainService[object]):
         experiment: Experiment,
         tool: WorkbenchTool,
         *,
-        action_verb: str = "placed on",
+        journal_code: JournalCode = JournalCode.TOOL_PLACED_ON_EQUIPMENT,
     ) -> None:
         widget = self._find_gross_balance_widget(experiment)
         self._validate_balance_empty(widget)
         widget.tool = tool
         self._update_balance_measured_mass(experiment)
-        experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
+        record_journal(experiment, journal_code, tool=tool_ref(tool), widget=widget_ref(widget))
 
     def take_tool_from_balance(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_gross_balance_widget(experiment)
@@ -137,7 +140,13 @@ class GrossBalanceServiceBase(WriteDomainService[object]):
         target_label: str,
     ) -> None:
         widget = self._find_gross_balance_widget(experiment)
-        experiment.audit_log.append(f"{tool_label} moved from {widget.label} to {target_label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=text_ref(tool_label),
+            source=widget_ref(widget),
+            target=text_ref(target_label),
+        )
 
     def _update_balance_measured_mass(self, experiment: Experiment) -> None:
         widget = self._find_gross_balance_widget(experiment)
@@ -332,7 +341,7 @@ class RestoreTrashedToolToGrossBalanceService(GrossBalanceServiceBase):
         self.place_tool_on_balance(
             experiment,
             tool,
-            action_verb="restored onto",
+            journal_code=JournalCode.TOOL_RESTORED_ONTO_EQUIPMENT,
         )
 
 
@@ -347,7 +356,11 @@ class MoveAnalyticalBalanceToolToGrossBalanceService(GrossBalanceServiceBase):
             raise ValueError("Analytical balance does not contain a tool.")
         moved_tool = analytical_balance.tool
         analytical_balance.tool = None
-        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class MoveGrossBalanceToolToWorkbenchService(GrossBalanceServiceBase):
@@ -386,7 +399,12 @@ class DiscardGrossBalanceToolService(GrossBalanceServiceBase):
         removed_tool = self.take_tool_from_balance(experiment)
         experiment.trash.children.append(removed_tool)
         experiment.trash.discarded_from[removed_tool.id] = widget.label
-        experiment.audit_log.append(f"{removed_tool.label} discarded from {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(removed_tool),
+            source=widget_ref(widget),
+        )
 
 
 class OpenGrossBalanceToolService(GrossBalanceServiceBase):
@@ -395,7 +413,12 @@ class OpenGrossBalanceToolService(GrossBalanceServiceBase):
         if not can_tool_be_sealed(tool.tool_type):
             raise ValueError(f"{tool.label} does not support sealing.")
         tool.is_sealed = False
-        experiment.audit_log.append(f"{tool.label} opened on Gross balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_OPENED,
+            tool=tool_ref(tool),
+            location=widget_type_ref("gross_balance", "Gross balance"),
+        )
 
 
 class CloseGrossBalanceToolService(GrossBalanceServiceBase):
@@ -404,14 +427,24 @@ class CloseGrossBalanceToolService(GrossBalanceServiceBase):
         if not can_tool_be_sealed(tool.tool_type):
             raise ValueError(f"{tool.label} does not support sealing.")
         tool.is_sealed = True
-        experiment.audit_log.append(f"{tool.label} sealed on Gross balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_SEALED,
+            tool=tool_ref(tool),
+            location=widget_type_ref("gross_balance", "Gross balance"),
+        )
 
 
 class ApplySampleLabelToGrossBalanceToolService(GrossBalanceServiceBase):
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         tool = self.require_gross_balance_tool(experiment)
         tool.labels.append(build_manual_label())
-        experiment.audit_log.append(f"Manual label applied to {tool.label} on Gross balance.")
+        record_journal(
+            experiment,
+            JournalCode.MANUAL_LABEL_APPLIED,
+            tool=tool_ref(tool),
+            location=widget_type_ref("gross_balance", "Gross balance"),
+        )
 
 
 class DiscardGrossBalanceProduceLotService(GrossBalanceServiceBase):
@@ -433,4 +466,9 @@ class DiscardGrossBalanceProduceLotService(GrossBalanceServiceBase):
             )
         )
         sync_canonical_produce_model(experiment)
-        experiment.audit_log.append(f"{produce_lot.label} discarded from {source_label}.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_DISCARDED,
+            produce=produce_ref(produce_lot),
+            source=text_ref(source_label),
+        )

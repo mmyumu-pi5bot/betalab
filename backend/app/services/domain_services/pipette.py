@@ -29,6 +29,9 @@ from app.services.helpers.tool_liquids import (
     transfer_liquid_portion,
 )
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import tool_ref
+from app.services.journal_service import record_journal
 
 
 @dataclass(frozen=True, slots=True)
@@ -475,7 +478,12 @@ class AspiratePipetteService(WriteDomainService[AspiratePipetteRequest]):
             pipette.calibration_context = deepcopy(source.calibration_context)
         if not source.liquids and not source.produce_fractions:
             source.injection_context = None
-        experiment.audit_log.append(f"Pipette aspirated {requested_ml:.3f} mL from {source.label}.")
+        record_journal(
+            experiment,
+            JournalCode.PIPETTE_ASPIRATED,
+            volume=f"{requested_ml:.3f}",
+            source=tool_ref(source),
+        )
 
     @staticmethod
     def _build_aspirated_context(
@@ -669,4 +677,9 @@ class DispensePipetteService(WriteDomainService[DispensePipetteRequest]):
         if not any(liquid.liquid_id == CALIBRATION_SOLUTION_ID for liquid in pipette.liquids):
             pipette.calibration_context = None
         target.contents_homogeneity = 0.0 if target_had_contents else 1.0
-        experiment.audit_log.append(f"Pipette dispensed {dispensed_ml:.3f} mL into {target.label}.")
+        record_journal(
+            experiment,
+            JournalCode.PIPETTE_DISPENSED,
+            volume=f"{dispensed_ml:.3f}",
+            target=tool_ref(target),
+        )

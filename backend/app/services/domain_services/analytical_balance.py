@@ -28,6 +28,9 @@ from app.services.helpers.produce_canonical import (
 from app.services.helpers.tool_liquids import add_liquid_to_tool
 from app.services.helpers.workbench import build_workbench_tool
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import slot_ref, tool_ref, widget_ref, widget_type_ref
+from app.services.journal_service import record_journal
 
 _ANALYTICAL_BALANCE_MAX_G = 220.0
 _ANALYTICAL_BALANCE_TARGET_MIN_G = 9.8
@@ -139,13 +142,13 @@ class AnalyticalBalanceServiceBase(WriteDomainService[object]):
         experiment: Experiment,
         tool: WorkbenchTool,
         *,
-        action_verb: str = "placed on",
+        journal_code: JournalCode = JournalCode.TOOL_PLACED_ON_EQUIPMENT,
     ) -> None:
         self._validate_supported_tool(tool)
         widget = self._find_analytical_balance_widget(experiment)
         self._validate_balance_empty(widget)
         widget.tool = tool
-        experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
+        record_journal(experiment, journal_code, tool=tool_ref(tool), widget=widget_ref(widget))
 
     def take_tool_from_balance(self, experiment: Experiment) -> WorkbenchTool:
         widget = self._find_analytical_balance_widget(experiment)
@@ -163,7 +166,11 @@ class MoveWorkbenchToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
             raise ValueError(f"Place a tool on {source_slot.label} before moving it.")
         moved_tool = source_slot.tool
         source_slot.tool = None
-        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class PlaceToolOnAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -179,7 +186,11 @@ class MoveRackToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
             raise ValueError(f"{rack_slot.label} does not contain a tool.")
         moved_tool = rack_slot.tool
         rack_slot.tool = None
-        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class RestoreTrashedToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -187,7 +198,11 @@ class RestoreTrashedToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase)
         tool = find_trash_tool(experiment.trash, request.trash_tool_id)
         experiment.trash.children = [t for t in experiment.trash.children if t.id != tool.id]
         experiment.trash.discarded_from.pop(tool.id, None)
-        self.place_tool_on_balance(experiment, tool, action_verb="restored to")
+        self.place_tool_on_balance(
+            experiment,
+            tool,
+            journal_code=JournalCode.TOOL_RESTORED_TO_EQUIPMENT,
+        )
 
 
 class MoveGrossBalanceToolToAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -198,7 +213,11 @@ class MoveGrossBalanceToolToAnalyticalBalanceService(AnalyticalBalanceServiceBas
         moved_tool = gross_balance.tool
         gross_balance.tool = None
         experiment.lims_reception.measured_gross_mass_g = None
-        self.place_tool_on_balance(experiment, moved_tool, action_verb="moved to")
+        self.place_tool_on_balance(
+            experiment,
+            moved_tool,
+            journal_code=JournalCode.TOOL_MOVED_TO_EQUIPMENT,
+        )
 
 
 class MoveAnalyticalBalanceToolToWorkbenchService(AnalyticalBalanceServiceBase):
@@ -208,7 +227,13 @@ class MoveAnalyticalBalanceToolToWorkbenchService(AnalyticalBalanceServiceBase):
             raise ValueError(f"{target_slot.label} already contains a tool")
         moved_tool = self.take_tool_from_balance(experiment)
         target_slot.tool = moved_tool
-        experiment.audit_log.append(f"{moved_tool.label} moved from Analytical balance to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(moved_tool),
+            source=widget_type_ref("analytical_balance", "Analytical balance"),
+            target=slot_ref(target_slot),
+        )
 
 
 class MoveAnalyticalBalanceToolToRackService(AnalyticalBalanceServiceBase):
@@ -218,7 +243,13 @@ class MoveAnalyticalBalanceToolToRackService(AnalyticalBalanceServiceBase):
             raise ValueError(f"{target_slot.label} already contains a tool")
         moved_tool = self.take_tool_from_balance(experiment)
         target_slot.tool = moved_tool
-        experiment.audit_log.append(f"{moved_tool.label} moved from Analytical balance to {target_slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_MOVED,
+            tool=tool_ref(moved_tool),
+            source=widget_type_ref("analytical_balance", "Analytical balance"),
+            target=slot_ref(target_slot),
+        )
 
 
 class DiscardAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
@@ -226,7 +257,12 @@ class DiscardAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
         discarded_tool = self.take_tool_from_balance(experiment)
         experiment.trash.children.append(discarded_tool)
         experiment.trash.discarded_from[discarded_tool.id] = "Analytical balance"
-        experiment.audit_log.append(f"{discarded_tool.label} discarded from Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(discarded_tool),
+            source=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class TareAnalyticalBalanceService(AnalyticalBalanceServiceBase):
@@ -234,7 +270,11 @@ class TareAnalyticalBalanceService(AnalyticalBalanceServiceBase):
         widget = self._find_analytical_balance_widget(experiment)
         measured_mass_g = self._calculate_tool_mass_g(widget.tool) if widget.tool is not None else 0.0
         experiment.analytical_balance.tare_mass_g = measured_mass_g
-        experiment.audit_log.append(f"Analytical balance tared at {measured_mass_g:.3f} g.")
+        record_journal(
+            experiment,
+            JournalCode.ANALYTICAL_BALANCE_TARED,
+            mass=f"{measured_mass_g:.3f}",
+        )
 
 
 class OpenAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
@@ -250,12 +290,22 @@ class OpenAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
         tool.is_sealed = False
         tool.closure_fault = None
         if vent_event is not None and vent_event.lost_mass_g > 0:
-            experiment.audit_log.append(
-                f"{tool.label} vented at {vent_event.pressure_bar:.3f} bar on Analytical balance; {vent_event.lost_mass_g:.3f} g of powder was lost."
+            record_journal(
+                experiment,
+                JournalCode.TOOL_VENTED,
+                tool=tool_ref(tool),
+                pressure=f"{vent_event.pressure_bar:.3f}",
+                location=widget_type_ref("analytical_balance", "Analytical balance"),
+                lost_mass=f"{vent_event.lost_mass_g:.3f}",
             )
             return
 
-        experiment.audit_log.append(f"{tool.label} opened on Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_OPENED,
+            tool=tool_ref(tool),
+            location=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class CloseAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
@@ -267,7 +317,12 @@ class CloseAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
         tool.is_sealed = True
         tool.closure_fault = None
         tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
-        experiment.audit_log.append(f"{tool.label} sealed on Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_SEALED,
+            tool=tool_ref(tool),
+            location=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class AddLiquidToAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
@@ -285,7 +340,12 @@ class ApplySampleLabelToAnalyticalBalanceToolService(AnalyticalBalanceServiceBas
     def _run(self, experiment: Experiment, request: EmptyRequest) -> None:
         tool = self.require_balance_tool(experiment)
         tool.labels.append(build_manual_label())
-        experiment.audit_log.append(f"Manual label applied to {tool.label} on Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.MANUAL_LABEL_APPLIED,
+            tool=tool_ref(tool),
+            location=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class UpdateAnalyticalBalanceToolSampleLabelTextService(AnalyticalBalanceServiceBase):
@@ -298,10 +358,21 @@ class UpdateAnalyticalBalanceToolSampleLabelTextService(AnalyticalBalanceService
         next_text = request.sample_label_text.strip()
         label.text = next_text
         if next_text:
-            experiment.audit_log.append(f"Sample label updated to {next_text} on {tool.label} on Analytical balance.")
+            record_journal(
+                experiment,
+                JournalCode.SAMPLE_LABEL_UPDATED_AT,
+                text=next_text,
+                tool=tool_ref(tool),
+                location=widget_type_ref("analytical_balance", "Analytical balance"),
+            )
             return
 
-        experiment.audit_log.append(f"Sample label cleared on {tool.label} on Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.SAMPLE_LABEL_CLEARED_AT,
+            tool=tool_ref(tool),
+            location=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class PourSpatulaIntoAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
@@ -340,7 +411,12 @@ class PourSpatulaIntoAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
             location_id=widget.id,
         )
 
-        experiment.audit_log.append(f"Powder transferred into {tool.label} on Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.SPATULA_POURED_AT,
+            target=tool_ref(tool),
+            location=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class LoadSpatulaFromAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
@@ -371,7 +447,12 @@ class LoadSpatulaFromAnalyticalBalanceToolService(AnalyticalBalanceServiceBase):
             loaded_mass_g=loaded_mass_g,
             material_states=experiment.produce_material_states,
         )
-        experiment.audit_log.append(f"Spatula loaded from {tool.label} on Analytical balance.")
+        record_journal(
+            experiment,
+            JournalCode.SPATULA_LOADED_AT,
+            source=tool_ref(tool),
+            location=widget_type_ref("analytical_balance", "Analytical balance"),
+        )
 
 
 class RecordAnalyticalSampleMassService(AnalyticalBalanceServiceBase):
@@ -390,4 +471,8 @@ class RecordAnalyticalSampleMassService(AnalyticalBalanceServiceBase):
             raise ValueError("ERR_RANGE: Mass outside specifications. Adjust the powder quantity.")
 
         experiment.lims_reception.measured_sample_mass_g = net_mass_g
-        experiment.audit_log.append(f"Analytical sample mass recorded at {net_mass_g:.3f} g.")
+        record_journal(
+            experiment,
+            JournalCode.ANALYTICAL_SAMPLE_MASS_RECORDED,
+            mass=f"{net_mass_g:.3f}",
+        )

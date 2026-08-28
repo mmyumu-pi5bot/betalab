@@ -19,6 +19,8 @@ to reveal each chromatogram as it is recorded.
 from __future__ import annotations
 
 from app.domain.models import Experiment, SequenceRun
+from app.domain.journal_codes import JournalCode
+from app.services.journal_service import record_journal
 
 #: Instrument seconds elapsed per wall-clock second. A 12-minute run therefore
 #: takes about 12 seconds to watch, and the tutorial's two injections about 25.
@@ -66,7 +68,10 @@ def _complete_sequence(experiment: Experiment, run: SequenceRun) -> None:
     if experiment.rack.state == "locked":
         experiment.rack.state = "completed"
     ready = sum(1 for injection in run.injections if injection.status == "ok")
-    experiment.audit_log.append(
-        f"LC-MS/MS sequence run {run.id} completed: "
-        f"{len(run.injections)} injection(s), {ready} with extract context."
+    record_journal(
+        experiment,
+        JournalCode.SEQUENCE_COMPLETED,
+        run_id=run.id,
+        injection_count=len(run.injections),
+        ready_count=ready,
     )

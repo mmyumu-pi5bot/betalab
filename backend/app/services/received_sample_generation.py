@@ -97,6 +97,7 @@ def build_received_sampling_bag(label: str = "Sealed sampling bag") -> Workbench
     produce_lot = ProduceLot(
         id=new_id("produce"),
         label="Orchard apple lot",
+        label_code="orchard_apple_lot",
         produce_type="apple",
         total_mass_g=sample_spec.actual_mass_g,
         unit_count=sample_spec.unit_count,

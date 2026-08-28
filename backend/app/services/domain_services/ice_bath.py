@@ -7,6 +7,9 @@ from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import find_workspace_widget, format_volume
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import tool_ref, widget_ref
+from app.services.journal_service import record_journal
 
 physical_simulation_service = PhysicalSimulationService()
 
@@ -31,7 +34,7 @@ class IceBathServiceBase(WriteDomainService[object]):
         experiment: Experiment,
         tool: WorkbenchTool,
         *,
-        action_verb: str = "placed in",
+        journal_code: JournalCode = JournalCode.TOOL_PLACED_IN_EQUIPMENT,
     ) -> None:
         if tool.tool_type != "centrifuge_tube":
             raise ValueError(f"{tool.label} cannot be chilled here (only centrifuge tubes).")
@@ -39,7 +42,7 @@ class IceBathServiceBase(WriteDomainService[object]):
         if widget.tool is not None:
             raise ValueError(f"{widget.label} already contains a tube.")
         widget.tool = tool
-        experiment.audit_log.append(f"{tool.label} {action_verb} {widget.label}.")
+        record_journal(experiment, journal_code, tool=tool_ref(tool), widget=widget_ref(widget))
 
     def take_tool(self, experiment: Experiment) -> WorkbenchTool:
         widget = self.find_widget(experiment)
@@ -62,7 +65,12 @@ class CloseIceBathToolService(IceBathServiceBase):
         tool.is_sealed = True
         tool.closure_fault = None
         tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
-        experiment.audit_log.append(f"{tool.label} sealed in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_SEALED_IN,
+            tool=tool_ref(tool),
+            location=widget_ref(widget),
+        )
 
 
 class OpenIceBathToolService(IceBathServiceBase):
@@ -81,10 +89,19 @@ class OpenIceBathToolService(IceBathServiceBase):
         tool.is_sealed = False
         tool.closure_fault = None
         if vent_event is not None and vent_event.lost_mass_g > 0:
-            experiment.audit_log.append(
-                f"{tool.label} vented at {format_volume(vent_event.pressure_bar)} bar in {widget.label}; "
-                f"{format_volume(vent_event.lost_mass_g)} g of powder was lost."
+            record_journal(
+                experiment,
+                JournalCode.TOOL_VENTED_IN,
+                tool=tool_ref(tool),
+                pressure=format_volume(vent_event.pressure_bar),
+                location=widget_ref(widget),
+                lost_mass=format_volume(vent_event.lost_mass_g),
             )
             return
 
-        experiment.audit_log.append(f"{tool.label} opened in {widget.label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_OPENED_IN,
+            tool=tool_ref(tool),
+            location=widget_ref(widget),
+        )

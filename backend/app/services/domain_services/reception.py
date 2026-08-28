@@ -18,6 +18,9 @@ from app.services.helpers.lookups import (
     find_workspace_widget,
 )
 from app.services.received_sample_generation import resolve_received_bag_gross_mass_g
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import slot_ref, tool_ref
+from app.services.journal_service import record_journal
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +86,11 @@ class PlaceReceivedBagOnWorkbenchService(WriteDomainService[PlaceReceivedBagOnWo
 
         bag = experiment.basket_tools.pop(tool_index)
         slot.tool = bag
-        experiment.audit_log.append(f"Received sampling bag moved from basket to {slot.label}.")
+        record_journal(
+            experiment,
+            JournalCode.RECEIVED_BAG_MOVED_FROM_BASKET,
+            target=slot_ref(slot),
+        )
 
 
 class RecordGrossWeightService(WriteDomainService[RecordGrossWeightRequest]):
@@ -100,7 +107,11 @@ class RecordGrossWeightService(WriteDomainService[RecordGrossWeightRequest]):
             raise ValueError("Gross balance mass must be greater than zero.")
 
         experiment.lims_reception.measured_gross_mass_g = measured_mass_g
-        experiment.audit_log.append(f"Gross reception weight recorded at {measured_mass_g:.1f} g.")
+        record_journal(
+            experiment,
+            JournalCode.GROSS_WEIGHT_RECORDED,
+            mass=f"{measured_mass_g:.1f}",
+        )
 
 
 class SetGrossMassOffsetService(WriteDomainService[SetGrossMassOffsetRequest]):
@@ -112,7 +123,11 @@ class SetGrossMassOffsetService(WriteDomainService[SetGrossMassOffsetRequest]):
             raise ValueError("Gross balance offset must stay between -100 g and 0 g.")
 
         experiment.lims_reception.gross_mass_offset_g = int(request.gross_mass_offset_g)
-        experiment.audit_log.append(f"Gross balance container offset set to {request.gross_mass_offset_g:+d} g.")
+        record_journal(
+            experiment,
+            JournalCode.GROSS_OFFSET_SET,
+            offset=f"{request.gross_mass_offset_g:+d}",
+        )
 
 
 class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest]):
@@ -138,7 +153,11 @@ class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest])
                 status="awaiting_label_application",
             )
             experiment.lims_entries.append(entry)
-            experiment.audit_log.append(f"LIMS reception created for {entry.lab_sample_code}.")
+            record_journal(
+                experiment,
+                JournalCode.LIMS_RECEPTION_CREATED,
+                sample_code=entry.lab_sample_code,
+            )
         else:
             entry = existing_entry
             _update_lims_reception_entry(
@@ -147,7 +166,11 @@ class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest])
                 request,
                 measured_gross_mass_g=measured_gross_mass_g,
             )
-            experiment.audit_log.append(f"LIMS reception updated for {entry.lab_sample_code}.")
+            record_journal(
+                experiment,
+                JournalCode.LIMS_RECEPTION_UPDATED,
+                sample_code=entry.lab_sample_code,
+            )
 
         experiment.lims_reception = _clone_lims_entry(entry, printed_label_ticket=entry.printed_label_ticket)
 
@@ -174,8 +197,10 @@ class AcknowledgeReceptionMassCheckService(WriteDomainService[AcknowledgeRecepti
         entry.acknowledged_net_mass_g = net_mass_g
         if entry is not experiment.lims_reception and entry.id == experiment.lims_reception.id:
             experiment.lims_reception.acknowledged_net_mass_g = net_mass_g
-        experiment.audit_log.append(
-            f"Reception mass check confirmed at {net_mass_g:.1f} g net."
+        record_journal(
+            experiment,
+            JournalCode.LIMS_MASS_CHECK_CONFIRMED,
+            mass=f"{net_mass_g:.1f}",
         )
 
 
@@ -199,7 +224,7 @@ class PrintLimsLabelService(WriteDomainService[PrintLimsLabelRequest]):
         )
         entry.printed_label_ticket = ticket
         experiment.lims_reception = _clone_lims_entry(entry, printed_label_ticket=ticket)
-        experiment.audit_log.append(f"LIMS label printed for {sample_code}.")
+        record_journal(experiment, JournalCode.LIMS_LABEL_PRINTED, sample_code=sample_code)
 
 
 class DiscardPrintedLimsLabelService(WriteDomainService[EmptyReceptionRequest]):
@@ -224,7 +249,11 @@ class DiscardPrintedLimsLabelService(WriteDomainService[EmptyReceptionRequest]):
                 ),
             )
         )
-        experiment.audit_log.append(f"LIMS label {ticket.sample_code} discarded from terminal.")
+        record_journal(
+            experiment,
+            JournalCode.LIMS_LABEL_DISCARDED,
+            sample_code=ticket.sample_code,
+        )
 
 
 class ApplyPrintedLimsLabelService(WriteDomainService[ApplyPrintedLimsLabelRequest]):
@@ -239,7 +268,12 @@ class ApplyPrintedLimsLabelService(WriteDomainService[ApplyPrintedLimsLabelReque
         ticket = _require_printed_lims_ticket(experiment)
         _apply_ticket_to_tool(slot.tool, ticket)
         _consume_printed_lims_ticket(experiment, ticket)
-        experiment.audit_log.append(f"LIMS label {ticket.sample_code} applied to {slot.tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIMS_LABEL_APPLIED,
+            sample_code=ticket.sample_code,
+            tool=tool_ref(slot.tool),
+        )
 
 
 class ApplyPrintedLimsLabelToBasketBagService(WriteDomainService[EmptyReceptionRequest]):
@@ -256,7 +290,12 @@ class ApplyPrintedLimsLabelToBasketBagService(WriteDomainService[EmptyReceptionR
         ticket = _require_printed_lims_ticket(experiment)
         _apply_ticket_to_tool(basket_tool, ticket)
         _consume_printed_lims_ticket(experiment, ticket)
-        experiment.audit_log.append(f"LIMS label {ticket.sample_code} applied to {basket_tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIMS_LABEL_APPLIED,
+            sample_code=ticket.sample_code,
+            tool=tool_ref(basket_tool),
+        )
 
 
 class ApplyPrintedLimsLabelToGrossBalanceBagService(WriteDomainService[EmptyReceptionRequest]):
@@ -271,7 +310,12 @@ class ApplyPrintedLimsLabelToGrossBalanceBagService(WriteDomainService[EmptyRece
         ticket = _require_printed_lims_ticket(experiment)
         _apply_ticket_to_tool(balance_tool, ticket)
         _consume_printed_lims_ticket(experiment, ticket)
-        experiment.audit_log.append(f"LIMS label {ticket.sample_code} applied to {balance_tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIMS_LABEL_APPLIED,
+            sample_code=ticket.sample_code,
+            tool=tool_ref(balance_tool),
+        )
 
 
 class ApplyPrintedLimsLabelToAnalyticalBalanceToolService(WriteDomainService[EmptyReceptionRequest]):
@@ -286,7 +330,12 @@ class ApplyPrintedLimsLabelToAnalyticalBalanceToolService(WriteDomainService[Emp
         ticket = _require_printed_lims_ticket(experiment)
         _apply_ticket_to_tool(balance_tool, ticket)
         _consume_printed_lims_ticket(experiment, ticket)
-        experiment.audit_log.append(f"LIMS label {ticket.sample_code} applied to {balance_tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIMS_LABEL_APPLIED,
+            sample_code=ticket.sample_code,
+            tool=tool_ref(balance_tool),
+        )
 
 
 def _build_sample_code(experiment: Experiment) -> str:

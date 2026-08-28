@@ -11,6 +11,7 @@ from app.domain.acquisition_methods import (
     snapshot_acquisition_method,
 )
 from app.domain.dnd_rules import can_tool_seal
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     CalibrationContext,
     Experiment,
@@ -42,6 +43,8 @@ from app.services.helpers.produce_canonical import collect_produce_lots
 from app.services.helpers.produce_material_states import find_material_state
 from app.services.helpers.tool_liquids import add_liquid_to_tool
 from app.services.helpers.workbench import build_workbench_tool
+from app.services.journal_refs import tool_ref
+from app.services.journal_service import record_journal
 from app.services.physical_simulation_service import PhysicalSimulationService
 
 ISTD_SOLUTION_ID = "istd_solution"
@@ -333,12 +336,14 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
         vial.injection_context = build_extract_injection_context(experiment, tube, extract_volume_ml)
         context = vial.injection_context
 
-        experiment.audit_log.append(
-            f"Extract poured from {tube.label} into {vial.label} "
-            f"({context.sample_mass_g:.2f} g sample, "
-            f"{len(context.effective_residues_ug_per_kg)} compound(s)"
-            + (f", ISTD {context.istd_volume_ml:.3f} mL" if context.istd_volume_ml else ", no ISTD")
-            + ")."
+        record_journal(
+            experiment,
+            JournalCode.EXTRACT_POURED if context.istd_volume_ml else JournalCode.EXTRACT_POURED_NO_ISTD,
+            source=tool_ref(tube),
+            target=tool_ref(vial),
+            mass=f"{context.sample_mass_g:.2f}",
+            compound_count=len(context.effective_residues_ug_per_kg),
+            **({"istd_volume": f"{context.istd_volume_ml:.3f}"} if context.istd_volume_ml else {}),
         )
 
 
@@ -377,7 +382,7 @@ class LoadRackIntoInstrumentService(WriteDomainService[LoadRackIntoInstrumentReq
             raise ValueError(f"Close every vial before loading the rack: {', '.join(open_positions)} still open.")
 
         experiment.rack.state = "loaded"
-        experiment.audit_log.append("Autosampler rack loaded into the LC-MS/MS.")
+        record_journal(experiment, JournalCode.RACK_LOADED)
 
 
 @dataclass(frozen=True, slots=True)
@@ -401,7 +406,7 @@ class UnloadRackFromInstrumentService(WriteDomainService[UnloadRackFromInstrumen
             raise ValueError("The autosampler rack is not loaded into the LC-MS/MS.")
 
         experiment.rack.state = "available"
-        experiment.audit_log.append("Autosampler rack unloaded from the LC-MS/MS.")
+        record_journal(experiment, JournalCode.RACK_UNLOADED)
 
 
 @dataclass(frozen=True, slots=True)
@@ -552,9 +557,12 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         # The rack stays in the autosampler until the last injection is recorded.
         experiment.rack.state = "locked"
 
-        experiment.audit_log.append(
-            f"LC-MS/MS sequence run {run.id} started: {len(injections)} injection(s), "
-            f"{run.total_duration_s:.0f} s of acquisition."
+        record_journal(
+            experiment,
+            JournalCode.SEQUENCE_STARTED,
+            run_id=run.id,
+            injection_count=len(injections),
+            duration=f"{run.total_duration_s:.0f}",
         )
 
 
@@ -767,9 +775,7 @@ class PlaceCalibrationStandardVialService(WriteDomainService[PlaceCalibrationSta
             source_label="Palette",
             source_kind="palette",
         )
-        experiment.audit_log.append(
-            f"Calibration standard {level_text} ng/mL taken from the shelf."
-        )
+        record_journal(experiment, JournalCode.CALIBRATION_STANDARD_TAKEN, level=level_text)
 
 
 def _as_this_injection_shows_it(responses: dict[str, float]) -> dict[str, float]:

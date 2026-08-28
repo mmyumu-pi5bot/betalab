@@ -6,6 +6,9 @@ from app.domain.workbench_catalog import get_workbench_liquid_definition
 from app.services.helpers.lookups import format_volume, round_volume
 from app.services.helpers.produce_canonical import get_tool_remaining_fill_capacity_ml
 from app.services.physical_simulation_service import PhysicalSimulationService
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import liquid_id_ref, tool_ref
+from app.services.journal_service import record_journal
 
 QUECHERS_SALTS_ID = "quechers_salts"
 ISTD_SOLUTION_ID = "istd_solution"
@@ -115,7 +118,12 @@ def add_liquid_to_tool(
         )
         tool.quechers_state.phase = "reacting" if _tool_has_wet_contents(tool) else "armed"
         tool.contents_homogeneity = 0.0 if had_contents else 1.0
-        experiment.audit_log.append(f"{liquid_definition.name} added to {tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIQUID_ADDED,
+            liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+            target=tool_ref(tool),
+        )
         return
 
     if liquid_id == ISTD_SOLUTION_ID and tool.istd_phase_added is None:
@@ -174,21 +182,40 @@ def add_liquid_to_tool(
         tool.quechers_state.phase = "cemented"
         tool.quechers_state.faults = ["dry_salts_wetted"]
         tool.quechers_state.cementation_progress = 1.0
-        experiment.audit_log.append(
-            f"Dry QuEChERS salts in {tool.label} cemented instantly when wetted; the container is unusable."
-        )
+        record_journal(experiment, JournalCode.SALTS_CEMENTED_ON_CONTACT, tool=tool_ref(tool))
 
     if volume_to_add < requested_volume:
         if existing_liquid_was_present:
-            experiment.audit_log.append(
-                f"{liquid_definition.name} increased to {format_volume(updated_volume)} mL in {tool.label} (remaining capacity)."
+            record_journal(
+                experiment,
+                JournalCode.LIQUID_INCREASED_PARTIAL,
+                liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+                volume=format_volume(updated_volume),
+                target=tool_ref(tool),
             )
         else:
-            experiment.audit_log.append(f"{liquid_definition.name} added to {tool.label} at {format_volume(updated_volume)} mL (remaining capacity).")
+            record_journal(
+                experiment,
+                JournalCode.LIQUID_ADDED_PARTIAL,
+                liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+                target=tool_ref(tool),
+                volume=format_volume(updated_volume),
+            )
         return
 
     if existing_liquid_was_present:
-        experiment.audit_log.append(f"{liquid_definition.name} increased to {format_volume(updated_volume)} mL in {tool.label}.")
+        record_journal(
+            experiment,
+            JournalCode.LIQUID_INCREASED,
+            liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+            volume=format_volume(updated_volume),
+            target=tool_ref(tool),
+        )
         return
 
-    experiment.audit_log.append(f"{liquid_definition.name} added to {tool.label}.")
+    record_journal(
+        experiment,
+        JournalCode.LIQUID_ADDED,
+        liquid=liquid_id_ref(liquid_definition.id, liquid_definition.name),
+        target=tool_ref(tool),
+    )

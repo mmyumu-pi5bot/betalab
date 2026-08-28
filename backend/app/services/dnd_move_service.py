@@ -33,6 +33,9 @@ from app.services.transfer import (
     WorkbenchProduceLotTarget,
     WorkspaceProduceLotSource,
 )
+from app.domain.journal_codes import JournalCode
+from app.services.journal_refs import produce_ref, text_ref, tool_ref
+from app.services.journal_service import record_journal
 
 
 @dataclass(frozen=True, slots=True)
@@ -425,7 +428,10 @@ class GrossBalanceMoveDestination(MoveDestinationBase):
         _DndGrossBalanceService(self._runtime).place_tool_on_balance(
             experiment,
             _require_tool(moved),
-            action_verb=_tool_action_verb(moved, restored="restored onto"),
+            journal_code=_tool_journal_code(
+                moved,
+                restored=JournalCode.TOOL_RESTORED_ONTO_EQUIPMENT,
+            ),
         )
 
     def _place_produce_lot(self, experiment: Experiment, moved: DndMovedObject) -> None:
@@ -442,7 +448,10 @@ class AnalyticalBalanceMoveDestination(MoveDestinationBase):
         _DndAnalyticalBalanceService(self._runtime).place_tool_on_balance(
             experiment,
             _require_tool(moved),
-            action_verb=_tool_action_verb(moved, restored="restored to"),
+            journal_code=_tool_journal_code(
+                moved,
+                restored=JournalCode.TOOL_RESTORED_TO_EQUIPMENT,
+            ),
         )
 
     def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
@@ -456,7 +465,10 @@ class VortexMoveDestination(MoveDestinationBase):
         _DndVortexService(self._runtime).place_tool_on_vortex(
             experiment,
             _require_tool(moved),
-            action_verb=_tool_action_verb(moved, restored="restored to"),
+            journal_code=_tool_journal_code(
+                moved,
+                restored=JournalCode.TOOL_RESTORED_TO_EQUIPMENT,
+            ),
         )
 
 
@@ -465,7 +477,10 @@ class CentrifugeMoveDestination(MoveDestinationBase):
         _DndCentrifugeService(self._runtime).place_tool(
             experiment,
             _require_tool(moved),
-            action_verb=_tool_action_verb(moved, restored="restored to"),
+            journal_code=_tool_journal_code(
+                moved,
+                restored=JournalCode.TOOL_RESTORED_TO_EQUIPMENT,
+            ),
         )
 
 
@@ -474,7 +489,10 @@ class IceBathMoveDestination(MoveDestinationBase):
         _DndIceBathService(self._runtime).place_tool(
             experiment,
             _require_tool(moved),
-            action_verb=_tool_action_verb(moved, restored="restored to"),
+            journal_code=_tool_journal_code(
+                moved,
+                restored=JournalCode.TOOL_RESTORED_TO_EQUIPMENT,
+            ),
         )
 
 
@@ -499,7 +517,12 @@ class TrashBinMoveDestination(MoveDestinationBase):
         tool = _require_tool(moved)
         experiment.trash.children.append(tool)
         experiment.trash.discarded_from[tool.id] = moved.source_label or moved.source_ref.kind
-        experiment.audit_log.append(f"{tool.label} discarded from {moved.source_label or moved.source_ref.kind}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_DISCARDED,
+            tool=tool_ref(tool),
+            source=text_ref(moved.source_label or moved.source_ref.kind),
+        )
 
     def _place_produce_lot(self, experiment: Experiment, moved: DndMovedObject) -> None:
         removal = _require_produce_lot_removal(moved)
@@ -512,7 +535,12 @@ class TrashBinMoveDestination(MoveDestinationBase):
             )
         )
         sync_canonical_produce_model(experiment)
-        experiment.audit_log.append(f"{removal.entity.label} discarded from {removal.source_label}.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_DISCARDED,
+            produce=produce_ref(removal.entity),
+            source=text_ref(removal.source_label),
+        )
 
     def _place_sample_label(self, experiment: Experiment, moved: DndMovedObject) -> None:
         label = _require_sample_label(moved)
@@ -523,7 +551,11 @@ class TrashBinMoveDestination(MoveDestinationBase):
                 label=label,
             )
         )
-        experiment.audit_log.append(f"Label discarded from {moved.source_label}.")
+        record_journal(
+            experiment,
+            JournalCode.LABEL_DISCARDED,
+            source=text_ref(moved.source_label),
+        )
 
 
 class DndMoveObjectService(WriteDomainService[DndMoveObjectRequest]):
@@ -618,24 +650,49 @@ def _place_produce_lot(
     placement = target.place(experiment, removal.entity)
     sync_canonical_produce_model(experiment)
 
-    verb = "added" if moved.source_ref.kind == "basket" else "moved"
-    if moved.source_ref.kind == "trash":
-        verb = "restored from trash"
-
     if placement.contamination_applied:
         mark_surface_fractions_contaminated(experiment, removal.entity.id)
         if moved.source_ref.kind == "basket":
-            experiment.audit_log.append(f"{removal.entity.label} placed directly on {placement.target_label} and marked contaminated.")
+            record_journal(
+                experiment,
+                JournalCode.PRODUCE_PLACED_CONTAMINATED,
+                produce=produce_ref(removal.entity),
+                target=text_ref(placement.target_label),
+            )
             return
-        experiment.audit_log.append(f"{removal.entity.label} {verb} from {removal.source_label} to {placement.target_label} and marked contaminated.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_MOVED_FROM_TRASH_CONTAMINATED
+            if moved.source_ref.kind == "trash"
+            else JournalCode.PRODUCE_MOVED_CONTAMINATED,
+            produce=produce_ref(removal.entity),
+            source=text_ref(removal.source_label),
+            target=text_ref(placement.target_label),
+        )
         return
     if moved.source_ref.kind == "basket":
-        experiment.audit_log.append(f"{removal.entity.label} added to {placement.target_label}.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_ADDED,
+            produce=produce_ref(removal.entity),
+            target=text_ref(placement.target_label),
+        )
         return
     if moved.source_ref.kind == "trash":
-        experiment.audit_log.append(f"{removal.entity.label} restored from trash to {placement.location_label}.")
+        record_journal(
+            experiment,
+            JournalCode.PRODUCE_RESTORED_FROM_TRASH,
+            produce=produce_ref(removal.entity),
+            target=text_ref(placement.location_label),
+        )
         return
-    experiment.audit_log.append(f"{removal.entity.label} moved from {removal.source_label} to {placement.target_label}.")
+    record_journal(
+        experiment,
+        JournalCode.PRODUCE_MOVED,
+        produce=produce_ref(removal.entity),
+        source=text_ref(removal.source_label),
+        target=text_ref(placement.target_label),
+    )
 
 
 def _require_tool(moved: DndMovedObject) -> WorkbenchTool:
@@ -699,30 +756,55 @@ def _validate_not_same_location(request: DndMoveObjectRequest, destination: Move
         raise ValueError("Cannot drop an entity onto its current location.")
 
 
-def _tool_action_verb(moved: DndMovedObject, *, restored: str) -> str:
+def _tool_journal_code(moved: DndMovedObject, *, restored: JournalCode) -> JournalCode:
     if moved.source_ref.kind in {"debug_palette", "palette", "toolbar"}:
-        return "placed on"
+        return JournalCode.TOOL_PLACED_ON_EQUIPMENT
     if moved.source_ref.kind == "trash":
         return restored
-    return "moved to"
+    return JournalCode.TOOL_MOVED_TO_EQUIPMENT
 
 
 def _append_tool_move_audit(experiment: Experiment, moved: DndMovedObject, target_label: str) -> None:
     tool = _require_tool(moved)
     if moved.source_ref.kind in {"debug_palette", "palette", "toolbar"}:
-        experiment.audit_log.append(f"{tool.label} placed on {target_label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_PLACED,
+            tool=tool_ref(tool),
+            target=text_ref(target_label),
+        )
         return
     if moved.source_ref.kind == "trash":
-        experiment.audit_log.append(f"{tool.label} restored from trash to {target_label}.")
+        record_journal(
+            experiment,
+            JournalCode.TOOL_RESTORED_FROM_TRASH,
+            tool=tool_ref(tool),
+            target=text_ref(target_label),
+        )
         return
-    experiment.audit_log.append(f"{tool.label} moved from {moved.source_label} to {target_label}.")
+    record_journal(
+        experiment,
+        JournalCode.TOOL_MOVED,
+        tool=tool_ref(tool),
+        source=text_ref(moved.source_label),
+        target=text_ref(target_label),
+    )
 
 
 def _append_sample_label_move_audit(experiment: Experiment, moved: DndMovedObject, target_label: str) -> None:
     if moved.source_ref.kind == "trash":
-        experiment.audit_log.append(f"Label restored from trash to {target_label}.")
+        record_journal(
+            experiment,
+            JournalCode.LABEL_RESTORED_FROM_TRASH,
+            target=text_ref(target_label),
+        )
         return
-    experiment.audit_log.append(f"Label moved from {moved.source_label} to {target_label}.")
+    record_journal(
+        experiment,
+        JournalCode.LABEL_MOVED,
+        source=text_ref(moved.source_label),
+        target=text_ref(target_label),
+    )
 
 
 def _require_produce_lot_removal(moved: DndMovedObject) -> ProduceLotRemoval:
