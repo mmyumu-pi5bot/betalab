@@ -4,6 +4,7 @@ import { DropDraftCard } from "@/components/drop-draft-card";
 import { ProduceLotCard } from "@/components/produce-lot-card";
 import type { GrinderDndApi } from "@/hooks/use-grinder-dnd";
 import type { ExperimentProduceLot } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 type GrinderWidgetContentProps = {
   formatProduceLotMetadata: (lot: ExperimentProduceLot) => string | null;
@@ -24,6 +25,7 @@ export function GrinderWidgetContent({
   onConfirmDropDraft,
   onDragEnd,
 }: GrinderWidgetContentProps) {
+  const t = useT();
   const {
     grinderCanAttempt,
     grinderDisplayLabel,
@@ -52,7 +54,7 @@ export function GrinderWidgetContent({
         className="mx-auto max-w-[24rem]"
         onPowerClick={handleStartGrinder}
         powerButtonDisabled={!grinderCanAttempt || isGrinderRunning || isCommandPending}
-        powerButtonLabel={isGrinderRunning ? "Grinder running" : "Start grinder"}
+        powerButtonLabel={isGrinderRunning ? t("grinder.running") : t("grinder.start")}
         powerButtonTestId="grinder-power-button"
         status={grinderStatus}
         temperatureC={grinderLoadedLotTemperatureC}
@@ -97,18 +99,18 @@ export function GrinderWidgetContent({
                 data-testid="grinder-lcd-message"
               >
                 {grinderDisplayMode === "overload"
-                  ? "Whole fruit detected"
+                  ? t("grinder.wholeFruitDetected")
                   : grinderDisplayMode === "jammed"
                     ? grinderLotIsWaste
-                      ? "Discard jammed waste"
-                      : "Product not cold enough"
+                      ? t("grinder.discardJammedWaste")
+                      : t("grinder.productNotColdEnough")
                     : grinderDisplayMode === "warning"
-                      ? "High torque detected"
+                      ? t("grinder.highTorque")
                       : grinderDisplayMode === "complete"
-                        ? "Unload ground product"
+                        ? t("grinder.unloadGroundProduct")
                         : grinderDisplayMode === "ready"
-                          ? "System ready"
-                          : "Awaiting load"}
+                          ? t("grinder.systemReady")
+                          : t("grinder.awaitingLoad")}
               </p>
             )}
             <div className="flex items-center justify-between gap-4 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-700">
@@ -132,12 +134,12 @@ export function GrinderWidgetContent({
             metadata={
               lot.materialState === "ground"
                 ? formatProduceLotMetadata(lot)
-                  ? `Ground product • ${formatProduceLotMetadata(lot)}`
-                  : "Ground product"
+                  ? t("grinder.groundProductWithMetadata", { metadata: formatProduceLotMetadata(lot) ?? "" })
+                  : t("grinder.groundProduct")
                 : lot.materialState === "waste"
                   ? formatProduceLotMetadata(lot)
-                    ? `Jammed waste • ${formatProduceLotMetadata(lot)}`
-                    : "Jammed waste"
+                    ? t("grinder.jammedWasteWithMetadata", { metadata: formatProduceLotMetadata(lot) ?? "" })
+                    : t("grinder.jammedWaste")
                   : (formatProduceLotMetadata(lot) ?? "")
             }
             onDragEnd={grinderDndDisabled ? undefined : onDragEnd}
@@ -164,7 +166,7 @@ export function GrinderWidgetContent({
             }
             subtitle={
               <div className="mt-1 flex items-center justify-between gap-3">
-                <span className="block truncate text-xs text-slate-500">Cooling medium</span>
+                <span className="block truncate text-xs text-slate-500">{t("grinder.coolingMedium")}</span>
                 <span className="text-[11px] font-semibold text-slate-600">{liquid.volume_ml} g</span>
               </div>
             }

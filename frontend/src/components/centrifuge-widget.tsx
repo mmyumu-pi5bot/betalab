@@ -4,6 +4,7 @@ import type { DragEvent, ReactNode } from "react";
 
 import { CentrifugeIllustration } from "@/components/illustrations/centrifuge-illustration";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
+import { useT } from "@/lib/i18n";
 
 type CentrifugeWidgetProps = {
   canStart: boolean;
@@ -21,13 +22,14 @@ type CentrifugeWidgetProps = {
 };
 
 export function CentrifugeWidget(props: CentrifugeWidgetProps) {
+  const t = useT();
   const hasTube = props.stagedContent !== undefined;
   return (
     <WorkspaceEquipmentWidget
       bodyClassName="px-3 py-3"
       dataDropHighlighted={props.isDropHighlighted ? "true" : "false"}
       dropZoneTestId="centrifuge-dropzone"
-      eyebrow="Centrifuge"
+      eyebrow={t("widget.centrifuge")}
       headerAction={props.headerAction}
       onDragOver={props.onDragOver}
       onDrop={props.onDrop}
@@ -39,7 +41,7 @@ export function CentrifugeWidget(props: CentrifugeWidgetProps) {
         onStartClick={props.onStart}
         separationProgress={props.separationProgress}
         startDisabled={!props.canStart || props.isRunning || props.isCommandPending}
-        startLabel={props.isRunning ? "Centrifuging…" : "Start the centrifuge"}
+        startLabel={props.isRunning ? t("centrifuge.running") : t("centrifuge.start")}
         startTestId="centrifuge-start-button"
       />
       <div
@@ -52,7 +54,7 @@ export function CentrifugeWidget(props: CentrifugeWidgetProps) {
               props.isRunning ? "text-emerald-800" : "text-slate-800"
             }`}
           >
-            {props.isRunning ? "Separating" : hasTube ? "Ready" : "Idle"}
+            {props.isRunning ? t("centrifuge.separating") : hasTube ? t("equipment.ready") : t("equipment.idle")}
           </p>
           <p className="font-mono text-xs font-bold text-slate-800">{props.progressPercent}%</p>
         </div>

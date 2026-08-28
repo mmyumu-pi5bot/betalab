@@ -5,6 +5,7 @@ import { AppleIllustration } from "@/components/illustrations/apple-illustration
 import { LabAssetIcon } from "@/components/icons/lab-asset-icon";
 import { ProduceBasketIllustration } from "@/components/illustrations/produce-basket-illustration";
 import { InventoryWidget } from "@/components/inventory-widget";
+import { useI18n } from "@/lib/i18n";
 import { getProduceLotDisplayName } from "@/lib/produce-lot-display";
 import type { BenchToolInstance, ExperimentProduceLot } from "@/types/workbench";
 
@@ -33,11 +34,12 @@ export function ProduceBasketWidget({
   onToggle,
   produceLots,
 }: ProduceBasketWidgetProps) {
+  const { t, tn } = useI18n();
   const basketItemCount = produceLots.length + basketTools.length;
 
   return (
     <InventoryWidget
-      ariaLabel={`Open produce basket (${basketItemCount} item${basketItemCount === 1 ? "" : "s"})`}
+      ariaLabel={tn("basket.open", basketItemCount)}
       buttonTestId="basket-open-button"
       count={basketItemCount}
       countBadgeClassName="absolute right-[22px] top-1"
@@ -48,7 +50,7 @@ export function ProduceBasketWidget({
       onToggle={onToggle}
       overlayTestId="basket-dialog-overlay"
       overlayWidthClassName="w-[24rem] max-w-[min(24rem,calc(100vw-2rem))]"
-      title="Produce basket"
+      title={t("basket.title")}
     >
       <div className="space-y-4">
         <button
@@ -61,17 +63,17 @@ export function ProduceBasketWidget({
             <AppleIllustration className="h-12 w-12 shrink-0" />
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-slate-900">
-                Create received apple bag
+                {t("basket.createBag")}
               </span>
               <span className="mt-1 block text-sm text-slate-500">
-                Add a new incoming sample bag with field-label information.
+                {t("basket.createBagHint")}
               </span>
             </span>
           </span>
         </button>
         <div className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Basket contents
+            {t("basket.contents")}
           </p>
           <div className="mt-3 space-y-2">
             {basketTools.map((basketTool) => (
@@ -102,12 +104,12 @@ export function ProduceBasketWidget({
                 }
                 subtitle={
                   <span className="block truncate text-xs text-slate-500">
-                    {basketTool.fieldLabelText ?? "Field label attached"}
+                    {basketTool.fieldLabelText ?? t("basket.fieldLabelAttached")}
                   </span>
                 }
                 title={
                   <span className="block truncate text-sm font-semibold text-slate-900">
-                    Received sampling bag
+                    {t("basket.receivedBag")}
                   </span>
                 }
               />
@@ -138,13 +140,13 @@ export function ProduceBasketWidget({
                   }
                   title={
                     <span className="block truncate text-sm font-semibold text-slate-900">
-                      {getProduceLotDisplayName(lot)}
+                      {getProduceLotDisplayName(t, lot)}
                     </span>
                   }
                 />
               ))
             ) : basketTools.length === 0 ? (
-              <p className="text-sm text-slate-500">No produce lots created yet.</p>
+              <p className="text-sm text-slate-500">{t("basket.empty")}</p>
             ) : null}
           </div>
         </div>

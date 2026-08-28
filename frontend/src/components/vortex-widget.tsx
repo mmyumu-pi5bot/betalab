@@ -4,6 +4,7 @@ import type { DragEvent, ReactNode } from "react";
 
 import { VortexMixerIllustration } from "@/components/illustrations/vortex-mixer-illustration";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
+import { useT } from "@/lib/i18n";
 
 type VortexWidgetProps = {
   headerAction?: ReactNode;
@@ -28,6 +29,7 @@ export function VortexWidget({
   progressPercent,
   stagedContent,
 }: VortexWidgetProps) {
+  const t = useT();
   const hasTool = stagedContent !== undefined;
   const canStart = hasTool && !isRunning && !isCommandPending;
 
@@ -36,7 +38,7 @@ export function VortexWidget({
       bodyClassName="px-3 py-3"
       dataDropHighlighted={isDropHighlighted ? "true" : "false"}
       dropZoneTestId="vortex-dropzone"
-      eyebrow="Vortex mixer"
+      eyebrow={t("widget.vortex_mixer")}
       headerAction={headerAction}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -50,7 +52,7 @@ export function VortexWidget({
           isRunning={isRunning}
           onStartClick={onStart}
           startDisabled={!canStart}
-          startLabel={isRunning ? "Vortex running" : "Start vortex"}
+          startLabel={isRunning ? t("vortex.running") : t("vortex.start")}
           startTestId="vortex-start-button"
         />
 
@@ -64,7 +66,7 @@ export function VortexWidget({
               isRunning ? "text-emerald-800" : "text-slate-800"
             }`}
           >
-            {isRunning ? "Mixing" : hasTool ? "Ready" : "Idle"}
+            {isRunning ? t("vortex.mixing") : hasTool ? t("equipment.ready") : t("equipment.idle")}
           </p>
           {/* The track carries the tutorial anchor: the bar filling it is zero-wide
               when the run starts, leaving nothing to highlight. */}
@@ -82,7 +84,7 @@ export function VortexWidget({
               </div>
             ) : (
               <p className="font-mono text-sm font-semibold uppercase tracking-[0.2em] text-slate-800">
-                {hasTool ? "System ready" : "Awaiting tube"}
+                {hasTool ? t("vortex.systemReady") : t("vortex.awaitingTube")}
               </p>
             )}
           </div>

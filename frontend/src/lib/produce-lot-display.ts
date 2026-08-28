@@ -1,11 +1,16 @@
+import type { Translate } from "@/lib/i18n";
 import type { ExperimentProduceLot } from "@/types/workbench";
 
-export function getProduceLotDisplayName(produceLot: ExperimentProduceLot) {
+export function getProduceLotDisplayName(t: Translate, produceLot: ExperimentProduceLot) {
   if (produceLot.materialState !== "ground") {
     return produceLot.label;
   }
 
-  return /\bpowder\b/i.test(produceLot.label) ? produceLot.label : `${produceLot.label} powder`;
+  // Ground material is named "<lot> powder" unless the label already says so —
+  // and the word to look for is the one the active locale uses.
+  const powderWord = t("produce.powderWord");
+  const alreadyNamed = new RegExp(`\\b${powderWord}\\b`, "i").test(produceLot.label);
+  return alreadyNamed ? produceLot.label : t("produce.powderSuffix", { label: produceLot.label });
 }
 
 export function isProduceLotDegassing(produceLot: ExperimentProduceLot) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { LabSceneView } from "@/components/lab-scene-view";
 import type { FlatExperimentApi } from "@/types/flat-experiment-api";
@@ -30,9 +30,9 @@ import {
 import {
   buildDebugProduceDraftFields,
   buildDebugToolPresetDraftFields,
-  debugProducePresets,
-  debugToolPresets,
-  debugToolPresetsById,
+  getDebugProducePresets,
+  getDebugToolPresets,
+  getDebugToolPresetsById,
   formatProduceLotMetadata,
   getApproximateToolMassG,
   getRackIllustrationSlotPosition,
@@ -44,6 +44,8 @@ import {
   type LabSceneWidgetId,
 } from "@/lib/lab-scene-config";
 import { createExperiment, deleteExperiment, getToolbarCatalog } from "@/lib/api";
+import { useT } from "@/lib/i18n";
+import { localizeToolbarCatalog } from "@/lib/i18n/localize-experiment";
 import { evaluateTutorial, getTutorialDefinition } from "@/lib/tutorial-engine";
 import {
   getTutorialProduceDropIntervention,
@@ -62,8 +64,6 @@ import {
 } from "@/lib/lab-workflow-catalog";
 import type { DebugToolPresetId, ToolbarCategory } from "@/types/workbench";
 
-const defaultStatusMessage = "Saved";
-const defaultErrorMessage = "Unable to load lab scene";
 type WidgetId = LabSceneWidgetId;
 
 type LabSceneProps = {
@@ -76,6 +76,9 @@ type PendingTutorialIntervention = TutorialIntervention & {
 };
 
 export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
+  const t = useT();
+  const defaultStatusMessage = t("header.saved");
+  const defaultErrorMessage = t("header.loadError");
   const tutorialDefinition = getTutorialDefinition(tutorialId);
   const initialTutorialSession = tutorialDefinition && experimentId
     ? getTutorialSession(tutorialDefinition.id, experimentId)
@@ -104,7 +107,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     defaultStatusMessage,
     experimentId,
   });
-  const { state, statusMessage, isCommandPending, loadExperiment } = experimentApi;
+  const { state, statusMessage, hasSyncError, isCommandPending, loadExperiment } = experimentApi;
 
   useEffect(() => {
     if (!tutorialDefinition || state.status !== "ready") {
@@ -174,7 +177,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     if (
       !tutorialDefinition ||
       state.status !== "ready" ||
-      !window.confirm("Restart the tutorial and delete this dedicated experiment?")
+      !window.confirm(t("lab.restartTutorialConfirm"))
     ) {
       return;
     }
@@ -193,7 +196,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
         `/experiments/${replacement.id}?tutorial=${tutorialDefinition.id}`,
       );
     } catch {
-      window.alert("Unable to restart the tutorial right now.");
+      window.alert(t("lab.restartTutorialError"));
     }
   };
 
@@ -279,30 +282,30 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       ) {
         setPendingDropDraft({
           commandType: "place_calibration_standard_vial",
-          confirmLabel: "Take vial",
+          confirmLabel: t("draft.takeVial"),
           destinationKind,
           fields: buildCalibrationLevelDraftFields(),
           targetId: payload.destination.id,
           targetKind: "workspace_widget",
-          title: "Pick the calibration level",
+          title: t("draft.pickCalibrationLevel"),
         });
         return;
       }
       const preset =
-        payload.source.kind === "palette" ? debugToolPresetsById[payload.entity.id] : undefined;
+        payload.source.kind === "palette" ? getDebugToolPresetsById()[payload.entity.id] : undefined;
       if (!preset) {
         flatApi.moveObject(payload);
         return;
       }
       setPendingDropDraft({
         commandType: "create_debug_tool_preset",
-        confirmLabel: "Spawn",
+        confirmLabel: t("draft.spawn"),
         destinationKind,
         fields: buildDebugToolPresetDraftFields(preset.id as DebugToolPresetId),
         presetId: preset.id,
         targetId: payload.destination.id,
         targetKind: "workspace_widget",
-        title: `Configure ${preset.name}`,
+        title: t("draft.configurePreset", { preset: preset.name }),
       });
     },
   };
@@ -320,6 +323,12 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
   const [isBasketOpen, setIsBasketOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [toolbarCategories, setToolbarCategories] = useState<ToolbarCategory[]>([]);
+  // The catalogue is fetched once in English and rendered in the active locale;
+  // every entry is addressed by a stable id, so nothing downstream has to care.
+  const localizedToolbarCategories = useMemo(
+    () => localizeToolbarCatalog(t, toolbarCategories),
+    [t, toolbarCategories],
+  );
   const inventoryDropRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const spatula =
@@ -647,9 +656,9 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_30%),linear-gradient(180deg,#fffaf0_0%,#eef6ff_100%)] px-4 py-8 text-slate-950 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="mx-auto max-w-[1800px] rounded-[2rem] border border-slate-200 bg-white/90 p-8 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Betalab</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Laboratory workspace</h1>
-          <p className="mt-4 text-sm text-slate-600">Creating pesticide workbench from backend...</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t("lab.brand")}</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">{t("lab.workspace")}</h1>
+          <p className="mt-4 text-sm text-slate-600">{t("lab.creating")}</p>
         </div>
       </main>
     );
@@ -660,16 +669,16 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_30%),linear-gradient(180deg,#fffaf0_0%,#eef6ff_100%)] px-4 py-8 text-slate-950 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="mx-auto max-w-[1800px] rounded-[2rem] border border-rose-200 bg-white/90 p-8 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-700">
-            Backend connection error
+            {t("lab.backendError")}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Laboratory workspace</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">{t("lab.workspace")}</h1>
           <p className="mt-4 text-sm text-slate-600">{state.message}</p>
           <button
             className="mt-6 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white"
             onClick={() => { void loadExperiment(); }}
             type="button"
           >
-            Retry
+            {t("lab.retry")}
           </button>
         </div>
       </main>
@@ -773,11 +782,11 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       }}
       debug={{
         debugInventoryEnabled,
-        debugProducePresets,
-        debugToolPresets,
+        debugProducePresets: getDebugProducePresets(),
+        debugToolPresets: getDebugToolPresets(),
       }}
       inventory={{
-        toolbarCategories,
+        toolbarCategories: localizedToolbarCategories,
       }}
       display={{
         basketProduceLots: state.experiment.workspace.produceBasketLots,
@@ -844,6 +853,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
         stopSpatulaPour,
       }}
       ui={{
+        hasSyncError,
         isBasketOpen,
         isCommandPending,
         isTrashEmpty,

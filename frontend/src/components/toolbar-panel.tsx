@@ -8,6 +8,7 @@ import { WorkspaceEquipmentIcon } from "@/components/icons/workspace-equipment-i
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
 import { createToolbarDragPayload, writeToolbarDragPayload } from "@/lib/workbench-dnd";
 import type { DropTargetType, ToolbarAccent, ToolbarCategory, ToolbarItem } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 type ToolbarPanelProps = {
   categories: ToolbarCategory[];
@@ -29,9 +30,10 @@ const neutralToolClasses =
   "from-slate-200/70 via-slate-50 to-white text-slate-800 ring-slate-200";
 
 function SampleLabelIcon() {
+  const t = useT();
   return (
     <div
-      aria-label="Sampling label"
+      aria-label={t("toolbar.samplingLabel")}
       className="flex h-8 w-10 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-sky-50"
       data-kind="sample_label"
     >
@@ -49,6 +51,7 @@ export function ToolbarPanel({
   onItemDragEnd,
   onItemDragStart,
 }: ToolbarPanelProps) {
+  const t = useT();
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(categories.map((category) => [category.id, true])),
   );
@@ -59,7 +62,7 @@ export function ToolbarPanel({
         className={`${dragAffordanceClassName} text-xs font-semibold uppercase tracking-[0.24em] text-slate-500`}
         data-widget-drag-handle="true"
       >
-        Inventory
+        {t("toolbar.inventory")}
       </p>
 
       <div className="mt-2 space-y-3">

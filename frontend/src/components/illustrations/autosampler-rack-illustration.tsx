@@ -5,6 +5,7 @@ import {
 import type { BenchLiquidPortion } from "@/types/workbench";
 
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
+import { translateNow } from "@/lib/i18n";
 
 type AutosamplerRackIllustrationProps = {
   className?: string;
@@ -69,7 +70,7 @@ export function AutosamplerRackIllustration({
 
   return (
     <div
-      aria-label="Autosampler rack illustration"
+      aria-label={translateNow("illustration.rack")}
       className={className}
       data-occupied-count={occupiedSet.size}
       data-slot-count={slotCount}

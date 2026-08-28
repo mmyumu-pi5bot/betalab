@@ -1,0 +1,344 @@
+export const enLab = {
+
+  // Experiment header and journal drawer
+  "header.backToExperiments": "Back to experiments",
+  "header.experiments": "Experiments",
+  "header.workspace": "Laboratory workspace",
+  "header.experimentName": "Experiment name",
+  "header.renameExperiment": "Rename experiment",
+  "header.syncing": "Syncing...",
+  "header.saved": "Saved",
+  "header.loadError": "Unable to load lab scene",
+  "header.mutationError": "Experiment mutation failed",
+  "header.renameError": "Unable to rename experiment",
+  "journal.open": "Open experiment journal",
+  "journal.title": "Experiment journal",
+  "journal.short": "Journal",
+  "journal.history": "History",
+  "journal.subtitle": "Business actions, simulation events and warnings.",
+  "journal.close": "Close journal",
+  "journal.empty": "No journal entries yet",
+  "journal.emptyHint": "Meaningful experiment actions will appear here.",
+  "journal.category.system": "System",
+  "journal.category.manipulation": "Manipulation",
+  "journal.category.simulation": "Simulation",
+  "journal.category.layout": "Layout",
+
+
+  // Produce lot card
+  "produceCard.jammed": "Jammed",
+
+
+  // Produce basket widget
+  "basket.title": "Produce basket",
+  "basket.open.one": "Open produce basket ({count} item)",
+  "basket.open.other": "Open produce basket ({count} items)",
+  "basket.createBag": "Create received apple bag",
+  "basket.createBagHint": "Add a new incoming sample bag with field-label information.",
+  "basket.contents": "Basket contents",
+  "basket.fieldLabelAttached": "Field label attached",
+  "basket.receivedBag": "Received sampling bag",
+  "basket.empty": "No produce lots created yet.",
+
+
+  // Trash widget
+  "trash.title": "Trash",
+  "trash.workspaceWidget": "Workspace widget",
+  "trash.untitledLabel": "Untitled label",
+  "trash.empty": "Trash is empty.",
+
+
+  // Workbench, rack and equipment widgets
+  "workbench.addStation": "Add workbench station",
+  "workbench.removeStation": "Remove {slot}",
+  "workbench.readyForOperations": "Ready for bench operations.",
+  "workbench.produceOnStation": "Produce is resting directly on the station.",
+  "workbench.waitingForTool": "Waiting for a first tool.",
+  "workbench.stationSurface": "Station surface",
+  "workbench.emptyStation": "Empty station",
+  "rack.dragToInstrument": "Drag the rack into the LC-MS/MS",
+  "rack.noVialStaged": "No vial staged yet.",
+  "tool.knife": "Stainless steel knife",
+  "tool.spatula": "Powder spatula",
+  "tool.pipette": "Micropipette",
+  "actionBar.title": "Tools",
+  "grossBalance.gross": "Gross",
+  "grossBalance.decreaseOffset": "Decrease gross balance offset",
+  "grossBalance.increaseOffset": "Increase gross balance offset",
+  "centrifuge.running": "Centrifuging…",
+  "centrifuge.start": "Start the centrifuge",
+  "centrifuge.separating": "Separating",
+  "vortex.running": "Vortex running",
+  "vortex.start": "Start vortex",
+  "vortex.mixing": "Mixing",
+  "vortex.systemReady": "System ready",
+  "vortex.awaitingTube": "Awaiting tube",
+  "equipment.ready": "Ready",
+  "equipment.idle": "Idle",
+  "iceBath.chilling":
+    "Chilling. The salts release the same heat whatever the tube starts at, so a cold start lands the exotherm lower.",
+  "iceBath.idle":
+    "Stand a tube here to chill it before the salts go in, or to pull a reacting tube back down.",
+
+
+  // Action bar
+  "actionBar.actions": "Actions",
+
+
+  // Bench tool card
+  "toolCard.popped": "Popped",
+  "toolCard.sealed": "Sealed",
+  "toolCard.openState": "Open",
+  "toolCard.store": "Store {tool} in inventory",
+  "toolCard.storeShort": "Store in inventory",
+  "toolCard.emptyBeforeStoring": "Empty this tool before storing it",
+  "toolCard.open": "Open",
+  "toolCard.close": "Close",
+  "toolCard.openTool": "Open {tool}",
+  "toolCard.closeTool": "Close {tool}",
+  "toolCard.readyForProduceIntake": "Ready for produce lot intake",
+  "toolCard.readyForProduceStaging": "Ready for produce staging",
+  "toolCard.powderReservoirLoaded": "Powder reservoir loaded",
+  "toolCard.readyForSpatulaLoading": "Ready for spatula loading",
+  "toolCard.slurryPresent": "Slurry present",
+  "toolCard.powderDepositPresent": "Powder deposit present",
+  "toolCard.readyForPowderDosing": "Ready for powder dosing",
+  "toolCard.readyForLiquids": "Ready for liquid additions",
+  "toolCard.sampleLabelText": "Sample label text",
+  "toolCard.writeNote": "Write a note",
+  "toolCard.declaredContents": "Declared contents",
+  "toolCard.separatedPhases": "Separated phases",
+  "toolCard.supernatant": "Supernatant",
+  "toolCard.pellet": "Pellet",
+  "toolbar.inventory": "Inventory",
+  "toolbar.samplingLabel": "Sampling label",
+  "grinder.running": "Grinder running",
+  "grinder.start": "Start grinder",
+  "grinder.wholeFruitDetected": "Whole fruit detected",
+  "grinder.discardJammedWaste": "Discard jammed waste",
+  "grinder.productNotColdEnough": "Product not cold enough",
+  "grinder.highTorque": "High torque detected",
+  "grinder.unloadGroundProduct": "Unload ground product",
+  "grinder.systemReady": "System ready",
+  "grinder.awaitingLoad": "Awaiting load",
+  "grinder.groundProduct": "Ground product",
+  "grinder.groundProductWithMetadata": "Ground product • {metadata}",
+  "grinder.jammedWaste": "Jammed waste",
+  "grinder.jammedWasteWithMetadata": "Jammed waste • {metadata}",
+  "grinder.coolingMedium": "Cooling medium",
+  "degassing.indicator": "Degassing indicator",
+  "degassing.tooltip": "Degassing",
+  "pipette.loaded": "Pipette loaded",
+  "pipette.empty": "Pipette empty",
+
+
+  // Grinder readouts, spatula and pipette hints
+  "grinder.progress": "Progress {percent}%",
+  "grinder.torqueHigh": "Torque high",
+  "grinder.cycle30s": "Cycle 30s",
+  "grinder.loadNominal": "Load nominal",
+  "grinder.jamRisk": "Jam risk",
+  "grinder.loadReady": "Load ready",
+  "grinder.rotorStopped": "Rotor stopped",
+  "grinder.loadTooHigh": "Load too high",
+  "grinder.startLock": "Start lock",
+  "grinder.cryoMode": "Cryo mode",
+  "grinder.preCoolNow": "Pre-cool now",
+  "grinder.cryoArmed": "Cryo armed",
+  "grinder.unloadLot": "Unload lot",
+  "grinder.cutFirst": "Cut first",
+  "grinder.preCool": "Pre-cool",
+  "grinder.cycleReady": "Cycle ready",
+  "grinder.noSample": "No sample",
+  "grinder.dryIceDraftMass": "Dry ice draft mass",
+  "draft.dose": "Dose {liquid}",
+  "draft.volume": "Volume",
+  "draft.liquidDraftVolume": "{liquid} draft volume",
+  "draft.liquidFallback": "Liquid",
+  "draft.spawn": "Spawn",
+  "draft.configureApplePowder": "Configure Apple powder",
+  "draft.configureAppleSlurry": "Configure Apple slurry",
+  "draft.configurePreset": "Configure {preset}",
+  "draft.takeVial": "Take vial",
+  "draft.pickCalibrationLevel": "Pick the calibration level",
+  "spatula.pourHint": "Click to pour a little · Hold and lift to pour faster.",
+  "spatula.loadHint": "Click an open container holding powder to load the spatula.",
+  "spatula.emptyHint": "The spatula is empty. Load it from an open container first.",
+  "spatula.pouring": "Pouring...",
+  "spatula.loading": "Loading spatula...",
+  "pipetteHint.loaded":
+    "Pipette loaded {volume} / {capacity} mL · Hold over a container to dispense.",
+  "pipetteHint.empty": "Pipette empty · Hold over a liquid to aspirate.",
+  "pipetteHint.chooseTarget":
+    "The pipette is loaded: choose an open container that can receive liquid.",
+  "pipetteHint.chooseSource": "The pipette is empty: choose an open container containing liquid.",
+  "pipetteHint.aspirating": "Aspirating… release at the desired volume.",
+  "pipetteHint.dispensing": "Dispensing… release at the desired volume.",
+  "temperature.cryogenic": "Cryogenic",
+  "temperature.coolingFast": "Cooling fast",
+  "temperature.nearAmbient": "Near ambient",
+  "debug.objectFallback": "Object",
+
+
+  // Draft form labels
+  "draft.mass": "Mass",
+  "draft.dryIceFallback": "Dry ice pellets",
+
+
+  // Temperature status
+  "temperature.hot": "Hot",
+  "temperature.warm": "Warm",
+
+
+  // Workspace canvas
+  "workspace.storeInInventory": "Store in inventory",
+  "workspace.emptyBeforeStoring": "Empty this equipment before storing it",
+  "instrument.footer.completed":
+    "Acquisition completed. The instrument results are available below.",
+  "instrument.footer.running":
+    "Acquisition in progress. The rack stays locked until the last injection is recorded.",
+  "instrument.footer.ready":
+    "Rack loaded. The acquisition sequence can now be configured and started.",
+  "instrument.footer.dragRack":
+    "Drag the staged rack onto the LC-MS/MS to load it into the autosampler.",
+  "instrument.footer.emptyRack":
+    "Populate the rack with at least one autosampler vial before loading it.",
+  "instrument.startRun": "Start the acquisition run",
+  "instrument.closeConsole": "Close acquisition console",
+  "instrument.openConsole": "Open acquisition console",
+  "centrifuge.addTube": "Add a tube to centrifuge.",
+
+
+  // Lab scene shell and tutorial restart
+  "lab.restartTutorialConfirm": "Restart the tutorial and delete this dedicated experiment?",
+  "lab.restartTutorialError": "Unable to restart the tutorial right now.",
+  "lab.brand": "Betalab",
+  "lab.workspace": "Laboratory workspace",
+  "lab.creating": "Creating pesticide workbench from backend...",
+  "lab.calibrationLevelAria": "Calibration level in ng/mL",
+  "lab.calibrationLevelLabel": "Level",
+  "draft.add": "Add",
+
+
+  // Lab scene error state
+  "lab.backendError": "Backend connection error",
+  "lab.retry": "Retry",
+
+
+  // Debug palette presets and draft fields
+  "debug.preset.applePowderLot": "Apple powder lot",
+  "debug.preset.appleSlurryTube.name": "Apple slurry tube",
+  "debug.preset.appleSlurryTube.description": "Debug tube prefilled with apple slurry.",
+  "debug.preset.vortexedSlurryTube.name": "Vortexed slurry tube",
+  "debug.preset.vortexedSlurryTube.description":
+    "Debug tube with apple slurry already salted, sealed and vortexed — drop it straight into the centrifuge.",
+  "debug.preset.centrifugedSlurryTube.name": "Centrifuged slurry tube",
+  "debug.preset.centrifugedSlurryTube.description":
+    "Debug tube taken through the full QuEChERS prep and centrifuged — open, with a pipettable supernatant ready to transfer into a rack vial.",
+  "debug.preset.calibrationStockTube.name": "Calibration stock tube",
+  "debug.preset.calibrationStockTube.description":
+    "Debug centrifuge tube filled with a multi-residue calibration standard — pipette it into a rack vial yourself; the pipette carries the calibration identity across.",
+  "debug.preset.preparedAppleVial.name": "Prepared apple vial",
+  "debug.preset.preparedAppleVial.subtitle": "Autosampler vial · apple extract",
+  "debug.preset.preparedAppleVial.description":
+    "Debug autosampler vial holding a finished apple extract — the whole grind, extraction and pipetting chain skipped. Drop it straight into the rack and inject.",
+  "debug.preset.appleSlurry": "Apple slurry",
+  "debug.detail.appleExtract": "1 mL apple extract",
+  "debug.detail.calibration": "100 ng/mL calibration",
+  "debug.detail.appleSlurry": "10 g apple slurry",
+  "debug.field.powderMass": "Debug powder mass",
+  "debug.field.powderTemperature": "Debug powder temperature",
+  "debug.field.powderResidualCo2": "Debug powder residual CO2",
+  "debug.field.slurryAppleMass": "Debug slurry apple mass",
+  "debug.field.slurryTemperature": "Debug slurry temperature",
+  "debug.field.calibrationLevel": "Debug calibration stock level",
+  "debug.field.extractAppleMass": "Debug extract apple mass",
+  "debug.field.extractSolventVolume": "Debug extract solvent volume",
+  "debug.field.extractionRecovery": "Debug extraction recovery",
+  "debug.field.samplingAccuracy": "Debug sampling accuracy",
+  "debug.field.extractIstdVolume": "Debug extract ISTD volume",
+  "draft.temperature": "Temperature",
+  "draft.residualCo2": "Residual CO2",
+  "draft.appleMass": "Apple mass",
+  "draft.level": "Level",
+  "draft.extractVolume": "Extract volume",
+  "draft.recovery": "Recovery",
+  "draft.samplingAccuracy": "Sampling accuracy",
+  "draft.istdVolume": "ISTD volume",
+
+
+  // Debug preset subtitles
+  "debug.preset.tube50": "50 mL centrifuge tube",
+  "debug.preset.tube50ReadyToSpin": "50 mL centrifuge tube · ready to spin",
+  "debug.preset.tube50ReadyToPipette": "50 mL centrifuge tube · ready to pipette",
+  "debug.preset.tube50Standard": "50 mL tube · 100 ng/mL standard",
+
+
+  // LIMS terminal
+  "lims.eyebrow": "LIMS",
+  "lims.screen": "LIMS terminal screen",
+  "lims.awaitingAccession": "Awaiting accession",
+  "lims.awaitingHint": "Weighing captured automatically. Enter source details.",
+  "lims.orchardLine": "Orchard: {value}",
+  "lims.harvestDateLine": "Harvest date: {value}",
+  "lims.declaredMassLine": "Declared mass: {value}",
+  "lims.sampleMassLine": "Sample mass: {value}",
+  "lims.sampleCodeLine": "Sample code: {value}",
+  "lims.statusLine": "Status: {value}",
+  "lims.statusWaiting": "waiting for user entry",
+  "lims.receptionRecord": "Reception record",
+  "lims.status.awaiting_reception": "awaiting reception",
+  "lims.status.awaiting_label_application": "awaiting label application",
+  "lims.status.received": "received",
+  "lims.reviewMass": "Review reception mass calculation",
+  "lims.reviewed": "Reviewed",
+  "lims.review": "Review",
+  "lims.declaredMass": "Declared mass",
+  "lims.measuredGross": "Measured gross",
+  "lims.packagingTare": "Packaging tare",
+  "lims.measuredNet": "Measured net",
+  "lims.record": "Record",
+  "lims.newEntry": "New entry",
+  "lims.unnumberedEntry": "Unnumbered entry",
+  "lims.orchardProducer": "Orchard / producer",
+  "lims.enterOrchard": "Enter orchard or producer",
+  "lims.harvestDate": "Harvest date",
+  "lims.declaredMassField": "Declared mass from bag label (g)",
+  "lims.sampleMassField": "Sample mass (g)",
+  "lims.createRecord": "Create LIMS record",
+  "lims.updateRecord": "Update LIMS record",
+  "lims.printLabel": "Print label",
+
+
+  // API failures
+  "api.inspectDebug": "Unable to inspect debug state",
+  "api.mutation": "Failed to send experiment mutation",
+  "api.createExperiment": "Failed to create experiment",
+  "api.fetchExperiment": "Failed to fetch experiment",
+  "api.fetchExperiments": "Failed to fetch experiments",
+  "api.duplicateExperiment": "Failed to duplicate experiment",
+  "api.deleteExperiment": "Failed to delete experiment",
+  "api.fetchToolbar": "Failed to fetch toolbar catalog",
+  "api.fetchMethods": "Failed to fetch acquisition methods",
+  "api.fetchMethod": "Failed to fetch acquisition method",
+  "api.fetchMrmCatalog": "Failed to fetch the MRM reference catalog",
+  "api.proposeTransitions": "Failed to propose transitions",
+  "api.duplicateMethod": "Failed to duplicate the acquisition method",
+  "api.saveMethod": "Failed to save the acquisition method",
+  "api.deleteMethod": "Failed to delete the acquisition method",
+  "api.parseStream": "Failed to parse experiment stream payload",
+  "api.untitledExperiment": "Untitled experiment",
+
+
+  // Equipment illustrations
+  "illustration.appleLot": "Apple lot illustration",
+  "illustration.wasteBin": "Laboratory waste bin",
+  "illustration.iceBath": "Ice bath",
+  "illustration.instrument": "LC-MS/MS instrument illustration",
+  "illustration.centrifuge": "Benchtop centrifuge",
+  "illustration.limsPrinter": "LIMS label printer",
+  "illustration.rack": "Autosampler rack illustration",
+  "illustration.grinder": "Cryogenic grinder illustration",
+  "illustration.vortex": "Vortex mixer illustration",
+
+} as const;

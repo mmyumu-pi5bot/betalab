@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { translateJournalEntry, useI18n, type Locale, type Translate } from "@/lib/i18n";
 import type { JournalEntry } from "@/types/experiment";
 
 type ExperimentAppHeaderProps = {
   experimentName: string;
+  // Whether the last sync failed. Derived by the caller rather than by comparing
+  // the status message to "Saved", which stops being a stable sentinel once the
+  // message is translated.
+  hasSyncError: boolean;
   isSyncing: boolean;
   journalEntries: JournalEntry[];
   onRenameExperiment: (name: string) => Promise<boolean>;
@@ -43,12 +49,12 @@ function CloseIcon() {
   );
 }
 
-function formatJournalDate(value: string) {
+function formatJournalDate(value: string, locale: Locale) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
@@ -56,10 +62,10 @@ function formatJournalDate(value: string) {
   }).format(date);
 }
 
-function categoryLabel(category: JournalEntry["category"]) {
-  if (category === "simulation") return "Simulation";
-  if (category === "manipulation") return "Manipulation";
-  return "System";
+function categoryLabel(t: Translate, category: JournalEntry["category"]) {
+  if (category === "simulation") return t("journal.category.simulation");
+  if (category === "manipulation") return t("journal.category.manipulation");
+  return t("journal.category.system");
 }
 
 function ExperimentJournalDrawer({
@@ -69,19 +75,20 @@ function ExperimentJournalDrawer({
   entries: JournalEntry[];
   onClose: () => void;
 }) {
+  const { locale, t } = useI18n();
   return (
     <aside
-      aria-label="Experiment journal"
+      aria-label={t("journal.title")}
       className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-[-24px_0_60px_rgba(15,23,42,0.16)]"
     >
       <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">History</p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Experiment journal</h2>
-          <p className="mt-1 text-sm text-slate-500">Business actions, simulation events and warnings.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">{t("journal.history")}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{t("journal.title")}</h2>
+          <p className="mt-1 text-sm text-slate-500">{t("journal.subtitle")}</p>
         </div>
         <button
-          aria-label="Close journal"
+          aria-label={t("journal.close")}
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
           onClick={onClose}
           type="button"
@@ -93,8 +100,8 @@ function ExperimentJournalDrawer({
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {entries.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-            <p className="font-medium text-slate-800">No journal entries yet</p>
-            <p className="mt-1 text-sm text-slate-500">Meaningful experiment actions will appear here.</p>
+            <p className="font-medium text-slate-800">{t("journal.empty")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("journal.emptyHint")}</p>
           </div>
         ) : (
           <ol className="space-y-3">
@@ -112,13 +119,15 @@ function ExperimentJournalDrawer({
               >
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="font-semibold uppercase tracking-[0.14em] text-slate-600">
-                    {categoryLabel(entry.category)}
+                    {categoryLabel(t, entry.category)}
                   </span>
                   <time className="text-slate-500" dateTime={entry.occurredAt}>
-                    {formatJournalDate(entry.occurredAt)}
+                    {formatJournalDate(entry.occurredAt, locale)}
                   </time>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-800">{entry.message}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-800">
+                  {translateJournalEntry(t, locale, entry)}
+                </p>
               </li>
             ))}
           </ol>
@@ -130,11 +139,13 @@ function ExperimentJournalDrawer({
 
 export function ExperimentAppHeader({
   experimentName,
+  hasSyncError,
   isSyncing,
   journalEntries,
   onRenameExperiment,
   statusMessage,
 }: ExperimentAppHeaderProps) {
+  const { locale, t } = useI18n();
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -147,7 +158,6 @@ export function ExperimentAppHeader({
   const visibleEntries = [...(journalEntries ?? [])]
     .filter((entry) => entry.category !== "layout")
     .reverse();
-  const hasSyncError = !isSyncing && statusMessage !== "Saved";
   const latestEntry = visibleEntries[0] ?? null;
 
   useEffect(() => {
@@ -227,23 +237,23 @@ export function ExperimentAppHeader({
         }}
       >
         <span aria-live="polite" className="sr-only">
-          {latestEntry?.message ?? ""}
+          {latestEntry ? translateJournalEntry(t, locale, latestEntry) : ""}
         </span>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link
-              aria-label="Experiments"
+              aria-label={t("header.experiments")}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-lg text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
               href="/"
-              title="Back to experiments"
+              title={t("header.backToExperiments")}
             >
               <span aria-hidden="true">←</span>
             </Link>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Laboratory workspace</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{t("header.workspace")}</p>
               {isEditingName ? (
                 <input
-                  aria-label="Experiment name"
+                  aria-label={t("header.experimentName")}
                   autoFocus
                   className="mt-0.5 w-full max-w-md rounded-lg border border-sky-300 bg-white px-2 py-0.5 text-lg font-semibold tracking-tight text-slate-950 outline-none ring-sky-200 focus:ring-2 sm:text-xl"
                   disabled={isRenaming}
@@ -274,14 +284,14 @@ export function ExperimentAppHeader({
                     {experimentName}
                   </h1>
                   <button
-                    aria-label="Rename experiment"
+                    aria-label={t("header.renameExperiment")}
                     className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 opacity-70 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover/name:opacity-100"
                     onClick={() => {
                       skipNextBlurRef.current = false;
                       setNameDraft(experimentName);
                       setIsEditingName(true);
                     }}
-                    title="Rename experiment"
+                    title={t("header.renameExperiment")}
                     type="button"
                   >
                     <PencilIcon />
@@ -292,6 +302,7 @@ export function ExperimentAppHeader({
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <div
               className={`hidden max-w-64 items-center gap-2 rounded-full px-3 py-2 text-xs font-medium sm:flex ${
                 hasSyncError
@@ -308,17 +319,17 @@ export function ExperimentAppHeader({
                   hasSyncError ? "bg-rose-500" : isSyncing ? "animate-pulse bg-sky-500" : "bg-emerald-500"
                 }`}
               />
-              <span className="truncate">{isSyncing ? "Syncing..." : statusMessage}</span>
+              <span className="truncate">{isSyncing ? t("header.syncing") : statusMessage}</span>
             </div>
             <button
               aria-expanded={isJournalOpen}
-              aria-label="Open experiment journal"
+              aria-label={t("journal.open")}
               className="inline-flex h-10 items-center gap-2 rounded-full bg-slate-950 px-3.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
               onClick={() => setIsJournalOpen(true)}
               type="button"
             >
               <JournalIcon />
-              <span className="hidden sm:inline">Journal</span>
+              <span className="hidden sm:inline">{t("journal.short")}</span>
               {visibleEntries.length > 0 ? (
                 <span className="min-w-5 rounded-full bg-white/15 px-1.5 py-0.5 text-center text-[11px]">
                   {visibleEntries.length}

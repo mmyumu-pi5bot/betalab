@@ -14,6 +14,7 @@ import type {
   RunSequencePayload,
 } from "@/types/api-payloads";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 const METHOD_ID = "apple_pesticides_mrm_v1";
 
@@ -68,25 +69,27 @@ function replicateFilename(filename: string, replicateIndex: number, repetitions
   return `${filename.slice(0, -5)}_r${replicateIndex}.mzML`;
 }
 
-export function validateLines(lines: AcquisitionSequenceLinePayload[]): string | null {
+// Returns the catalogue key of the first rule the sequence breaks, so callers
+// render the complaint in the language the learner is working in.
+export function validateLines(lines: AcquisitionSequenceLinePayload[]): MessageKey | null {
   if (lines.length === 0) {
-    return "The sequence needs at least one vial in the rack.";
+    return "console.validation.noVial";
   }
   const slotIds = lines.map((line) => line.rack_slot_id);
   if (new Set(slotIds).size !== slotIds.length) {
-    return "Each occupied rack position must appear exactly once.";
+    return "console.validation.duplicatePosition";
   }
   if (lines.some((line) => !line.sample_name.trim())) {
-    return "Every line needs a sample name.";
+    return "console.validation.missingSampleName";
   }
   if (lines.some((line) => line.injection_volume_ul <= 0 || line.injection_volume_ul > 100)) {
-    return "Injection volume must be between 0 and 100 µL.";
+    return "console.validation.injectionVolume";
   }
   if (lines.some((line) => line.repetitions < 1 || line.repetitions > 10)) {
-    return "Repetitions must be between 1 and 10.";
+    return "console.validation.repetitions";
   }
   if (lines.some((line) => !line.output_filename.trim().toLowerCase().endsWith(".mzml"))) {
-    return "Every output filename must end with .mzML.";
+    return "console.validation.filenameExtension";
   }
   const filenames = lines.flatMap((line) =>
     Array.from({ length: line.repetitions }, (_, index) =>
@@ -94,7 +97,7 @@ export function validateLines(lines: AcquisitionSequenceLinePayload[]): string |
     ),
   );
   if (new Set(filenames).size !== filenames.length) {
-    return "Output filenames must be unique.";
+    return "console.validation.filenameUnique";
   }
   return null;
 }
@@ -105,6 +108,7 @@ export function LcMsMsAcquisitionConsole({
   onSequenceChange,
   sequence,
 }: Props) {
+  const { t, tn } = useI18n();
   const lines = sequence.injections;
   const validationMessage = useMemo(() => validateLines(lines), [lines]);
   const [isMethodManagerOpen, setIsMethodManagerOpen] = useState(false);
@@ -140,24 +144,29 @@ export function LcMsMsAcquisitionConsole({
 
   return (
     <div
-      aria-label="LC-MS/MS acquisition console"
+      aria-label={t("console.title")}
       className="mt-4 rounded-2xl border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"
       role="dialog"
     >
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
-          Acquisition console
+          {t("console.eyebrow")}
         </p>
-        <h3 className="mt-1 text-sm font-semibold">Sequence setup</h3>
+        <h3 className="mt-1 text-sm font-semibold">{t("console.sequenceSetup")}</h3>
       </div>
 
       <label className="mt-4 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-        Acquisition method
+        {t("console.acquisitionMethod")}
         <select
-          aria-label="Acquisition method"
+          aria-label={t("console.acquisitionMethod")}
           className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 font-mono text-xs text-cyan-200"
           data-tutorial-anchor="console-method-select"
           data-tutorial-declared-levels={method?.calibrationLevelsNgPerMl.length ?? 0}
+          // The count alone cannot say whether the ladder describes the vials in
+          // the rack, and the tutorial has to know before it lets a run start.
+          data-tutorial-declared-level-values={
+            method?.calibrationLevelsNgPerMl.join(", ") ?? ""
+          }
           onChange={(event) =>
             onSequenceChange({ ...sequence, method_id: event.target.value })
           }
@@ -184,7 +193,7 @@ export function LcMsMsAcquisitionConsole({
             <p className="text-[11px] text-rose-300">{methodError}</p>
           ) : method === null ? (
             <p className="text-[11px] text-slate-400">
-              {isMethodLoading ? "Loading the method…" : "No method loaded."}
+              {isMethodLoading ? t("method.loading") : t("console.noMethodLoaded")}
             </p>
           ) : (
             <>
@@ -196,18 +205,21 @@ export function LcMsMsAcquisitionConsole({
                     className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-300"
                     data-testid="method-educational-badge"
                   >
-                    Educational
+                    {t("method.educational")}
                   </span>
                 ) : null}
                 {method.isBuiltIn ? (
                   <span className="rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">
-                    Built-in
+                    {t("console.builtIn")}
                   </span>
                 ) : null}
               </div>
               <p className="mt-0.5 font-mono text-[10px] text-slate-500">
-                {compoundCount} compounds · {method.transitions.length} transitions ·{" "}
-                {formatDuration(method.runtimeS)} run
+                {t("console.methodSummary", {
+                  compounds: compoundCount,
+                  transitions: method.transitions.length,
+                  runtime: formatDuration(method.runtimeS),
+                })}
               </p>
             </>
           )}
@@ -218,7 +230,7 @@ export function LcMsMsAcquisitionConsole({
           onClick={() => setIsMethodManagerOpen(true)}
           type="button"
         >
-          Manage methods
+          {t("console.manageMethods")}
         </button>
       </div>
 
@@ -244,15 +256,17 @@ export function LcMsMsAcquisitionConsole({
           >
             <div className="mb-3 flex items-center justify-between">
               <span className="text-xs font-semibold text-cyan-200">
-                Position {rackPosition({ id: line.rack_slot_id } as RackSlot)}
+                {t("console.position", {
+                  position: rackPosition({ id: line.rack_slot_id } as RackSlot),
+                })}
               </span>
               <span className="font-mono text-[10px] text-slate-500">{line.rack_slot_id}</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="text-[10px] text-slate-400">
-                Sample name
+                {t("console.sampleName")}
                 <input
-                  aria-label="Sample name"
+                  aria-label={t("console.sampleName")}
                   className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
                   onChange={(event) => updateLine(index, { sample_name: event.target.value })}
                   value={line.sample_name}
@@ -260,22 +274,22 @@ export function LcMsMsAcquisitionConsole({
               </label>
               <NumericField
                 className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                label="Injection volume (µL)"
+                label={t("console.injectionVolume")}
                 labelClassName="text-[10px] text-slate-400"
                 onChange={(next) => updateLine(index, { injection_volume_ul: next })}
                 value={line.injection_volume_ul}
               />
               <NumericField
                 className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                label="Repetitions"
+                label={t("console.repetitions")}
                 labelClassName="text-[10px] text-slate-400"
                 onChange={(next) => updateLine(index, { repetitions: next })}
                 value={line.repetitions}
               />
               <label className="text-[10px] text-slate-400">
-                Output filename
+                {t("console.outputFilename")}
                 <input
-                  aria-label="Output filename"
+                  aria-label={t("console.outputFilename")}
                   className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 font-mono text-xs text-white"
                   onChange={(event) => updateLine(index, { output_filename: event.target.value })}
                   value={line.output_filename}
@@ -288,8 +302,7 @@ export function LcMsMsAcquisitionConsole({
 
       <div className="mt-4 flex items-center justify-between gap-4">
         <p className={`text-xs ${validationMessage ? "text-amber-300" : "text-emerald-300"}`}>
-          {validationMessage ??
-            `Sequence ready: ${lines.length} injection line${lines.length > 1 ? "s" : ""}.`}
+          {validationMessage ? t(validationMessage) : tn("console.ready", lines.length)}
         </p>
         <button
           className="shrink-0 rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
@@ -298,7 +311,7 @@ export function LcMsMsAcquisitionConsole({
           onClick={onRun}
           type="button"
         >
-          Launch acquisition
+          {t("console.launch")}
         </button>
       </div>
     </div>

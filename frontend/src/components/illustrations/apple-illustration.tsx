@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { translateNow } from "@/lib/i18n";
 
 type AppleIllustrationProps = SVGProps<SVGSVGElement> & {
   smokeIntensity?: "none" | "light" | "medium" | "heavy";
@@ -244,7 +245,7 @@ export function AppleIllustration({
 }: AppleIllustrationProps) {
   return (
     <svg
-      aria-label="Apple lot illustration"
+      aria-label={translateNow("illustration.appleLot")}
       className={className}
       data-apple-count="3"
       data-smoke-intensity={smokeIntensity}

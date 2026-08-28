@@ -3,6 +3,7 @@
 import type { DragEvent, ReactNode } from "react";
 
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
+import { useT } from "@/lib/i18n";
 
 type AnalyticalBalanceWidgetProps = {
   headerAction?: ReactNode;
@@ -30,6 +31,7 @@ export function AnalyticalBalanceWidget({
   stagedContent,
   tareMassG,
 }: AnalyticalBalanceWidgetProps) {
+  const t = useT();
   const isOverload = measuredMassG !== null && measuredMassG > analyticalBalanceMaxG;
   const isTargetExceeded = netMassG !== null && netMassG > targetMaxG;
   const displayText = isOverload
@@ -47,7 +49,7 @@ export function AnalyticalBalanceWidget({
       bodyClassName="px-4 py-4"
       dataDropHighlighted={isDropHighlighted ? "true" : "false"}
       dropZoneTestId="analytical-balance-dropzone"
-      eyebrow="Analytical balance"
+      eyebrow={t("widget.analytical_balance")}
       headerAction={headerAction}
       onDragOver={onDragOver}
       onDrop={onDrop}

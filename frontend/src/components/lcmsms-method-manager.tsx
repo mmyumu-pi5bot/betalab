@@ -13,6 +13,7 @@ import {
 import { deleteAcquisitionMethod, duplicateAcquisitionMethod } from "@/lib/api";
 import type { AcquisitionMethod, AcquisitionMethodSummary } from "@/types/workbench";
 import { LAYER } from "@/lib/layers";
+import { useT, type MessageKey } from "@/lib/i18n";
 
 type Props = {
   catalog: AcquisitionMethodSummary[];
@@ -26,9 +27,9 @@ type Props = {
 
 type ManagerTab = "details" | "edit";
 
-const TABS: { id: ManagerTab; label: string }[] = [
-  { id: "details", label: "Details" },
-  { id: "edit", label: "Edit" },
+const TABS: { id: ManagerTab; labelKey: MessageKey }[] = [
+  { id: "details", labelKey: "manager.tabDetails" },
+  { id: "edit", labelKey: "manager.tabEdit" },
 ];
 
 export function LcMsMsMethodManager({
@@ -39,6 +40,7 @@ export function LcMsMsMethodManager({
   revision,
   selectedMethodId,
 }: Props) {
+  const t = useT();
   const [previewMethodId, setPreviewMethodId] = useState(selectedMethodId);
   const [tab, setTab] = useState<ManagerTab>("details");
   const [copyName, setCopyName] = useState("");
@@ -104,7 +106,7 @@ export function LcMsMsMethodManager({
       onMethodSelected(saved.method.id);
       onLibraryChanged();
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Failed to duplicate the method.");
+      setFailure(cause instanceof Error ? cause.message : t("manager.duplicateError"));
     } finally {
       setIsBusy(false);
     }
@@ -127,7 +129,7 @@ export function LcMsMsMethodManager({
       }
       onLibraryChanged();
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Failed to delete the method.");
+      setFailure(cause instanceof Error ? cause.message : t("manager.deleteError"));
     } finally {
       setIsBusy(false);
     }
@@ -144,7 +146,7 @@ export function LcMsMsMethodManager({
         onClick={onClose}
       />
       <div
-        aria-label="Acquisition method manager"
+        aria-label={t("manager.title")}
         aria-modal="true"
         className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 shadow-2xl"
         role="dialog"
@@ -154,10 +156,10 @@ export function LcMsMsMethodManager({
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
               LC-MS/MS
             </p>
-            <h3 className="mt-0.5 text-sm font-semibold">Method manager</h3>
+            <h3 className="mt-0.5 text-sm font-semibold">{t("manager.heading")}</h3>
           </div>
           <button
-            aria-label="Close method manager"
+            aria-label={t("manager.close")}
             data-tutorial-anchor="method-manager-close"
             className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800"
             onClick={onClose}
@@ -171,7 +173,7 @@ export function LcMsMsMethodManager({
           <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto border-b border-slate-800 p-3 md:border-b-0 md:border-r">
             <div>
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                Method library
+                {t("manager.library")}
               </p>
               <ul className="space-y-1">
                 {catalog.map((entry) => (
@@ -197,18 +199,20 @@ export function LcMsMsMethodManager({
                         v{entry.version}
                       </span>
                       <span className="mt-0.5 block text-[9px] text-slate-500">
-                        {entry.isBuiltIn ? "Built-in" : "User"} · {entry.transitionCount}{" "}
-                        transitions
+                        {t("manager.entrySummary", {
+                          origin: entry.isBuiltIn ? t("console.builtIn") : t("manager.user"),
+                          count: entry.transitionCount,
+                        })}
                       </span>
                       {entry.id === selectedMethodId ? (
                         <span className="mt-1 inline-block rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-300">
-                          In use
+                          {t("manager.inUse")}
                         </span>
                       ) : null}
                     </button>
                     {entry.isBuiltIn ? null : pendingDeleteId === entry.id ? (
                       <button
-                        aria-label={`Confirm deleting ${entry.name}`}
+                        aria-label={t("manager.confirmDelete", { name: entry.name })}
                         className="shrink-0 rounded-lg border border-rose-700 bg-rose-950/60 px-2 text-[10px] font-semibold text-rose-200 hover:bg-rose-900/60 disabled:opacity-40"
                         disabled={isBusy}
                         onClick={() => handleDelete(entry.id)}
@@ -218,7 +222,7 @@ export function LcMsMsMethodManager({
                       </button>
                     ) : (
                       <button
-                        aria-label={`Delete ${entry.name}`}
+                        aria-label={t("manager.delete", { name: entry.name })}
                         className="shrink-0 rounded-lg border border-slate-800 px-2 text-[10px] text-slate-400 hover:bg-slate-900 hover:text-rose-300"
                         onClick={() => setPendingDeleteId(entry.id)}
                         type="button"
@@ -233,18 +237,22 @@ export function LcMsMsMethodManager({
 
             <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
               <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                New method
+                {t("manager.newMethod")}
               </p>
               <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
-                Methods are created by duplicating an existing one, then editing the copy.
+                {t("manager.newMethodHint")}
               </p>
               <label className="mt-2 block text-[9px] text-slate-400">
-                Copy name
+                {t("manager.copyName")}
                 <input
-                  aria-label="Copy name"
+                  aria-label={t("manager.copyName")}
                   className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-white"
                   onChange={(event) => setCopyName(event.target.value)}
-                  placeholder={method !== null ? `${method.name} (copy)` : "Method name"}
+                  placeholder={
+                    method !== null
+                      ? t("manager.copyPlaceholder", { name: method.name })
+                      : t("manager.methodNamePlaceholder")
+                  }
                   value={copyName}
                 />
               </label>
@@ -255,7 +263,7 @@ export function LcMsMsMethodManager({
                 onClick={handleDuplicate}
                 type="button"
               >
-                Duplicate method
+                {t("manager.duplicate")}
               </button>
             </div>
 
@@ -266,11 +274,11 @@ export function LcMsMsMethodManager({
 
           <section className="flex min-h-0 flex-col">
             <div
-              aria-label="Method view"
+              aria-label={t("manager.methodView")}
               className="flex gap-1 border-b border-slate-800 px-3 py-2"
               role="tablist"
             >
-              {TABS.map(({ id, label }) => (
+              {TABS.map(({ id, labelKey }) => (
                 <button
                   aria-selected={tab === id}
                   className={`rounded-full px-3 py-1 text-[11px] font-medium ${
@@ -284,7 +292,7 @@ export function LcMsMsMethodManager({
                   role="tab"
                   type="button"
                 >
-                  {label}
+                  {t(labelKey)}
                 </button>
               ))}
             </div>
@@ -301,15 +309,15 @@ export function LcMsMsMethodManager({
                   }}
                 />
               ) : (
-                <p className="mt-3 text-xs text-slate-400">Loading the method…</p>
+                <p className="mt-3 text-xs text-slate-400">{t("method.loading")}</p>
               )}
             </div>
 
             <footer className="flex items-center justify-between gap-3 border-t border-slate-800 px-3 py-2.5">
               <p className="text-[10px] text-slate-500">
                 {previewMethodId === selectedMethodId
-                  ? "This method is the one the sequence will run."
-                  : "Previewing a method does not change the sequence."}
+                  ? t("manager.selectedNote")
+                  : t("manager.previewNote")}
               </p>
               <button
                 className="shrink-0 rounded-full bg-cyan-500 px-4 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
@@ -317,7 +325,7 @@ export function LcMsMsMethodManager({
                 onClick={() => onMethodSelected(previewMethodId)}
                 type="button"
               >
-                Use for this sequence
+                {t("manager.useForSequence")}
               </button>
             </footer>
           </section>

@@ -1,3 +1,4 @@
+import { translateNow } from "@/lib/i18n";
 import type { ProduceDropCommand } from "@/lib/produce-drop-command-resolver";
 import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { MoveObjectPayload } from "@/types/api-payloads";
@@ -28,7 +29,7 @@ function openProduceDraft(
       command.kind === "create_debug_produce_lot_on_workbench"
         ? "create_debug_produce_lot_on_workbench"
         : "create_debug_produce_lot_to_widget",
-    confirmLabel: "Spawn",
+    confirmLabel: translateNow("draft.spawn"),
     fields: buildDebugProduceDraftFields(),
     presetId: command.payload.presetId,
     targetId:
@@ -39,7 +40,7 @@ function openProduceDraft(
       command.kind === "create_debug_produce_lot_on_workbench"
         ? "bench_slot"
         : "workspace_widget",
-    title: "Configure Apple powder",
+    title: translateNow("draft.configureApplePowder"),
   });
 }
 

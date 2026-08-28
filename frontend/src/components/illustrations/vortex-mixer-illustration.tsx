@@ -1,6 +1,7 @@
 "use client";
 
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
+import { translateNow } from "@/lib/i18n";
 
 type VortexMixerIllustrationProps = {
   className?: string;
@@ -64,7 +65,7 @@ export function VortexMixerIllustration({
 
   return (
     <div
-      aria-label="Vortex mixer illustration"
+      aria-label={translateNow("illustration.vortex")}
       className={`relative ${className ?? ""}`}
       data-drop-highlighted={dropHighlighted}
       data-has-tool={hasTool}

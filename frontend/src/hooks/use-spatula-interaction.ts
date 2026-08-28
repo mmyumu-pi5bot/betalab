@@ -8,6 +8,7 @@ import type {
 
 import { getLastPointerPosition, trackPointerPosition } from "@/lib/pointer-position";
 import type { BenchToolInstance, SpatulaState } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 const HOLD_THRESHOLD_MS = 200;
 const CLICK_INCREMENT_MU_G = 0.05;
@@ -48,6 +49,7 @@ export function useSpatulaInteraction({
   onPourIntoAnalyticalBalanceTool,
   spatula,
 }: UseSpatulaInteractionOptions) {
+  const t = useT();
   const [spatulaCursorPosition, setSpatulaCursorPosition] = useState<{ x: number; y: number } | null>(null);
   const [spatulaHintMessage, setSpatulaHintMessage] = useState<string | null>(null);
   const spatulaPourIntervalRef = useRef<number | null>(null);
@@ -118,10 +120,10 @@ export function useSpatulaInteraction({
 
     setSpatulaHintMessage(
       spatula.isLoaded
-        ? "Click to pour a little · Hold and lift to pour faster."
-        : "Click an open container holding powder to load the spatula.",
+        ? t("spatula.pourHint")
+        : t("spatula.loadHint"),
     );
-  }, [isSpatulaMode, spatula.isLoaded]);
+  }, [isSpatulaMode, spatula.isLoaded, t]);
 
   // Use refs so the pointermove listener always reads the latest rate constants
   // without those values appearing in the effect dep array (which would cause
@@ -185,13 +187,13 @@ export function useSpatulaInteraction({
       }
 
       if (!spatula.isLoaded) {
-        setSpatulaHintMessage("The spatula is empty. Load it from an open container first.");
+        setSpatulaHintMessage(t("spatula.emptyHint"));
         return;
       }
 
       event.preventDefault();
       stopSpatulaPour();
-      setSpatulaHintMessage("Versement en cours...");
+      setSpatulaHintMessage(t("spatula.pouring"));
       spatulaPourStateRef.current = {
         currentRateG: holdInitialRateG,
         isHolding: false,
@@ -225,6 +227,7 @@ export function useSpatulaInteraction({
       onPourIntoTool,
       spatula.isLoaded,
       stopSpatulaPour,
+      t,
     ],
   );
 
@@ -254,10 +257,10 @@ export function useSpatulaInteraction({
   const loadSpatulaFromTool = useCallback(
     (slotId: string) => {
       stopSpatulaPour();
-      setSpatulaHintMessage("Loading spatula...");
+      setSpatulaHintMessage(t("spatula.loading"));
       onLoadFromTool({ slot_id: slotId });
     },
-    [onLoadFromTool, stopSpatulaPour],
+    [onLoadFromTool, stopSpatulaPour, t],
   );
 
   const handleSpatulaToolIllustrationClick = useCallback(
@@ -296,16 +299,16 @@ export function useSpatulaInteraction({
           // No justPouredRef guard here: on the balance there is no onClick path
           // that could trigger a spurious reload, so every intentional click should load.
           onLoadFromAnalyticalBalance();
-          setSpatulaHintMessage("Loading spatula...");
+          setSpatulaHintMessage(t("spatula.loading"));
         } else {
-          setSpatulaHintMessage("The spatula is empty. Load it from an open container first.");
+          setSpatulaHintMessage(t("spatula.emptyHint"));
         }
         return;
       }
 
       event.preventDefault();
       stopSpatulaPour();
-      setSpatulaHintMessage("Versement en cours...");
+      setSpatulaHintMessage(t("spatula.pouring"));
       spatulaPourStateRef.current = {
         currentRateG: holdInitialRateG,
         isHolding: false,
@@ -339,6 +342,7 @@ export function useSpatulaInteraction({
       onPourIntoAnalyticalBalanceTool,
       spatula.isLoaded,
       stopSpatulaPour,
+      t,
     ],
   );
 
@@ -365,10 +369,10 @@ export function useSpatulaInteraction({
       justPouredRef.current = false;
 
       if (canPourIntoTool(tool) && !spatula.isLoaded) {
-        setSpatulaHintMessage("The spatula is empty. Load it from an open container first.");
+        setSpatulaHintMessage(t("spatula.emptyHint"));
       }
     },
-    [canLoadFromTool, canPourIntoTool, isSpatulaMode, loadSpatulaFromTool, spatula.isLoaded],
+    [canLoadFromTool, canPourIntoTool, isSpatulaMode, loadSpatulaFromTool, spatula.isLoaded, t],
   );
 
   const handleSpatulaTrashClick = useCallback(() => {

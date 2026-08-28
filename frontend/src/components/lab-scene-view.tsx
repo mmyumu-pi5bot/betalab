@@ -119,6 +119,7 @@ type LabSceneViewProps = {
     stopSpatulaPour: () => void;
   };
   ui: {
+    hasSyncError: boolean;
     isBasketOpen: boolean;
     isCommandPending: boolean;
     isTrashEmpty: boolean;
@@ -205,6 +206,7 @@ export function LabSceneView({
       <div className="mx-auto w-full">
         <ExperimentAppHeader
           experimentName={experiment.name || experiment.id}
+          hasSyncError={ui.hasSyncError}
           isSyncing={ui.isCommandPending}
           journalEntries={experiment.journalEntries}
           onRenameExperiment={ui.onRenameExperiment}

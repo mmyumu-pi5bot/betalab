@@ -11,6 +11,7 @@ import type {
   SequenceRun,
   TransitionTrace,
 } from "@/types/workbench";
+import { useI18n, useT } from "@/lib/i18n";
 
 const CHART_WIDTH = 320;
 const CHART_HEIGHT = 64;
@@ -32,7 +33,7 @@ type Props = {
  * moves a clock. Revealing here is what turns that clock into a chromatogram
  * being drawn live, without re-sending the data on every tick.
  */
-export function revealTrace(trace: TransitionTrace, acquiredUntilS: number): TransitionTrace {
+function revealTrace(trace: TransitionTrace, acquiredUntilS: number): TransitionTrace {
   if (acquiredUntilS >= trace.acquisition.runDurationS) return trace;
   let count = 0;
   while (count < trace.timesS.length && trace.timesS[count] <= acquiredUntilS) {
@@ -110,6 +111,7 @@ function TransitionChromatogram({
   acquiredUntilS: number;
   trace: TransitionTrace;
 }) {
+  const t = useT();
   const { transition } = trace;
   const recorded = revealTrace(trace, acquiredUntilS);
   const apex = recorded.intensities.length > 0 ? Math.max(...recorded.intensities) : 0;
@@ -132,7 +134,7 @@ function TransitionChromatogram({
             isQuantifier ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-600"
           }`}
         >
-          {isQuantifier ? "Quantifier" : "Qualifier"}
+          {isQuantifier ? t("method.quantifier") : t("method.qualifier")}
         </span>
       </div>
 
@@ -174,6 +176,7 @@ function InjectionPanel({
   acquiredUntilS: number;
   injection: InjectionMeasurement;
 }) {
+  const t = useT();
   const displayName = injection.sampleName || injection.vialLabel;
   const runDurationS = injection.traces[0]?.acquisition.runDurationS ?? 0;
   const isPending = acquiredUntilS <= 0;
@@ -182,10 +185,13 @@ function InjectionPanel({
   return (
     <div data-testid="injection-panel">
       <p className="text-[10px] text-slate-500">
-        <span className="font-semibold text-slate-700">{displayName}</span> · slot{" "}
-        {injection.rackSlotId} · {injection.injectionVolumeUl} µL · rep{" "}
-        {injection.replicateIndex} ·{" "}
-        <span className="font-mono">{injection.outputFilename}</span>
+        {t("results.injectionHeader", {
+          name: displayName,
+          slot: injection.rackSlotId,
+          volume: injection.injectionVolumeUl,
+          replicate: injection.replicateIndex,
+          filename: injection.outputFilename,
+        })}
       </p>
 
       {isPending ? (
@@ -193,7 +199,7 @@ function InjectionPanel({
           className="mt-2 rounded-[0.9rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500"
           data-testid="injection-pending"
         >
-          Waiting in the autosampler queue.
+          {t("results.pending")}
         </p>
       ) : null}
 
@@ -202,8 +208,10 @@ function InjectionPanel({
           className="mt-2 text-[10px] font-medium text-sky-600"
           data-testid="injection-recording"
         >
-          Recording · {formatDuration(acquiredUntilS)} of{" "}
-          {formatDuration(runDurationS)}
+          {t("results.recording", {
+            elapsed: formatDuration(acquiredUntilS),
+            total: formatDuration(runDurationS),
+          })}
         </p>
       ) : null}
 
@@ -212,19 +220,18 @@ function InjectionPanel({
           className="mt-2 rounded-[0.9rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
           data-testid="injection-insufficient-volume"
         >
-          The needle could not reach enough sample: earlier injections drained
-          this vial down to its dead volume. Every channel recorded baseline.
+          {t("results.insufficientVolume")}
         </p>
       ) : null}
 
       {injection.status === "no_extract_context" ? (
         <p className="mt-2 rounded-[0.9rem] border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          This vial held no injectable content — every channel recorded baseline.
+          {t("results.noExtractContext")}
         </p>
       ) : null}
 
       {injection.traces.length === 0 ? (
-        <p className="mt-2 text-xs text-slate-400">No trace recorded for this injection.</p>
+        <p className="mt-2 text-xs text-slate-400">{t("results.noTrace")}</p>
       ) : (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {injection.traces.map((trace) => (
@@ -246,6 +253,7 @@ export function LcMsMsRunResults({
   onSkip,
   runs,
 }: Props) {
+  const { t, tn } = useI18n();
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null;
   const [selectedInjectionId, setSelectedInjectionId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -295,9 +303,11 @@ export function LcMsMsRunResults({
         className="text-[10px] font-semibold uppercase tracking-wide text-slate-400"
         data-testid="run-summary"
       >
-        Sequence {latestRun.id} · {latestRun.injections.length} injection
-        {latestRun.injections.length > 1 ? "s" : ""} · {latestRun.methodSnapshot.name} v
-        {latestRun.methodSnapshot.version}
+        {tn("results.summary", latestRun.injections.length, {
+          id: latestRun.id,
+          method: latestRun.methodSnapshot.name,
+          version: latestRun.methodSnapshot.version,
+        })}
       </p>
 
       {experimentId ? (
@@ -305,9 +315,9 @@ export function LcMsMsRunResults({
           className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-2.5 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-100"
           download
           href={sequenceRunResultsUrl(experimentId, latestRun.id)}
-          title="Method file plus one chromatogram file per injection the instrument has finished recording."
+          title={t("results.downloadTitle")}
         >
-          Download results
+          {t("results.download")}
         </a>
       ) : null}
 
@@ -318,8 +328,10 @@ export function LcMsMsRunResults({
         >
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-medium text-sky-800">
-              Acquiring · {formatDuration(latestRun.elapsedS)} of{" "}
-              {formatDuration(latestRun.totalDurationS)}
+              {t("results.acquiring", {
+                elapsed: formatDuration(latestRun.elapsedS),
+                total: formatDuration(latestRun.totalDurationS),
+              })}
             </p>
             {onSkip ? (
               <button
@@ -328,7 +340,7 @@ export function LcMsMsRunResults({
                 onClick={onSkip}
                 type="button"
               >
-                Skip to end
+                {t("results.skipToEnd")}
               </button>
             ) : null}
           </div>
@@ -385,19 +397,19 @@ export function LcMsMsRunResults({
       >
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Acquisition monitor
+            {t("results.monitor")}
           </p>
           <button
             className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
             onClick={() => setIsExpanded((current) => !current)}
             type="button"
           >
-            {isExpanded ? "Close data viewer" : "Open data viewer"}
+            {isExpanded ? t("results.closeViewer") : t("results.openViewer")}
           </button>
         </div>
         {isExpanded ? (
           <p className="px-3 py-4 text-center text-[11px] text-slate-400">
-            Showing this run in the data viewer.
+            {t("results.shownInViewer")}
           </p>
         ) : (
           <div
@@ -421,7 +433,7 @@ export function LcMsMsRunResults({
                 onClick={() => setIsExpanded(false)}
               />
               <div
-                aria-label="Acquisition data viewer"
+                aria-label={t("results.viewer")}
                 aria-modal="true"
                 className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
                 role="dialog"
@@ -432,11 +444,11 @@ export function LcMsMsRunResults({
                       LC-MS/MS
                     </p>
                     <h3 className="mt-0.5 text-sm font-semibold text-slate-800">
-                      Acquisition data viewer
+                      {t("results.viewer")}
                     </h3>
                   </div>
                   <button
-                    aria-label="Close data viewer"
+                    aria-label={t("results.closeViewer")}
                     className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"
                     onClick={() => setIsExpanded(false)}
                     type="button"

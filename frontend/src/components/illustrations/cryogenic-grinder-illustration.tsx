@@ -2,6 +2,7 @@
 
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
 import { getCryogenicStatus, type CryogenicTone } from "@/lib/cryogenic-temperature";
+import { translateNow } from "@/lib/i18n";
 
 type CryogenicGrinderIllustrationProps = {
   className?: string;
@@ -76,7 +77,7 @@ export function CryogenicGrinderIllustration({
 
   return (
     <div
-      aria-label="Cryogenic grinder illustration"
+      aria-label={translateNow("illustration.grinder")}
       className={`relative ${className ?? ""}`}
       data-status={status}
       data-testid={testId}

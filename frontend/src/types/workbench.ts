@@ -819,6 +819,9 @@ export type ExperimentProduceLot = {
   isDraggable: boolean;
   allowedDropTargets: DropTargetType[];
   label: string;
+  /** How the backend built `label`, so the UI can render it in the active locale. */
+  labelCode?: string | null;
+  labelIndex?: number | null;
   produceType: ProduceLotType;
   residualCo2MassG?: number;
   temperatureC?: number;

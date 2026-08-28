@@ -10,6 +10,14 @@ import {
   listExperiments,
   renameExperiment,
 } from "@/lib/api";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import {
+  translateExperimentStatus,
+  translateJournalEntry,
+  translateNow,
+  useI18n,
+  type Locale,
+} from "@/lib/i18n";
 import { CALIBRATION_SAMPLE_TUTORIAL_ID } from "@/lib/tutorial-engine";
 import {
   clearTutorialSession,
@@ -67,13 +75,13 @@ function ArrowIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
-function formatSessionDate(value: string) {
+function formatSessionDate(value: string, locale: Locale) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
@@ -84,6 +92,7 @@ function formatSessionDate(value: string) {
 
 export function ExperimentsHome() {
   const router = useRouter();
+  const { locale, t, tn } = useI18n();
   const [experiments, setExperiments] = useState<ExperimentListEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, startCreateTransition] = useTransition();
@@ -151,7 +160,7 @@ export function ExperimentsHome() {
           return;
         }
         setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load saved experiments",
+          error instanceof Error ? error.message : translateNow("home.error.load"),
         );
       } finally {
         if (isMounted) {
@@ -174,7 +183,7 @@ export function ExperimentsHome() {
         router.push(`/experiments/${experiment.id}`);
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Unable to create experiment",
+          error instanceof Error ? error.message : translateNow("home.error.create"),
         );
       }
     });
@@ -199,7 +208,7 @@ export function ExperimentsHome() {
         );
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Unable to create tutorial experiment",
+          error instanceof Error ? error.message : translateNow("home.error.createTutorial"),
         );
       }
     });
@@ -224,7 +233,7 @@ export function ExperimentsHome() {
       });
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Unable to delete experiment",
+        error instanceof Error ? error.message : translateNow("home.error.delete"),
       );
     } finally {
       setDeletingExperimentId(null);
@@ -284,7 +293,7 @@ export function ExperimentsHome() {
       setEditingExperimentId(null);
       setNameDraft("");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to rename experiment");
+      setErrorMessage(error instanceof Error ? error.message : translateNow("home.error.rename"));
     } finally {
       renameInFlightRef.current = null;
     }
@@ -315,7 +324,7 @@ export function ExperimentsHome() {
       setExperiments(await listExperiments());
       setManagingExperimentId(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to duplicate experiment");
+      setErrorMessage(error instanceof Error ? error.message : translateNow("home.error.duplicate"));
     } finally {
       setDuplicatingExperimentId(null);
     }
@@ -324,62 +333,64 @@ export function ExperimentsHome() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f7efe1,_#efe4cd_48%,_#e5d7bb)] px-6 py-10 text-stone-900">
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
-        <section className="rounded-[32px] border border-stone-900/10 bg-[#fff8ea]/85 p-8 shadow-[0_30px_80px_rgba(84,53,20,0.12)] backdrop-blur">
-          <p className="font-mono text-xs uppercase tracking-[0.35em] text-stone-500">
-            Betalab
-          </p>
-          <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-2xl">
-              <h1 className="font-serif text-4xl leading-tight text-stone-950 md:text-5xl">
-                Experiment sessions
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-stone-600 md:text-base">
-                Resume a saved lab run or open a fresh experiment without rebuilding the
-                whole setup by hand.
+        <section className="relative z-10 rounded-[32px] border border-stone-900/10 bg-[#fff8ea]/85 p-8 shadow-[0_30px_80px_rgba(84,53,20,0.12)] backdrop-blur">
+          <div className="flex items-start justify-between gap-4">
+            <p className="font-mono text-xs uppercase tracking-[0.35em] text-stone-500">
+              {t("home.brand")}
+            </p>
+            <LanguageSwitcher className="shrink-0" />
+          </div>
+          <div className="mt-3 max-w-2xl">
+            <h1 className="font-serif text-4xl leading-tight text-stone-950 md:text-5xl">
+              {t("home.title")}
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-stone-600 md:text-base">
+              {t("home.subtitle")}
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-stone-900/10 bg-white/70 p-6 shadow-[0_24px_60px_rgba(84,53,20,0.08)] backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <div className="flex items-baseline gap-3">
+              <h2 className="font-serif text-2xl text-stone-950">{t("home.experiments")}</h2>
+              <p className="text-sm text-stone-500">
+                {isLoading ? t("home.loading") : tn("home.sessionCount", experiments.length)}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                type="button"
-                onClick={handleCreateExperiment}
+                className="rounded-full bg-stone-950 px-4 py-2 text-sm font-medium text-stone-50 transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70"
                 disabled={isCreating}
-                className="rounded-full bg-stone-950 px-5 py-3 text-sm font-medium text-stone-50 transition hover:bg-stone-800 disabled:cursor-wait disabled:opacity-70"
+                onClick={handleCreateExperiment}
+                type="button"
               >
-                {isCreating ? "Creating..." : "New experiment"}
+                {isCreating ? t("home.creating") : t("home.newExperiment")}
               </button>
               <button
-                aria-label="New tutorial"
-                className="rounded-full border border-sky-300 bg-sky-50 px-5 py-3 text-sm font-semibold text-sky-800 transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-70"
+                className="rounded-full border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-70"
                 disabled={isCreating}
                 onClick={handleOpenTutorial}
                 type="button"
               >
-                {isCreating ? "Creating..." : "New tutorial"}
+                {isCreating ? t("home.creating") : t("home.newTutorial")}
               </button>
             </div>
           </div>
+
           {errorMessage ? (
             <p className="mt-4 rounded-2xl bg-rose-100 px-4 py-3 text-sm text-rose-800">
               {errorMessage}
             </p>
           ) : null}
-        </section>
-
-        <section className="rounded-[32px] border border-stone-900/10 bg-white/70 p-6 shadow-[0_24px_60px_rgba(84,53,20,0.08)] backdrop-blur">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-serif text-2xl text-stone-950">Saved experiments</h2>
-            <p className="text-sm text-stone-500">
-              {isLoading ? "Loading..." : `${experiments.length} session${experiments.length === 1 ? "" : "s"}`}
-            </p>
-          </div>
 
           {isLoading ? (
             <div className="mt-6 rounded-3xl border border-dashed border-stone-300 bg-stone-50/80 px-6 py-10 text-sm text-stone-500">
-              Loading saved experiments...
+              {t("home.loadingExperiments")}
             </div>
           ) : experiments.length === 0 ? (
             <div className="mt-6 rounded-3xl border border-dashed border-stone-300 bg-stone-50/80 px-6 py-10 text-sm text-stone-500">
-              No saved experiments yet.
+              {t("home.empty")}
             </div>
           ) : (
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -405,7 +416,7 @@ export function ExperimentsHome() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-stone-400">
-                        {experiment.status}
+                        {translateExperimentStatus(t, experiment.status)}
                       </p>
                       {editingExperimentId === experiment.id ? (
                         <form
@@ -416,7 +427,7 @@ export function ExperimentsHome() {
                           }}
                         >
                           <label className="sr-only" htmlFor={`experiment-name-${experiment.id}`}>
-                            Experiment name
+                            {t("home.experimentName")}
                           </label>
                           <input
                             id={`experiment-name-${experiment.id}`}
@@ -453,7 +464,7 @@ export function ExperimentsHome() {
                             </h3>
                             <button
                               type="button"
-                              aria-label={`Rename ${displayName}`}
+                              aria-label={t("home.rename", { name: displayName })}
                               onClick={() => {
                                 skipNextRenameBlurRef.current = false;
                                 setEditingExperimentId(experiment.id);
@@ -475,48 +486,50 @@ export function ExperimentsHome() {
                     {isTutorialExperiment ? (
                       <div className="flex flex-col items-end gap-2">
                         <span className="rounded-full bg-sky-700 px-3 py-1 text-xs font-semibold text-white">
-                          Tutorial
+                          {t("home.tutorialBadge")}
                         </span>
                       </div>
                     ) : null}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-stone-700">
                     <span className="rounded-full bg-stone-100 px-3 py-1.5">
-                      {summary.workbenchToolCount} bench tool{summary.workbenchToolCount === 1 ? "" : "s"}
+                      {tn("home.benchToolCount", summary.workbenchToolCount)}
                     </span>
                     <span className="rounded-full bg-sky-100 px-3 py-1.5 text-sky-900">
-                      {summary.rackToolCount} rack vial{summary.rackToolCount === 1 ? "" : "s"}
+                      {tn("home.rackVialCount", summary.rackToolCount)}
                     </span>
                     <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-900">
-                      {summary.materialCount} material{summary.materialCount === 1 ? "" : "s"}
+                      {tn("home.materialCount", summary.materialCount)}
                     </span>
                     <span className="rounded-full bg-violet-100 px-3 py-1.5 text-violet-900">
-                      {summary.runCount} run{summary.runCount === 1 ? "" : "s"}
+                      {tn("home.runCount", summary.runCount)}
                     </span>
                   </div>
                   <dl className="mt-5 flex flex-col gap-2 text-sm text-stone-600">
                     <div className="flex items-center justify-between gap-3">
-                      <dt>Updated</dt>
+                      <dt>{t("home.updated")}</dt>
                       <dd className="text-right text-stone-950">
-                        {formatSessionDate(experiment.updated_at)}
+                        {formatSessionDate(experiment.updated_at, locale)}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <dt>Simulated</dt>
+                      <dt>{t("home.simulated")}</dt>
                       <dd className="text-right text-stone-950">
-                        {formatSessionDate(experiment.last_simulation_at)}
+                        {formatSessionDate(experiment.last_simulation_at, locale)}
                       </dd>
                     </div>
                   </dl>
                   <p className="mt-5 line-clamp-3 min-h-[3.75rem] text-sm leading-6 text-stone-500">
-                    {experiment.last_audit_entry ?? "No audit log yet."}
+                    {experiment.lastJournalEvent
+                      ? translateJournalEntry(t, locale, experiment.lastJournalEvent)
+                      : t("home.noAuditLog")}
                   </p>
                   <div className="relative mt-4 flex items-center gap-2">
                     <button
                       aria-label={
                         isTutorialExperiment
-                          ? "Open tutorial experiment"
-                          : "Open experiment"
+                          ? t("home.openTutorialExperiment")
+                          : t("home.openExperiment")
                       }
                       type="button"
                       onClick={() => {
@@ -543,12 +556,12 @@ export function ExperimentsHome() {
                           : "bg-stone-900 text-white hover:bg-stone-800"
                       }`}
                     >
-                      {isTutorialExperiment ? "Open tutorial" : "Open experiment"}
+                      {isTutorialExperiment ? t("home.openTutorial") : t("home.openExperiment")}
                       <ArrowIcon />
                     </button>
                     <button
                       type="button"
-                      aria-label={`Manage ${displayName}`}
+                      aria-label={t("home.manage", { name: displayName })}
                       aria-expanded={managingExperimentId === experiment.id}
                       aria-haspopup="menu"
                       onClick={() =>
@@ -567,13 +580,13 @@ export function ExperimentsHome() {
                       >
                         <button
                           type="button"
-                          aria-label={`Duplicate ${displayName}`}
+                          aria-label={t("home.duplicateNamed", { name: displayName })}
                           onClick={() => void handleDuplicateExperiment(experiment.id)}
                           disabled={duplicatingExperimentId === experiment.id}
                           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-stone-700 transition hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
                         >
                           <CopyIcon />
-                          {duplicatingExperimentId === experiment.id ? "Duplicating..." : "Duplicate"}
+                          {duplicatingExperimentId === experiment.id ? t("home.duplicating") : t("home.duplicate")}
                         </button>
                         <button
                           type="button"
@@ -582,7 +595,7 @@ export function ExperimentsHome() {
                           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-stone-700 transition hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
                         >
                           <TrashIcon />
-                          {deletingExperimentId === experiment.id ? "Deleting..." : "Delete"}
+                          {deletingExperimentId === experiment.id ? t("home.deleting") : t("home.delete")}
                         </button>
                       </div>
                     ) : null}

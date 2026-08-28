@@ -18,6 +18,7 @@ import type { DropDraft } from "@/hooks/use-drop-draft";
 import type { BenchToolInstance } from "@/types/workbench";
 import type { EquipmentToolDragPayload } from "@/lib/workbench-dnd";
 import type { DragStateApi } from "@/hooks/use-drag-state";
+import { translateLiquidDefinitionName, useT } from "@/lib/i18n";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
   AddLiquidToToolPayload,
@@ -62,6 +63,7 @@ export function useAnalyticalBalanceDnd({
   experimentApi,
   setPendingDropDraft,
 }: AnalyticalBalanceDndOptions): AnalyticalBalanceDndApi {
+  const t = useT();
   const { activeDragItem, clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
 
   const handleAnalyticalBalanceDragOver = (event: DragEvent<HTMLElement>) => {
@@ -132,14 +134,15 @@ export function useAnalyticalBalanceDnd({
         });
         return;
       }
+      const draftLiquidName = translateLiquidDefinitionName(t, liquidDefinition);
       setPendingDropDraft({
         commandType: "add_liquid_to_analytical_balance_tool",
         fields: [
           {
-            ariaLabel: `${liquidDefinition?.name ?? "Liquid"} draft volume`,
+            ariaLabel: t("draft.liquidDraftVolume", { liquid: draftLiquidName }),
             id: "volume_ml",
             inputStep: 0.1,
-            label: "Volume",
+            label: t("draft.volume"),
             stepAmount: 1,
             unitLabel: "mL",
             value: liquidDefinition?.transfer_volume_ml ?? 0,
@@ -149,7 +152,7 @@ export function useAnalyticalBalanceDnd({
         itemId: toolbarPayload.itemId,
         targetId: "analytical_balance",
         targetKind: "workspace_widget",
-        title: `Dose ${liquidDefinition?.name ?? "Liquid"}`,
+        title: t("draft.dose", { liquid: draftLiquidName }),
       });
       return;
     }

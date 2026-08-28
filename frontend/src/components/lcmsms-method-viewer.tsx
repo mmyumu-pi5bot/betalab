@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDuration, formatNumber } from "@/lib/acquisition-method-format";
+import { useT, type MessageKey } from "@/lib/i18n";
 import type { AcquisitionMethod, MrmTransition } from "@/types/workbench";
 
 type Props = {
@@ -9,37 +10,16 @@ type Props = {
   method: AcquisitionMethod | null;
 };
 
-const GLOSSARY: { term: string; explanation: string }[] = [
+const GLOSSARY: { termKey: MessageKey; explanationKey: MessageKey }[] = [
+  { termKey: "glossary.q1.term", explanationKey: "glossary.q1.explanation" },
+  { termKey: "glossary.q3.term", explanationKey: "glossary.q3.explanation" },
   {
-    term: "Q1",
-    explanation:
-      "First quadrupole. It filters the precursor ion — the intact molecule as it leaves the source — and lets through only the selected m/z.",
+    termKey: "glossary.collisionEnergy.term",
+    explanationKey: "glossary.collisionEnergy.explanation",
   },
-  {
-    term: "Q3",
-    explanation:
-      "Third quadrupole. It filters one product ion, a fragment produced in the collision cell. The Q1 → Q3 pair is what makes a transition specific.",
-  },
-  {
-    term: "Collision energy",
-    explanation:
-      "Voltage accelerating the precursor into the collision gas. Too low and the molecule does not fragment; too high and the chosen fragment is destroyed in turn.",
-  },
-  {
-    term: "Dwell time",
-    explanation:
-      "Time spent measuring one transition per cycle. Longer dwell means a better signal-to-noise ratio, but fewer points across each chromatographic peak.",
-  },
-  {
-    term: "Quantifier",
-    explanation:
-      "The most intense transition of a compound. Its area is the one used to compute the concentration.",
-  },
-  {
-    term: "Qualifier",
-    explanation:
-      "A second transition of the same compound. It is not used to quantify: its ratio to the quantifier confirms the identity and exposes interferences.",
-  },
+  { termKey: "glossary.dwellTime.term", explanationKey: "glossary.dwellTime.explanation" },
+  { termKey: "glossary.quantifier.term", explanationKey: "glossary.quantifier.explanation" },
+  { termKey: "glossary.qualifier.term", explanationKey: "glossary.qualifier.explanation" },
 ];
 
 function ParameterRow({ label, value }: { label: string; value: string }) {
@@ -71,6 +51,7 @@ function StatTile({
 }
 
 function TransitionRow({ transition }: { transition: MrmTransition }) {
+  const t = useT();
   const isQuantifier = transition.role === "quantifier";
   return (
     <tr className="border-b border-slate-800/70 last:border-0" data-testid="method-transition-row">
@@ -88,7 +69,7 @@ function TransitionRow({ transition }: { transition: MrmTransition }) {
             isQuantifier ? "bg-cyan-500/20 text-cyan-300" : "bg-slate-700/60 text-slate-300"
           }`}
         >
-          {isQuantifier ? "Quantifier" : "Qualifier"}
+          {isQuantifier ? t("method.quantifier") : t("method.qualifier")}
         </span>
       </td>
       <td className="px-1 py-1 text-right font-mono text-slate-300">
@@ -114,6 +95,7 @@ function TransitionRow({ transition }: { transition: MrmTransition }) {
 }
 
 export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
+  const t = useT();
   if (error !== null) {
     return (
       <div className="mt-3 rounded-xl border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-300">
@@ -125,7 +107,7 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
   if (isLoading || method === null) {
     return (
       <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
-        Loading the method…
+        {t("method.loading")}
       </div>
     );
   }
@@ -134,7 +116,7 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
 
   return (
     <section
-      aria-label="Acquisition method details"
+      aria-label={t("method.details")}
       className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -145,12 +127,12 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
             className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-300"
             data-testid="method-educational-badge"
           >
-            Educational
+            {t("method.educational")}
           </span>
         ) : null}
         {method.isBuiltIn ? (
           <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">
-            Built-in · read-only
+            {t("method.builtInReadOnly")}
           </span>
         ) : null}
       </div>
@@ -161,17 +143,17 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
 
       <div className="mt-3 grid grid-cols-3 gap-2">
         <StatTile
-          label="Run duration"
+          label={t("method.runDuration")}
           testId="method-runtime"
           value={formatDuration(method.runtimeS)}
         />
         <StatTile
-          label="Compounds"
+          label={t("method.compounds")}
           testId="method-compound-count"
           value={String(compoundCount)}
         />
         <StatTile
-          label="Transitions"
+          label={t("method.transitions")}
           testId="method-transition-count"
           value={String(method.transitions.length)}
         />
@@ -183,21 +165,21 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
           data-testid="method-lc-parameters"
         >
           <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-            Liquid chromatography
+            {t("method.liquidChromatography")}
           </p>
-          <ParameterRow label="Column" value={method.liquidChromatography.columnLabel} />
+          <ParameterRow label={t("method.column")} value={method.liquidChromatography.columnLabel} />
           <ParameterRow
-            label="Oven"
+            label={t("method.oven")}
             value={`${formatNumber(method.liquidChromatography.columnTemperatureC)} °C`}
           />
           <ParameterRow
-            label="Flow"
+            label={t("method.flow")}
             value={`${formatNumber(method.liquidChromatography.flowMlPerMin)} mL/min`}
           />
-          <ParameterRow label="Phase A" value={method.liquidChromatography.mobilePhaseA} />
-          <ParameterRow label="Phase B" value={method.liquidChromatography.mobilePhaseB} />
+          <ParameterRow label={t("method.phaseA")} value={method.liquidChromatography.mobilePhaseA} />
+          <ParameterRow label={t("method.phaseB")} value={method.liquidChromatography.mobilePhaseB} />
           <ParameterRow
-            label="Gradient"
+            label={t("method.gradient")}
             value={method.liquidChromatography.gradient
               .map((step) => `${formatDuration(step.timeS)} → ${step.mobilePhaseBPercent}% B`)
               .join(" · ")}
@@ -209,27 +191,27 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
           data-testid="method-source-parameters"
         >
           <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-            Ion source
+            {t("method.ionSource")}
           </p>
-          <ParameterRow label="Source" value={method.ionSource.sourceType} />
+          <ParameterRow label={t("method.source")} value={method.ionSource.sourceType} />
           <ParameterRow
-            label="Spray voltage"
+            label={t("method.sprayVoltage")}
             value={`${formatNumber(method.ionSource.ionSprayVoltageV)} V`}
           />
           <ParameterRow
-            label="Temperature"
+            label={t("method.temperature")}
             value={`${formatNumber(method.ionSource.sourceTemperatureC)} °C`}
           />
           <ParameterRow
-            label="Nebulizer gas"
+            label={t("method.nebulizerGas")}
             value={`${formatNumber(method.ionSource.nebulizerGasPsi)} psi`}
           />
           <ParameterRow
-            label="Heater gas"
+            label={t("method.heaterGas")}
             value={`${formatNumber(method.ionSource.heaterGasPsi)} psi`}
           />
           <ParameterRow
-            label="Curtain gas"
+            label={t("method.curtainGas")}
             value={`${formatNumber(method.ionSource.curtainGasPsi)} psi`}
           />
         </div>
@@ -239,14 +221,14 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
         <table className="w-full min-w-[34rem] text-[10px]">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-950/60 text-[9px] uppercase tracking-wide text-slate-500">
-              <th className="py-1 pl-2 pr-1 text-left font-medium">Compound</th>
-              <th className="px-1 py-1 text-left font-medium">Role</th>
+              <th className="py-1 pl-2 pr-1 text-left font-medium">{t("method.compound")}</th>
+              <th className="px-1 py-1 text-left font-medium">{t("method.role")}</th>
               <th className="px-1 py-1 text-right font-medium">Q1</th>
               <th className="px-1 py-1 text-right font-medium">Q3</th>
-              <th className="px-1 py-1 text-center font-medium">Pol.</th>
-              <th className="px-1 py-1 text-right font-medium">CE (V)</th>
-              <th className="px-1 py-1 text-right font-medium">Dwell (ms)</th>
-              <th className="py-1 pl-1 pr-2 text-right font-medium">RT</th>
+              <th className="px-1 py-1 text-center font-medium">{t("method.polarityShort")}</th>
+              <th className="px-1 py-1 text-right font-medium">{t("method.collisionEnergyShort")}</th>
+              <th className="px-1 py-1 text-right font-medium">{t("method.dwellShort")}</th>
+              <th className="py-1 pl-1 pr-2 text-right font-medium">{t("method.retentionShort")}</th>
             </tr>
           </thead>
           <tbody>
@@ -262,13 +244,13 @@ export function LcMsMsMethodViewer({ error, isLoading, method }: Props) {
         data-testid="method-glossary"
       >
         <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-          Reading this method
+          {t("method.readingThisMethod")}
         </p>
         <dl className="space-y-1.5">
-          {GLOSSARY.map(({ term, explanation }) => (
-            <div key={term}>
-              <dt className="text-[10px] font-semibold text-cyan-300">{term}</dt>
-              <dd className="text-[10px] leading-relaxed text-slate-400">{explanation}</dd>
+          {GLOSSARY.map(({ termKey, explanationKey }) => (
+            <div key={termKey}>
+              <dt className="text-[10px] font-semibold text-cyan-300">{t(termKey)}</dt>
+              <dd className="text-[10px] leading-relaxed text-slate-400">{t(explanationKey)}</dd>
             </div>
           ))}
         </dl>

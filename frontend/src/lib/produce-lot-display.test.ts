@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 
+import { getTranslator } from "@/lib/i18n";
 import {
   getProduceLotDegassingIntensity,
   getProduceLotDisplayName,
   isProduceLotDegassing,
 } from "@/lib/produce-lot-display";
 
+const t = getTranslator("en");
+
 describe("getProduceLotDisplayName", () => {
   it("keeps the base label for whole produce lots", () => {
     expect(
-      getProduceLotDisplayName({
+      getProduceLotDisplayName(t, {
         id: "produce_1",
         label: "Apple lot 1",
         produceType: "apple",
@@ -21,7 +24,7 @@ describe("getProduceLotDisplayName", () => {
 
   it("adds the powder suffix for ground produce lots", () => {
     expect(
-      getProduceLotDisplayName({
+      getProduceLotDisplayName(t, {
         id: "produce_1",
         materialState: "ground",
         label: "Apple lot 1",

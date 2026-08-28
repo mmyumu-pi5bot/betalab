@@ -29,6 +29,7 @@ import type {
   ToolbarDragPayload,
 } from "@/types/workbench";
 import type { MoveObjectPayload } from "@/types/api-payloads";
+import { useI18n, type TranslatePlural } from "@/lib/i18n";
 
 type ToolDropPayload = EquipmentToolDragPayload;
 
@@ -66,10 +67,8 @@ type WorkbenchPanelProps = {
   slots: BenchSlot[];
 };
 
-function formatProduceLotMetadata(produceLot: ExperimentProduceLot) {
-  return produceLot.unitCount === null
-    ? ""
-    : `${produceLot.unitCount} unit${produceLot.unitCount === 1 ? "" : "s"}`;
+function formatProduceLotMetadata(tn: TranslatePlural, produceLot: ExperimentProduceLot) {
+  return produceLot.unitCount === null ? "" : tn("produce.unitCount", produceLot.unitCount);
 }
 
 export function WorkbenchPanel({
@@ -78,6 +77,7 @@ export function WorkbenchPanel({
   renderPendingContent,
   slots,
 }: WorkbenchPanelProps) {
+  const { t, tn } = useI18n();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const headerPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const {
@@ -244,7 +244,7 @@ export function WorkbenchPanel({
 
           <div className="flex items-center gap-2">
             <button
-              aria-label="Add workbench station"
+              aria-label={t("workbench.addStation")}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white/85 text-base font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-white"
               data-testid="add-workbench-slot-button"
               onClick={() => {
@@ -287,14 +287,14 @@ export function WorkbenchPanel({
                     <p className="text-sm font-semibold text-slate-900">{slot.label}</p>
                     <p className="mt-1 text-sm text-slate-600">
                       {tool
-                        ? "Ready for bench operations."
+                        ? t("workbench.readyForOperations")
                         : surfaceProduceLots.length > 0
-                          ? "Produce is resting directly on the station."
-                          : "Waiting for a first tool."}
+                          ? t("workbench.produceOnStation")
+                          : t("workbench.waitingForTool")}
                     </p>
                   </div>
                   <button
-                    aria-label={`Remove ${slot.label}`}
+                    aria-label={t("workbench.removeStation", { slot: slot.label })}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:border-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                     data-testid={`remove-workbench-slot-button-${slot.id}`}
                     disabled={tool !== null || surfaceProduceLots.length > 0}
@@ -414,7 +414,7 @@ export function WorkbenchPanel({
                   ) : surfaceProduceLots.length > 0 ? (
                     <div className="flex min-h-56 flex-col justify-between p-1">
                       <div>
-                        <p className="text-base font-semibold text-slate-950">Station surface</p>
+                        <p className="text-base font-semibold text-slate-950">{t("workbench.stationSurface")}</p>
                         <p className="mt-1 text-xs text-slate-600">
                           Direct produce contact contaminates the lot.
                         </p>
@@ -427,7 +427,7 @@ export function WorkbenchPanel({
                             draggable={!dndDisabled && Boolean(onProduceLotDragStart)}
                             footerBadge={<ProduceLotStatusBadge produceLot={produceLot} />}
                             key={produceLot.id}
-                            metadata={formatProduceLotMetadata(produceLot)}
+                            metadata={formatProduceLotMetadata(tn, produceLot)}
                             onClick={() => {
                               onProduceLotClick?.(slot.id, produceLot);
                             }}
@@ -448,7 +448,7 @@ export function WorkbenchPanel({
                     </div>
                   ) : (
                     <div className="flex min-h-56 flex-col items-center justify-center rounded-[1.4rem] border border-dashed border-slate-200 bg-slate-50/80 p-6 text-center 2xl:min-h-[20rem]">
-                      <p className="text-sm font-semibold text-slate-900">Empty station</p>
+                      <p className="text-sm font-semibold text-slate-900">{t("workbench.emptyStation")}</p>
                       <p className="mt-2 max-w-xs text-sm text-slate-600">
                         Drop a workflow tool here to start building the bench.
                       </p>

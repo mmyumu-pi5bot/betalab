@@ -12,6 +12,7 @@ import {
   getLiquidAccentPalette,
 } from "@/lib/liquid-visuals";
 import type { BenchLabel, BenchToolInstance, ExperimentProduceLot } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 type BenchToolCardProps = {
   className?: string;
@@ -85,6 +86,7 @@ export function BenchToolCard({
   tool,
   tutorialToolId = tool.id,
 }: BenchToolCardProps) {
+  const t = useT();
   const produceLots = tool.produceLots ?? [];
   const totalVolumeMl = tool.liquids.reduce((total, liquid) => total + liquid.volume_ml, 0);
   const fillRatio = tool.capacity_ml > 0 ? Math.min(totalVolumeMl / tool.capacity_ml, 1) : 0;
@@ -107,7 +109,11 @@ export function BenchToolCard({
   const hasFieldLabel = isSampleBag && tool.fieldLabelText !== null && tool.fieldLabelText !== undefined;
   const displayLabelText = isSampleBag ? getPrimaryToolLabelText(labels) : null;
   const sealStateLabel =
-    tool.closureFault === "pressure_pop" ? "Popped" : isSealed ? "Sealed" : "Open";
+    tool.closureFault === "pressure_pop"
+      ? t("toolCard.popped")
+      : isSealed
+        ? t("toolCard.sealed")
+        : t("toolCard.openState");
   const sealStateToneClass =
     tool.closureFault === "pressure_pop"
       ? "border-rose-200 bg-rose-50 text-rose-700"
@@ -177,7 +183,7 @@ export function BenchToolCard({
             </h3>
             {onStore ? (
               <button
-                aria-label={`Store ${tool.label} in inventory`}
+                aria-label={t("toolCard.store", { tool: tool.label })}
                 data-tutorial-anchor={`store-tool-${tutorialToolId}`}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
                 disabled={!canStore}
@@ -186,7 +192,7 @@ export function BenchToolCard({
                   event.stopPropagation();
                   onStore();
                 }}
-                title={canStore ? "Store in inventory" : "Empty this tool before storing it"}
+                title={canStore ? t("toolCard.storeShort") : t("toolCard.emptyBeforeStoring")}
                 type="button"
               >
                 <StoreInInventoryIcon className="h-4 w-4" />
@@ -200,7 +206,7 @@ export function BenchToolCard({
                   {sealStateLabel}
                 </span>
                 <button
-                  aria-label={`${isSealed ? "Open" : "Close"} ${tool.label}`}
+                  aria-label={isSealed ? t("toolCard.openTool", { tool: tool.label }) : t("toolCard.closeTool", { tool: tool.label })}
                   data-tutorial-anchor={`seal-tool-${tutorialToolId}`}
                   className="inline-flex min-w-[3.75rem] justify-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                   draggable={false}
@@ -209,7 +215,7 @@ export function BenchToolCard({
                   }}
                   type="button"
                 >
-                  {isSealed ? "Open" : "Close"}
+                  {isSealed ? t("toolCard.open") : t("toolCard.close")}
                 </button>
               </div>
             ) : null}
@@ -254,26 +260,26 @@ export function BenchToolCard({
                 {isSampleBag
                   ? produceLots.length > 0
                     ? `${produceLots.length} produce lot${produceLots.length === 1 ? "" : "s"} loaded`
-                    : "Ready for produce lot intake"
+                    : t("toolCard.readyForProduceIntake")
                   : isProduceSurface
                     ? produceLots.length > 0
                       ? `${produceLots.length} produce lot${produceLots.length === 1 ? "" : "s"} staged`
                       : powderMassG > 0
                         ? `${powderMassG.toFixed(0)} g powder residue`
-                        : "Ready for produce staging"
+                        : t("toolCard.readyForProduceStaging")
                   : isPowderTool
                     ? tool.toolType === "storage_jar"
                       ? powderMassG > 0
-                        ? "Powder reservoir loaded"
-                        : "Ready for spatula loading"
+                        ? t("toolCard.powderReservoirLoaded")
+                        : t("toolCard.readyForSpatulaLoading")
                       : containsSlurry
-                        ? "Slurry present"
+                        ? t("toolCard.slurryPresent")
                       : powderMassG > 0
-                        ? "Powder deposit present"
-                        : "Ready for powder dosing"
+                        ? t("toolCard.powderDepositPresent")
+                        : t("toolCard.readyForPowderDosing")
                   : tool.liquids.length > 0
                     ? `${tool.liquids.length} liquid loaded`
-                    : "Ready for liquid additions"}
+                    : t("toolCard.readyForLiquids")}
               </p>
             </div>
           </div>
@@ -320,7 +326,7 @@ export function BenchToolCard({
                   />
                 ) : (
                   <input
-                    aria-label="Sample label text"
+                    aria-label={t("toolCard.sampleLabelText")}
                     className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-400"
                     data-testid={
                       labels.length === 1
@@ -337,7 +343,7 @@ export function BenchToolCard({
                         event.currentTarget.blur();
                       }
                     }}
-                    placeholder="Write a note"
+                    placeholder={t("toolCard.writeNote")}
                     readOnly={label.labelKind !== "manual"}
                     type="text"
                   />
@@ -365,7 +371,7 @@ export function BenchToolCard({
         {pendingContent ? (
           <div className="space-y-0.5">{pendingContent}</div>
         ) : produceLots.length > 0 || tool.liquids.length > 0 ? (
-          <section className="space-y-1.5" aria-label="Declared contents">
+          <section className="space-y-1.5" aria-label={t("toolCard.declaredContents")}>
             <p className="px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
               Declared contents
             </p>
@@ -434,8 +440,9 @@ function SeparatedPhasesPanel({
   pelletMassG: number;
   supernatantMl: number;
 }) {
+  const t = useT();
   return (
-    <section aria-label="Separated phases" className="space-y-1.5" data-testid="separated-phases">
+    <section aria-label={t("toolCard.separatedPhases")} className="space-y-1.5" data-testid="separated-phases">
       <p className="px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
         Separated phases
       </p>
@@ -443,7 +450,7 @@ function SeparatedPhasesPanel({
         <div className="flex items-center justify-between gap-2 bg-amber-50 px-2.5 py-1.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400" />
-            <span className="truncate text-xs font-semibold text-amber-900">Supernatant</span>
+            <span className="truncate text-xs font-semibold text-amber-900">{t("toolCard.supernatant")}</span>
             <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-700">
               Pipette draws this
             </span>
@@ -455,7 +462,7 @@ function SeparatedPhasesPanel({
         <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-100 px-2.5 py-1.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400" />
-            <span className="truncate text-xs font-semibold text-slate-700">Pellet</span>
+            <span className="truncate text-xs font-semibold text-slate-700">{t("toolCard.pellet")}</span>
             <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
               Left behind
             </span>

@@ -1,3 +1,4 @@
+import { translateNow } from "@/lib/i18n";
 import type { Experiment } from "@/types/experiment";
 import type { ProduceDragPayload } from "@/types/workbench";
 
@@ -35,18 +36,17 @@ export function getTutorialProduceDropIntervention({
     .find((tool) => tool.toolType === "cutting_board");
 
   return {
-    actionLabel: "Use the highlighted Cutting board",
+    actionLabel: translateNow("guard.contamination.actionLabel"),
     anchor: cuttingBoard
       ? `bench-tool-card-${cuttingBoard.id}`
       : "palette-item-cutting_board_hdpe",
-    continueLabel: "Continue tutorial",
-    title: "Contamination prevented",
-    instruction:
-      "Do not place the apples directly on the workbench. Contact with the bare surface would irreversibly contaminate the sample. Drop them onto the highlighted Cutting board instead.",
+    continueLabel: translateNow("guard.contamination.continueLabel"),
+    title: translateNow("guard.contamination.title"),
+    instruction: translateNow("guard.contamination.instruction"),
     hint: cuttingBoard
-      ? "The attempted drop was cancelled: the apples are still in their original container."
-      : "First deploy a Cutting board from Inventory, then transfer the apples onto it.",
-    leaveLabel: "Leave tutorial and place anyway",
+      ? translateNow("guard.contamination.hintCancelled")
+      : translateNow("guard.contamination.hintDeploy"),
+    leaveLabel: translateNow("guard.contamination.leaveLabel"),
   };
 }
 
@@ -76,13 +76,12 @@ export function getTutorialTareIntervention({
   }
 
   return {
-    actionLabel: "Do not tare again",
+    actionLabel: translateNow("guard.tare.actionLabel"),
     anchor: "analytical-balance-tare",
-    continueLabel: "Keep the empty-tube tare",
-    title: "Tare protected",
-    instruction:
-      "The tube already contains powder. Taring again would hide that mass from the Net display, so the tutorial cancelled the action. Keep the tare measured with the empty tube and continue dosing until Net reaches about 10.000 g.",
-    hint: "Nothing changed on the balance: the original empty-tube tare and the current Net value were preserved.",
-    leaveLabel: "Leave tutorial and tare anyway",
+    continueLabel: translateNow("guard.tare.continueLabel"),
+    title: translateNow("guard.tare.title"),
+    instruction: translateNow("guard.tare.instruction"),
+    hint: translateNow("guard.tare.hint"),
+    leaveLabel: translateNow("guard.tare.leaveLabel"),
   };
 }

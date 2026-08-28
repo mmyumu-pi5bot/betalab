@@ -5,6 +5,7 @@ import type { DragEvent } from "react";
 import { DraggableInventoryItem } from "@/components/draggable-inventory-item";
 import { LabWasteBinIllustration } from "@/components/illustrations/lab-waste-bin-illustration";
 import { InventoryWidget } from "@/components/inventory-widget";
+import { useT } from "@/lib/i18n";
 import { getProduceLotDisplayName } from "@/lib/produce-lot-display";
 import type {
   BenchToolInstance,
@@ -65,6 +66,7 @@ export function TrashWidget({
   trashedTools,
   trashedWidgets,
 }: TrashWidgetProps) {
+  const t = useT();
   const trashItemCount =
     trashedTools.length + trashedProduceLots.length + trashedSampleLabels.length + trashedWidgets.length;
 
@@ -88,7 +90,7 @@ export function TrashWidget({
       onToggle={handleToggle}
       overlayTestId="trash-dialog-overlay"
       overlayWidthClassName="w-[26rem] max-w-[min(26rem,calc(100vw-2rem))]"
-      title="Trash"
+      title={t("trash.title")}
     >
       <div className="space-y-2">
         {trashedTools.map((tool) => {
@@ -139,7 +141,7 @@ export function TrashWidget({
             }
             title={
               <p className="truncate text-sm font-semibold text-slate-900">
-                {getProduceLotDisplayName(trashProduceLot.produceLot)}
+                {getProduceLotDisplayName(t, trashProduceLot.produceLot)}
               </p>
             }
           />
@@ -152,7 +154,7 @@ export function TrashWidget({
             onDragStart={
               dndDisabled ? undefined : (dataTransfer) => onTrashedWidgetDragStart(widget, dataTransfer)
             }
-            subtitle={<p className="truncate text-xs text-slate-500">Workspace widget</p>}
+            subtitle={<p className="truncate text-xs text-slate-500">{t("trash.workspaceWidget")}</p>}
             title={
               <p className="truncate text-sm font-semibold text-slate-900">
                 {widget.label}
@@ -177,14 +179,14 @@ export function TrashWidget({
             }
             title={
               <p className="truncate text-sm font-semibold text-slate-900">
-                {trashSampleLabel.label?.text || "Untitled label"}
+                {trashSampleLabel.label?.text || t("trash.untitledLabel")}
               </p>
             }
           />
         ))}
         {isEmpty ? (
           <div className="rounded-[1rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-            Trash is empty.
+            {t("trash.empty")}
           </div>
         ) : null}
       </div>

@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { translateNow } from "@/lib/i18n";
 
 type LabWasteBinIllustrationProps = SVGProps<SVGSVGElement> & {
   hasItems?: boolean;
@@ -18,7 +19,7 @@ export function LabWasteBinIllustration({
 }: LabWasteBinIllustrationProps) {
   return (
     <svg
-      aria-label="Laboratory waste bin"
+      aria-label={translateNow("illustration.wasteBin")}
       className={className}
       data-has-items={hasItems}
       data-open={isOpen}

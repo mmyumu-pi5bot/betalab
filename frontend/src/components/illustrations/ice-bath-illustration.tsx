@@ -3,6 +3,7 @@
 import { useId } from "react";
 
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
+import { translateNow } from "@/lib/i18n";
 
 type IceBathIllustrationProps = {
   className?: string;
@@ -39,7 +40,7 @@ export function IceBathIllustration({ className, hasTube }: IceBathIllustrationP
 
   return (
     <div
-      aria-label="Ice bath"
+      aria-label={translateNow("illustration.iceBath")}
       className={`relative ${className ?? ""}`}
       data-testid="ice-bath-illustration"
       role="group"

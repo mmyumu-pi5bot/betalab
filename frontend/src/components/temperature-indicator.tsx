@@ -6,6 +6,7 @@ import {
   getCryogenicStatus,
   type CryogenicTone,
 } from "@/lib/cryogenic-temperature";
+import { useT } from "@/lib/i18n";
 
 type TemperatureIndicatorProps = {
   temperatureC: number;
@@ -25,12 +26,14 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function TemperatureIndicator({ temperatureC, tutorialAnchor }: TemperatureIndicatorProps) {
+  const t = useT();
   const normalizedFill = clamp(
     (temperatureC - cryogenicTemperatureC) / (ambientTemperatureC - cryogenicTemperatureC),
     0,
     1,
   );
-  const { label, tone } = getCryogenicStatus(temperatureC);
+  const { labelKey, tone } = getCryogenicStatus(temperatureC);
+  const label = t(labelKey);
   const toneClassName = toneClassNames[tone];
   const formattedTemperature = `${temperatureC.toFixed(1)}°C`;
   const tooltipLabel = `${label} • ${temperatureC.toFixed(1)} C`;

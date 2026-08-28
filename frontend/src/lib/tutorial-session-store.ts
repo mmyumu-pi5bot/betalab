@@ -1,4 +1,4 @@
-export const TUTORIAL_SESSION_STORAGE_KEY = "betalab:tutorial-sessions:v1";
+const TUTORIAL_SESSION_STORAGE_KEY = "betalab:tutorial-sessions:v1";
 
 // "completed" is a deliberate exit: the learner finished the tutorial and switched
 // the experiment to free mode, so the coach must not come back on its own.

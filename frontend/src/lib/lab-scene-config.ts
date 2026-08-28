@@ -1,3 +1,4 @@
+import { translateNow } from "@/lib/i18n";
 import type { CSSProperties } from "react";
 
 import type { DebugProducePreset } from "@/components/debug-produce-palette";
@@ -70,143 +71,124 @@ const debugProduceAllowedDropTargets: DropTargetType[] = [
   "gross_balance_widget",
 ];
 
-export const debugProducePresets: DebugProducePreset[] = [
-  {
-    id: "apple_powder_residual_co2",
-    produceLot: {
-      id: "debug_preview_apple_powder_residual_co2",
-      label: "Apple powder lot",
-      produceType: "apple",
-      totalMassG: 2450,
-      unitCount: null,
-      materialState: "ground",
-      residualCo2MassG: 18,
-      temperatureC: -62,
-      grindQualityLabel: "powder_fine",
-      isDraggable: true,
-      allowedDropTargets: debugProduceAllowedDropTargets,
+// Debug presets are built on demand rather than frozen at import: their names and
+// descriptions come from the message catalogue, and the learner can switch
+// language after this module has already been evaluated.
+export function getDebugProducePresets(): DebugProducePreset[] {
+  return [
+    {
+      id: "apple_powder_residual_co2",
+      produceLot: {
+        id: "debug_preview_apple_powder_residual_co2",
+        label: translateNow("debug.preset.applePowderLot"),
+        produceType: "apple",
+        totalMassG: 2450,
+        unitCount: null,
+        materialState: "ground",
+        residualCo2MassG: 18,
+        temperatureC: -62,
+        grindQualityLabel: "powder_fine",
+        isDraggable: true,
+        allowedDropTargets: debugProduceAllowedDropTargets,
+      },
     },
-  },
+  ];
+}
+
+const debugTubeDropTargets: DropTargetType[] = [
+  "workbench_slot",
+  "trash_bin",
+  "gross_balance_widget",
+  "analytical_balance_widget",
+  "vortex_widget",
 ];
 
-export const debugSlurryTubePreset: ToolCatalogItem = {
-  id: "apple_slurry_centrifuge_tube",
-  name: "Apple slurry tube",
-  subtitle: "50 mL centrifuge tube",
-  description: "Debug tube prefilled with apple slurry.",
-  accent: "rose",
-  itemType: "tool",
-  toolType: "centrifuge_tube",
-  capacity_ml: 50,
-  allowedDropTargets: [
-    "workbench_slot",
-    "trash_bin",
-    "gross_balance_widget",
-    "analytical_balance_widget",
-    "vortex_widget",
-  ],
-};
+export const debugPreparedExtractVialPresetId = "apple_extract_vial";
 
-export const debugVortexedSlurryTubePreset: ToolCatalogItem = {
-  id: "vortexed_slurry_centrifuge_tube",
-  name: "Vortexed slurry tube",
-  subtitle: "50 mL centrifuge tube · ready to spin",
-  description:
-    "Debug tube with apple slurry already salted, sealed and vortexed — drop it straight into the centrifuge.",
-  accent: "rose",
-  itemType: "tool",
-  toolType: "centrifuge_tube",
-  capacity_ml: 50,
-  allowedDropTargets: [
-    "workbench_slot",
-    "trash_bin",
-    "gross_balance_widget",
-    "analytical_balance_widget",
-    "vortex_widget",
-  ],
-};
+export function getDebugToolPresets(): ToolCatalogItem[] {
+  return [
+    {
+      id: "apple_slurry_centrifuge_tube",
+      name: translateNow("debug.preset.appleSlurryTube.name"),
+      subtitle: translateNow("debug.preset.tube50"),
+      description: translateNow("debug.preset.appleSlurryTube.description"),
+      accent: "rose",
+      itemType: "tool",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      allowedDropTargets: debugTubeDropTargets,
+    },
+    {
+      id: "vortexed_slurry_centrifuge_tube",
+      name: translateNow("debug.preset.vortexedSlurryTube.name"),
+      subtitle: translateNow("debug.preset.tube50ReadyToSpin"),
+      description: translateNow("debug.preset.vortexedSlurryTube.description"),
+      accent: "rose",
+      itemType: "tool",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      allowedDropTargets: debugTubeDropTargets,
+    },
+    {
+      id: "separated_slurry_centrifuge_tube",
+      name: translateNow("debug.preset.centrifugedSlurryTube.name"),
+      subtitle: translateNow("debug.preset.tube50ReadyToPipette"),
+      description: translateNow("debug.preset.centrifugedSlurryTube.description"),
+      accent: "rose",
+      itemType: "tool",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      allowedDropTargets: debugTubeDropTargets,
+    },
+    {
+      id: debugPreparedExtractVialPresetId,
+      name: translateNow("debug.preset.preparedAppleVial.name"),
+      subtitle: translateNow("debug.preset.preparedAppleVial.subtitle"),
+      description: translateNow("debug.preset.preparedAppleVial.description"),
+      accent: "rose",
+      itemType: "tool",
+      toolType: "sample_vial",
+      capacity_ml: 2,
+      allowedDropTargets: [
+        "workbench_slot",
+        "rack_slot",
+        "trash_bin",
+        "gross_balance_widget",
+        "analytical_balance_widget",
+      ],
+    },
+    {
+      id: "calibration_standard_tube",
+      name: translateNow("debug.preset.calibrationStockTube.name"),
+      subtitle: translateNow("debug.preset.tube50Standard"),
+      description: translateNow("debug.preset.calibrationStockTube.description"),
+      accent: "rose",
+      itemType: "tool",
+      toolType: "centrifuge_tube",
+      capacity_ml: 50,
+      allowedDropTargets: debugTubeDropTargets,
+    },
+  ];
+}
 
-export const debugSeparatedSlurryTubePreset: ToolCatalogItem = {
-  id: "separated_slurry_centrifuge_tube",
-  name: "Centrifuged slurry tube",
-  subtitle: "50 mL centrifuge tube · ready to pipette",
-  description:
-    "Debug tube taken through the full QuEChERS prep and centrifuged — open, with a pipettable supernatant ready to transfer into a rack vial.",
-  accent: "rose",
-  itemType: "tool",
-  toolType: "centrifuge_tube",
-  capacity_ml: 50,
-  allowedDropTargets: [
-    "workbench_slot",
-    "trash_bin",
-    "gross_balance_widget",
-    "analytical_balance_widget",
-    "vortex_widget",
-  ],
-};
+export function getDebugToolPresetsById(): Record<string, ToolCatalogItem> {
+  return Object.fromEntries(getDebugToolPresets().map((preset) => [preset.id, preset]));
+}
 
-export const debugCalibrationTubePreset: ToolCatalogItem = {
-  id: "calibration_standard_tube",
-  name: "Calibration stock tube",
-  subtitle: "50 mL tube · 100 ng/mL standard",
-  description:
-    "Debug centrifuge tube filled with a multi-residue calibration standard — pipette it into a rack vial yourself; the pipette carries the calibration identity across.",
-  accent: "rose",
-  itemType: "tool",
-  toolType: "centrifuge_tube",
-  capacity_ml: 50,
-  allowedDropTargets: [
-    "workbench_slot",
-    "trash_bin",
-    "gross_balance_widget",
-    "analytical_balance_widget",
-    "vortex_widget",
-  ],
-};
-
-export const debugPreparedExtractVialPreset: ToolCatalogItem = {
-  id: "apple_extract_vial",
-  name: "Prepared apple vial",
-  subtitle: "Autosampler vial · apple extract",
-  description:
-    "Debug autosampler vial holding a finished apple extract — the whole grind, extraction and pipetting chain skipped. Drop it straight into the rack and inject.",
-  accent: "rose",
-  itemType: "tool",
-  toolType: "sample_vial",
-  capacity_ml: 2,
-  allowedDropTargets: [
-    "workbench_slot",
-    "rack_slot",
-    "trash_bin",
-    "gross_balance_widget",
-    "analytical_balance_widget",
-  ],
-};
-
-export const debugToolPresets: ToolCatalogItem[] = [
-  debugSlurryTubePreset,
-  debugVortexedSlurryTubePreset,
-  debugSeparatedSlurryTubePreset,
-  debugPreparedExtractVialPreset,
-  debugCalibrationTubePreset,
-];
-
-export const debugToolPresetsById: Record<string, ToolCatalogItem> = Object.fromEntries(
-  debugToolPresets.map((preset) => [preset.id, preset]),
-);
-
-const debugSlurryPreviewLot: ExperimentProduceLot = {
+function buildDebugSlurryPreviewLot(): ExperimentProduceLot {
+  return {
   id: "debug_slurry_preview",
-  label: "Apple slurry",
+  label: translateNow("debug.preset.appleSlurry"),
   produceType: "apple",
   totalMassG: 10,
   unitCount: null,
   materialState: "slurry",
   isDraggable: true,
   allowedDropTargets: [],
-};
+  };
+}
 
-export type DebugToolPresetPreview = {
+type DebugToolPresetPreview = {
   accent: ToolbarAccent;
   containsSlurry: boolean;
   detailLabel: string;
@@ -221,11 +203,11 @@ const debugCalibrationPresetIds = new Set<DebugToolPresetId>(["calibration_stand
 // Slurry tubes show an apple-slurry fill; the calibration and prepared-extract presets
 // show a clear liquid instead of produce, since both hold a solution only.
 export function getDebugToolPresetPreview(preset: ToolCatalogItem): DebugToolPresetPreview {
-  if (preset.id === debugPreparedExtractVialPreset.id) {
+  if (preset.id === debugPreparedExtractVialPresetId) {
     return {
       accent: preset.accent,
       containsSlurry: false,
-      detailLabel: "1 mL apple extract",
+      detailLabel: translateNow("debug.detail.appleExtract"),
       fillRatio: 0.55,
       iconKind: preset.toolType,
       produceLots: [],
@@ -235,7 +217,7 @@ export function getDebugToolPresetPreview(preset: ToolCatalogItem): DebugToolPre
     return {
       accent: preset.accent,
       containsSlurry: false,
-      detailLabel: "100 ng/mL calibration",
+      detailLabel: translateNow("debug.detail.calibration"),
       fillRatio: 0.55,
       iconKind: preset.toolType,
       produceLots: [],
@@ -244,10 +226,10 @@ export function getDebugToolPresetPreview(preset: ToolCatalogItem): DebugToolPre
   return {
     accent: preset.accent,
     containsSlurry: true,
-    detailLabel: "10 g apple slurry",
+    detailLabel: translateNow("debug.detail.appleSlurry"),
     fillRatio: 0.4,
     iconKind: preset.toolType,
-    produceLots: [debugSlurryPreviewLot],
+    produceLots: [buildDebugSlurryPreviewLot()],
   };
 }
 
@@ -303,7 +285,7 @@ export function getRackIllustrationSlotPosition(slotIndex: number) {
   };
 }
 
-export type RackIllustrationGrabEdge = {
+type RackIllustrationGrabEdge = {
   id: "top" | "bottom" | "left" | "right";
   style: CSSProperties;
 };
@@ -360,10 +342,10 @@ export function getApproximateToolMassG(tool: BenchToolInstance, decimals = 1) {
 export function buildDebugProduceDraftFields(): DropDraftField[] {
   return [
     {
-      ariaLabel: "Debug powder mass",
+      ariaLabel: translateNow("debug.field.powderMass"),
       id: "total_mass_g",
       inputStep: 10,
-      label: "Mass",
+      label: translateNow("draft.mass"),
       minValue: 1,
       stepAmount: 50,
       unitLabel: "g",
@@ -371,10 +353,10 @@ export function buildDebugProduceDraftFields(): DropDraftField[] {
       wheelStep: 50,
     },
     {
-      ariaLabel: "Debug powder temperature",
+      ariaLabel: translateNow("debug.field.powderTemperature"),
       id: "temperature_c",
       inputStep: 1,
-      label: "Temperature",
+      label: translateNow("draft.temperature"),
       minValue: -120,
       stepAmount: 5,
       unitLabel: "C",
@@ -383,10 +365,10 @@ export function buildDebugProduceDraftFields(): DropDraftField[] {
       wheelStep: 5,
     },
     {
-      ariaLabel: "Debug powder residual CO2",
+      ariaLabel: translateNow("debug.field.powderResidualCo2"),
       id: "residual_co2_mass_g",
       inputStep: 0.1,
-      label: "Residual CO2",
+      label: translateNow("draft.residualCo2"),
       stepAmount: 1,
       unitLabel: "g",
       value: 18,
@@ -398,10 +380,10 @@ export function buildDebugProduceDraftFields(): DropDraftField[] {
 export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
   return [
     {
-      ariaLabel: "Debug slurry apple mass",
+      ariaLabel: translateNow("debug.field.slurryAppleMass"),
       id: "produce_mass_g",
       inputStep: 0.1,
-      label: "Apple mass",
+      label: translateNow("draft.appleMass"),
       minValue: 0.1,
       stepAmount: 1,
       unitLabel: "g",
@@ -409,10 +391,10 @@ export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
       wheelStep: 1,
     },
     {
-      ariaLabel: "Debug slurry temperature",
+      ariaLabel: translateNow("debug.field.slurryTemperature"),
       id: "temperature_c",
       inputStep: 1,
-      label: "Temperature",
+      label: translateNow("draft.temperature"),
       minValue: -120,
       stepAmount: 5,
       unitLabel: "C",
@@ -423,13 +405,13 @@ export function buildDebugSlurryTubeDraftFields(): DropDraftField[] {
   ];
 }
 
-export function buildDebugCalibrationStockDraftFields(): DropDraftField[] {
+function buildDebugCalibrationStockDraftFields(): DropDraftField[] {
   return [
     {
-      ariaLabel: "Debug calibration stock level",
+      ariaLabel: translateNow("debug.field.calibrationLevel"),
       id: "level_ng_per_ml",
       inputStep: 1,
-      label: "Level",
+      label: translateNow("draft.level"),
       minValue: 1,
       stepAmount: 10,
       unitLabel: "ng/mL",
@@ -443,13 +425,13 @@ export function buildDebugCalibrationStockDraftFields(): DropDraftField[] {
 // to come from: how much apple went into how much solvent, and how well the prep went.
 // Recovery and sampling accuracy are the two factors a real prep draws at random —
 // pinning them here is what makes a debug vial reproducible.
-export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
+function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
   return [
     {
-      ariaLabel: "Debug extract apple mass",
+      ariaLabel: translateNow("debug.field.extractAppleMass"),
       id: "produce_mass_g",
       inputStep: 0.1,
-      label: "Apple mass",
+      label: translateNow("draft.appleMass"),
       minValue: 0.1,
       stepAmount: 1,
       unitLabel: "g",
@@ -457,10 +439,10 @@ export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
       wheelStep: 1,
     },
     {
-      ariaLabel: "Debug extract solvent volume",
+      ariaLabel: translateNow("debug.field.extractSolventVolume"),
       id: "extract_volume_ml",
       inputStep: 0.1,
-      label: "Extract volume",
+      label: translateNow("draft.extractVolume"),
       minValue: 0.1,
       stepAmount: 1,
       unitLabel: "mL",
@@ -468,10 +450,10 @@ export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
       wheelStep: 1,
     },
     {
-      ariaLabel: "Debug extraction recovery",
+      ariaLabel: translateNow("debug.field.extractionRecovery"),
       id: "extraction_recovery_percent",
       inputStep: 1,
-      label: "Recovery",
+      label: translateNow("draft.recovery"),
       minValue: 1,
       presets: [60, 80, 92, 100],
       stepAmount: 5,
@@ -480,10 +462,10 @@ export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
       wheelStep: 5,
     },
     {
-      ariaLabel: "Debug sampling accuracy",
+      ariaLabel: translateNow("debug.field.samplingAccuracy"),
       id: "sampling_accuracy_percent",
       inputStep: 1,
-      label: "Sampling accuracy",
+      label: translateNow("draft.samplingAccuracy"),
       minValue: 1,
       presets: [70, 85, 100],
       stepAmount: 5,
@@ -492,10 +474,10 @@ export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
       wheelStep: 5,
     },
     {
-      ariaLabel: "Debug extract ISTD volume",
+      ariaLabel: translateNow("debug.field.extractIstdVolume"),
       id: "istd_volume_ml",
       inputStep: 0.01,
-      label: "ISTD volume",
+      label: translateNow("draft.istdVolume"),
       stepAmount: 0.05,
       unitLabel: "mL",
       value: 0.1,
@@ -505,7 +487,7 @@ export function buildDebugPreparedExtractVialDraftFields(): DropDraftField[] {
 }
 
 export function buildDebugToolPresetDraftFields(presetId: DebugToolPresetId): DropDraftField[] {
-  if (presetId === debugPreparedExtractVialPreset.id) {
+  if (presetId === debugPreparedExtractVialPresetId) {
     return buildDebugPreparedExtractVialDraftFields();
   }
   if (debugCalibrationPresetIds.has(presetId)) {

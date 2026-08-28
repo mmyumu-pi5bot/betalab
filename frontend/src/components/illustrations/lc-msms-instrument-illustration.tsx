@@ -1,4 +1,5 @@
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
+import { translateNow } from "@/lib/i18n";
 
 type LcMsMsInstrumentIllustrationProps = {
   activeStage?: "lc" | "transfer" | "msms" | null;
@@ -112,7 +113,7 @@ export function LcMsMsInstrumentIllustration({
 
   return (
     <div
-      aria-label="LC-MS/MS instrument illustration"
+      aria-label={translateNow("illustration.instrument")}
       className={className}
       data-active-stage={activeStage ?? "none"}
       data-status={status}

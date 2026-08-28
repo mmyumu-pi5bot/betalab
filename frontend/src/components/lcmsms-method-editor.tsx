@@ -19,6 +19,7 @@ import type {
   MrmTransition,
   ReferenceCompound,
 } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   method: AcquisitionMethod;
@@ -26,9 +27,6 @@ type Props = {
 };
 
 type EditorMode = "simple" | "advanced";
-
-const CALIBRATION_LEVELS_ERROR =
-  "Calibration levels must be a list of positive numbers, separated by commas.";
 
 /**
  * Read the ladder the user typed, or say why it cannot be read.
@@ -50,6 +48,7 @@ function formatCalibrationLevels(levels: number[]): string {
 }
 
 export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
+  const t = useT();
   const [mode, setMode] = useState<EditorMode>("simple");
   const [name, setName] = useState(method.name);
   const [version, setVersion] = useState(method.version);
@@ -126,7 +125,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
       const proposed = await proposeMrmTransitions([compoundId]);
       setTransitions([...transitions, ...proposed]);
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Failed to propose transitions.");
+      setFailure(cause instanceof Error ? cause.message : t("editor.proposeError"));
     }
   }
 
@@ -134,7 +133,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
     if (errors.length > 0) return;
     const calibrationLevelsNgPerMl = parseCalibrationLevels(calibrationLevelsText);
     if (calibrationLevelsNgPerMl === null) {
-      setFailure(CALIBRATION_LEVELS_ERROR);
+      setFailure(t("editor.calibrationLevelsError"));
       return;
     }
     setIsBusy(true);
@@ -151,7 +150,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
       setSavedVersion(saved.method.version);
       onMethodSaved(saved.method);
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Failed to save the method.");
+      setFailure(cause instanceof Error ? cause.message : t("editor.saveError"));
     } finally {
       setIsBusy(false);
     }
@@ -160,14 +159,12 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
   if (method.isBuiltIn) {
     return (
       <section
-        aria-label="Acquisition method editor"
+        aria-label={t("editor.title")}
         className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3"
         data-tutorial-anchor="method-editor-builtin-notice"
       >
         <p className="text-[11px] leading-relaxed text-slate-300">
-          <span className="font-semibold text-slate-100">{method.name}</span> is a built-in
-          method and cannot be edited. Use <em>Duplicate method</em> in the library to obtain
-          an editable copy, change the copy, then save it as a new version.
+          {t("editor.builtInNotice", { name: method.name })}
         </p>
       </section>
     );
@@ -175,18 +172,18 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
 
   return (
     <section
-      aria-label="Acquisition method editor"
+      aria-label={t("editor.title")}
       className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-xs font-semibold text-slate-100">Edit method</h4>
+        <h4 className="text-xs font-semibold text-slate-100">{t("editor.editMethod")}</h4>
         <div className="ml-auto flex gap-1">
           {(
             [
-              ["simple", "Simple"],
-              ["advanced", "Advanced"],
+              ["simple", "editor.simple"],
+              ["advanced", "editor.advanced"],
             ] as const
-          ).map(([candidate, label]) => (
+          ).map(([candidate, labelKey]) => (
             <button
               className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
                 mode === candidate
@@ -197,7 +194,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
               onClick={() => setMode(candidate)}
               type="button"
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -205,9 +202,9 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
 
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <label className="text-[10px] text-slate-400">
-          Method name
+          {t("editor.methodName")}
           <input
-            aria-label="Method name"
+            aria-label={t("editor.methodName")}
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
             onChange={(event) => {
             setSavedVersion(null);
@@ -217,9 +214,9 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
           />
         </label>
         <label className="text-[10px] text-slate-400">
-          Version
+          {t("editor.version")}
           <input
-            aria-label="Version"
+            aria-label={t("editor.version")}
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
             onChange={(event) => {
             setSavedVersion(null);
@@ -231,29 +228,27 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
       </div>
 
       <label className="mt-2 block text-[10px] text-slate-400">
-        Calibration levels (ng/mL)
+        {t("editor.calibrationLevels")}
         <input
-          aria-label="Calibration levels (ng/mL)"
+          aria-label={t("editor.calibrationLevels")}
           className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
           data-tutorial-anchor="method-editor-calibration-levels"
           onChange={(event) => {
             setSavedVersion(null);
             setCalibrationLevelsText(event.target.value);
           }}
-          placeholder="e.g. 1, 2, 5, 10, 20"
+          placeholder={t("editor.calibrationLevelsPlaceholder")}
           value={calibrationLevelsText}
         />
         <span className="mt-1 block leading-relaxed text-slate-500">
-          Optional. The exported method file gets one concentration column per level,
-          in this order. Leave empty to export no concentration column and fill them in
-          yourself. Nothing checks these against the standards actually in the rack.
+          {t("editor.calibrationLevelsHint")}
         </span>
       </label>
 
       {mode === "simple" ? (
         <div className="mt-3" data-testid="simple-mode-compounds">
           <p className="text-[10px] text-slate-400">
-            Pick the compounds to target. The catalog proposes their known transitions.
+            {t("editor.pickCompounds")}
           </p>
           <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
             {referenceCatalog.map((compound) => {
@@ -297,24 +292,24 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
                   }
                   type="button"
                 >
-                  Remove transition
+                  {t("editor.removeTransition")}
                 </button>
               </div>
               <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                 {(
                   [
-                    ["Q1 (m/z)", "q1Mz"],
-                    ["Q3 (m/z)", "q3Mz"],
-                    ["CE (V)", "collisionEnergyV"],
-                    ["Dwell (ms)", "dwellTimeMs"],
-                    ["RT (s)", "expectedRetentionTimeS"],
-                    ["Window (s)", "retentionWindowS"],
+                    ["editor.q1", "q1Mz"],
+                    ["editor.q3", "q3Mz"],
+                    ["editor.collisionEnergy", "collisionEnergyV"],
+                    ["editor.dwell", "dwellTimeMs"],
+                    ["editor.retentionTime", "expectedRetentionTimeS"],
+                    ["editor.retentionWindow", "retentionWindowS"],
                   ] as const
-                ).map(([label, field]) => (
+                ).map(([labelKey, field]) => (
                   <NumericField
                     className="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1 font-mono text-[10px] text-white"
                     key={field}
-                    label={label}
+                    label={t(labelKey)}
                     labelClassName="text-[9px] text-slate-400"
                     onChange={(next) =>
                       setTransitions(
@@ -325,9 +320,9 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
                   />
                 ))}
                 <label className="text-[9px] text-slate-400">
-                  Polarity
+                  {t("editor.polarity")}
                   <select
-                    aria-label="Polarity"
+                    aria-label={t("editor.polarity")}
                     className="mt-0.5 w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-[10px] text-white"
                     onChange={(event) =>
                       setTransitions(
@@ -338,8 +333,8 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
                     }
                     value={transition.polarity}
                   >
-                    <option value="positive">positive</option>
-                    <option value="negative">negative</option>
+                    <option value="positive">{t("editor.polarityPositive")}</option>
+                    <option value="negative">{t("editor.polarityNegative")}</option>
                   </select>
                 </label>
               </div>
@@ -354,7 +349,9 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
           data-testid="method-errors"
         >
           {errors.map((error) => (
-            <li key={error}>{error}</li>
+            <li key={`${error.key}-${JSON.stringify(error.params ?? {})}`}>
+              {t(error.key, error.params)}
+            </li>
           ))}
         </ul>
       ) : null}
@@ -366,7 +363,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
         >
           {warnings.map((warning) => (
             <li key={`${warning.code}-${warning.transitionId}`}>
-              {warning.message} Saving is still allowed — run it and look at the trace.
+              {t("editor.warningSuffix", { message: warning.message })}
             </li>
           ))}
         </ul>
@@ -386,7 +383,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
         onClick={handleSave}
         type="button"
       >
-        Save as new version
+        {t("editor.save")}
       </button>
 
       {savedVersion !== null ? (
@@ -395,7 +392,7 @@ export function LcMsMsMethodEditor({ method, onMethodSaved }: Props) {
           data-testid="method-saved-confirmation"
           data-tutorial-anchor="method-editor-saved"
         >
-          Saved as v{savedVersion}. Select it as the acquisition method in the console.
+          {t("editor.saved", { version: savedVersion })}
         </p>
       ) : null}
       </div>

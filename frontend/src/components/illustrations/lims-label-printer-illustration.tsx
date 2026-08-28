@@ -1,5 +1,7 @@
 "use client";
 
+import { translateNow } from "@/lib/i18n";
+
 type LimsLabelPrinterIllustrationProps = {
   className?: string;
   hasTicket: boolean;
@@ -50,7 +52,7 @@ export function LimsLabelPrinterIllustration({
 }: LimsLabelPrinterIllustrationProps) {
   return (
     <svg
-      aria-label="LIMS label printer"
+      aria-label={translateNow("illustration.limsPrinter")}
       className={className}
       fill="none"
       viewBox="0 0 360 76"

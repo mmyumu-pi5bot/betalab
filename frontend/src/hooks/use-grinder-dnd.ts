@@ -9,6 +9,7 @@ import {
   writeWorkspaceLiquidDragPayload,
 } from "@/lib/workbench-dnd";
 import { ambientTemperatureC } from "@/lib/cryogenic-temperature";
+import { translateCatalogName, useT } from "@/lib/i18n";
 import { labLiquidCatalog } from "@/lib/lab-workflow-catalog";
 import { executeGrinderProduceDropCommand } from "@/lib/produce-drop-command-executor";
 import { resolveProduceDropCommand } from "@/lib/produce-drop-command-resolver";
@@ -91,6 +92,7 @@ export function useGrinderDnd({
   pendingDropDraft,
   setPendingDropDraft,
 }: GrinderDndOptions): GrinderDndApi {
+  const t = useT();
   const { clearDropTargets, setActiveDragItem, showDropTargets } = dragState;
 
   const grinderProduceLots = grinderWidget?.produceLots ?? [];
@@ -150,49 +152,49 @@ export function useGrinderDnd({
 
   const grinderInfoLine1 =
     grinderDisplayMode === "running"
-      ? `Progress ${Math.round(grinderProgressPercent)}%`
+      ? t("grinder.progress", { percent: Math.round(grinderProgressPercent) })
       : grinderDisplayMode === "warning"
-        ? "Torque high"
+        ? t("grinder.torqueHigh")
         : "RPM 00000";
 
   const grinderInfoLine1Right =
     grinderDisplayMode === "running" || grinderDisplayMode === "warning"
       ? "RPM 10000"
       : grinderDisplayMode === "ready"
-        ? "Cycle 30s"
+        ? t("grinder.cycle30s")
         : "";
 
   const grinderInfoLine2 =
     grinderDisplayMode === "running"
-      ? "Load nominal"
+      ? t("grinder.loadNominal")
       : grinderDisplayMode === "warning"
-        ? "Jam risk"
+        ? t("grinder.jamRisk")
         : grinderDisplayMode === "ready"
-          ? "Load ready"
+          ? t("grinder.loadReady")
           : grinderDisplayMode === "complete"
-            ? "Rotor stopped"
+            ? t("grinder.rotorStopped")
             : grinderDisplayMode === "overload"
-              ? "Load too high"
+              ? t("grinder.loadTooHigh")
               : grinderDisplayMode === "jammed"
-                ? "Start lock"
-                : "Rotor stopped";
+                ? t("grinder.startLock")
+                : t("grinder.rotorStopped");
 
   const grinderInfoLine2Right =
     grinderDisplayMode === "running"
-      ? "Cryo mode"
+      ? t("grinder.cryoMode")
       : grinderDisplayMode === "warning"
-        ? "Pre-cool now"
+        ? t("grinder.preCoolNow")
         : grinderDisplayMode === "ready"
-          ? "Cryo armed"
+          ? t("grinder.cryoArmed")
           : grinderDisplayMode === "complete"
-            ? "Unload lot"
+            ? t("grinder.unloadLot")
             : grinderDisplayMode === "overload"
-              ? "Cut first"
+              ? t("grinder.cutFirst")
               : grinderDisplayMode === "jammed"
-                ? "Pre-cool"
+                ? t("grinder.preCool")
                 : grinderHasProduceLot
-                  ? "Cycle ready"
-                  : "No sample";
+                  ? t("grinder.cycleReady")
+                  : t("grinder.noSample");
 
   const handleOpenGrinderLiquidDraft = (liquidId: "dry_ice_pellets") => {
     const liquidDefinition = labLiquidCatalog[liquidId];
@@ -200,10 +202,10 @@ export function useGrinderDnd({
       commandType: "add_liquid_to_workspace_widget",
       fields: [
         {
-          ariaLabel: "Dry ice draft mass",
+          ariaLabel: t("grinder.dryIceDraftMass"),
           id: "volume_ml",
           inputStep: 1,
-          label: "Mass",
+          label: t("draft.mass"),
           stepAmount: 100,
           unitLabel: "g",
           value: liquidDefinition?.transfer_volume_ml ?? 1000,
@@ -213,7 +215,11 @@ export function useGrinderDnd({
       itemId: liquidId,
       targetId: "grinder",
       targetKind: "workspace_widget",
-      title: `Dose ${liquidDefinition?.name ?? "Dry ice pellets"}`,
+      title: t("draft.dose", {
+        liquid: liquidDefinition
+          ? translateCatalogName(t, liquidDefinition.id, liquidDefinition.name)
+          : t("draft.dryIceFallback"),
+      }),
     });
   };
 

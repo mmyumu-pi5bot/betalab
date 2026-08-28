@@ -76,7 +76,7 @@ describe("ExperimentsHome", () => {
     render(<ExperimentsHome />);
 
     await waitFor(() => {
-      expect(screen.getByText("No saved experiments yet.")).toBeInTheDocument();
+      expect(screen.getByText("No experiments yet.")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "New experiment" }));

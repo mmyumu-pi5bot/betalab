@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createExperiment, getExperiment, renameExperiment, subscribeToExperimentStream } from "@/lib/api";
 import { mutationFns, type MutationFn } from "@/lib/experiment-mutation-fns";
 import { useCommandPending } from "@/hooks/use-command-pending";
+import { useT } from "@/lib/i18n";
+import { localizeExperiment } from "@/lib/i18n/localize-experiment";
 import type { Experiment } from "@/types/experiment";
 import type {
   AddLiquidToAnalyticalBalanceToolPayload,
@@ -90,6 +92,7 @@ export function useLabExperiment({
   defaultStatusMessage,
   experimentId,
 }: UseLabExperimentOptions) {
+  const t = useT();
   const [state, setState] = useState<LabExperimentState>({ status: "loading" });
   const [statusMessage, setStatusMessage] = useState(defaultStatusMessage);
   const latestSnapshotVersionRef = useRef(0);
@@ -126,6 +129,16 @@ export function useLabExperiment({
   useEffect(() => {
     void loadExperiment();
   }, [loadExperiment]);
+
+  // Everything downstream reads labels straight off the snapshot, so the whole
+  // snapshot is translated once here rather than in every card that renders one.
+  const localizedState = useMemo<LabExperimentState>(
+    () =>
+      state.status === "ready"
+        ? { status: "ready", experiment: localizeExperiment(t, state.experiment) }
+        : state,
+    [state, t],
+  );
 
   const readyExperimentId = state.status === "ready" ? state.experiment.id : null;
 
@@ -186,7 +199,7 @@ export function useLabExperiment({
     try {
       await runMutation(mutation, payload, options);
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Experiment mutation failed");
+      setStatusMessage(error instanceof Error ? error.message : t("header.mutationError"));
     } finally {
       setCommandPending(false);
     }
@@ -213,7 +226,7 @@ export function useLabExperiment({
         await runMutation(mutationFns.setGrossBalanceContainerOffset, nextPayload);
       }
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Experiment mutation failed");
+      setStatusMessage(error instanceof Error ? error.message : t("header.mutationError"));
     } finally {
       grossBalanceOffsetInFlightRef.current = false;
       grossBalanceOffsetQueuedPayloadRef.current = null;
@@ -234,7 +247,7 @@ export function useLabExperiment({
       await runMutation((activeExperimentId) => renameExperiment(activeExperimentId, name));
       return true;
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Unable to rename experiment");
+      setStatusMessage(error instanceof Error ? error.message : t("header.renameError"));
       return false;
     } finally {
       setCommandPending(false);
@@ -246,8 +259,11 @@ export function useLabExperiment({
       rename,
     },
     isCommandPending,
+    // The status line only ever holds the caller's "saved" wording or an error
+    // coming back from the API, so anything else is a failed sync.
+    hasSyncError: statusMessage !== defaultStatusMessage,
     loadExperiment,
-    state,
+    state: localizedState,
     statusMessage,
 
     // ── Workbench ────────────────────────────────────────────────────────────

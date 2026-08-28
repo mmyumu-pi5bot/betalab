@@ -124,6 +124,8 @@ describe("api client", () => {
         category: "simulation",
         severity: "warning",
         message: "Pressure increased.",
+        code: null,
+        params: {},
       },
     ]);
   });
@@ -477,7 +479,19 @@ describe("api client", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(listExperiments()).resolves.toEqual(experiments);
+    // The flat audit string is folded into the structured last journal event.
+    await expect(listExperiments()).resolves.toEqual([
+      {
+        ...experiments[0],
+        last_audit_entry: undefined,
+        lastJournalEvent: {
+          message: "Wide-neck HDPE jar sealed on Station 1.",
+          code: null,
+          params: {},
+        },
+      },
+      { ...experiments[1], last_audit_entry: undefined, lastJournalEvent: null },
+    ]);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/experiments");
   });
 

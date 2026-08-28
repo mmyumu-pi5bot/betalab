@@ -8,6 +8,7 @@ import { executeToolDropCommand } from "@/lib/tool-drop-command-executor";
 import { resolveToolDropCommand } from "@/lib/tool-drop-command-resolver";
 import { canResolveActiveWorkbenchSlotDrop } from "@/lib/workbench-slot-drop-resolver";
 import type { AddLiquidToToolPayload, MoveObjectPayload } from "@/types/api-payloads";
+import { translateLiquidDefinitionName, useT } from "@/lib/i18n";
 import type {
   BenchSlot,
   BenchToolInstance,
@@ -81,6 +82,7 @@ export function useWorkbenchHandlers({
   setPendingDropDraft,
   workbenchSlots,
 }: UseWorkbenchHandlersOptions): WorkbenchHandlers {
+  const t = useT();
   const canApplyLimsTicketToSlot = (slot: BenchSlot): boolean => {
     if (slot.tool === null || !hasPrintedLabelTicket) {
       return false;
@@ -108,13 +110,13 @@ export function useWorkbenchHandlers({
       ) {
         setPendingDropDraft({
           commandType: "create_debug_tool_preset",
-          confirmLabel: "Add",
+          confirmLabel: t("draft.add"),
           destinationKind: "workbench_tool",
           fields: buildDebugSlurryTubeDraftFields(),
           presetId: payload.itemId,
           targetId: slotId,
           targetKind: "bench_slot",
-          title: "Configure Apple slurry",
+          title: t("draft.configureAppleSlurry"),
         });
         return;
       }
@@ -142,14 +144,15 @@ export function useWorkbenchHandlers({
       });
       return;
     }
+    const draftLiquidName = translateLiquidDefinitionName(t, liquidDefinition);
     setPendingDropDraft({
       commandType: "add_liquid_to_workbench_tool",
       fields: [
         {
-          ariaLabel: `${liquidDefinition?.name ?? "Liquid"} draft volume`,
+          ariaLabel: t("draft.liquidDraftVolume", { liquid: draftLiquidName }),
           id: "volume_ml",
           inputStep: 0.1,
-          label: "Volume",
+          label: t("draft.volume"),
           stepAmount: 1,
           unitLabel: "mL",
           value: liquidDefinition?.transfer_volume_ml ?? 0,
@@ -159,7 +162,7 @@ export function useWorkbenchHandlers({
       itemId: payload.itemId,
       targetId: slotId,
       targetKind: "bench_slot",
-      title: `Dose ${liquidDefinition?.name ?? "Liquid"}`,
+      title: t("draft.dose", { liquid: draftLiquidName }),
     });
   };
 

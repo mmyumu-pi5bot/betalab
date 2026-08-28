@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import type { BenchToolInstance, PipetteState } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 const HOLD_THRESHOLD_MS = 180;
 const HOLD_INTERVAL_MS = 140;
@@ -30,6 +31,7 @@ export function usePipetteInteraction({
   onDispense,
   pipette,
 }: UsePipetteInteractionOptions) {
+  const t = useT();
   const [pipetteHintMessage, setPipetteHintMessage] = useState<string | null>(null);
   const [previewVolumeMl, setPreviewVolumeMl] = useState<number | null>(null);
   const holdStateRef = useRef<HoldState | null>(null);
@@ -67,10 +69,13 @@ export function usePipetteInteraction({
     }
     setPipetteHintMessage(
       pipette.volumeMl > 0
-        ? `Pipette loaded ${pipette.volumeMl.toFixed(2)} / ${pipette.capacityMl.toFixed(2)} mL · Hold over a container to dispense.`
-        : "Pipette empty · Hold over a liquid to aspirate.",
+        ? t("pipetteHint.loaded", {
+            volume: pipette.volumeMl.toFixed(2),
+            capacity: pipette.capacityMl.toFixed(2),
+          })
+        : t("pipetteHint.empty"),
     );
-  }, [isPipetteMode, pipette.capacityMl, pipette.volumeMl, stopPipetteHold]);
+  }, [isPipetteMode, pipette.capacityMl, pipette.volumeMl, stopPipetteHold, t]);
 
   useEffect(() => {
     if (!isPipetteMode) return;
@@ -102,8 +107,8 @@ export function usePipetteInteraction({
     if (!operation) {
       setPipetteHintMessage(
         pipette.volumeMl > 0
-          ? "The pipette is loaded: choose an open container that can receive liquid."
-          : "The pipette is empty: choose an open container containing liquid.",
+          ? t("pipetteHint.chooseTarget")
+          : t("pipetteHint.chooseSource"),
       );
       return;
     }
@@ -118,8 +123,8 @@ export function usePipetteInteraction({
     );
     setPipetteHintMessage(
       operation === "aspirate"
-        ? "Aspirating… release at the desired volume."
-        : "Dispensing… release at the desired volume.",
+        ? t("pipetteHint.aspirating")
+        : t("pipetteHint.dispensing"),
     );
     timeoutRef.current = window.setTimeout(() => {
       const state = holdStateRef.current;
@@ -141,7 +146,7 @@ export function usePipetteInteraction({
         );
       }, HOLD_INTERVAL_MS);
     }, HOLD_THRESHOLD_MS);
-  }, [isPipetteMode, pipette.capacityMl, pipette.volumeMl, stopPipetteHold]);
+  }, [isPipetteMode, pipette.capacityMl, pipette.volumeMl, stopPipetteHold, t]);
 
   return {
     handlePipetteToolPointerDown,

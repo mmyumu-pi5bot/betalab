@@ -1,4 +1,12 @@
+import type { MessageKey, MessageParams } from "@/lib/i18n";
 import type { AcquisitionMethod, MrmTransition } from "@/types/workbench";
+
+/** A rule the method breaks, named by catalogue key so the editor can render it
+ *  in the learner's language rather than in the language the rule was written in. */
+export type MethodValidationError = {
+  key: MessageKey;
+  params?: MessageParams;
+};
 
 /**
  * Structural errors that make a method unusable. Mirrors
@@ -11,15 +19,15 @@ import type { AcquisitionMethod, MrmTransition } from "@/types/workbench";
  */
 export function validateAcquisitionMethod(
   method: Pick<AcquisitionMethod, "name" | "runtimeS" | "transitions" | "version">,
-): string[] {
-  const errors: string[] = [];
+): MethodValidationError[] {
+  const errors: MethodValidationError[] = [];
 
-  if (!method.name.trim()) errors.push("A method needs a name.");
-  if (!method.version.trim()) errors.push("A method needs a version.");
-  if (method.runtimeS <= 0) errors.push("Run duration must be positive.");
+  if (!method.name.trim()) errors.push({ key: "methodError.missingName" });
+  if (!method.version.trim()) errors.push({ key: "methodError.missingVersion" });
+  if (method.runtimeS <= 0) errors.push({ key: "methodError.runtimePositive" });
 
   if (method.transitions.length === 0) {
-    errors.push("A method needs at least one transition.");
+    errors.push({ key: "methodError.noTransition" });
     return errors;
   }
 
@@ -27,7 +35,7 @@ export function validateAcquisitionMethod(
   const duplicated = new Set<string>();
   for (const transition of method.transitions) {
     if (!transition.id.trim()) {
-      errors.push("Every transition needs an identifier.");
+      errors.push({ key: "methodError.transitionIdentifier" });
     } else if (seen.has(transition.id)) {
       duplicated.add(transition.id);
     } else {
@@ -35,18 +43,18 @@ export function validateAcquisitionMethod(
     }
 
     if (transition.q1Mz <= 0 || transition.q3Mz <= 0) {
-      errors.push(`Transition '${transition.id}': m/z values must be positive.`);
+      errors.push({ key: "methodError.mzPositive", params: { id: transition.id } });
     }
     if (transition.dwellTimeMs <= 0) {
-      errors.push(`Transition '${transition.id}': dwell time must be positive.`);
+      errors.push({ key: "methodError.dwellPositive", params: { id: transition.id } });
     }
     if (transition.retentionWindowS <= 0) {
-      errors.push(`Transition '${transition.id}': retention window must be positive.`);
+      errors.push({ key: "methodError.windowPositive", params: { id: transition.id } });
     }
   }
 
   for (const transitionId of [...duplicated].sort()) {
-    errors.push(`Duplicate transition identifier '${transitionId}'.`);
+    errors.push({ key: "methodError.duplicateIdentifier", params: { id: transitionId } });
   }
 
   const withQuantifier = new Set(
@@ -57,7 +65,7 @@ export function validateAcquisitionMethod(
   const compoundIds = [...new Set(method.transitions.map((t) => t.compoundId))];
   for (const compoundId of compoundIds) {
     if (!withQuantifier.has(compoundId)) {
-      errors.push(`Compound '${compoundId}' has no quantifier transition.`);
+      errors.push({ key: "methodError.noQuantifier", params: { compound: compoundId } });
     }
   }
 

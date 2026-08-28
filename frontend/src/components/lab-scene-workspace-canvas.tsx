@@ -54,6 +54,7 @@ import type {
   TrashProduceLotEntry,
   TrashSampleLabelEntry,
 } from "@/types/workbench";
+import { useT, type Translate } from "@/lib/i18n";
 import type { MoveObjectPayload, RunSequencePayload } from "@/types/api-payloads";
 
 type LabSceneWorkspaceCanvasProps = {
@@ -211,6 +212,7 @@ export function LabSceneWorkspaceCanvas({
   workspace,
   workspaceActions,
 }: LabSceneWorkspaceCanvasProps) {
+  const t = useT();
   const [isAcquisitionConsoleOpen, setIsAcquisitionConsoleOpen] = useState(false);
   const [acquisitionSequenceDraft, setAcquisitionSequenceDraft] =
     useState<RunSequencePayload | null>(null);
@@ -274,7 +276,7 @@ export function LabSceneWorkspaceCanvas({
 
     return (
       <button
-        aria-label="Store in inventory"
+        aria-label={t("workspace.storeInInventory")}
         className={`flex h-10 w-8 items-center justify-center rounded-[0.8rem] border shadow-sm transition ${
           isDisabled
             ? "cursor-not-allowed border-slate-200/80 bg-slate-100/90 text-slate-300"
@@ -287,7 +289,7 @@ export function LabSceneWorkspaceCanvas({
         onClick={() => {
           workspaceActions.onStoreWorkspaceWidget(widget.id);
         }}
-        title={isDisabled ? "Empty this equipment before storing it" : "Store in inventory"}
+        title={isDisabled ? t("workspace.emptyBeforeStoring") : t("workspace.storeInInventory")}
         type="button"
       >
         <StoreInInventoryIcon className="h-4.5 w-4.5" />
@@ -668,14 +670,14 @@ export function LabSceneWorkspaceCanvas({
                   }}
                   footer={
                     rack.instrumentStatus === "completed"
-                      ? "Acquisition completed. The instrument results are available below."
+                      ? t("instrument.footer.completed")
                       : rack.instrumentStatus === "running"
-                      ? "Acquisition in progress. The rack stays locked until the last injection is recorded."
+                      ? t("instrument.footer.running")
                       : rack.instrumentStatus === "ready"
-                      ? "Rack loaded. The acquisition sequence can now be configured and started."
+                      ? t("instrument.footer.ready")
                       : rack.rackLoadedCount > 0
-                        ? "Drag the staged rack onto the LC-MS/MS to load it into the autosampler."
-                        : "Populate the rack with at least one autosampler vial before loading it."
+                        ? t("instrument.footer.dragRack")
+                        : t("instrument.footer.emptyRack")
                   }
                 >
                   <LcMsMsInstrumentIllustration
@@ -690,7 +692,7 @@ export function LabSceneWorkspaceCanvas({
                       ui.isCommandPending ||
                       acquisitionValidationMessage !== null
                     }
-                    startLabel="Start the acquisition run"
+                    startLabel={t("instrument.startRun")}
                     status={rack.instrumentStatus}
                     testId="lc-msms-instrument-illustration"
                   />
@@ -703,8 +705,8 @@ export function LabSceneWorkspaceCanvas({
                       type="button"
                     >
                       {isAcquisitionConsoleOpen
-                        ? "Close acquisition console"
-                        : "Open acquisition console"}
+                        ? t("instrument.closeConsole")
+                        : t("instrument.openConsole")}
                     </button>
                     {experiment.rack.state === "loaded" ||
                     experiment.rack.state === "completed" ? (
@@ -772,6 +774,7 @@ export function LabSceneWorkspaceCanvas({
                   separationProgress={centrifugeTool?.quechersState?.separationProgress ?? 0}
                   stagedContent={centrifugeStagedContent}
                   startBlockReason={formatCentrifugeStartBlockReason(
+                    t,
                     centrifugeWidget?.centrifugeStartBlockReason,
                   )}
                 />
@@ -791,7 +794,7 @@ export function LabSceneWorkspaceCanvas({
                     grinderTargetType && dnd.isDropTargetHighlighted(grinderTargetType) ? "true" : "false"
                   }
                   dropZoneTestId="grinder-dropzone"
-                  eyebrow="Cryogenic grinder"
+                  eyebrow={t("widget.cryogenic_grinder")}
                   headerAction={renderStoreWidgetAction(widget)}
                   onDragOver={dnd.grinder.handleGrinderDragOver}
                   onDrop={dnd.grinder.handleGrinderDrop}
@@ -861,10 +864,10 @@ export function LabSceneWorkspaceCanvas({
   );
 }
 
-function formatCentrifugeStartBlockReason(reason?: string | null): string | null {
+function formatCentrifugeStartBlockReason(t: Translate, reason?: string | null): string | null {
   switch (reason) {
     case "missing_tube":
-      return "Add a tube to centrifuge.";
+      return t("centrifuge.addTube");
     default:
       return null;
   }

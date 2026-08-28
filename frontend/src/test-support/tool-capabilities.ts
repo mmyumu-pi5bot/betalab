@@ -34,10 +34,6 @@ export function canToolBeSealed(toolType: ToolType): boolean {
   return requireToolSpec(toolType).can_seal;
 }
 
-export function canToolReceiveContents(toolType: ToolType, isSealed = false): boolean {
-  return !canToolBeSealed(toolType) || !isSealed;
-}
-
 const labelOnlyAccepts = [
   { entityKind: "sample_label" as const },
   { entityKind: "lims_label_ticket" as const },

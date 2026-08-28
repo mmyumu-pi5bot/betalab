@@ -25,7 +25,7 @@ test.describe("Experiments home", () => {
 
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { name: "Saved experiments" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Experiments" })).toBeVisible();
     await expect(page.getByText(savedExperiment.id)).toBeVisible();
     await expect(page.getByText(savedExperiment.last_audit_entry)).toBeVisible();
     await expect(page.getByText("1 session")).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("Experiments home", () => {
     await page.getByRole("button", { name: "Delete" }).click();
 
     await expect(page.getByText("0 sessions")).toBeVisible();
-    await expect(page.getByText("No saved experiments yet.")).toBeVisible();
+    await expect(page.getByText("No experiments yet.")).toBeVisible();
     await expect(page.getByText(savedExperiment.id)).toHaveCount(0);
   });
 });

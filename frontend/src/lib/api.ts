@@ -1,3 +1,4 @@
+import { translateNow } from "@/lib/i18n";
 import type { Experiment, ExperimentListEntry, JournalEntry } from "@/types/experiment";
 import type {
   AcquisitionMethod,
@@ -69,13 +70,41 @@ function normalizeJournalEntry(raw: unknown): JournalEntry | null {
   const entry = raw as Record<string, unknown>;
   const category = String(entry.category ?? "system") as JournalEntry["category"];
   const severity = String(entry.severity ?? "info") as JournalEntry["severity"];
+  const params = entry.params;
   return {
     id: String(entry.id ?? ""),
     occurredAt: String(entry.occurredAt ?? entry.occurred_at ?? ""),
     category,
     severity,
     message: String(entry.message ?? ""),
+    code: entry.code === undefined || entry.code === null ? null : String(entry.code),
+    params:
+      params !== null && typeof params === "object"
+        ? (params as JournalEntry["params"])
+        : {},
   };
+}
+
+// Older rows only carry the rendered message; both shapes reach the UI as one.
+function normalizeLastJournalEvent(
+  entry: Record<string, unknown>,
+): ExperimentListEntry["lastJournalEvent"] {
+  const raw = entry.lastJournalEvent ?? entry.last_journal_event;
+  if (raw !== null && typeof raw === "object") {
+    const event = raw as Record<string, unknown>;
+    return {
+      message: String(event.message ?? ""),
+      code: event.code === undefined || event.code === null ? null : String(event.code),
+      params:
+        event.params !== null && typeof event.params === "object"
+          ? (event.params as JournalEntry["params"])
+          : {},
+    };
+  }
+  const message = entry.last_audit_entry ?? entry.lastAuditEntry;
+  return message === null || message === undefined
+    ? null
+    : { message: String(message), code: null, params: {} };
 }
 
 function normalizeContainedEntity(raw: unknown): ContainedEntity | null {
@@ -190,7 +219,7 @@ export async function getDebugInspection(
     `${API_BASE_URL}/experiments/${encodeURIComponent(experimentId)}/debug/inspect/${entityKind}/${encodeURIComponent(entityId)}`,
   );
   if (!response.ok) {
-    throw await buildApiError(response, "Unable to inspect debug state");
+    throw await buildApiError(response, translateNow("api.inspectDebug"));
   }
   return response.json() as Promise<unknown>;
 }
@@ -212,7 +241,7 @@ async function sendMutationRequest(
   });
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to send experiment mutation");
+    throw await buildApiError(response, translateNow("api.mutation"));
   }
 
   const experiment = normalizeExperiment((await response.json()) as Experiment);
@@ -232,7 +261,7 @@ export async function createExperiment(name?: string): Promise<Experiment> {
   });
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to create experiment");
+    throw await buildApiError(response, translateNow("api.createExperiment"));
   }
 
   const experiment = normalizeExperiment((await response.json()) as Experiment);
@@ -244,7 +273,7 @@ export async function getExperiment(experimentId: string): Promise<Experiment> {
   const response = await fetch(`${API_BASE_URL}/experiments/${experimentId}`);
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to fetch experiment");
+    throw await buildApiError(response, translateNow("api.fetchExperiment"));
   }
 
   const experiment = normalizeExperiment((await response.json()) as Experiment);
@@ -256,42 +285,45 @@ export async function listExperiments(): Promise<ExperimentListEntry[]> {
   const response = await fetch(`${API_BASE_URL}/experiments`);
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to fetch experiments");
+    throw await buildApiError(response, translateNow("api.fetchExperiments"));
   }
 
   const payload = (await response.json()) as ExperimentListEntry[];
-  return payload.map((entry) => ({
-    ...entry,
-    name: String(entry.name ?? "Untitled experiment"),
-    last_simulation_at: String(entry.last_simulation_at),
-    updated_at: String(entry.updated_at),
-    last_audit_entry:
-      entry.last_audit_entry === null || entry.last_audit_entry === undefined
-        ? null
-        : String(entry.last_audit_entry),
-    summary: {
-      workbenchToolCount: Number(
-        entry.summary?.workbenchToolCount ??
-          (entry.summary as Record<string, unknown> | undefined)?.workbench_tool_count ??
-          0,
-      ),
-      rackToolCount: Number(
-        entry.summary?.rackToolCount ??
-          (entry.summary as Record<string, unknown> | undefined)?.rack_tool_count ??
-          0,
-      ),
-      materialCount: Number(
-        entry.summary?.materialCount ??
-          (entry.summary as Record<string, unknown> | undefined)?.material_count ??
-          0,
-      ),
-      runCount: Number(
-        entry.summary?.runCount ??
-          (entry.summary as Record<string, unknown> | undefined)?.run_count ??
-          0,
-      ),
-    },
-  }));
+  return payload.map((entry) => {
+    // The flat last-audit string is folded into `lastJournalEvent`; carrying the
+    // raw field on as well would leave two copies of the same sentence.
+    const rest = { ...(entry as ExperimentListEntry & Record<string, unknown>) };
+    delete rest.last_audit_entry;
+    return {
+      ...rest,
+      name: String(entry.name ?? translateNow("api.untitledExperiment")),
+      last_simulation_at: String(entry.last_simulation_at),
+      updated_at: String(entry.updated_at),
+      lastJournalEvent: normalizeLastJournalEvent(entry),
+      summary: {
+        workbenchToolCount: Number(
+          entry.summary?.workbenchToolCount ??
+            (entry.summary as Record<string, unknown> | undefined)?.workbench_tool_count ??
+            0,
+        ),
+        rackToolCount: Number(
+          entry.summary?.rackToolCount ??
+            (entry.summary as Record<string, unknown> | undefined)?.rack_tool_count ??
+            0,
+        ),
+        materialCount: Number(
+          entry.summary?.materialCount ??
+            (entry.summary as Record<string, unknown> | undefined)?.material_count ??
+            0,
+        ),
+        runCount: Number(
+          entry.summary?.runCount ??
+            (entry.summary as Record<string, unknown> | undefined)?.run_count ??
+            0,
+        ),
+      },
+    };
+  });
 }
 
 export async function renameExperiment(experimentId: string, name: string): Promise<Experiment> {
@@ -308,7 +340,7 @@ export async function duplicateExperiment(experimentId: string): Promise<Experim
     { method: "POST" },
   );
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to duplicate experiment");
+    throw await buildApiError(response, translateNow("api.duplicateExperiment"));
   }
   const experiment = normalizeExperiment((await response.json()) as Experiment);
   experimentCache.set(experiment.id, experiment);
@@ -364,7 +396,7 @@ export async function getToolbarCatalog(): Promise<ToolbarCategory[]> {
   const response = await fetch(`${API_BASE_URL}/experiments/catalog/toolbar`);
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to fetch toolbar catalog");
+    throw await buildApiError(response, translateNow("api.fetchToolbar"));
   }
 
   const payload = (await response.json()) as Array<Record<string, unknown>>;
@@ -382,7 +414,7 @@ export async function getAcquisitionMethodCatalog(): Promise<AcquisitionMethodSu
   const response = await fetch(`${API_BASE_URL}/experiments/catalog/acquisition-methods`);
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to fetch acquisition methods");
+    throw await buildApiError(response, translateNow("api.fetchMethods"));
   }
 
   const payload = (await response.json()) as Array<Record<string, unknown>>;
@@ -395,7 +427,7 @@ export async function getAcquisitionMethod(methodId: string): Promise<Acquisitio
   );
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to fetch acquisition method");
+    throw await buildApiError(response, translateNow("api.fetchMethod"));
   }
 
   return normalizeAcquisitionMethod(await response.json());
@@ -405,7 +437,7 @@ export async function getMrmReferenceCatalog(): Promise<ReferenceCompound[]> {
   const response = await fetch(`${API_BASE_URL}/experiments/catalog/mrm-reference`);
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to fetch the MRM reference catalog");
+    throw await buildApiError(response, translateNow("api.fetchMrmCatalog"));
   }
 
   const payload = (await response.json()) as Array<Record<string, unknown>>;
@@ -448,7 +480,7 @@ export async function proposeMrmTransitions(compoundIds: string[]): Promise<MrmT
   );
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to propose transitions");
+    throw await buildApiError(response, translateNow("api.proposeTransitions"));
   }
 
   const payload = (await response.json()) as Array<Record<string, unknown>>;
@@ -489,7 +521,7 @@ export async function duplicateAcquisitionMethod(payload: {
   );
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to duplicate the acquisition method");
+    throw await buildApiError(response, translateNow("api.duplicateMethod"));
   }
 
   return normalizeSavedMethod(await response.json());
@@ -547,7 +579,7 @@ export async function saveAcquisitionMethod(
   );
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to save the acquisition method");
+    throw await buildApiError(response, translateNow("api.saveMethod"));
   }
 
   return normalizeSavedMethod(await response.json());
@@ -560,7 +592,7 @@ export async function deleteAcquisitionMethod(methodId: string): Promise<void> {
   );
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to delete the acquisition method");
+    throw await buildApiError(response, translateNow("api.deleteMethod"));
   }
 }
 
@@ -570,7 +602,7 @@ export async function deleteExperiment(experimentId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw await buildApiError(response, "Failed to delete experiment");
+    throw await buildApiError(response, translateNow("api.deleteExperiment"));
   }
 
   experimentCache.delete(experimentId);
@@ -628,7 +660,7 @@ export function subscribeToExperimentStream(
         experimentCache.set(experiment.id, experiment);
         handlers.onMessage(experiment);
       } catch {
-        handlers.onError?.(new Error("Failed to parse experiment stream payload"));
+        handlers.onError?.(new Error(translateNow("api.parseStream")));
       }
     };
 
@@ -1897,7 +1929,7 @@ function normalizeExperiment(experiment: Experiment): Experiment {
   return {
     ...experiment,
     name: String(
-      (experiment as Experiment & Record<string, unknown>).name ?? "Untitled experiment",
+      (experiment as Experiment & Record<string, unknown>).name ?? translateNow("api.untitledExperiment"),
     ),
     last_simulation_at: String(
       (experiment as Experiment & Record<string, unknown>).last_simulation_at ??
@@ -2648,7 +2680,7 @@ function normalizeWorkspaceWidget(
   };
 }
 
-export function normalizeMrmTransition(raw: Record<string, unknown>): MrmTransition {
+function normalizeMrmTransition(raw: Record<string, unknown>): MrmTransition {
   return {
     id: String(raw.id ?? ""),
     compoundId: String(raw.compoundId ?? raw.compound_id ?? ""),
@@ -2867,6 +2899,18 @@ function normalizeProduceLot(
     isDraggable: Boolean(lot.isDraggable ?? lot.is_draggable ?? true),
     allowedDropTargets: normalizeAllowedDropTargets(lot.allowedDropTargets ?? lot.allowed_drop_targets),
     label: String(lot.label),
+    labelCode:
+      lot.labelCode !== undefined && lot.labelCode !== null
+        ? String(lot.labelCode)
+        : lot.label_code !== undefined && lot.label_code !== null
+          ? String(lot.label_code)
+          : null,
+    labelIndex:
+      lot.labelIndex !== undefined && lot.labelIndex !== null
+        ? Number(lot.labelIndex)
+        : lot.label_index !== undefined && lot.label_index !== null
+          ? Number(lot.label_index)
+          : null,
     produceType: String(lot.produceType ?? lot.produce_type) as ExperimentProduceLot["produceType"],
     residualCo2MassG: Number(
       stateRecord?.residualCo2MassG ?? lot.residualCo2MassG ?? lot.residual_co2_mass_g ?? 0,

@@ -1,6 +1,7 @@
 "use client";
 
 import { buildEquipmentIllustrationSurface } from "@/components/illustrations/equipment-illustration-surface";
+import { translateNow } from "@/lib/i18n";
 
 type CentrifugeIllustrationProps = {
   className?: string;
@@ -64,7 +65,7 @@ export function CentrifugeIllustration({
 
   return (
     <div
-      aria-label="Benchtop centrifuge"
+      aria-label={translateNow("illustration.centrifuge")}
       className={`relative ${className ?? ""}`}
       data-testid="centrifuge-illustration"
       role="group"

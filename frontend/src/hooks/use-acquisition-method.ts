@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { getAcquisitionMethod, getAcquisitionMethodCatalog } from "@/lib/api";
 import type { AcquisitionMethod, AcquisitionMethodSummary } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 /**
  * Read the acquisition method library.
@@ -44,6 +45,7 @@ export function useAcquisitionMethodDetail(
   methodId: string,
   revision: number,
 ): AcquisitionMethodDetail {
+  const t = useT();
   const [method, setMethod] = useState<AcquisitionMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,13 +63,13 @@ export function useAcquisitionMethodDetail(
       .catch((cause: unknown) => {
         if (!isCurrent) return;
         setMethod(null);
-        setError(cause instanceof Error ? cause.message : "Failed to load the method.");
+        setError(cause instanceof Error ? cause.message : t("lcms.methodLoadError"));
         setIsLoading(false);
       });
     return () => {
       isCurrent = false;
     };
-  }, [methodId, revision]);
+  }, [methodId, revision, t]);
 
   return { error, isLoading, method };
 }

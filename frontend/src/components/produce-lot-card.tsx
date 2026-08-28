@@ -7,6 +7,7 @@ import { AppleIllustration } from "@/components/illustrations/apple-illustration
 import { TemperatureIndicator } from "@/components/temperature-indicator";
 import { ambientTemperatureC } from "@/lib/cryogenic-temperature";
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
+import { useT } from "@/lib/i18n";
 import {
   getProduceLotDegassingIntensity,
   getProduceLotDisplayName,
@@ -47,7 +48,8 @@ export function ProduceLotCard({
   produceLot,
   variant,
 }: ProduceLotCardProps) {
-  const displayName = getProduceLotDisplayName(produceLot);
+  const t = useT();
+  const displayName = getProduceLotDisplayName(t, produceLot);
   const isDegassing = isProduceLotDegassing(produceLot);
   const smokeIntensity = getProduceLotDegassingIntensity(produceLot);
   const degassingProgress = Math.min((produceLot.residualCo2MassG ?? 0) / Math.max(produceLot.totalMassG * 0.12, 1), 1);
@@ -60,7 +62,7 @@ export function ProduceLotCard({
     <div
       className={`${draggable ? dragAffordanceClassName : ""} ${cardClassName} ${className}`.trim()}
       data-debug-model={JSON.stringify(produceLot)}
-      data-debug-label={getProduceLotDisplayName(produceLot)}
+      data-debug-label={displayName}
       data-degassing={isDegassing ? "true" : "false"}
       data-testid={dataTestId}
       draggable={draggable}
@@ -82,7 +84,7 @@ export function ProduceLotCard({
             <div className="min-w-0 flex-1">
               {produceLot.materialState === "waste" ? (
                 <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-700">
-                  Jammed
+                  {t("produceCard.jammed")}
                 </p>
               ) : null}
               <p className="text-xs leading-[1.05rem] text-slate-500" title={metadata}>

@@ -37,12 +37,26 @@ export type ExperimentWorkspace = {
   widgets: ExperimentWorkspaceWidget[];
 };
 
+/** An entity named inside a journal message, with the id its label is keyed by. */
+export type JournalRef = {
+  kind: "tool" | "widget" | "slot" | "liquid" | "produce" | "text";
+  id: string;
+  text: string;
+  index?: number | null;
+};
+
+export type JournalParam = string | number | JournalRef;
+
 export type JournalEntry = {
   id: string;
   occurredAt: string;
   category: "system" | "manipulation" | "simulation" | "layout";
   severity: "info" | "warning" | "error";
+  /** English wording, rendered by the backend. */
   message: string;
+  /** What happened. Absent on entries recorded before the journal was structured. */
+  code: string | null;
+  params: Record<string, JournalParam>;
 };
 
 export type Experiment = {
@@ -73,7 +87,12 @@ export type ExperimentListEntry = {
   last_simulation_at: string;
   snapshot_version: number;
   updated_at: string;
-  last_audit_entry: string | null;
+  /** The most recent journal line, structured so it can be shown in any language. */
+  lastJournalEvent: {
+    message: string;
+    code: string | null;
+    params: Record<string, JournalParam>;
+  } | null;
   summary: {
     workbenchToolCount: number;
     rackToolCount: number;

@@ -1,3 +1,4 @@
+import { translateNow } from "@/lib/i18n";
 import type { DropDraftField } from "@/components/drop-draft-card";
 import type { LiquidCatalogItem, ToolCatalogItem, ToolbarCategory } from "@/types/workbench";
 
@@ -14,12 +15,12 @@ export const CALIBRATION_STANDARD_VIAL_ITEM_ID = "calibration_standard_vial";
 export function buildCalibrationLevelDraftFields(): DropDraftField[] {
   return [
     {
-      ariaLabel: "Calibration level in ng/mL",
+      ariaLabel: translateNow("lab.calibrationLevelAria"),
       id: "level_ng_per_ml",
       inputStep: 0.1,
-      label: "Level",
+      label: translateNow("lab.calibrationLevelLabel"),
       minValue: 0.1,
-      presets: [1, 5, 10, 50, 100, 500],
+      presets: [1, 5, 10, 50, 100, 200, 500, 1000],
       stepAmount: 10,
       unitLabel: "ng/mL",
       value: 10,

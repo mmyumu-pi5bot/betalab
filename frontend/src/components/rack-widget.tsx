@@ -10,6 +10,7 @@ import {
   getRackIllustrationPlateOutline,
 } from "@/lib/lab-scene-config";
 import type { BenchToolInstance, RackSlot } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 type RackWidgetProps = {
   dndDisabled?: boolean;
@@ -54,6 +55,7 @@ export function RackWidget({
   rackSlots,
   slotCount,
 }: RackWidgetProps) {
+  const t = useT();
   const isRackDraggable = !dndDisabled && !isCommandPending;
   const rackIllustrationRef = useRef<HTMLDivElement | null>(null);
 
@@ -81,7 +83,7 @@ export function RackWidget({
   return (
     <WorkspaceEquipmentWidget
       bodyClassName="px-4 py-4 xl:px-5 xl:py-5"
-      eyebrow="Autosampler rack"
+      eyebrow={t("widget.autosampler_rack")}
       headerAction={headerAction}
     >
       <div className="space-y-3">
@@ -117,7 +119,7 @@ export function RackWidget({
                 onDragEnd={onItemDragEnd}
                 onDragStart={handleRackGrabDragStart}
                 style={edge.style}
-                title={isRackDraggable ? "Drag the rack into the LC-MS/MS" : undefined}
+                title={isRackDraggable ? t("rack.dragToInstrument") : undefined}
               />
             ))}
           </div>
@@ -194,7 +196,7 @@ export function RackWidget({
               })}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">No vial staged yet.</p>
+            <p className="text-sm text-slate-500">{t("rack.noVialStaged")}</p>
           )}
         </div>
         {isLoadedIntoInstrument ? (

@@ -3,10 +3,11 @@
 import { dragAffordanceClassName } from "@/lib/drag-affordance";
 import { PipetteIcon } from "@/components/pipette-icon";
 import type { PipetteState } from "@/types/workbench";
+import { useT, type MessageKey } from "@/lib/i18n";
 
 type ActionDefinition = {
   id: string;
-  label: string;
+  labelKey: MessageKey;
 };
 
 type ActionBarPanelProps = {
@@ -16,18 +17,9 @@ type ActionBarPanelProps = {
 };
 
 const actions: ActionDefinition[] = [
-  {
-    id: "knife",
-    label: "Stainless steel knife",
-  },
-  {
-    id: "spatula",
-    label: "Powder spatula",
-  },
-  {
-    id: "pipette",
-    label: "Micropipette",
-  },
+  { id: "knife", labelKey: "tool.knife" },
+  { id: "spatula", labelKey: "tool.spatula" },
+  { id: "pipette", labelKey: "tool.pipette" },
 ];
 
 function KnifeIcon({ active }: { active: boolean }) {
@@ -108,6 +100,7 @@ export function ActionBarPanel({
   pipette,
   onToggleAction,
 }: ActionBarPanelProps) {
+  const t = useT();
   const pipetteFillRatio = Math.max(0, Math.min(1, pipette.volumeMl / pipette.capacityMl));
   return (
     <section className="rounded-[1.2rem] border border-slate-200 bg-white p-2 shadow-sm">
@@ -115,12 +108,13 @@ export function ActionBarPanel({
         className={`${dragAffordanceClassName} text-xs font-semibold uppercase tracking-[0.24em] text-slate-500`}
         data-widget-drag-handle="true"
       >
-        Actions
+        {t("actionBar.actions")}
       </p>
 
       <div className="mt-2 flex flex-col gap-2">
         {actions.map((action) => {
           const isActive = action.id === activeActionId;
+          const actionLabel = t(action.labelKey);
 
           return (
             <button
@@ -132,18 +126,18 @@ export function ActionBarPanel({
               }`}
               data-debug-id={action.id === "pipette" ? "pipette" : undefined}
               data-debug-kind={action.id === "pipette" ? "pipette" : undefined}
-              data-debug-label={action.id === "pipette" ? "Micropipette" : undefined}
+              data-debug-label={action.id === "pipette" ? actionLabel : undefined}
               data-tutorial-anchor={`action-${action.id}`}
               key={action.id}
               onClick={() => onToggleAction(action.id)}
               title={
                 action.id === "pipette"
-                  ? `${action.label} · ${pipette.volumeMl.toFixed(2)} / ${pipette.capacityMl.toFixed(2)} mL`
-                  : action.label
+                  ? `${actionLabel} · ${pipette.volumeMl.toFixed(2)} / ${pipette.capacityMl.toFixed(2)} mL`
+                  : actionLabel
               }
               type="button"
             >
-              <span className="sr-only">{action.label}</span>
+              <span className="sr-only">{actionLabel}</span>
               <div
                 className={`absolute inset-0 rounded-xl ${
                   isActive ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" : ""

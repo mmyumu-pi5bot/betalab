@@ -5,12 +5,14 @@ import { useEffect, useRef } from "react";
 import { PipetteIcon } from "@/components/pipette-icon";
 import { getLastPointerPosition, trackPointerPosition } from "@/lib/pointer-position";
 import type { PipetteState } from "@/types/workbench";
+import { useT } from "@/lib/i18n";
 
 export function PipetteOverlay({ hint, isPipetteMode, pipette }: {
   hint: string | null;
   isPipetteMode: boolean;
   pipette: PipetteState;
 }) {
+  const t = useT();
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export function PipetteOverlay({ hint, isPipetteMode, pipette }: {
   const fillRatio = pipette.capacityMl > 0 ? pipette.volumeMl / pipette.capacityMl : 0;
   return (
     <div
-      aria-label={hint ?? (pipette.volumeMl > 0 ? "Pipette loaded" : "Pipette empty")}
+      aria-label={hint ?? (pipette.volumeMl > 0 ? t("pipette.loaded") : t("pipette.empty"))}
       className="pointer-events-none fixed left-0 top-0 z-[100] w-20 opacity-0 will-change-transform"
       ref={overlayRef}
     >

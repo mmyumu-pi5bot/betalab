@@ -7,6 +7,7 @@ import { LimsLabelPrinterIllustration } from "@/components/illustrations/lims-la
 import { SampleIdentityLabel } from "@/components/sample-identity-label";
 import { WorkspaceEquipmentWidget } from "@/components/workspace-equipment-widget";
 import type { LimsReception, PrintedLabelTicket } from "@/types/workbench";
+import { translateLimsStatus, useT } from "@/lib/i18n";
 
 type LimsWidgetProps = {
   entries: LimsReception[];
@@ -35,6 +36,7 @@ export function LimsWidget({
   onTicketDragStart,
   reception,
 }: LimsWidgetProps) {
+  const t = useT();
   const [selectedEntryId, setSelectedEntryId] = useState<string>(reception.id ?? "new");
   const [orchardName, setOrchardName] = useState("");
   const [harvestDate, setHarvestDate] = useState("");
@@ -155,7 +157,8 @@ export function LimsWidget({
   const displayedEntry = selectedEntryView ?? reception;
   const displayedTicket = selectedEntryView?.printedLabelTicket ?? reception.printedLabelTicket;
   const isTicketDraggable = displayedTicket?.isDraggable ?? true;
-  const saveButtonLabel = selectedEntryView === null ? "Create LIMS record" : "Update LIMS record";
+  const saveButtonLabel =
+    selectedEntryView === null ? t("lims.createRecord") : t("lims.updateRecord");
   const displayedGrossMassG = displayedEntry.measuredGrossMassG;
   const displayedPackagingTareMassG = displayedEntry.packagingTareMassG;
   const displayedNetMassG =
@@ -177,7 +180,7 @@ export function LimsWidget({
   return (
     <WorkspaceEquipmentWidget
       bodyClassName="px-3 py-3"
-      eyebrow="LIMS"
+      eyebrow={t("lims.eyebrow")}
       headerAction={headerAction}
     >
       <div className="space-y-2.5">
@@ -195,7 +198,7 @@ export function LimsWidget({
           </div>
           <div className="bg-[linear-gradient(180deg,#0f172a,#16233a)] px-3 py-2.5">
             <svg
-              aria-label="LIMS terminal screen"
+              aria-label={t("lims.screen")}
               className="h-[12.5rem] w-full rounded-[1rem] border border-sky-400/25 bg-[#07111f] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.06)]"
               viewBox="0 0 360 228"
             >
@@ -208,53 +211,67 @@ export function LimsWidget({
               {isEmptyState ? (
                 <>
                   <text x="28" y="78" fill="#e2e8f0" fontSize="15" fontFamily="monospace">
-                    Awaiting accession
+                    {t("lims.awaitingAccession")}
                   </text>
                   <text x="28" y="104" fill="#7dd3fc" fontSize="12" fontFamily="monospace">
-                    Weighing captured automatically. Enter source details.
+                    {t("lims.awaitingHint")}
                   </text>
                   <text x="28" y="136" fill="#94a3b8" fontSize="12" fontFamily="monospace">
-                    Orchard: --
+                    {t("lims.orchardLine", { value: "--" })}
                   </text>
                   <text x="28" y="156" fill="#94a3b8" fontSize="12" fontFamily="monospace">
-                    Harvest date: --
+                    {t("lims.harvestDateLine", { value: "--" })}
                   </text>
                   <text x="28" y="176" fill="#94a3b8" fontSize="12" fontFamily="monospace">
-                    Declared mass: --
+                    {t("lims.declaredMassLine", { value: "--" })}
                   </text>
                   <text x="28" y="196" fill="#94a3b8" fontSize="12" fontFamily="monospace">
-                    Sample mass: --
+                    {t("lims.sampleMassLine", { value: "--" })}
                   </text>
                   <text x="28" y="212" fill="#38bdf8" fontSize="12" fontFamily="monospace">
-                    Status: waiting for user entry
+                    {t("lims.statusLine", { value: t("lims.statusWaiting") })}
                   </text>
                 </>
               ) : (
                 <>
                   <text x="28" y="78" fill="#e2e8f0" fontSize="15" fontFamily="monospace">
-                    Reception record
+                    {t("lims.receptionRecord")}
                   </text>
                   <text x="28" y="106" fill="#7dd3fc" fontSize="12" fontFamily="monospace">
-                    Orchard: {displayedEntry.orchardName || orchardName || "--"}
+                    {t("lims.orchardLine", {
+                      value: displayedEntry.orchardName || orchardName || "--",
+                    })}
                   </text>
                   <text x="28" y="126" fill="#7dd3fc" fontSize="12" fontFamily="monospace">
-                    Harvest date: {displayedEntry.harvestDate || harvestDate || "--"}
+                    {t("lims.harvestDateLine", {
+                      value: displayedEntry.harvestDate || harvestDate || "--",
+                    })}
                   </text>
                   <text x="28" y="146" fill="#7dd3fc" fontSize="12" fontFamily="monospace">
-                    Declared mass: {displayedEntry.indicativeMassG > 0 ? formatIndicativeMass(displayedEntry.indicativeMassG) : hasIndicativeMass ? formatIndicativeMass(indicativeMassValue) : "--"}
+                    {t("lims.declaredMassLine", {
+                      value:
+                        displayedEntry.indicativeMassG > 0
+                          ? formatIndicativeMass(displayedEntry.indicativeMassG)
+                          : hasIndicativeMass
+                            ? formatIndicativeMass(indicativeMassValue)
+                            : "--",
+                    })}
                   </text>
                   <text x="28" y="166" fill="#7dd3fc" fontSize="12" fontFamily="monospace">
-                    Sample mass: {displayedEntry.measuredSampleMassG !== null
-                      ? formatMeasuredSampleMass(displayedEntry.measuredSampleMassG)
-                      : hasMeasuredSampleMass
-                        ? formatMeasuredSampleMass(measuredSampleMassValue)
-                        : "--"}
+                    {t("lims.sampleMassLine", {
+                      value:
+                        displayedEntry.measuredSampleMassG !== null
+                          ? formatMeasuredSampleMass(displayedEntry.measuredSampleMassG)
+                          : hasMeasuredSampleMass
+                            ? formatMeasuredSampleMass(measuredSampleMassValue)
+                            : "--",
+                    })}
                   </text>
                   <text x="28" y="186" fill="#7dd3fc" fontSize="12" fontFamily="monospace">
-                    Sample code: {displayedEntry.labSampleCode ?? "--"}
+                    {t("lims.sampleCodeLine", { value: displayedEntry.labSampleCode ?? "--" })}
                   </text>
                   <text x="28" y="206" fill="#22c55e" fontSize="11" fontFamily="monospace">
-                    Status: {displayedEntry.status}
+                    {t("lims.statusLine", { value: translateLimsStatus(t, displayedEntry.status) })}
                   </text>
                 </>
               )}
@@ -286,7 +303,7 @@ export function LimsWidget({
           </div>
         </div>
         <button
-          aria-label="Review reception mass calculation"
+          aria-label={t("lims.reviewMass")}
           aria-pressed={hasReviewedMassSummary}
           className={`w-full rounded-[1rem] border px-3 py-3 text-left transition ${
             hasReviewedMassSummary
@@ -309,15 +326,15 @@ export function LimsWidget({
               </p>
             </div>
             <span className="text-xs font-semibold text-emerald-700">
-              {hasReviewedMassSummary ? "Reviewed" : "Review"}
+              {hasReviewedMassSummary ? t("lims.reviewed") : t("lims.review")}
             </span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             {[
-              ["Declared mass", displayedDeclaredMassG === null ? "--" : formatIndicativeMass(displayedDeclaredMassG)],
-              ["Measured gross", displayedGrossMassG === null ? "--" : `${displayedGrossMassG.toFixed(1)} g`],
-              ["Packaging tare", `${displayedPackagingTareMassG.toFixed(1)} g`],
-              ["Measured net", displayedNetMassG === null ? "--" : `${displayedNetMassG.toFixed(1)} g`],
+              [t("lims.declaredMass"), displayedDeclaredMassG === null ? "--" : formatIndicativeMass(displayedDeclaredMassG)],
+              [t("lims.measuredGross"), displayedGrossMassG === null ? "--" : `${displayedGrossMassG.toFixed(1)} g`],
+              [t("lims.packagingTare"), `${displayedPackagingTareMassG.toFixed(1)} g`],
+              [t("lims.measuredNet"), displayedNetMassG === null ? "--" : `${displayedNetMassG.toFixed(1)} g`],
             ].map(([label, value]) => (
               <span className="rounded-lg border border-white/80 bg-white/75 px-2 py-2" key={label}>
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -332,7 +349,7 @@ export function LimsWidget({
         </button>
         <div className="grid grid-cols-2 gap-2">
           <label className="col-span-2 grid gap-1">
-            <span className="text-xs font-medium text-slate-600">Record</span>
+            <span className="text-xs font-medium text-slate-600">{t("lims.record")}</span>
             <select
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 focus:border-sky-400"
               onChange={(event) => {
@@ -347,27 +364,27 @@ export function LimsWidget({
               }}
               value={selectedEntryId}
             >
-              <option value="new">New entry</option>
+              <option value="new">{t("lims.newEntry")}</option>
               {entries.map((entry) => (
                 <option key={entry.id ?? entry.labSampleCode} value={entry.id ?? ""}>
-                  {entry.labSampleCode ?? "Unnumbered entry"}
+                  {entry.labSampleCode ?? t("lims.unnumberedEntry")}
                 </option>
               ))}
             </select>
           </label>
           <label className="grid gap-1 rounded-[0.9rem] border border-slate-200 bg-white/85 px-2.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-            <span className="text-xs font-medium text-slate-600">Orchard / producer</span>
+            <span className="text-xs font-medium text-slate-600">{t("lims.orchardProducer")}</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400"
               data-tutorial-anchor="lims-orchard-name"
               onChange={(event) => setOrchardName(event.target.value)}
-              placeholder="Enter orchard or producer"
+              placeholder={t("lims.enterOrchard")}
               type="text"
               value={orchardName}
             />
           </label>
           <label className="grid gap-1 rounded-[0.9rem] border border-slate-200 bg-white/85 px-2.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-            <span className="text-xs font-medium text-slate-600">Harvest date</span>
+            <span className="text-xs font-medium text-slate-600">{t("lims.harvestDate")}</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 focus:border-sky-400"
               data-tutorial-anchor="lims-harvest-date"
@@ -377,7 +394,7 @@ export function LimsWidget({
             />
           </label>
           <label className="grid gap-1 rounded-[0.9rem] border border-slate-200 bg-white/85 px-2.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-            <span className="text-xs font-medium text-slate-600">Declared mass from bag label (g)</span>
+            <span className="text-xs font-medium text-slate-600">{t("lims.declaredMassField")}</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400"
               data-tutorial-anchor="lims-indicative-mass"
@@ -391,7 +408,7 @@ export function LimsWidget({
             />
           </label>
           <label className="grid gap-1 rounded-[0.9rem] border border-slate-200 bg-white/85 px-2.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-            <span className="text-xs font-medium text-slate-600">Sample mass (g)</span>
+            <span className="text-xs font-medium text-slate-600">{t("lims.sampleMassField")}</span>
             <input
               className="rounded-[0.8rem] border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-400"
               data-tutorial-anchor="lims-sample-mass"
@@ -434,7 +451,7 @@ export function LimsWidget({
             }
             type="button"
           >
-            Print label
+            {t("lims.printLabel")}
           </button>
         </div>
         {displayedTicket ? (
