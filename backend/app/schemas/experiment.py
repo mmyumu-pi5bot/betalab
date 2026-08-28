@@ -133,11 +133,7 @@ class SequenceRunSchema(BaseModel):
     id: str
     injections: list[InjectionMeasurementSchema] = Field(default_factory=list)
     method_id: str = APPLE_PESTICIDES_MRM_V1_ID
-    method_snapshot: AcquisitionMethodSchema = Field(
-        default_factory=lambda: AcquisitionMethodSchema.model_validate(
-            asdict(APPLE_PESTICIDES_MRM_V1)
-        )
-    )
+    method_snapshot: AcquisitionMethodSchema = Field(default_factory=lambda: AcquisitionMethodSchema.model_validate(asdict(APPLE_PESTICIDES_MRM_V1)))
     total_duration_s: float = 0.0
     elapsed_s: float = 0.0
 

@@ -84,9 +84,7 @@ def unload_rack_from_instrument(experiment_id: str) -> ExperimentSchema:
 
 
 @router.post("/{experiment_id}/lcmsms/place-calibration-vial", response_model=ExperimentSchema)
-def place_calibration_standard_vial(
-    experiment_id: str, body: PlaceCalibrationStandardVialBody
-) -> ExperimentSchema:
+def place_calibration_standard_vial(experiment_id: str, body: PlaceCalibrationStandardVialBody) -> ExperimentSchema:
     return handle_service_errors(
         lambda: PlaceCalibrationStandardVialService(experiment_service).run(
             experiment_id,
@@ -149,7 +147,5 @@ def download_sequence_results(experiment_id: str, run_id: str) -> Response:
     return Response(
         content=build_run_bundle(run),
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{run_bundle_filename(run)}"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{run_bundle_filename(run)}"'},
     )

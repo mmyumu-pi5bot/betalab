@@ -157,17 +157,13 @@ def add_liquid_to_tool(
     else:
         existing_liquid.volume_ml = round_volume(existing_liquid.volume_ml + volume_to_add)
         existing_liquid.true_volume_ml = round(
-            (existing_liquid.true_volume_ml if existing_liquid.true_volume_ml is not None else existing_liquid.volume_ml)
-            + true_volume_to_add,
+            (existing_liquid.true_volume_ml if existing_liquid.true_volume_ml is not None else existing_liquid.volume_ml) + true_volume_to_add,
             6,
         )
         updated_volume = existing_liquid.volume_ml
         existing_liquid_was_present = True
 
-    has_other_components = bool(
-        tool.produce_fractions
-        or any(liquid.liquid_id != liquid_definition.id for liquid in tool.liquids)
-    )
+    has_other_components = bool(tool.produce_fractions or any(liquid.liquid_id != liquid_definition.id for liquid in tool.liquids))
     if volume_to_add > 0:
         if not had_contents:
             tool.contents_homogeneity = 1.0

@@ -306,10 +306,7 @@ def add_liquid_to_existing_tool(
     powder_present_before_addition = get_tool_total_powder_mass_g(
         tool,
         material_states=experiment.produce_material_states,
-    ) > 0 or any(
-        get_material_state_name(experiment.produce_material_states, produce_lot.id) == "ground"
-        for produce_lot in tool.produce_lots
-    )
+    ) > 0 or any(get_material_state_name(experiment.produce_material_states, produce_lot.id) == "ground" for produce_lot in tool.produce_lots)
     add_liquid_to_tool(
         experiment,
         tool,
@@ -369,11 +366,7 @@ class UpdateWorkbenchLiquidVolumeService(WriteDomainService[UpdateWorkbenchLiqui
             experiment.audit_log.append(f"{liquid_entry.name} removed from {tool.label}.")
             return
 
-        error_factor = (
-            previous_true_volume / previous_nominal_volume
-            if previous_nominal_volume > 0
-            else 1.0
-        )
+        error_factor = previous_true_volume / previous_nominal_volume if previous_nominal_volume > 0 else 1.0
         liquid_entry.true_volume_ml = round(liquid_entry.volume_ml * error_factor, 6)
 
         experiment.audit_log.append(f"{liquid_entry.name} adjusted to {format_volume(liquid_entry.volume_ml)} mL in {tool.label}.")

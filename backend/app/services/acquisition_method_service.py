@@ -1,4 +1,5 @@
 """Orchestration for acquisition methods: read built-ins, author user copies."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -45,9 +46,7 @@ class AcquisitionMethodService:
     """Read access to every method, write access to user methods only."""
 
     def __init__(self, repository: AcquisitionMethodRepository | None = None) -> None:
-        self._repository = (
-            repository if repository is not None else InMemoryAcquisitionMethodRepository()
-        )
+        self._repository = repository if repository is not None else InMemoryAcquisitionMethodRepository()
 
     # -- reads ---------------------------------------------------------------
 
@@ -62,9 +61,7 @@ class AcquisitionMethodService:
             pass
         stored = self._repository.load(method_id)
         if stored is None:
-            raise AcquisitionMethodNotFoundError(
-                f"Unknown acquisition method '{method_id}'."
-            )
+            raise AcquisitionMethodNotFoundError(f"Unknown acquisition method '{method_id}'.")
         return stored
 
     def warnings_for(self, method: AcquisitionMethod) -> list[MethodWarning]:
@@ -94,9 +91,7 @@ class AcquisitionMethodService:
         result under a different id.
         """
         if self._is_built_in(method.id):
-            raise ImmutableAcquisitionMethodError(
-                f"'{method.id}' is a built-in method. Duplicate it before editing."
-            )
+            raise ImmutableAcquisitionMethodError(f"'{method.id}' is a built-in method. Duplicate it before editing.")
         stored = replace(method, is_built_in=False)
         self._require_valid(stored)
         self._repository.save(stored)
@@ -104,13 +99,9 @@ class AcquisitionMethodService:
 
     def delete(self, method_id: str) -> None:
         if self._is_built_in(method_id):
-            raise ImmutableAcquisitionMethodError(
-                f"'{method_id}' is a built-in method and cannot be deleted."
-            )
+            raise ImmutableAcquisitionMethodError(f"'{method_id}' is a built-in method and cannot be deleted.")
         if not self._repository.delete(method_id):
-            raise AcquisitionMethodNotFoundError(
-                f"Unknown acquisition method '{method_id}'."
-            )
+            raise AcquisitionMethodNotFoundError(f"Unknown acquisition method '{method_id}'.")
 
     # -- helpers -------------------------------------------------------------
 
@@ -127,6 +118,4 @@ class AcquisitionMethodService:
             raise InvalidAcquisitionMethodError(errors)
 
 
-acquisition_method_service = AcquisitionMethodService(
-    repository=SqliteAcquisitionMethodRepository(settings.experiments_db_path)
-)
+acquisition_method_service = AcquisitionMethodService(repository=SqliteAcquisitionMethodRepository(settings.experiments_db_path))

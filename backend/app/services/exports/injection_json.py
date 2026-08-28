@@ -17,6 +17,7 @@ Two things are deliberately *absent* rather than empty:
   configuration. A key for it here would be an instrument claiming to have
   chosen a peak, which it never does.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -62,12 +63,7 @@ def build_injection_document(
                 "main_channel": event.main_channel.channel_number,
                 "time": [round(value / 60.0, _TIME_DECIMALS) for value in axis_s],
                 "time_step": _mean_step_min(axis_s),
-                "channels": {
-                    str(slot.channel_number): _build_channel(
-                        slot, traces.get(slot.transition.id), axis_s
-                    )
-                    for slot in event.channels
-                },
+                "channels": {str(slot.channel_number): _build_channel(slot, traces.get(slot.transition.id), axis_s) for slot in event.channels},
             }
         )
 
@@ -118,9 +114,7 @@ def _align_to_axis(trace: TransitionTrace | None, axis_s: list[float]) -> list[f
         return []
     if trace.times_s == axis_s:
         return [round(value, _AMPLITUDE_DECIMALS) for value in trace.intensities]
-    return [
-        round(_interpolate(trace, instant), _AMPLITUDE_DECIMALS) for instant in axis_s
-    ]
+    return [round(_interpolate(trace, instant), _AMPLITUDE_DECIMALS) for instant in axis_s]
 
 
 def _interpolate(trace: TransitionTrace, instant: float) -> float:
@@ -134,8 +128,5 @@ def _interpolate(trace: TransitionTrace, instant: float) -> float:
             if span <= 0:
                 return trace.intensities[index]
             weight = (instant - left) / span
-            return (
-                trace.intensities[index - 1] * (1.0 - weight)
-                + trace.intensities[index] * weight
-            )
+            return trace.intensities[index - 1] * (1.0 - weight) + trace.intensities[index] * weight
     return trace.intensities[-1]

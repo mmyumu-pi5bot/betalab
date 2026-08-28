@@ -28,10 +28,7 @@ GROUND_POWDER_APPARENT_DENSITY_G_PER_ML = 0.5
 
 def sync_canonical_produce_model(experiment: Experiment) -> None:
     produce_lots_by_id = collect_produce_lots(experiment)
-    temperature_before_sync = {
-        fraction.produce_lot_id: fraction.temperature_c
-        for fraction in reversed(_all_produce_fractions(experiment))
-    }
+    temperature_before_sync = {fraction.produce_lot_id: fraction.temperature_c for fraction in reversed(_all_produce_fractions(experiment))}
     state_ids_by_signature: dict[tuple[object, ...], str] = {}
     material_states: list[ProduceMaterialState] = []
     existing_states_by_id = {state.id: state for state in experiment.produce_material_states}
@@ -59,9 +56,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
         material_states.append(existing_state)
         material_state_ids_added.add(state_id)
 
-    def seed_fraction_temperature_c(
-        existing_fraction: ProduceFraction | None, produce_lot_id: str
-    ) -> float:
+    def seed_fraction_temperature_c(existing_fraction: ProduceFraction | None, produce_lot_id: str) -> float:
         """A rebuilt fraction keeps the temperature it had.
 
         Fractions are re-derived on every sync, so without this the body of material
@@ -120,9 +115,7 @@ def sync_canonical_produce_model(experiment: Experiment) -> None:
             # intact every time the signature moves -- and temperature is part of
             # that signature, so powder simply warming on the bench was enough to
             # wipe the residues back to pristine on every tick.
-            material_state_record.pesticide_degradation_factors = dict(
-                existing_state.pesticide_degradation_factors
-            )
+            material_state_record.pesticide_degradation_factors = dict(existing_state.pesticide_degradation_factors)
         material_states.append(material_state_record)
         material_state_ids_added.add(state_id)
         return state_id
@@ -340,9 +333,7 @@ def _generate_residues_if_missing(lot: ProduceLot) -> None:
         lot.pesticide_residues = generate_pesticide_residues(lot.produce_type)
 
 
-def set_lot_fraction_temperatures(
-    experiment: Experiment, produce_lot_id: str, temperature_c: float
-) -> None:
+def set_lot_fraction_temperatures(experiment: Experiment, produce_lot_id: str, temperature_c: float) -> None:
     """Put every body of this lot at a chosen temperature.
 
     Only debug presets need this: they conjure material that is already cold, and
@@ -440,11 +431,7 @@ def _build_tool_produce_fractions(
                 produce_material_state_id=state_id,
                 temperature_c=seed_fraction_temperature_c(existing_fraction, produce_lot.id),
                 mass_g=produce_lot.total_mass_g,
-                true_mass_g=(
-                    existing_fraction.true_mass_g
-                    if existing_fraction is not None
-                    else produce_lot.total_mass_g
-                ),
+                true_mass_g=(existing_fraction.true_mass_g if existing_fraction is not None else produce_lot.total_mass_g),
                 unit_count=(existing_fraction.unit_count if existing_fraction is not None else produce_lot.unit_count),
                 is_mixed=(existing_fraction.is_mixed if existing_fraction is not None else False),
                 is_contaminated=(existing_fraction.is_contaminated if existing_fraction is not None else False),
@@ -485,11 +472,7 @@ def _build_surface_produce_fractions(
                 produce_material_state_id=ensure_material_state_id(produce_lot),
                 temperature_c=seed_fraction_temperature_c(existing_fraction, produce_lot.id),
                 mass_g=produce_lot.total_mass_g,
-                true_mass_g=(
-                    existing_fraction.true_mass_g
-                    if existing_fraction is not None
-                    else produce_lot.total_mass_g
-                ),
+                true_mass_g=(existing_fraction.true_mass_g if existing_fraction is not None else produce_lot.total_mass_g),
                 unit_count=(existing_fraction.unit_count if existing_fraction is not None else produce_lot.unit_count),
                 is_mixed=(existing_fraction.is_mixed if existing_fraction is not None else False),
                 is_contaminated=(existing_fraction.is_contaminated if existing_fraction is not None else False),
@@ -507,11 +490,7 @@ def _build_trash_produce_fraction(entry: TrashProduceLotEntry, ensure_material_s
         produce_lot_id=entry.produce_lot.id,
         produce_material_state_id=ensure_material_state_id(entry.produce_lot),
         mass_g=entry.produce_lot.total_mass_g,
-        true_mass_g=(
-            entry.produce_fraction.true_mass_g
-            if entry.produce_fraction is not None
-            else entry.produce_lot.total_mass_g
-        ),
+        true_mass_g=(entry.produce_fraction.true_mass_g if entry.produce_fraction is not None else entry.produce_lot.total_mass_g),
         unit_count=entry.produce_lot.unit_count,
         is_mixed=entry.produce_fraction.is_mixed if entry.produce_fraction is not None else False,
         is_contaminated=entry.produce_fraction.is_contaminated if entry.produce_fraction is not None else False,

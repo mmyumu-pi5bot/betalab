@@ -6,6 +6,7 @@ Two documents leave Betalab, and they are a matched pair. The method file
 integrates a peak or reads a concentration — the boundary drawn in
 :class:`app.domain.models.TransitionTrace` still holds on the way out.
 """
+
 from __future__ import annotations
 
 import io
@@ -31,10 +32,7 @@ from app.services.exports.run_bundle import build_run_bundle
 def _method(compound_ids: tuple[str, ...] = ("boscalid", "imidacloprid")):
     """The built-in method narrowed to a couple of compounds, order preserved."""
     transitions = tuple(
-        transition
-        for compound_id in compound_ids
-        for transition in APPLE_PESTICIDES_MRM_V1.transitions
-        if transition.compound_id == compound_id
+        transition for compound_id in compound_ids for transition in APPLE_PESTICIDES_MRM_V1.transitions if transition.compound_id == compound_id
     )
     return replace(APPLE_PESTICIDES_MRM_V1, transitions=transitions)
 
@@ -58,10 +56,7 @@ def _trace(transition, times_s, intensities):
 
 
 def _injection(method, output_filename="cal_1.00 ng_mL.mzML"):
-    traces = [
-        _trace(transition, [60.0, 60.5, 61.0], [0.0, 100.0, 20.0])
-        for transition in method.transitions
-    ]
+    traces = [_trace(transition, [60.0, 60.5, 61.0], [0.0, 100.0, 20.0]) for transition in method.transitions]
     return InjectionMeasurement(
         id="inj_1",
         vial_id="vial_1",
@@ -119,11 +114,7 @@ class TestInjectionDocument:
         method = _method()
         document = build_injection_document(_injection(method), method)
 
-        seg_ids = [
-            channel["seg_id"]
-            for measure in document["measures"]
-            for channel in measure["channels"].values()
-        ]
+        seg_ids = [channel["seg_id"] for measure in document["measures"] for channel in measure["channels"].values()]
         assert seg_ids == [0, 1, 2, 3]
         first = document["measures"][0]["channels"]["1"]
         assert first["segment"] == first["seg_id"]
@@ -215,16 +206,8 @@ class TestMethodCodFile:
         header, rows = build_method_cod_rows(method)
         document = build_injection_document(_injection(method), method)
 
-        from_cod = [
-            row[header.index(f"Ch.({channel}) seg_id")]
-            for row in rows
-            for channel in (1, 2)
-        ]
-        from_json = [
-            channel["seg_id"]
-            for measure in document["measures"]
-            for channel in measure["channels"].values()
-        ]
+        from_cod = [row[header.index(f"Ch.({channel}) seg_id")] for row in rows for channel in (1, 2)]
+        from_json = [channel["seg_id"] for measure in document["measures"] for channel in measure["channels"].values()]
         assert from_cod == from_json
 
     def test_the_internal_standard_is_flagged_and_named_on_its_analytes(self) -> None:
@@ -275,9 +258,7 @@ class TestMethodCodFile:
         workbook = openpyxl.load_workbook(io.BytesIO(build_method_cod_workbook(method)))
         sheet = workbook.active
 
-        assert [cell.value for cell in sheet[1]] == [
-            value if value != "" else None for value in header
-        ]
+        assert [cell.value for cell in sheet[1]] == [value if value != "" else None for value in header]
         assert sheet.cell(row=2, column=header.index("name") + 1).value == "Boscalid"
         assert sheet.cell(row=2, column=len(header)).value == 2.0
 
@@ -351,9 +332,7 @@ class TestResultDownloadRoute:
         method = _method()
         experiment_id = experiment_service.create_experiment().id
         experiment = experiment_service._require_experiment(experiment_id)
-        instrument = next(
-            widget for widget in experiment.workspace.widgets if widget.id == "instrument"
-        )
+        instrument = next(widget for widget in experiment.workspace.widgets if widget.id == "instrument")
         instrument.sequence_runs.append(
             SequenceRun(
                 id="run_1",
@@ -373,9 +352,7 @@ class TestResultDownloadRoute:
 
         experiment_id, run_id = self._experiment_with_run()
 
-        response = TestClient(app).get(
-            f"/experiments/{experiment_id}/lcmsms/runs/{run_id}/results"
-        )
+        response = TestClient(app).get(f"/experiments/{experiment_id}/lcmsms/runs/{run_id}/results")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/zip"
@@ -390,9 +367,7 @@ class TestResultDownloadRoute:
 
         experiment_id, _ = self._experiment_with_run()
 
-        response = TestClient(app).get(
-            f"/experiments/{experiment_id}/lcmsms/runs/nope/results"
-        )
+        response = TestClient(app).get(f"/experiments/{experiment_id}/lcmsms/runs/nope/results")
 
         assert response.status_code == 404
 

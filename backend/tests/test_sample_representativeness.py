@@ -1,4 +1,5 @@
 """How preparation quality reaches the chromatogram: sampling, matrix, dirt."""
+
 from __future__ import annotations
 
 import random
@@ -16,11 +17,7 @@ from app.services.physical_simulation_service import PhysicalSimulationService
 def _boscalid_quantifier():
     from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1
 
-    return next(
-        t
-        for t in APPLE_PESTICIDES_MRM_V1.transitions
-        if t.compound_id == COMPOUND and t.role == "quantifier"
-    )
+    return next(t for t in APPLE_PESTICIDES_MRM_V1.transitions if t.compound_id == COMPOUND and t.role == "quantifier")
 
 
 def _method_with(*transitions):
@@ -29,6 +26,7 @@ def _method_with(*transitions):
     from app.domain.acquisition_methods import APPLE_PESTICIDES_MRM_V1
 
     return replace(APPLE_PESTICIDES_MRM_V1, transitions=tuple(transitions))
+
 
 COMPOUND = "boscalid"
 
@@ -72,10 +70,7 @@ class TestDrawingTheSamplingError:
 
     def test_a_coarse_grind_biases_the_aliquot(self) -> None:
         random.seed(7)
-        draws = [
-            PhysicalSimulationService.draw_sampling_representativeness(0.0)
-            for _ in range(200)
-        ]
+        draws = [PhysicalSimulationService.draw_sampling_representativeness(0.0) for _ in range(200)]
 
         assert any(draw != 1.0 for draw in draws)
         # Unbiased on average: a coarse grind is as likely to over- as to
@@ -85,10 +80,7 @@ class TestDrawingTheSamplingError:
     def test_a_finer_grind_narrows_the_spread(self) -> None:
         def spread(homogeneity: float) -> float:
             random.seed(11)
-            draws = [
-                PhysicalSimulationService.draw_sampling_representativeness(homogeneity)
-                for _ in range(300)
-            ]
+            draws = [PhysicalSimulationService.draw_sampling_representativeness(homogeneity) for _ in range(300)]
             mean = sum(draws) / len(draws)
             return sum((draw - mean) ** 2 for draw in draws) / len(draws)
 
@@ -219,9 +211,7 @@ class TestTheStandardOnlyCorrectsWhatCoElutesWithIt:
 
     def _corrected_ratio(self, retention_time_s: float, matrix_load: float) -> float:
         istd = PhysicalSimulationService.matrix_suppression_factor(matrix_load, 396.0)
-        analyte = PhysicalSimulationService.matrix_suppression_factor(
-            matrix_load, retention_time_s
-        )
+        analyte = PhysicalSimulationService.matrix_suppression_factor(matrix_load, retention_time_s)
         return analyte / istd
 
     def test_a_co_eluting_compound_is_corrected_almost_perfectly(self) -> None:

@@ -62,4 +62,3 @@ def update_material_state(
     for field_name, field_value in fields.items():
         setattr(state, field_name, field_value)
     return state
-

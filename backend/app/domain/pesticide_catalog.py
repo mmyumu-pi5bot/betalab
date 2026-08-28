@@ -76,8 +76,4 @@ def apply_degradation_step(
     if temperature_c <= threshold_c:
         return degradation_factors
     thermal_stress = (temperature_c - threshold_c) * elapsed_seconds
-    return {
-        cid: factor * exp(-CATALOG_BY_ID[cid].thermal_k * thermal_stress)
-        for cid, factor in degradation_factors.items()
-        if cid in CATALOG_BY_ID
-    }
+    return {cid: factor * exp(-CATALOG_BY_ID[cid].thermal_k * thermal_stress) for cid, factor in degradation_factors.items() if cid in CATALOG_BY_ID}

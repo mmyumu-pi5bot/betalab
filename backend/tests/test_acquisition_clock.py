@@ -1,4 +1,5 @@
 """Tests for the accelerated acquisition clock: a sequence takes time to record."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -44,9 +45,7 @@ def _bootstrap(service: ExperimentRuntimeService, vial_count: int) -> str:
     for index in range(1, vial_count + 1):
         PlaceToolInRackSlotService(service).run(
             exp_id,
-            PlaceToolInRackSlotRequest(
-                rack_slot_id=f"rack_slot_{index}", tool_id="sample_vial_lcms"
-            ),
+            PlaceToolInRackSlotRequest(rack_slot_id=f"rack_slot_{index}", tool_id="sample_vial_lcms"),
         )
     experiment.rack.state = "loaded"
     return exp_id
@@ -119,9 +118,7 @@ class TestSequenceStartsRunning:
         _launch(service, exp_id, 1)
 
         with pytest.raises(ValueError, match="cannot be unloaded during an acquisition"):
-            UnloadRackFromInstrumentService(service).run(
-                exp_id, UnloadRackFromInstrumentRequest()
-            )
+            UnloadRackFromInstrumentService(service).run(exp_id, UnloadRackFromInstrumentRequest())
 
 
 class TestClockAdvancesTheAcquisition:
@@ -133,9 +130,7 @@ class TestClockAdvancesTheAcquisition:
         service._now_fn = lambda: START + timedelta(seconds=4)
         service.get_experiment(exp_id)
 
-        assert _only_run(service, exp_id).elapsed_s == pytest.approx(
-            4 * ACQUISITION_TIME_ACCELERATION
-        )
+        assert _only_run(service, exp_id).elapsed_s == pytest.approx(4 * ACQUISITION_TIME_ACCELERATION)
 
     def test_the_sequence_completes_and_releases_the_rack(self) -> None:
         service = _service_at(START)
@@ -167,20 +162,12 @@ class TestClockAdvancesTheAcquisition:
         _launch(service, exp_id, 1)
         service._now_fn = lambda: START + timedelta(hours=1)
         service.get_experiment(exp_id)
-        completions = [
-            entry
-            for entry in service._require_experiment(exp_id).audit_log
-            if "completed" in entry
-        ]
+        completions = [entry for entry in service._require_experiment(exp_id).audit_log if "completed" in entry]
 
         service._now_fn = lambda: START + timedelta(hours=2)
         service.get_experiment(exp_id)
 
-        assert [
-            entry
-            for entry in service._require_experiment(exp_id).audit_log
-            if "completed" in entry
-        ] == completions
+        assert [entry for entry in service._require_experiment(exp_id).audit_log if "completed" in entry] == completions
 
 
 class TestSkippingTheWait:

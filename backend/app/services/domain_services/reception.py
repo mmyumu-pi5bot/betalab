@@ -125,12 +125,8 @@ class CreateLimsReceptionService(WriteDomainService[CreateLimsReceptionRequest])
         if request.measured_sample_mass_g is not None and request.measured_sample_mass_g <= 0:
             raise ValueError("Sample mass must be greater than zero.")
 
-        existing_entry = (
-            _find_lims_entry(experiment, request.entry_id) if request.entry_id is not None else None
-        )
-        measured_gross_mass_g = _resolve_measured_gross_mass_g(
-            experiment, request.measured_gross_mass_g, entry=existing_entry
-        )
+        existing_entry = _find_lims_entry(experiment, request.entry_id) if request.entry_id is not None else None
+        measured_gross_mass_g = _resolve_measured_gross_mass_g(experiment, request.measured_gross_mass_g, entry=existing_entry)
         if existing_entry is None:
             entry = _build_lims_reception_entry(
                 experiment,

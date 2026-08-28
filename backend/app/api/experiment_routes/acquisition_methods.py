@@ -1,4 +1,5 @@
 """Acquisition method catalog: read every method, author user copies."""
+
 from dataclasses import asdict, replace
 
 from fastapi import HTTPException
@@ -55,10 +56,7 @@ class ProposeTransitionsBody(BaseModel):
 def _to_detail(method: AcquisitionMethod) -> SavedAcquisitionMethodSchema:
     return SavedAcquisitionMethodSchema(
         method=AcquisitionMethodSchema.model_validate(asdict(method)),
-        warnings=[
-            MethodWarningSchema(**asdict(warning))
-            for warning in acquisition_method_service.warnings_for(method)
-        ],
+        warnings=[MethodWarningSchema(**asdict(warning)) for warning in acquisition_method_service.warnings_for(method)],
     )
 
 
@@ -160,28 +158,21 @@ def get_acquisition_method_detail(method_id: str) -> AcquisitionMethodSchema:
 )
 def get_acquisition_method_warnings(method_id: str) -> list[MethodWarningSchema]:
     method = _resolve_or_404(method_id)
-    return [
-        MethodWarningSchema(**asdict(warning))
-        for warning in acquisition_method_service.warnings_for(method)
-    ]
+    return [MethodWarningSchema(**asdict(warning)) for warning in acquisition_method_service.warnings_for(method)]
 
 
 @router.put(
     "/catalog/acquisition-methods/{method_id}",
     response_model=SavedAcquisitionMethodSchema,
 )
-def save_acquisition_method(
-    method_id: str, body: SaveMethodBody
-) -> SavedAcquisitionMethodSchema:
+def save_acquisition_method(method_id: str, body: SaveMethodBody) -> SavedAcquisitionMethodSchema:
     existing = _resolve_or_404(method_id)
     edited = replace(
         existing,
         name=body.name,
         version=body.version,
         runtime_s=body.runtime_s,
-        transitions=tuple(
-            MrmTransition(**transition.model_dump()) for transition in body.transitions
-        ),
+        transitions=tuple(MrmTransition(**transition.model_dump()) for transition in body.transitions),
         calibration_levels_ng_per_ml=tuple(body.calibration_levels_ng_per_ml),
     )
     try:

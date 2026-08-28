@@ -3,6 +3,7 @@
 Built-in methods live in code and are never stored. Only the methods a user
 creates by duplicating one land here.
 """
+
 from __future__ import annotations
 
 import json
@@ -50,9 +51,7 @@ def deserialize_acquisition_method(schema: AcquisitionMethodSchema) -> Acquisiti
             ),
         ),
         ion_source=IonSourceParameters(**schema.ion_source.model_dump()),
-        transitions=tuple(
-            MrmTransition(**transition.model_dump()) for transition in schema.transitions
-        ),
+        transitions=tuple(MrmTransition(**transition.model_dump()) for transition in schema.transitions),
         calibration_levels_ng_per_ml=tuple(schema.calibration_levels_ng_per_ml),
     )
 
@@ -116,9 +115,7 @@ class SqliteAcquisitionMethodRepository:
 
     def list(self) -> list[AcquisitionMethod]:
         with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT payload FROM acquisition_methods ORDER BY id"
-            ).fetchall()
+            rows = connection.execute("SELECT payload FROM acquisition_methods ORDER BY id").fetchall()
         return [self._decode(row[0]) for row in rows]
 
     def delete(self, method_id: str) -> bool:
@@ -131,9 +128,7 @@ class SqliteAcquisitionMethodRepository:
         return cursor.rowcount > 0
 
     def _decode(self, payload: str) -> AcquisitionMethod:
-        return deserialize_acquisition_method(
-            AcquisitionMethodSchema.model_validate(json.loads(payload))
-        )
+        return deserialize_acquisition_method(AcquisitionMethodSchema.model_validate(json.loads(payload)))
 
     def _ensure_parent_directory(self) -> None:
         Path(self._db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,7 @@ concentrations stays behind in the jar. Every lookup between the balance and
 the injection has to follow that reference, otherwise the sample chromatogram
 comes out as a blank while the calibration point looks perfect.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -98,9 +99,7 @@ def test_injection_context_reads_residues_from_the_lot_left_in_the_jar() -> None
     experiment = service._require_experiment(experiment_id)
     tube = experiment.workbench.slots[0].tool
     assert tube is not None
-    tube.quechers_extraction_result = QuechersExtractionResult(
-        extraction_manip_factor=1.0, istd_manip_factor=None, istd_phase=None
-    )
+    tube.quechers_extraction_result = QuechersExtractionResult(extraction_manip_factor=1.0, istd_manip_factor=None, istd_phase=None)
     tube.liquids = [
         WorkbenchLiquid(
             id="liquid_acn",
@@ -114,9 +113,7 @@ def test_injection_context_reads_residues_from_the_lot_left_in_the_jar() -> None
     context = build_extract_injection_context(experiment, tube, 1.0)
 
     # 480 intact, 640 halved by the degradation factors carried on the state.
-    assert context.effective_residues_ug_per_kg == pytest.approx(
-        {"boscalid": 480.0, "captan": 320.0}
-    )
+    assert context.effective_residues_ug_per_kg == pytest.approx({"boscalid": 480.0, "captan": 320.0})
 
 
 def test_slurry_conversion_keeps_the_degradation_already_accumulated() -> None:
@@ -127,9 +124,7 @@ def test_slurry_conversion_keeps_the_degradation_already_accumulated() -> None:
 
     AddLiquidToWorkbenchToolService(service).run(
         experiment_id,
-        AddLiquidToWorkbenchToolRequest(
-            slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0
-        ),
+        AddLiquidToWorkbenchToolRequest(slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0),
     )
 
     experiment = service._require_experiment(experiment_id)
@@ -161,9 +156,7 @@ def test_quechers_heat_degrades_the_tube_portion_not_the_jar_stock() -> None:
     tube.produce_fractions[0].produce_material_state_id = slurry_state.id
     tube.quechers_state.temperature_c = 60.0
 
-    PhysicalSimulationService().advance_quechers_pesticide_degradation(
-        tube, 120.0, experiment.produce_material_states
-    )
+    PhysicalSimulationService().advance_quechers_pesticide_degradation(tube, 120.0, experiment.produce_material_states)
 
     jar_state = experiment.produce_material_states[0]
     assert slurry_state.pesticide_degradation_factors["boscalid"] < 1.0
@@ -184,9 +177,7 @@ def test_the_canonical_resync_leaves_existing_material_states_alone() -> None:
     service, experiment_id = _jar_and_tube()
     AddLiquidToWorkbenchToolService(service).run(
         experiment_id,
-        AddLiquidToWorkbenchToolRequest(
-            slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0
-        ),
+        AddLiquidToWorkbenchToolRequest(slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0),
     )
     experiment = service._require_experiment(experiment_id)
     before = {state.id for state in experiment.produce_material_states}
@@ -194,9 +185,7 @@ def test_the_canonical_resync_leaves_existing_material_states_alone() -> None:
     sync_canonical_produce_model(experiment)
 
     assert {state.id for state in experiment.produce_material_states} == before
-    ground = next(
-        state for state in experiment.produce_material_states if state.material_state == "ground"
-    )
+    ground = next(state for state in experiment.produce_material_states if state.material_state == "ground")
     assert ground.pesticide_degradation_factors == {"boscalid": 1.0, "captan": 0.5}
 
 
@@ -209,19 +198,13 @@ def test_the_injection_reads_the_degradation_of_the_portion_not_of_the_jar() -> 
     service, experiment_id = _jar_and_tube()
     AddLiquidToWorkbenchToolService(service).run(
         experiment_id,
-        AddLiquidToWorkbenchToolRequest(
-            slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0
-        ),
+        AddLiquidToWorkbenchToolRequest(slot_id="station_1", liquid_id="acetonitrile_extraction", volume_ml=10.0),
     )
     experiment = service._require_experiment(experiment_id)
     tube = experiment.workbench.slots[0].tool
     assert tube is not None
 
-    portion_state = next(
-        state
-        for state in experiment.produce_material_states
-        if state.id == tube.produce_fractions[0].produce_material_state_id
-    )
+    portion_state = next(state for state in experiment.produce_material_states if state.id == tube.produce_fractions[0].produce_material_state_id)
     portion_state.pesticide_degradation_factors = {"boscalid": 1.0, "captan": 0.25}
     # The jar's powder is intact and listed first, exactly as it is when the jar
     # was placed on the bench before the tube.

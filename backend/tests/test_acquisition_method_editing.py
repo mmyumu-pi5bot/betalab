@@ -1,4 +1,5 @@
 """Tests for authoring user acquisition methods: duplicate, validate, edit, persist."""
+
 from __future__ import annotations
 
 import json
@@ -50,11 +51,7 @@ def _service() -> AcquisitionMethodService:
 
 
 def _transition(compound_id: str, role: str = "quantifier"):
-    return next(
-        t
-        for t in APPLE_PESTICIDES_MRM_V1.transitions
-        if t.compound_id == compound_id and t.role == role
-    )
+    return next(t for t in APPLE_PESTICIDES_MRM_V1.transitions if t.compound_id == compound_id and t.role == role)
 
 
 class TestValidation:
@@ -168,9 +165,7 @@ class TestSimpleModeTransitionProposal:
 
 class TestDuplication:
     def test_a_copy_is_editable_and_keeps_its_provenance(self) -> None:
-        copy = duplicate_acquisition_method(
-            APPLE_PESTICIDES_MRM_V1, "my_method", "My method", "0.1.0"
-        )
+        copy = duplicate_acquisition_method(APPLE_PESTICIDES_MRM_V1, "my_method", "My method", "0.1.0")
 
         assert copy.id == "my_method"
         assert copy.is_built_in is False
@@ -209,17 +204,13 @@ class TestAcquisitionMethodServiceCrud:
         service = _service()
 
         with pytest.raises(ValueError, match="already exists"):
-            service.duplicate(
-                APPLE_PESTICIDES_MRM_V1_ID, APPLE_PESTICIDES_MRM_V1_ID, "Clone", "9.9.9"
-            )
+            service.duplicate(APPLE_PESTICIDES_MRM_V1_ID, APPLE_PESTICIDES_MRM_V1_ID, "Clone", "9.9.9")
 
     def test_saves_a_new_version_of_a_user_method(self) -> None:
         service = _service()
         copy = service.duplicate(APPLE_PESTICIDES_MRM_V1_ID, "mine", "Mine", "0.1.0")
 
-        saved = service.save_new_version(
-            replace(copy, version="0.2.0", transitions=copy.transitions[:2])
-        )
+        saved = service.save_new_version(replace(copy, version="0.2.0", transitions=copy.transitions[:2]))
 
         assert saved.version == "0.2.0"
         assert service.get_method("mine").version == "0.2.0"
@@ -272,15 +263,11 @@ class TestAcquisitionMethodServiceCrud:
 class TestUserMethodPersistence:
     def test_a_user_method_survives_a_restart(self, tmp_path) -> None:
         db_path = str(tmp_path / "methods.sqlite3")
-        service = AcquisitionMethodService(
-            repository=SqliteAcquisitionMethodRepository(db_path)
-        )
+        service = AcquisitionMethodService(repository=SqliteAcquisitionMethodRepository(db_path))
         copy = service.duplicate(APPLE_PESTICIDES_MRM_V1_ID, "mine", "Mine", "0.1.0")
         service.save_new_version(replace(copy, transitions=copy.transitions[:3]))
 
-        reloaded = AcquisitionMethodService(
-            repository=SqliteAcquisitionMethodRepository(db_path)
-        ).get_method("mine")
+        reloaded = AcquisitionMethodService(repository=SqliteAcquisitionMethodRepository(db_path)).get_method("mine")
 
         assert reloaded.name == "Mine"
         assert reloaded.is_built_in is False
@@ -327,10 +314,7 @@ class TestRunningWithAUserMethod:
             ),
         )
 
-        instrument = next(
-            w for w in service._require_experiment(exp_id).workspace.widgets
-            if w.id == "instrument"
-        )
+        instrument = next(w for w in service._require_experiment(exp_id).workspace.widgets if w.id == "instrument")
         run = instrument.sequence_runs[0]
         assert run.method_id == "mine"
         assert run.method_snapshot.name == "Mine"
@@ -346,9 +330,7 @@ class TestRunningWithAUserMethod:
 class TestAcquisitionMethodRoutes:
     @pytest.fixture(autouse=True)
     def _isolated_service(self, monkeypatch):
-        monkeypatch.setattr(
-            method_routes, "acquisition_method_service", _service(), raising=True
-        )
+        monkeypatch.setattr(method_routes, "acquisition_method_service", _service(), raising=True)
 
     def test_duplicates_a_method_over_http(self) -> None:
         response = TestClient(app).post(
@@ -503,9 +485,7 @@ class TestAcquisitionMethodRoutes:
         assert client.get("/experiments/catalog/acquisition-methods/mine").status_code == 404
 
     def test_deleting_a_built_in_method_returns_409(self) -> None:
-        response = TestClient(app).delete(
-            f"/experiments/catalog/acquisition-methods/{APPLE_PESTICIDES_MRM_V1_ID}"
-        )
+        response = TestClient(app).delete(f"/experiments/catalog/acquisition-methods/{APPLE_PESTICIDES_MRM_V1_ID}")
 
         assert response.status_code == 409
 
@@ -585,23 +565,15 @@ class TestCalibrationLevels:
             calibration_levels_ng_per_ml=(1.0, 0.0),
         )
 
-        assert validate_acquisition_method(method) == [
-            "Calibration levels must be positive."
-        ]
+        assert validate_acquisition_method(method) == ["Calibration levels must be positive."]
 
     def test_a_ladder_survives_a_restart_as_a_tuple(self, tmp_path) -> None:
         db_path = str(tmp_path / "methods.sqlite3")
-        service = AcquisitionMethodService(
-            repository=SqliteAcquisitionMethodRepository(db_path)
-        )
+        service = AcquisitionMethodService(repository=SqliteAcquisitionMethodRepository(db_path))
         copy = service.duplicate(APPLE_PESTICIDES_MRM_V1_ID, "mine", "Mine", "0.1.0")
-        service.save_new_version(
-            replace(copy, calibration_levels_ng_per_ml=(1.0, 2.0, 5.0))
-        )
+        service.save_new_version(replace(copy, calibration_levels_ng_per_ml=(1.0, 2.0, 5.0)))
 
-        reloaded = AcquisitionMethodService(
-            repository=SqliteAcquisitionMethodRepository(db_path)
-        ).get_method("mine")
+        reloaded = AcquisitionMethodService(repository=SqliteAcquisitionMethodRepository(db_path)).get_method("mine")
 
         assert reloaded.calibration_levels_ng_per_ml == (1.0, 2.0, 5.0)
         assert isinstance(reloaded.calibration_levels_ng_per_ml, tuple)
@@ -610,9 +582,7 @@ class TestCalibrationLevels:
         """Old payloads carry no ladder key; they must default to an empty one."""
         db_path = str(tmp_path / "methods.sqlite3")
         repository = SqliteAcquisitionMethodRepository(db_path)
-        legacy = asdict(
-            replace(APPLE_PESTICIDES_MRM_V1, id="legacy", is_built_in=False)
-        )
+        legacy = asdict(replace(APPLE_PESTICIDES_MRM_V1, id="legacy", is_built_in=False))
         legacy.pop("calibration_levels_ng_per_ml", None)
         with sqlite3.connect(db_path) as connection:
             connection.execute(
@@ -648,9 +618,7 @@ class TestCalibrationLevels:
                 "version": "0.1.0",
             },
         )
-        detail = client.get(
-            "/experiments/catalog/acquisition-methods/ladder_route"
-        ).json()
+        detail = client.get("/experiments/catalog/acquisition-methods/ladder_route").json()
 
         response = client.put(
             "/experiments/catalog/acquisition-methods/ladder_route",
@@ -684,9 +652,7 @@ class TestCalibrationLevels:
                 "version": "0.1.0",
             },
         )
-        detail = client.get(
-            "/experiments/catalog/acquisition-methods/no_ladder"
-        ).json()
+        detail = client.get("/experiments/catalog/acquisition-methods/no_ladder").json()
 
         response = client.put(
             "/experiments/catalog/acquisition-methods/no_ladder",

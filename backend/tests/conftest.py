@@ -41,9 +41,7 @@ def isolated_route_experiment_store(tmp_path, monkeypatch):
     ``./data/experiments.sqlite3`` and leave rows behind, which is exactly how
     eighteen stray "Untitled experiment" rows once appeared there.
     """
-    isolated = ExperimentRuntimeService(
-        repository=SqliteExperimentRepository(str(tmp_path / "route-tests.sqlite3"))
-    )
+    isolated = ExperimentRuntimeService(repository=SqliteExperimentRepository(str(tmp_path / "route-tests.sqlite3")))
     for module_info in pkgutil.iter_modules(experiment_routes.__path__):
         module = __import__(
             f"{experiment_routes.__name__}.{module_info.name}",

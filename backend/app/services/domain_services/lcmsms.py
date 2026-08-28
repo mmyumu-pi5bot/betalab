@@ -1,4 +1,5 @@
 """LC-MS/MS domain services: pour extract from tube to vial, run sequence."""
+
 from __future__ import annotations
 
 import random
@@ -62,6 +63,7 @@ VIAL_DEAD_VOLUME_ML = 0.05
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _find_tool_anywhere(experiment: Experiment, tool_id: str) -> WorkbenchTool | None:
     """Return the tool with the given ID from any location in the experiment."""
     for slot in experiment.workbench.slots:
@@ -105,25 +107,17 @@ def _effective_residues(
         lot = lot_map.get(lot_id)
         if lot is None or not lot.pesticide_residues:
             continue
-        state = states_by_id.get(fraction.produce_material_state_id) or find_material_state(
-            material_states, lot_id
-        )
+        state = states_by_id.get(fraction.produce_material_state_id) or find_material_state(material_states, lot_id)
         deg_factors = state.pesticide_degradation_factors if state else {}
 
-        mass = (
-            fraction.true_mass_g
-            if fraction.true_mass_g is not None
-            else fraction.mass_g
-        )
+        mass = fraction.true_mass_g if fraction.true_mass_g is not None else fraction.mass_g
         total_mass_g[lot_id] = total_mass_g.get(lot_id, 0.0) + mass
         if lot_id not in weighted_residues:
             weighted_residues[lot_id] = {}
         for compound_id, initial in lot.pesticide_residues.items():
             factor = deg_factors.get(compound_id, 1.0)
             effective = initial * max(0.0, min(1.0, factor))
-            weighted_residues[lot_id][compound_id] = (
-                weighted_residues[lot_id].get(compound_id, 0.0) + effective * mass
-            )
+            weighted_residues[lot_id][compound_id] = weighted_residues[lot_id].get(compound_id, 0.0) + effective * mass
 
     # Average across all lot fractions (weighted by mass)
     merged: dict[str, float] = {}
@@ -157,9 +151,7 @@ def _draw_injection_volume(vial: WorkbenchTool, injection_volume_ul: float) -> N
     for liquid in vial.liquids:
         liquid.volume_ml = round(max(liquid.volume_ml * remaining_share, 0.0), 6)
         if liquid.true_volume_ml is not None:
-            liquid.true_volume_ml = round(
-                max(liquid.true_volume_ml * remaining_share, 0.0), 6
-            )
+            liquid.true_volume_ml = round(max(liquid.true_volume_ml * remaining_share, 0.0), 6)
 
 
 def _reference_retention_time_s(compound_id: str) -> float | None:
@@ -227,19 +219,14 @@ def build_extract_injection_context(
 
     total_sample_mass_g = sum(fraction.mass_g for fraction in tube.produce_fractions)
     total_sample_true_mass_g = sum(
-        fraction.true_mass_g
-        if fraction.true_mass_g is not None
-        else fraction.mass_g
-        for fraction in tube.produce_fractions
+        fraction.true_mass_g if fraction.true_mass_g is not None else fraction.mass_g for fraction in tube.produce_fractions
     )
     if total_sample_mass_g <= 0:
         raise ValueError(f"{tube.label} contains no sample mass to pipette.")
     acetonitrile = next((liquid for liquid in tube.liquids if liquid.liquid_id == ACETONITRILE_ID), None)
     total_extract_volume_ml = acetonitrile.volume_ml if acetonitrile is not None else 10.0
     total_extract_true_volume_ml = (
-        acetonitrile.true_volume_ml
-        if acetonitrile is not None and acetonitrile.true_volume_ml is not None
-        else total_extract_volume_ml
+        acetonitrile.true_volume_ml if acetonitrile is not None and acetonitrile.true_volume_ml is not None else total_extract_volume_ml
     )
     if total_extract_volume_ml <= 0:
         raise ValueError(f"{tube.label} contains no extract volume to pipette.")
@@ -257,39 +244,26 @@ def build_extract_injection_context(
     # carry the same sampling bias.
     extraction_result = tube.quechers_extraction_result
     if extraction_result is not None and extraction_result.sampling_representativeness is None:
-        extraction_result.sampling_representativeness = (
-            PhysicalSimulationService.draw_sampling_representativeness(
-                _aliquot_homogeneity(
-                    tube.produce_fractions, experiment.produce_material_states
-                )
-            )
+        extraction_result.sampling_representativeness = PhysicalSimulationService.draw_sampling_representativeness(
+            _aliquot_homogeneity(tube.produce_fractions, experiment.produce_material_states)
         )
 
     # Grime carried in with the powder: measured container contacts, plus a
     # nominal credit for anything left on a dirty bench. The poured aliquot takes
     # its share like everything else in the tube.
     foreign_matter_mg = sum(
-        fraction.impurity_mass_mg
-        + (
-            PhysicalSimulationService.contaminated_fraction_impurity_mg
-            if fraction.is_contaminated
-            else 0.0
-        )
+        fraction.impurity_mass_mg + (PhysicalSimulationService.contaminated_fraction_impurity_mg if fraction.is_contaminated else 0.0)
         for fraction in tube.produce_fractions
     )
 
     return InjectionContext(
         source_tube_id=tube.id,
         sample_mass_g=round(
-            sample_mass_g
-            if sample_mass_g is not None
-            else total_sample_mass_g * volume_ratio,
+            sample_mass_g if sample_mass_g is not None else total_sample_mass_g * volume_ratio,
             4,
         ),
         sample_true_mass_g=round(
-            sample_true_mass_g
-            if sample_true_mass_g is not None
-            else total_sample_true_mass_g * true_volume_ratio,
+            sample_true_mass_g if sample_true_mass_g is not None else total_sample_true_mass_g * true_volume_ratio,
             6,
         ),
         extract_volume_ml=round(extract_volume_ml, 3),
@@ -305,9 +279,7 @@ def build_extract_injection_context(
         istd_reference_conc_ng_per_ml=ISTD_REFERENCE_CONC_NG_PER_ML,
         foreign_matter_mass_mg=round(foreign_matter_mg * volume_ratio, 6),
         extract_true_volume_ml=round(
-            extract_true_volume_ml
-            if extract_true_volume_ml is not None
-            else extract_volume_ml,
+            extract_true_volume_ml if extract_true_volume_ml is not None else extract_volume_ml,
             6,
         ),
         istd_true_volume_ml=(
@@ -323,6 +295,7 @@ def build_extract_injection_context(
 # ---------------------------------------------------------------------------
 # Pour extract
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class PourExtractToVialRequest:
@@ -343,10 +316,7 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
 
         qs = tube.quechers_state
         if qs.phase != "separated" or "dry_salts_wetted" in qs.faults:
-            raise ValueError(
-                f"{tube.label} does not contain a separated extract. "
-                "Complete vortexing and centrifugation first."
-            )
+            raise ValueError(f"{tube.label} does not contain a separated extract. Complete vortexing and centrifugation first.")
         if tube.quechers_extraction_result is None:
             raise ValueError(f"{tube.label} has no extraction result — run the simulation clock first.")
 
@@ -358,9 +328,7 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
         if vial.injection_context is not None:
             raise ValueError(f"{vial.label} already contains an extract.")
 
-        acetonitrile = next(
-            (liq for liq in tube.liquids if liq.liquid_id == ACETONITRILE_ID), None
-        )
+        acetonitrile = next((liq for liq in tube.liquids if liq.liquid_id == ACETONITRILE_ID), None)
         extract_volume_ml = acetonitrile.volume_ml if acetonitrile is not None else 10.0
         vial.injection_context = build_extract_injection_context(experiment, tube, extract_volume_ml)
         context = vial.injection_context
@@ -377,6 +345,7 @@ class PourExtractToVialService(WriteDomainService[PourExtractToVialRequest]):
 # ---------------------------------------------------------------------------
 # Run sequence
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class LoadRackIntoInstrumentRequest:
@@ -402,17 +371,10 @@ class LoadRackIntoInstrumentService(WriteDomainService[LoadRackIntoInstrumentReq
         # technician can make, and the rack shows it. The autosampler is where it
         # stops: the needle pierces a septum, and an open vial would evaporate.
         open_positions = [
-            slot.label
-            for slot in experiment.rack.slots
-            if slot.tool is not None
-            and can_tool_seal(slot.tool.tool_type)
-            and not slot.tool.is_sealed
+            slot.label for slot in experiment.rack.slots if slot.tool is not None and can_tool_seal(slot.tool.tool_type) and not slot.tool.is_sealed
         ]
         if open_positions:
-            raise ValueError(
-                "Close every vial before loading the rack: "
-                f"{', '.join(open_positions)} still open."
-            )
+            raise ValueError(f"Close every vial before loading the rack: {', '.join(open_positions)} still open.")
 
         experiment.rack.state = "loaded"
         experiment.audit_log.append("Autosampler rack loaded into the LC-MS/MS.")
@@ -458,9 +420,7 @@ class SkipAcquisitionService(WriteDomainService[SkipAcquisitionRequest]):
     def _run(self, experiment: Experiment, request: SkipAcquisitionRequest) -> None:
         del request
         instrument = find_workspace_widget(experiment.workspace, "instrument")
-        running = [
-            run for run in instrument.sequence_runs if not is_sequence_complete(run)
-        ]
+        running = [run for run in instrument.sequence_runs if not is_sequence_complete(run)]
         if not running:
             raise ValueError("No acquisition is currently running.")
         for run in running:
@@ -493,11 +453,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
         # Injectable so a test can reproduce a whole acquisition byte for byte.
         self._rng = rng if rng is not None else random.Random()
         # Resolves built-in *and* user-authored methods; injectable for tests.
-        self._resolve_method = (
-            method_resolver
-            if method_resolver is not None
-            else acquisition_method_service.get_method
-        )
+        self._resolve_method = method_resolver if method_resolver is not None else acquisition_method_service.get_method
 
     def _run(self, experiment: Experiment, request: RunSequenceRequest) -> None:
         instrument = find_workspace_widget(experiment.workspace, "instrument")
@@ -531,11 +487,7 @@ class RunSequenceService(WriteDomainService[RunSequenceRequest]):
                 # by earlier injections is still injected — the autosampler tries
                 # — but draws nothing, so every channel records baseline.
                 held_ml = _vial_total_volume_ml(vial)
-                is_dry = (
-                    held_ml > 0
-                    and held_ml - VIAL_DEAD_VOLUME_ML
-                    < configured.injection_volume_ul / 1000.0
-                )
+                is_dry = held_ml > 0 and held_ml - VIAL_DEAD_VOLUME_ML < configured.injection_volume_ul / 1000.0
                 if is_dry:
                     status = "insufficient_volume"
                     responses = {}
@@ -655,6 +607,7 @@ def _replicate_output_filename(
 # Take a prepared calibration standard off the shelf
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class PlaceCalibrationStandardVialRequest:
     level_ng_per_ml: float
@@ -749,9 +702,7 @@ def apply_prepared_extract(
 
     add_liquid_to_tool(experiment, vial, liquid_id=ACETONITRILE_ID, volume_ml=aliquot_ml)
     if vial_istd_volume_ml > 0:
-        add_liquid_to_tool(
-            experiment, vial, liquid_id=ISTD_SOLUTION_ID, volume_ml=vial_istd_volume_ml
-        )
+        add_liquid_to_tool(experiment, vial, liquid_id=ISTD_SOLUTION_ID, volume_ml=vial_istd_volume_ml)
 
     recovery = round(extraction_recovery, 4)
     vial.injection_context = InjectionContext(
@@ -820,9 +771,7 @@ class PlaceCalibrationStandardVialService(WriteDomainService[PlaceCalibrationSta
         )
 
 
-def _compute_calibration_responses(
-    vial: WorkbenchTool, ctx: CalibrationContext
-) -> dict[str, float]:
+def _compute_calibration_responses(vial: WorkbenchTool, ctx: CalibrationContext) -> dict[str, float]:
     """Extract concentration seen by the detector for a calibration standard.
 
     A pure solution carries no extraction variance: the response follows the
@@ -884,8 +833,7 @@ def _compute_sample_responses(
     # never carries the sampling error and the ratio cannot correct it.
     sampling_bias = (
         extraction_result.sampling_representativeness
-        if extraction_result is not None
-        and extraction_result.sampling_representativeness is not None
+        if extraction_result is not None and extraction_result.sampling_representativeness is not None
         else 1.0
     )
 
@@ -914,13 +862,9 @@ def _compute_sample_responses(
         pesticide_amount_ng = true_effective_ug_per_kg * sample_true_mass_g
 
         env_pest = random.gauss(1.0, ENV_NOISE_SIGMA)
-        suppression = PhysicalSimulationService.matrix_suppression_factor(
-            matrix_load, _reference_retention_time_s(compound_id)
-        )
+        suppression = PhysicalSimulationService.matrix_suppression_factor(matrix_load, _reference_retention_time_s(compound_id))
         # Concentration in the extract using the TRUE delivered solvent volume
-        pesticide_conc = (
-            pesticide_amount_ng * extraction_manip * sampling_bias * suppression
-        ) / extract_true_v
+        pesticide_conc = (pesticide_amount_ng * extraction_manip * sampling_bias * suppression) / extract_true_v
         responses[compound_id] = round(pesticide_conc * env_pest, 6)
 
     if istd_true_v is not None and istd_manip is not None:
@@ -935,8 +879,6 @@ def _compute_sample_responses(
             matrix_load, _reference_retention_time_s(INTERNAL_STANDARD_COMPOUND_ID)
         )
         istd_conc = (istd_amount_ng_true * istd_manip * istd_suppression) / extract_true_v
-        responses[INTERNAL_STANDARD_COMPOUND_ID] = round(
-            istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6
-        )
+        responses[INTERNAL_STANDARD_COMPOUND_ID] = round(istd_conc * random.gauss(1.0, ENV_NOISE_SIGMA), 6)
 
     return responses

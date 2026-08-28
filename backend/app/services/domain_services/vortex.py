@@ -257,12 +257,8 @@ class StartVortexCycleService(VortexServiceBase):
         if not state.is_usable:
             raise ValueError(f"{widget.tool.label} is contaminated and cannot be vortexed.")
         produce_state_ids = {fraction.produce_material_state_id for fraction in widget.tool.produce_fractions}
-        has_slurry = any(
-            state.id in produce_state_ids and state.material_state == "slurry"
-            for state in experiment.produce_material_states
-        ) or any(
-            get_material_state_name(experiment.produce_material_states, lot.id) == "slurry"
-            for lot in widget.tool.produce_lots
+        has_slurry = any(state.id in produce_state_ids and state.material_state == "slurry" for state in experiment.produce_material_states) or any(
+            get_material_state_name(experiment.produce_material_states, lot.id) == "slurry" for lot in widget.tool.produce_lots
         )
         has_wet_contents = bool(widget.tool.liquids or has_slurry)
         faults: list[str] = []

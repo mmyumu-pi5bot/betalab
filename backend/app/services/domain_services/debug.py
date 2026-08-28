@@ -34,9 +34,7 @@ _physical_simulation_service = PhysicalSimulationService()
 _RAW_SLURRY_TUBE_PRESET = "apple_slurry_centrifuge_tube"
 _VORTEXED_SLURRY_TUBE_PRESET = "vortexed_slurry_centrifuge_tube"
 _SEPARATED_SLURRY_TUBE_PRESET = "separated_slurry_centrifuge_tube"
-_SLURRY_TUBE_PRESETS = frozenset(
-    {_RAW_SLURRY_TUBE_PRESET, _VORTEXED_SLURRY_TUBE_PRESET, _SEPARATED_SLURRY_TUBE_PRESET}
-)
+_SLURRY_TUBE_PRESETS = frozenset({_RAW_SLURRY_TUBE_PRESET, _VORTEXED_SLURRY_TUBE_PRESET, _SEPARATED_SLURRY_TUBE_PRESET})
 _SLURRY_PRESET_LABELS = {
     _RAW_SLURRY_TUBE_PRESET: "Apple slurry",
     _VORTEXED_SLURRY_TUBE_PRESET: "vortexed apple slurry",
@@ -228,20 +226,12 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
             fraction.location_kind = location_kind
             fraction.location_id = location_id
 
-    def _spawn_calibration_standard(
-        self, experiment: Experiment, request: CreateDebugToolPresetRequest
-    ) -> None:
-        level_ng_per_ml = (
-            request.level_ng_per_ml
-            if request.level_ng_per_ml is not None
-            else _DEFAULT_CALIBRATION_LEVEL_NG_PER_ML
-        )
+    def _spawn_calibration_standard(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
+        level_ng_per_ml = request.level_ng_per_ml if request.level_ng_per_ml is not None else _DEFAULT_CALIBRATION_LEVEL_NG_PER_ML
         if request.destination_kind == "workbench_tool":
             slot = find_workbench_slot(experiment.workbench, request.destination_id)
             if slot.tool is None or slot.tool.tool_type not in {"sample_vial", "centrifuge_tube"}:
-                raise ValueError(
-                    "A calibration standard requires an autosampler vial or centrifuge tube."
-                )
+                raise ValueError("A calibration standard requires an autosampler vial or centrifuge tube.")
             if slot.tool.is_sealed:
                 raise ValueError(f"Open {slot.tool.label} before adding a calibration standard.")
             container = slot.tool
@@ -262,27 +252,13 @@ class CreateDebugToolPresetService(WriteDomainService[CreateDebugToolPresetReque
         )
         _cap_vial_spawned_into_rack(container, request.destination_kind)
 
-    def _spawn_prepared_extract_vial(
-        self, experiment: Experiment, request: CreateDebugToolPresetRequest
-    ) -> None:
+    def _spawn_prepared_extract_vial(self, experiment: Experiment, request: CreateDebugToolPresetRequest) -> None:
         apply_kwargs = {
-            "sample_mass_g": _value_or_default(
-                request.produce_mass_g, _DEFAULT_EXTRACT_APPLE_MASS_G
-            ),
-            "extract_volume_ml": _value_or_default(
-                request.extract_volume_ml, _DEFAULT_EXTRACT_VOLUME_ML
-            ),
-            "extraction_recovery": _value_or_default(
-                request.extraction_recovery_percent, _DEFAULT_EXTRACTION_RECOVERY_PERCENT
-            )
-            / 100.0,
-            "sampling_accuracy": _value_or_default(
-                request.sampling_accuracy_percent, _DEFAULT_SAMPLING_ACCURACY_PERCENT
-            )
-            / 100.0,
-            "istd_volume_ml": _value_or_default(
-                request.istd_volume_ml, _DEFAULT_EXTRACT_ISTD_VOLUME_ML
-            ),
+            "sample_mass_g": _value_or_default(request.produce_mass_g, _DEFAULT_EXTRACT_APPLE_MASS_G),
+            "extract_volume_ml": _value_or_default(request.extract_volume_ml, _DEFAULT_EXTRACT_VOLUME_ML),
+            "extraction_recovery": _value_or_default(request.extraction_recovery_percent, _DEFAULT_EXTRACTION_RECOVERY_PERCENT) / 100.0,
+            "sampling_accuracy": _value_or_default(request.sampling_accuracy_percent, _DEFAULT_SAMPLING_ACCURACY_PERCENT) / 100.0,
+            "istd_volume_ml": _value_or_default(request.istd_volume_ml, _DEFAULT_EXTRACT_ISTD_VOLUME_ML),
         }
 
         if request.destination_kind == "workbench_tool":
@@ -364,6 +340,8 @@ def _fill_tool_with_debug_slurry(
             container_label=tool.label,
         )
     )
+
+
 def _apply_slurry_extract_preset(preset_id: str, tool: WorkbenchTool) -> None:
     """Advance a freshly filled slurry tube to the extraction state its preset encodes."""
     if preset_id == _VORTEXED_SLURRY_TUBE_PRESET:

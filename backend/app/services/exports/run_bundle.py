@@ -8,6 +8,7 @@ An injection appears once *it* has finished, not once the run has. That is how
 a real instrument behaves: each file lands as its own acquisition ends, so a
 sequence interrupted halfway still yields the files it managed to record.
 """
+
 from __future__ import annotations
 
 import io

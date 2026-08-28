@@ -106,7 +106,7 @@ class WorkbenchLiquid:
     name: str
     volume_ml: float
     accent: str
-    true_volume_ml: float | None = None   # hidden actual delivered volume; None -> defaults to volume_ml
+    true_volume_ml: float | None = None  # hidden actual delivered volume; None -> defaults to volume_ml
     #: Solvent carries its own heat. Without this it was read at whatever
     #: surrounded the tube, so a third of a tube's thermal mass teleported to the
     #: new temperature the instant the tube was picked up and moved.
@@ -147,6 +147,7 @@ class QuechersExtractionResult:
     the same value when ISTD was added at the right time, or an independent
     draw when ISTD was added too late — meaning the ratio will be biased.
     """
+
     extraction_manip_factor: float
     istd_manip_factor: float | None
     istd_phase: str | None  # "pre_solvent" | "pre_salts" | "post_salts" | None
@@ -165,14 +166,15 @@ class InjectionContext:
     Carries everything the LC-MS/MS calculation needs: the true pesticide concentrations
     (post-degradation), the shared ε_manip factors from QuEChERS, and the ISTD amount.
     """
+
     source_tube_id: str
-    sample_mass_g: float       # g of apple powder extracted
-    extract_volume_ml: float   # mL of acetonitrile used (sets the dilution)
+    sample_mass_g: float  # g of apple powder extracted
+    extract_volume_ml: float  # mL of acetonitrile used (sets the dilution)
     # True residues after thermal degradation at extraction time, per compound (µg/kg)
     effective_residues_ug_per_kg: dict[str, float]
     sample_true_mass_g: float | None = None  # hidden sampled mass; None -> sample_mass_g
     extraction_result: QuechersExtractionResult | None = None
-    istd_volume_ml: float | None = None           # mL of ISTD solution added to the tube
+    istd_volume_ml: float | None = None  # mL of ISTD solution added to the tube
     istd_reference_conc_ng_per_ml: float = 100.0  # ng/mL in the ISTD stock (catalog value)
     # Foreign matter carried into the tube: measured container-contact impurities
     # plus a nominal credit for fractions left on a dirty bench. It raises the
@@ -185,9 +187,10 @@ class InjectionContext:
 @dataclass
 class CalibrationContext:
     """Marks a vial as a multi-residue calibration standard at a known concentration."""
+
     level_ng_per_ml: float
     compound_ids: list[str]
-    true_level_ng_per_ml: float | None = None   # hidden actual prepared concentration; None -> defaults to level_ng_per_ml
+    true_level_ng_per_ml: float | None = None  # hidden actual prepared concentration; None -> defaults to level_ng_per_ml
 
     def __post_init__(self) -> None:
         if self.true_level_ng_per_ml is None:
@@ -197,6 +200,7 @@ class CalibrationContext:
 @dataclass(frozen=True, slots=True)
 class TraceAcquisitionMetadata:
     """How one MRM channel was acquired, and whether it could see anything."""
+
     run_duration_s: float
     point_count: int
     sampling_interval_s: float
@@ -217,6 +221,7 @@ class TransitionTrace:
     no calibration curve and no concentration — those belong to the downstream
     analysis application.
     """
+
     injection_id: str
     transition: MrmTransition
     times_s: list[float]
@@ -227,6 +232,7 @@ class TransitionTrace:
 @dataclass
 class InjectionMeasurement:
     """Per-vial result within a sequence run."""
+
     id: str
     vial_id: str
     vial_label: str
@@ -250,6 +256,7 @@ class SequenceRun:
     reproducible — and ``elapsed_s`` then says how much of them the instrument
     has actually recorded so far. Readers reveal each trace up to that point.
     """
+
     id: str
     injections: list[InjectionMeasurement]
     method_id: str = APPLE_PESTICIDES_MRM_V1_ID

@@ -370,9 +370,7 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
             material_states=experiment.produce_material_states,
             surroundings=surroundings,
         )
-        physical_simulation_service.advance_quechers_pesticide_degradation(
-            tool, elapsed_seconds, experiment.produce_material_states
-        )
+        physical_simulation_service.advance_quechers_pesticide_degradation(tool, elapsed_seconds, experiment.produce_material_states)
 
     for widget in experiment.workspace.widgets:
         remaining_seconds = elapsed_seconds
@@ -423,9 +421,7 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
 
         if widget.centrifuge_run_remaining_ms > 0:
             centrifuge_elapsed_ms = min(elapsed_ms, widget.centrifuge_run_remaining_ms)
-            widget.centrifuge_run_remaining_ms = round_volume(
-                max(widget.centrifuge_run_remaining_ms - centrifuge_elapsed_ms, 0.0)
-            )
+            widget.centrifuge_run_remaining_ms = round_volume(max(widget.centrifuge_run_remaining_ms - centrifuge_elapsed_ms, 0.0))
             if widget.tool is not None:
                 duration_ms = max(widget.centrifuge_run_duration_ms, 1.0)
                 widget.tool.quechers_state.separation_progress = round_volume(
@@ -448,12 +444,8 @@ def advance_workspace_cryogenics_state(experiment: Experiment, elapsed_ms: float
     # of material like any other: it exchanges heat with the room even though it is
     # not inside a tool that the loop above would have reached.
     for slot in experiment.workbench.slots:
-        physical_simulation_service.advance_fraction_temperatures(
-            slot.surface_produce_fractions, elapsed_seconds, surroundings=bench
-        )
-    physical_simulation_service.advance_fraction_temperatures(
-        experiment.workspace.produce_basket_fractions, elapsed_seconds, surroundings=bench
-    )
+        physical_simulation_service.advance_fraction_temperatures(slot.surface_produce_fractions, elapsed_seconds, surroundings=bench)
+    physical_simulation_service.advance_fraction_temperatures(experiment.workspace.produce_basket_fractions, elapsed_seconds, surroundings=bench)
     for slot in experiment.workbench.slots:
         if slot.tool is not None:
             if slot.tool.is_sealed and can_tool_be_sealed(slot.tool.tool_type):

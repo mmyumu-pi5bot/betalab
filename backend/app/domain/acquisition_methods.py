@@ -13,6 +13,7 @@ those channels actually see anything is decided by
    ``True`` and every transition carries its own ``provenance`` marker so the
    distinction survives serialization, persistence and the run snapshot.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -132,11 +133,7 @@ def _transition_from_reference(reference: ReferenceTransition) -> MrmTransition:
         dwell_time_ms=_DWELL_BY_COMPOUND_KIND[reference.compound_kind],
         expected_retention_time_s=reference.expected_retention_time_s,
         retention_window_s=60.0,
-        internal_standard_id=(
-            None
-            if reference.compound_kind == "internal_standard"
-            else INTERNAL_STANDARD_COMPOUND_ID
-        ),
+        internal_standard_id=(None if reference.compound_kind == "internal_standard" else INTERNAL_STANDARD_COMPOUND_ID),
         provenance=reference.provenance,
     )
 
@@ -192,9 +189,7 @@ APPLE_PESTICIDES_MRM_V1 = AcquisitionMethod(
 
 BUILT_IN_ACQUISITION_METHODS: tuple[AcquisitionMethod, ...] = (APPLE_PESTICIDES_MRM_V1,)
 
-_BUILT_IN_BY_ID: dict[str, AcquisitionMethod] = {
-    method.id: method for method in BUILT_IN_ACQUISITION_METHODS
-}
+_BUILT_IN_BY_ID: dict[str, AcquisitionMethod] = {method.id: method for method in BUILT_IN_ACQUISITION_METHODS}
 
 
 def list_built_in_acquisition_methods() -> tuple[AcquisitionMethod, ...]:
@@ -250,9 +245,7 @@ def build_transitions_for_compounds(compound_ids: Sequence[str]) -> tuple[MrmTra
         raise ValueError(f"Unknown compound(s): {', '.join(sorted(unknown))}.")
 
     by_compound = {compound_id: index for index, compound_id in enumerate(wanted)}
-    selected = [
-        reference for reference in MRM_REFERENCE_CATALOG if reference.compound_id in by_compound
-    ]
+    selected = [reference for reference in MRM_REFERENCE_CATALOG if reference.compound_id in by_compound]
     selected.sort(key=lambda reference: by_compound[reference.compound_id])
     return tuple(_transition_from_reference(reference) for reference in selected)
 

@@ -1,4 +1,5 @@
 """Tests for MRM trace generation: what each declared channel actually records."""
+
 from __future__ import annotations
 
 import random
@@ -84,53 +85,38 @@ class TestTraceStructure:
         # Scheduled MRM: the channel is only measured while its window is open.
         assert trace.times_s[0] >= transition.expected_retention_time_s - half_width
         assert trace.times_s[-1] <= transition.expected_retention_time_s + half_width
-        assert all(
-            second > first
-            for first, second in zip(trace.times_s, trace.times_s[1:], strict=False)
-        )
+        assert all(second > first for first, second in zip(trace.times_s, trace.times_s[1:], strict=False))
 
     def test_records_the_acquisition_metadata(self) -> None:
         transition = _transition("boscalid")
-        traces = generate_transition_traces(
-            "inj_1", _method_with(transition), {"boscalid": 1.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(transition), {"boscalid": 1.0}, _rng())
 
         acquisition = traces[0].acquisition
         trace = traces[0]
         assert acquisition.run_duration_s == APPLE_PESTICIDES_MRM_V1.runtime_s
         assert acquisition.point_count == len(trace.times_s)
         # Alone in its window, the channel cycles at its own dwell plus settling.
-        assert acquisition.sampling_interval_s == pytest.approx(
-            (transition.dwell_time_ms + INTERSCAN_DELAY_MS) / 1000.0, abs=1e-3
-        )
+        assert acquisition.sampling_interval_s == pytest.approx((transition.dwell_time_ms + INTERSCAN_DELAY_MS) / 1000.0, abs=1e-3)
         assert acquisition.dwell_time_ms == transition.dwell_time_ms
         assert acquisition.polarity == transition.polarity
         assert acquisition.matched_reference_transition is True
         assert acquisition.acquired_in_retention_window is True
 
     def test_intensities_never_go_negative(self) -> None:
-        traces = generate_transition_traces(
-            "inj_1", APPLE_PESTICIDES_MRM_V1, {}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", APPLE_PESTICIDES_MRM_V1, {}, _rng())
 
         assert all(value >= 0.0 for trace in traces for value in trace.intensities)
 
 
 class TestSignalDependsOnPhysicalContent:
     def test_present_compound_yields_a_peak_above_baseline(self) -> None:
-        traces = generate_transition_traces(
-            "inj_1", _method_with(_transition("boscalid")), {"boscalid": 2.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(_transition("boscalid")), {"boscalid": 2.0}, _rng())
 
         trace = traces[0]
-        assert _peak_height(trace) == pytest.approx(
-            2.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1
-        )
+        assert _peak_height(trace) == pytest.approx(2.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1)
 
     def test_absent_compound_yields_baseline_noise_only(self) -> None:
-        traces = generate_transition_traces(
-            "inj_1", _method_with(_transition("boscalid")), {"acetamiprid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(_transition("boscalid")), {"acetamiprid": 5.0}, _rng())
 
         trace = traces[0]
         assert max(trace.intensities) < BASELINE_COUNTS * 3
@@ -182,22 +168,16 @@ class TestNumericTransitionMatching:
             compound_label="Acetamiprid",
         )
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(mislabelled), {"boscalid": 2.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(mislabelled), {"boscalid": 2.0}, _rng())
 
         trace = traces[0]
         assert trace.acquisition.matched_reference_transition is True
-        assert _peak_height(trace) == pytest.approx(
-            2.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1
-        )
+        assert _peak_height(trace) == pytest.approx(2.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1)
 
     def test_right_compound_name_with_wrong_masses_sees_nothing(self) -> None:
         detuned = replace(_transition("boscalid"), q1_mz=343.0 + 5.0)
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng())
 
         trace = traces[0]
         assert trace.acquisition.matched_reference_transition is False
@@ -210,9 +190,7 @@ class TestNumericTransitionMatching:
             retention_window_s=20.0,
         )
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(missed), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(missed), {"boscalid": 5.0}, _rng())
 
         trace = traces[0]
         assert trace.acquisition.matched_reference_transition is True
@@ -224,9 +202,7 @@ class TestPolarityIsPartOfTheAddress:
     def test_right_masses_in_the_wrong_ionisation_mode_see_nothing(self) -> None:
         inverted = replace(_transition("boscalid"), polarity="negative")
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(inverted), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(inverted), {"boscalid": 5.0}, _rng())
 
         trace = traces[0]
         assert trace.acquisition.matched_reference_transition is False
@@ -235,9 +211,7 @@ class TestPolarityIsPartOfTheAddress:
     def test_the_declared_polarity_is_reported_on_the_trace(self) -> None:
         inverted = replace(_transition("boscalid"), polarity="negative")
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(inverted), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(inverted), {"boscalid": 5.0}, _rng())
 
         assert traces[0].acquisition.polarity == "negative"
 
@@ -246,17 +220,13 @@ class TestCollisionEnergyDrivesFragmentation:
     def _height_at(self, collision_energy_v: float) -> float:
         tuned = _transition("boscalid")
         detuned = replace(tuned, collision_energy_v=collision_energy_v)
-        traces = generate_transition_traces(
-            "inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng())
         return _peak_height(traces[0])
 
     def test_the_tuned_energy_yields_the_full_response(self) -> None:
         tuned = _transition("boscalid")
 
-        assert self._height_at(tuned.collision_energy_v) == pytest.approx(
-            5.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1
-        )
+        assert self._height_at(tuned.collision_energy_v) == pytest.approx(5.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1)
 
     def test_response_falls_away_on_both_sides_of_the_tuned_energy(self) -> None:
         tuned = _transition("boscalid").collision_energy_v
@@ -285,16 +255,11 @@ class TestTimeIsABudget:
 
         times = schedule[transition.id]
         interval = (times[-1] - times[0]) / (len(times) - 1)
-        assert interval == pytest.approx(
-            (transition.dwell_time_ms + INTERSCAN_DELAY_MS) / 1000.0, abs=1e-3
-        )
+        assert interval == pytest.approx((transition.dwell_time_ms + INTERSCAN_DELAY_MS) / 1000.0, abs=1e-3)
 
     def test_co_eluting_channels_share_the_instrument_and_lose_points(self) -> None:
         alone = _transition("boscalid")
-        crowded = _method_with(alone, *[
-            replace(alone, id=f"filler_{index}")
-            for index in range(4)
-        ])
+        crowded = _method_with(alone, *[replace(alone, id=f"filler_{index}") for index in range(4)])
 
         solo_points = len(acquisition_schedule(_method_with(alone))[alone.id])
         shared_points = len(acquisition_schedule(crowded)[alone.id])
@@ -329,9 +294,7 @@ class TestTimeIsABudget:
             retention_window_s=20.0,
         )
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(unreachable), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(unreachable), {"boscalid": 5.0}, _rng())
 
         assert traces[0].times_s == []
         assert traces[0].intensities == []
@@ -373,9 +336,7 @@ class TestQuantifierAndQualifier:
         quantifier = _transition("boscalid", "quantifier")
         qualifier = _transition("boscalid", "qualifier")
 
-        traces = generate_transition_traces(
-            "inj_1", _method_with(quantifier, qualifier), {"boscalid": 3.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(quantifier, qualifier), {"boscalid": 3.0}, _rng())
 
         assert len(traces) == 2
         assert traces[0].transition.id != traces[1].transition.id
@@ -404,9 +365,7 @@ class TestQuantifierAndQualifier:
         )
 
         assert traces[0].transition.compound_kind == "internal_standard"
-        assert _peak_height(traces[0]) == pytest.approx(
-            1.5 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1
-        )
+        assert _peak_height(traces[0]) == pytest.approx(1.5 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1)
 
 
 class TestReproducibility:
@@ -431,9 +390,7 @@ class TestReproducibility:
 
 class TestNoQuantificationLeaks:
     def test_a_trace_exposes_only_instrumental_output(self) -> None:
-        trace = generate_transition_traces(
-            "inj_1", _method_with(_transition("boscalid")), {"boscalid": 1.0}, _rng()
-        )[0]
+        trace = generate_transition_traces("inj_1", _method_with(_transition("boscalid")), {"boscalid": 1.0}, _rng())[0]
 
         forbidden = {
             "calculated_conc_ug_per_kg",
@@ -454,21 +411,15 @@ class TestMassTransmission:
             q1_mz=round(tuned.q1_mz + q1_offset, 4),
             q3_mz=round(tuned.q3_mz + q3_offset, 4),
         )
-        traces = generate_transition_traces(
-            "inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng()
-        )
+        traces = generate_transition_traces("inj_1", _method_with(detuned), {"boscalid": 5.0}, _rng())
         return _peak_height(traces[0])
 
     def test_the_tuned_masses_pass_everything(self) -> None:
-        assert self._height_at() == pytest.approx(
-            5.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1
-        )
+        assert self._height_at() == pytest.approx(5.0 * RESPONSE_COUNTS_PER_CONCENTRATION_UNIT, rel=0.1)
 
     def test_a_small_mis_set_costs_nothing(self) -> None:
         """The flat top is why a method survives calibration drift and transfer."""
-        assert self._height_at(q1_offset=0.1, q3_offset=0.1) == pytest.approx(
-            self._height_at(), rel=0.05
-        )
+        assert self._height_at(q1_offset=0.1, q3_offset=0.1) == pytest.approx(self._height_at(), rel=0.05)
 
     def test_response_falls_away_past_the_plateau(self) -> None:
         full = self._height_at()
@@ -489,9 +440,7 @@ class TestMassTransmission:
     def test_the_built_in_method_is_never_penalised(self) -> None:
         """It copies the reference masses verbatim, so it sits on the plateau."""
         for transition in APPLE_PESTICIDES_MRM_V1.transitions:
-            reference = find_reference_transition(
-                transition.q1_mz, transition.q3_mz, transition.polarity
-            )
+            reference = find_reference_transition(transition.q1_mz, transition.q3_mz, transition.polarity)
             assert reference is not None
             assert _mass_transmission(transition, reference) == 1.0
 

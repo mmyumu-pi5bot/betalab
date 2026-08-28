@@ -6,6 +6,7 @@ code means two different apples arriving downstream under one identity — so th
 globally unique half of the code is the experiment number, allocated once by the
 store that knows every experiment.
 """
+
 from __future__ import annotations
 
 from app.services.domain_services.reception import (
@@ -19,9 +20,7 @@ from app.services.experiment_service import ExperimentRuntimeService
 
 
 def _receive(service: ExperimentRuntimeService, exp_id: str, orchard: str = "Verger du Clos") -> str:
-    RecordGrossWeightService(service).run(
-        exp_id, RecordGrossWeightRequest(measured_gross_mass_g=1036.0)
-    )
+    RecordGrossWeightService(service).run(exp_id, RecordGrossWeightRequest(measured_gross_mass_g=1036.0))
     CreateLimsReceptionService(service).run(
         exp_id,
         CreateLimsReceptionRequest(
@@ -39,9 +38,7 @@ def _receive(service: ExperimentRuntimeService, exp_id: str, orchard: str = "Ver
 
 
 def test_code_pairs_the_experiment_number_with_a_local_sequence(tmp_path) -> None:
-    service = ExperimentRuntimeService(
-        repository=SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
-    )
+    service = ExperimentRuntimeService(repository=SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3")))
     exp_id = service.create_experiment().id
 
     first = _receive(service, exp_id)

@@ -383,9 +383,7 @@ class RecordAnalyticalSampleMassService(AnalyticalBalanceServiceBase):
 
         tare_mass_g = experiment.analytical_balance.tare_mass_g
         if tare_mass_g is None:
-            raise ValueError(
-                "ERR_TARE: Tare error: the container seems too heavy or the balance was not reset to zero."
-            )
+            raise ValueError("ERR_TARE: Tare error: the container seems too heavy or the balance was not reset to zero.")
 
         net_mass_g = round(measured_mass_g - tare_mass_g, 3)
         if net_mass_g < _ANALYTICAL_BALANCE_TARGET_MIN_G or net_mass_g > _ANALYTICAL_BALANCE_TARGET_MAX_G:

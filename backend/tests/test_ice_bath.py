@@ -98,11 +98,7 @@ def _move_tube_to_ice_bath(service: ExperimentRuntimeService, experiment_id: str
 
 
 def _chilled_tube(service: ExperimentRuntimeService, experiment_id: str):
-    widget = next(
-        widget
-        for widget in service._require_experiment(experiment_id).workspace.widgets
-        if widget.id == "ice_bath"
-    )
+    widget = next(widget for widget in service._require_experiment(experiment_id).workspace.widgets if widget.id == "ice_bath")
     assert widget.tool is not None
     return widget.tool
 
@@ -111,9 +107,7 @@ def _portion(service: ExperimentRuntimeService, experiment_id: str) -> ProduceMa
     tube = _chilled_tube(service, experiment_id)
     fraction = tube.produce_fractions[0]
     return next(
-        state
-        for state in service._require_experiment(experiment_id).produce_material_states
-        if state.id == fraction.produce_material_state_id
+        state for state in service._require_experiment(experiment_id).produce_material_states if state.id == fraction.produce_material_state_id
     )
 
 
@@ -139,11 +133,7 @@ def test_a_tube_can_be_dragged_into_the_ice_bath_and_back_out() -> None:
         ),
     )
 
-    widget = next(
-        widget
-        for widget in service._require_experiment(experiment.id).workspace.widgets
-        if widget.id == "ice_bath"
-    )
+    widget = next(widget for widget in service._require_experiment(experiment.id).workspace.widgets if widget.id == "ice_bath")
     assert widget.tool is None
     assert service._require_experiment(experiment.id).workbench.slots[0].tool is not None
 
@@ -178,9 +168,7 @@ def test_the_bath_chills_a_warm_portion_towards_zero() -> None:
     _advance(service, experiment.id, 60000)
 
     portion = _portion_fraction(service, experiment.id)
-    assert portion.temperature_c == pytest.approx(
-        PhysicalSimulationService.ice_bath_temperature_c, abs=1.0
-    )
+    assert portion.temperature_c == pytest.approx(PhysicalSimulationService.ice_bath_temperature_c, abs=1.0)
 
 
 def test_a_chilled_tube_keeps_the_exotherm_under_the_damage_threshold() -> None:
@@ -250,9 +238,7 @@ def test_the_bath_is_gentler_than_the_bench_for_the_same_delay() -> None:
             _move_tube_to_ice_bath(service, experiment.id)
         _advance(service, experiment.id, 60000)
         return next(
-            state
-            for state in service._require_experiment(experiment.id).produce_material_states
-            if state.id == "state_portion"
+            state for state in service._require_experiment(experiment.id).produce_material_states if state.id == "state_portion"
         ).pesticide_degradation_factors["captan"]
 
     assert captan_after_salting(use_bath=True) > captan_after_salting(use_bath=False)
@@ -371,9 +357,7 @@ def test_the_tube_body_tempers_powder_straight_out_of_the_mill() -> None:
         )
     )
 
-    mixture = PhysicalSimulationService.mixture_temperature_c(
-        tool, [], surroundings=PhysicalSimulationService.bench_surroundings()
-    )
+    mixture = PhysicalSimulationService.mixture_temperature_c(tool, [], surroundings=PhysicalSimulationService.bench_surroundings())
 
     assert -60.0 < mixture < -20.0
 

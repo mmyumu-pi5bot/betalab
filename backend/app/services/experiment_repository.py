@@ -129,9 +129,7 @@ class SqliteExperimentRepository:
                 ON CONFLICT(name) DO UPDATE SET value = value + 1
                 """
             )
-            row = connection.execute(
-                "SELECT value FROM platform_counters WHERE name = 'experiment_number'"
-            ).fetchone()
+            row = connection.execute("SELECT value FROM platform_counters WHERE name = 'experiment_number'").fetchone()
             connection.commit()
         return int(row[0])
 
@@ -324,20 +322,12 @@ class SqliteExperimentRepository:
         the very collision the number exists to prevent. The counter is left above the
         highest number assigned, so new experiments carry on from there.
         """
-        rows = connection.execute(
-            "SELECT id, payload FROM experiments ORDER BY created_at, id"
-        ).fetchall()
-        unnumbered = [
-            (experiment_id, payload)
-            for experiment_id, payload in rows
-            if not json.loads(payload).get("sequence_number")
-        ]
+        rows = connection.execute("SELECT id, payload FROM experiments ORDER BY created_at, id").fetchall()
+        unnumbered = [(experiment_id, payload) for experiment_id, payload in rows if not json.loads(payload).get("sequence_number")]
         if not unnumbered:
             return
 
-        counter_row = connection.execute(
-            "SELECT value FROM platform_counters WHERE name = 'experiment_number'"
-        ).fetchone()
+        counter_row = connection.execute("SELECT value FROM platform_counters WHERE name = 'experiment_number'").fetchone()
         next_number = int(counter_row[0]) if counter_row is not None else 0
         for experiment_id, serialized_payload in unnumbered:
             next_number += 1
@@ -435,10 +425,7 @@ def _deserialize_experiment(payload: dict) -> Experiment:
         for entry in schema.journal_entries
     ]
     if not journal_entries and schema.audit_log:
-        journal_entries = [
-            build_journal_event(message, occurred_at=schema.last_simulation_at)
-            for message in schema.audit_log
-        ]
+        journal_entries = [build_journal_event(message, occurred_at=schema.last_simulation_at) for message in schema.audit_log]
     experiment = Experiment(
         id=schema.id,
         name=schema.name,
@@ -519,21 +506,11 @@ def _deserialize_experiment(payload: dict) -> Experiment:
             volume_ml=schema.pipette.volume_ml,
             true_volume_ml=schema.pipette.true_volume_ml,
             source_tool_id=schema.pipette.source_tool_id,
-            injection_context=_deserialize_injection_context(
-                schema.pipette.injection_context
-            ),
-            calibration_context=_deserialize_calibration_context(
-                schema.pipette.calibration_context
-            ),
-            liquids=[
-                _deserialize_workbench_liquid(liquid)
-                for liquid in schema.pipette.liquids
-            ],
+            injection_context=_deserialize_injection_context(schema.pipette.injection_context),
+            calibration_context=_deserialize_calibration_context(schema.pipette.calibration_context),
+            liquids=[_deserialize_workbench_liquid(liquid) for liquid in schema.pipette.liquids],
             produce_lots=[_deserialize_produce_lot(lot) for lot in schema.pipette.produce_lots],
-            produce_fractions=[
-                _deserialize_produce_fraction(fraction)
-                for fraction in schema.pipette.produce_fractions
-            ],
+            produce_fractions=[_deserialize_produce_fraction(fraction) for fraction in schema.pipette.produce_fractions],
         ),
         lims_entries=_deserialize_lims_entries(schema),
         snapshot_version=schema.snapshot_version,
@@ -628,10 +605,7 @@ def _deserialize_workspace(schema: ExperimentSchema) -> Workspace:
                                 vial_label=injection.vial_label,
                                 rack_slot_id=injection.rack_slot_id,
                                 status=injection.status,
-                                traces=[
-                                    _deserialize_transition_trace(trace)
-                                    for trace in injection.traces
-                                ],
+                                traces=[_deserialize_transition_trace(trace) for trace in injection.traces],
                                 sample_name=injection.sample_name,
                                 injection_volume_ul=injection.injection_volume_ul,
                                 replicate_index=injection.replicate_index,
@@ -762,9 +736,7 @@ def _deserialize_injection_context(context_schema) -> InjectionContext | None:
             extraction_manip_factor=context_schema.extraction_result.extraction_manip_factor,
             istd_manip_factor=context_schema.extraction_result.istd_manip_factor,
             istd_phase=context_schema.extraction_result.istd_phase,
-            sampling_representativeness=(
-                context_schema.extraction_result.sampling_representativeness
-            ),
+            sampling_representativeness=(context_schema.extraction_result.sampling_representativeness),
         )
         if context_schema.extraction_result is not None
         else None

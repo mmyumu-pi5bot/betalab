@@ -79,10 +79,7 @@ def _find_produce_fraction(payload: dict, produce_lot_id: str) -> dict:
         if isinstance(node, dict):
             for key, value in node.items():
                 if "fraction" in key and isinstance(value, list):
-                    found.extend(
-                        f for f in value
-                        if isinstance(f, dict) and f.get("produce_lot_id") == produce_lot_id
-                    )
+                    found.extend(f for f in value if isinstance(f, dict) and f.get("produce_lot_id") == produce_lot_id)
                 walk(value)
         elif isinstance(node, list):
             for item in node:
@@ -1133,6 +1130,7 @@ def test_debug_tool_preset_route_spawns_apple_slurry_tube() -> None:
     assert lot_state["material_state"] == "slurry"
     assert tool["produce_fractions"][0]["temperature_c"] == 4.0
     assert "homogeneity_score" not in lot_state
+
 
 def test_open_workbench_tool_route_unseals_a_jar() -> None:
     with TestClient(app) as client:

@@ -10,6 +10,7 @@ will not see what its author probably expects. A transition watching masses no
 compound produces is a legitimate thing to save — running it and finding a flat
 trace is the whole point of the exercise. Warnings never block.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -76,11 +77,7 @@ def validate_acquisition_method(method: AcquisitionMethod) -> list[str]:
         errors.append(f"Duplicate transition identifier '{transition_id}'.")
 
     # Every targeted compound needs the channel its area would be read from.
-    compounds_with_quantifier = {
-        transition.compound_id
-        for transition in method.transitions
-        if transition.role == "quantifier"
-    }
+    compounds_with_quantifier = {transition.compound_id for transition in method.transitions if transition.role == "quantifier"}
     for compound_id in method.compound_ids:
         if compound_id not in compounds_with_quantifier:
             errors.append(f"Compound '{compound_id}' has no quantifier transition.")
@@ -105,9 +102,7 @@ def collect_acquisition_method_warnings(method: AcquisitionMethod) -> list[Metho
                 )
             )
 
-        reference = find_reference_transition(
-            transition.q1_mz, transition.q3_mz, transition.polarity
-        )
+        reference = find_reference_transition(transition.q1_mz, transition.q3_mz, transition.polarity)
         if reference is None:
             warnings.append(
                 MethodWarning(

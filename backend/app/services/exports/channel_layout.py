@@ -5,6 +5,7 @@ back. Both must agree on two things: which channel of a compound is number 1,
 and what ``seg_id`` each one carries. Deriving that layout twice would let the
 pair drift apart, so it is derived once, here.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

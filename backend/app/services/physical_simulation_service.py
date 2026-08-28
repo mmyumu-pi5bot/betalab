@@ -165,9 +165,7 @@ class PhysicalSimulationService:
         if elapsed_seconds <= 0 or not fractions:
             return
         surroundings = surroundings or self.bench_surroundings()
-        progress = 1.0 - exp(
-            -self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds
-        )
+        progress = 1.0 - exp(-self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds)
         for fraction in fractions:
             fraction.temperature_c += (surroundings.temperature_c - fraction.temperature_c) * progress
 
@@ -245,9 +243,7 @@ class PhysicalSimulationService:
         if elapsed_seconds <= 0:
             return
         surroundings = surroundings or self.bench_surroundings()
-        progress = 1.0 - exp(
-            -self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds
-        )
+        progress = 1.0 - exp(-self.warming_rate_per_second * surroundings.exchange_multiplier * elapsed_seconds)
 
         def relax(temperature_c: float) -> float:
             return temperature_c + (surroundings.temperature_c - temperature_c) * progress
@@ -276,9 +272,7 @@ class PhysicalSimulationService:
             # No exotherm owns the temperature yet, so the tube simply reads what
             # it holds. Reporting a flat room temperature until the salts go in
             # would hide the one number that decides how high the reaction climbs.
-            state.temperature_c = self.mixture_temperature_c(
-                tool, material_states or [], surroundings=surroundings
-            )
+            state.temperature_c = self.mixture_temperature_c(tool, material_states or [], surroundings=surroundings)
         if not state.salts_added:
             return
         if state.phase == "armed" and (tool.liquids or tool.produce_lots or tool.produce_fractions):
@@ -340,8 +334,7 @@ class PhysicalSimulationService:
                 self.quechers_peak_temperature_c - self.quechers_degradation_threshold_c
             )
             state.thermal_degradation_progress = min(
-                state.thermal_degradation_progress
-                + elapsed_seconds * severity / self.quechers_full_degradation_seconds_at_peak,
+                state.thermal_degradation_progress + elapsed_seconds * severity / self.quechers_full_degradation_seconds_at_peak,
                 1.0,
             )
 
@@ -526,13 +519,9 @@ class PhysicalSimulationService:
         of the gradient; the middle of the run is comparatively clean. Both the
         suppression of analytes and the height of the background follow it.
         """
-        early = cls.matrix_early_weight * exp(
-            -(retention_time_s**2) / (2.0 * cls.matrix_early_sigma_s**2)
-        )
+        early = cls.matrix_early_weight * exp(-(retention_time_s**2) / (2.0 * cls.matrix_early_sigma_s**2))
         late_offset = retention_time_s - cls.matrix_late_center_s
-        late = cls.matrix_late_weight * exp(
-            -(late_offset**2) / (2.0 * cls.matrix_late_sigma_s**2)
-        )
+        late = cls.matrix_late_weight * exp(-(late_offset**2) / (2.0 * cls.matrix_late_sigma_s**2))
         return 1.0 + early + late
 
     @classmethod
@@ -540,11 +529,7 @@ class PhysicalSimulationService:
         """Multiplier on the detector's background at this point in the run."""
         if foreign_matter_mass_mg <= 0:
             return 1.0
-        return 1.0 + (
-            cls.dirt_baseline_gain_per_mg
-            * foreign_matter_mass_mg
-            * cls.local_matrix_factor(retention_time_s)
-        )
+        return 1.0 + (cls.dirt_baseline_gain_per_mg * foreign_matter_mass_mg * cls.local_matrix_factor(retention_time_s))
 
     @classmethod
     def matrix_load_g_per_ml(cls, sample_mass_g: float, extract_volume_ml: float) -> float:
@@ -578,13 +563,10 @@ class PhysicalSimulationService:
         if retention_time_s is None:
             # Elution moment unknown: apply the run's average matrix rather than
             # assuming the compound comes off in the void, where it is worst.
-            return round(
-                1.0 / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml), 6
-            )
+            return round(1.0 / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml), 6)
         local_matrix = cls.local_matrix_factor(retention_time_s)
         return round(
-            1.0
-            / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml * local_matrix),
+            1.0 / (1.0 + cls.matrix_suppression_coefficient * matrix_load_g_per_ml * local_matrix),
             6,
         )
 
@@ -622,9 +604,7 @@ class PhysicalSimulationService:
         if elapsed_seconds <= 0:
             return
         current = max(0.0, min(1.0, tool.contents_homogeneity))
-        mixed_fraction = 1.0 - math.exp(
-            -elapsed_seconds / cls.vortex_mixing_time_constant_seconds
-        )
+        mixed_fraction = 1.0 - math.exp(-elapsed_seconds / cls.vortex_mixing_time_constant_seconds)
         tool.contents_homogeneity = round(
             min(current + (1.0 - current) * mixed_fraction, 1.0),
             6,
@@ -642,9 +622,7 @@ class PhysicalSimulationService:
         one. A fully homogeneous container is drawn exactly proportionally.
         """
         normalized_homogeneity = max(0.0, min(1.0, homogeneity))
-        relative_sigma = cls.aspiration_heterogeneity_relative_sigma * (
-            1.0 - normalized_homogeneity
-        )
+        relative_sigma = cls.aspiration_heterogeneity_relative_sigma * (1.0 - normalized_homogeneity)
         if relative_sigma <= 0:
             return list(volumes_ml)
         return [
@@ -1138,8 +1116,7 @@ class PhysicalSimulationService:
 
         gas_moles = trapped_co2_mass_g / self.co2_molar_mass_g_per_mol
         mean_temperature_c = (
-            sum(self.fraction_temperature_c(tool.produce_fractions, lot.id) for lot in tool.produce_lots)
-            / len(tool.produce_lots)
+            sum(self.fraction_temperature_c(tool.produce_fractions, lot.id) for lot in tool.produce_lots) / len(tool.produce_lots)
             if tool.produce_lots
             else self.ambient_temperature_c
         )

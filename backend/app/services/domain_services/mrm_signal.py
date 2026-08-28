@@ -23,6 +23,7 @@ feeds exactly one of them:
    More channels open at once, or longer dwells, mean fewer points across each
    peak — the trade-off that makes method design a real skill.
 """
+
 from __future__ import annotations
 
 import random
@@ -158,9 +159,7 @@ def _filter_transmission(offset_da: float) -> float:
 
 def _mass_transmission(declared: MrmTransition, reference: ReferenceTransition) -> float:
     """Both quadrupoles filter in series, so their transmissions multiply."""
-    return _filter_transmission(
-        declared.q1_mz - reference.q1_mz
-    ) * _filter_transmission(declared.q3_mz - reference.q3_mz)
+    return _filter_transmission(declared.q1_mz - reference.q1_mz) * _filter_transmission(declared.q3_mz - reference.q3_mz)
 
 
 def _is_within_retention_window(
@@ -195,9 +194,7 @@ def _fit_to_budget(schedule: dict[str, list[float]]) -> dict[str, list[float]]:
     if total <= MAX_POINTS_PER_INJECTION:
         return schedule
     step = ceil(total / MAX_POINTS_PER_INJECTION)
-    return {
-        transition_id: samples[::step] for transition_id, samples in schedule.items()
-    }
+    return {transition_id: samples[::step] for transition_id, samples in schedule.items()}
 
 
 def acquisition_schedule(method: AcquisitionMethod) -> dict[str, list[float]]:
@@ -229,11 +226,7 @@ def acquisition_schedule(method: AcquisitionMethod) -> dict[str, list[float]]:
             break
         active = [t for t in transitions if bounds[t.id][0] <= clock <= bounds[t.id][1]]
         if not active:
-            upcoming = [
-                start
-                for start, _ in bounds.values()
-                if clock < start < method.runtime_s
-            ]
+            upcoming = [start for start, _ in bounds.values() if clock < start < method.runtime_s]
             if not upcoming:
                 break
             clock = min(upcoming)
@@ -352,10 +345,7 @@ def generate_transition_traces(
                     dwell_time_ms=transition.dwell_time_ms,
                     polarity=transition.polarity,
                     matched_reference_transition=reference is not None,
-                    acquired_in_retention_window=(
-                        reference is not None
-                        and _is_within_retention_window(transition, reference)
-                    ),
+                    acquired_in_retention_window=(reference is not None and _is_within_retention_window(transition, reference)),
                 ),
             )
         )

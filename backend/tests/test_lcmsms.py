@@ -66,9 +66,7 @@ def _create(service: ExperimentRuntimeService) -> str:
 
 
 def _place_vial_on_bench(service: ExperimentRuntimeService, exp_id: str, slot_id: str = "station_1") -> str:
-    PlaceToolOnWorkbenchService(service).run(
-        exp_id, PlaceToolOnWorkbenchRequest(slot_id=slot_id, tool_id="sample_vial_lcms")
-    )
+    PlaceToolOnWorkbenchService(service).run(exp_id, PlaceToolOnWorkbenchRequest(slot_id=slot_id, tool_id="sample_vial_lcms"))
     exp = service._require_experiment(exp_id)
     slot = next(s for s in exp.workbench.slots if s.id == slot_id)
     assert slot.tool is not None
@@ -76,9 +74,7 @@ def _place_vial_on_bench(service: ExperimentRuntimeService, exp_id: str, slot_id
 
 
 def _place_vial_in_rack(service: ExperimentRuntimeService, exp_id: str, rack_slot_id: str = "rack_slot_1") -> str:
-    PlaceToolInRackSlotService(service).run(
-        exp_id, PlaceToolInRackSlotRequest(rack_slot_id=rack_slot_id, tool_id="sample_vial_lcms")
-    )
+    PlaceToolInRackSlotService(service).run(exp_id, PlaceToolInRackSlotRequest(rack_slot_id=rack_slot_id, tool_id="sample_vial_lcms"))
     exp = service._require_experiment(exp_id)
     slot = next(s for s in exp.rack.slots if s.id == rack_slot_id)
     assert slot.tool is not None
@@ -129,6 +125,7 @@ def _load_rack_into_instrument(service: ExperimentRuntimeService, exp_id: str) -
 # PlaceCalibrationStandardVialService
 # ---------------------------------------------------------------------------
 
+
 class TestPlaceCalibrationStandardVial:
     """The lab buys its calibration points ready to use.
 
@@ -159,9 +156,7 @@ class TestPlaceCalibrationStandardVial:
         assert vial.calibration_context is not None
         assert vial.calibration_context.level_ng_per_ml == 10.0
         assert len(vial.calibration_context.compound_ids) > 0
-        assert [(liquid.liquid_id, liquid.volume_ml) for liquid in vial.liquids] == [
-            ("calibration_solution", 1.0)
-        ]
+        assert [(liquid.liquid_id, liquid.volume_ml) for liquid in vial.liquids] == [("calibration_solution", 1.0)]
 
     def test_places_a_prepared_vial_straight_into_the_rack(self) -> None:
         service = ExperimentRuntimeService()
@@ -390,6 +385,7 @@ class TestPlaceCalibrationStandardVial:
 # draw_prepared_level unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestDrawPreparedLevel:
     def test_zero_nominal_returns_zero(self) -> None:
         assert PhysicalSimulationService.draw_prepared_level(0.0) == 0.0
@@ -439,9 +435,7 @@ class TestComputeCalibrationResponses:
         responses_b = _compute_calibration_responses(_make_vial(), ctx_b)
 
         # Same seed → same env_noise draw → responses differ exactly by the true-level ratio.
-        assert responses_b["chlorpyrifos"] == pytest.approx(
-            responses_a["chlorpyrifos"] * (true_level_b / true_level_a), rel=1e-6
-        )
+        assert responses_b["chlorpyrifos"] == pytest.approx(responses_a["chlorpyrifos"] * (true_level_b / true_level_a), rel=1e-6)
 
     def test_covers_every_compound_of_the_standard(self) -> None:
         ctx = CalibrationContext(
@@ -476,9 +470,7 @@ class TestComputeCalibrationResponses:
 
         # 0.05 mL of a 100 ng/mL stock in 1.05 mL of solution.
         expected = 0.05 * ISTD_REFERENCE_CONC_NG_PER_ML / 1.05
-        assert responses[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(
-            expected, rel=0.02
-        )
+        assert responses[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(expected, rel=0.02)
 
     def test_spiking_the_standard_dilutes_the_residues_it_carries(self) -> None:
         """Adding ISTD adds volume, and volume dilutes — as it does in any vial."""
@@ -509,15 +501,13 @@ class TestComputeCalibrationResponses:
         responses = _compute_calibration_responses(vial, ctx)
 
         expected = 0.045 * ISTD_REFERENCE_CONC_NG_PER_ML / 1.045
-        assert responses[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(
-            expected, rel=0.02
-        )
-
+        assert responses[INTERNAL_STANDARD_COMPOUND_ID] == pytest.approx(expected, rel=0.02)
 
 
 # ---------------------------------------------------------------------------
 # RunSequenceService — calibration vials
 # ---------------------------------------------------------------------------
+
 
 class TestLoadRackIntoInstrument:
     def test_loads_a_non_empty_deployed_rack_and_persists_the_state(self, tmp_path) -> None:
@@ -582,9 +572,7 @@ class TestRunSequenceWithCalibration:
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
         sample_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_4")
-        calibration_vial_id = _place_calibration_vial_in_rack(
-            service, exp_id, "rack_slot_2", 50.0
-        )
+        calibration_vial_id = _place_calibration_vial_in_rack(service, exp_id, "rack_slot_2", 50.0)
         _load_rack_into_instrument(service, exp_id)
         RunSequenceService(service).run(
             exp_id,
@@ -630,9 +618,7 @@ class TestRunSequenceWithCalibration:
         # Every declared channel is recorded, whatever the vial holds.
         assert len(calibration.traces) == len(APPLE_PESTICIDES_MRM_V1.transitions)
         assert all(trace.injection_id == calibration.id for trace in calibration.traces)
-        boscalid_quantifier = next(
-            trace for trace in calibration.traces if trace.transition.id == "boscalid__quantifier"
-        )
+        boscalid_quantifier = next(trace for trace in calibration.traces if trace.transition.id == "boscalid__quantifier")
         assert max(boscalid_quantifier.intensities) > 1000.0
 
         first_sample, second_sample = run.injections[1:]
@@ -648,9 +634,7 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        physical_calibration_id = _place_calibration_vial_in_rack(
-            service, exp_id, "rack_slot_1", 20.0
-        )
+        physical_calibration_id = _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 20.0)
         empty_vial_id = _place_vial_in_rack(service, exp_id, "rack_slot_2")
         _load_rack_into_instrument(service, exp_id)
 
@@ -710,20 +694,14 @@ class TestRunSequenceWithCalibration:
 
         exp = service._require_experiment(exp_id)
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
-        assert [inj.sample_name for inj in instrument.sequence_runs[0].injections] == [
-            "Lone vial"
-        ]
+        assert [inj.sample_name for inj in instrument.sequence_runs[0].injections] == ["Lone vial"]
 
     def test_accepts_two_calibrants_and_one_sample(self) -> None:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        _place_calibration_vial_in_rack(
-            service, exp_id, "rack_slot_1", 10.0
-        )
-        _place_calibration_vial_in_rack(
-            service, exp_id, "rack_slot_2", 50.0
-        )
+        _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 10.0)
+        _place_calibration_vial_in_rack(service, exp_id, "rack_slot_2", 50.0)
         _place_vial_in_rack(service, exp_id, "rack_slot_3")
         _load_rack_into_instrument(service, exp_id)
 
@@ -958,10 +936,7 @@ class TestRunSequenceWithCalibration:
             )
             exp = service._require_experiment(exp_id)
             instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
-            return [
-                trace.intensities
-                for trace in instrument.sequence_runs[0].injections[0].traces
-            ]
+            return [trace.intensities for trace in instrument.sequence_runs[0].injections[0].traces]
 
         random.seed(SEED)
         first = run_once()
@@ -1003,9 +978,7 @@ class TestRunSequenceWithCalibration:
         instrument = next(w for w in exp.workspace.widgets if w.id == "instrument")
         injection = instrument.sequence_runs[0].injections[0]
         assert len(injection.traces) == 2
-        assert [trace.transition.id for trace in injection.traces] == [
-            t.id for t in two_channel_method.transitions
-        ]
+        assert [trace.transition.id for trace in injection.traces] == [t.id for t in two_channel_method.transitions]
 
     def test_roundtrip_preserves_the_traces(self, tmp_path) -> None:
         repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
@@ -1029,17 +1002,10 @@ class TestRunSequenceWithCalibration:
                 ],
             ),
         )
-        original = next(
-            w for w in service._require_experiment(exp_id).workspace.widgets
-            if w.id == "instrument"
-        ).sequence_runs[0].injections[0]
+        original = next(w for w in service._require_experiment(exp_id).workspace.widgets if w.id == "instrument").sequence_runs[0].injections[0]
 
-        reloaded_experiment = ExperimentRuntimeService(
-            repository=repository
-        )._require_experiment(exp_id)
-        instrument = next(
-            w for w in reloaded_experiment.workspace.widgets if w.id == "instrument"
-        )
+        reloaded_experiment = ExperimentRuntimeService(repository=repository)._require_experiment(exp_id)
+        instrument = next(w for w in reloaded_experiment.workspace.widgets if w.id == "instrument")
         reloaded = instrument.sequence_runs[0].injections[0]
 
         assert reloaded.id == original.id
@@ -1079,18 +1045,14 @@ class TestRunSequenceWithCalibration:
         )
         # Rewrite the stored payload in the pre-trace shape.
         with sqlite3.connect(str(tmp_path / "experiments.sqlite3")) as connection:
-            row = connection.execute(
-                "SELECT payload FROM experiments WHERE id = ?", (exp_id,)
-            ).fetchone()
+            row = connection.execute("SELECT payload FROM experiments WHERE id = ?", (exp_id,)).fetchone()
             payload = json.loads(row[0])
             for widget in payload["workspace"]["widgets"]:
                 for run in widget.get("sequence_runs", []):
                     for injection in run["injections"]:
                         injection.pop("traces", None)
                         injection.pop("id", None)
-                        injection["compounds"] = [
-                            {"compound_id": "boscalid", "pesticide_signal": 1.0}
-                        ]
+                        injection["compounds"] = [{"compound_id": "boscalid", "pesticide_signal": 1.0}]
             connection.execute(
                 "UPDATE experiments SET payload = ? WHERE id = ?",
                 (json.dumps(payload), exp_id),
@@ -1130,9 +1092,7 @@ class TestRunSequenceWithCalibration:
                 ),
             )
 
-    def test_roundtrip_rebuilds_the_stored_snapshot_rather_than_the_registry(
-        self, tmp_path
-    ) -> None:
+    def test_roundtrip_rebuilds_the_stored_snapshot_rather_than_the_registry(self, tmp_path) -> None:
         """A past run must reload its own frozen method, not today's registry entry."""
         repository = SqliteExperimentRepository(str(tmp_path / "experiments.sqlite3"))
         service = ExperimentRuntimeService(repository=repository)
@@ -1189,15 +1149,9 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService()
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        calibration_vial_id = _place_calibration_vial_in_rack(
-            service, exp_id, "rack_slot_1", 10.0
-        )
+        calibration_vial_id = _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 10.0)
         experiment = service._require_experiment(exp_id)
-        vial = next(
-            slot.tool
-            for slot in experiment.rack.slots
-            if slot.tool is not None and slot.tool.id == calibration_vial_id
-        )
+        vial = next(slot.tool for slot in experiment.rack.slots if slot.tool is not None and slot.tool.id == calibration_vial_id)
         add_liquid_to_tool(experiment, vial, liquid_id=ISTD_SOLUTION_ID, volume_ml=0.05)
         service._repository.save(experiment)
         _load_rack_into_instrument(service, exp_id)
@@ -1219,13 +1173,9 @@ class TestRunSequenceWithCalibration:
         )
 
         reloaded = service._require_experiment(exp_id)
-        instrument = next(
-            w for w in reloaded.workspace.widgets if w.id == "instrument"
-        )
+        instrument = next(w for w in reloaded.workspace.widgets if w.id == "instrument")
         istd_trace = next(
-            trace
-            for trace in instrument.sequence_runs[0].injections[0].traces
-            if trace.transition.compound_id == INTERNAL_STANDARD_COMPOUND_ID
+            trace for trace in instrument.sequence_runs[0].injections[0].traces if trace.transition.compound_id == INTERNAL_STANDARD_COMPOUND_ID
         )
         assert max(istd_trace.intensities) > 10 * BASELINE_COUNTS
 
@@ -1234,9 +1184,7 @@ class TestRunSequenceWithCalibration:
         service = ExperimentRuntimeService(repository=repository)
         exp_id = _create(service)
         _deploy_instrument_and_rack(service, exp_id)
-        _place_calibration_vial_in_rack(
-            service, exp_id, "rack_slot_1", 10.0
-        )
+        _place_calibration_vial_in_rack(service, exp_id, "rack_slot_1", 10.0)
         _place_vial_in_rack(service, exp_id, "rack_slot_2")
         _load_rack_into_instrument(service, exp_id)
         request = RunSequenceRequest(
@@ -1303,11 +1251,7 @@ def test_run_sequence_route_accepts_the_console_contract(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    instrument = next(
-        widget
-        for widget in response.json()["workspace"]["widgets"]
-        if widget["id"] == "instrument"
-    )
+    instrument = next(widget for widget in response.json()["workspace"]["widgets"] if widget["id"] == "instrument")
     assert instrument["sequence_runs"][0]["method_id"] == APPLE_PESTICIDES_MRM_V1_ID
     assert instrument["sequence_runs"][0]["injections"][1]["sample_name"] == "Apple A"
 
@@ -1342,9 +1286,8 @@ def test_unload_rack_route_marks_the_rack_as_available(monkeypatch) -> None:
 # _compute_compounds unit tests — four invariants
 # ---------------------------------------------------------------------------
 
-def _liquid(
-    liquid_id: str, volume_ml: float, *, true_volume_ml: float | None = None
-) -> WorkbenchLiquid:
+
+def _liquid(liquid_id: str, volume_ml: float, *, true_volume_ml: float | None = None) -> WorkbenchLiquid:
     """One liquid sitting in a vial, with an optionally divergent delivered volume."""
     return WorkbenchLiquid(
         id=new_id("bench_liquid"),
@@ -1419,8 +1362,6 @@ def _make_ctx(
 
 
 SEED = 1234
-
-
 
 
 class TestSampleResponseInvariants:
@@ -1717,9 +1658,7 @@ class TestOpenVialsBlockLoading:
         exp_id = self._rack_with_open_vial(service)
 
         with pytest.raises(ValueError, match="Position 1 still open"):
-            LoadRackIntoInstrumentService(service).run(
-                exp_id, LoadRackIntoInstrumentRequest()
-            )
+            LoadRackIntoInstrumentService(service).run(exp_id, LoadRackIntoInstrumentRequest())
 
     def test_capping_the_vial_makes_the_rack_loadable(self) -> None:
         service = ExperimentRuntimeService()

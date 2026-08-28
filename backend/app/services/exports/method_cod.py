@@ -7,6 +7,7 @@ file leaves ``num_cas``, ``formula``, ``loq`` and the rest blank, and inventing
 a CAS number would mean inventing a real-world identifier rather than a
 pedagogical placeholder. Blank is the honest value.
 """
+
 from __future__ import annotations
 
 import io
@@ -52,11 +53,7 @@ _CHANNEL_COLUMNS = ("q1", "q3", "seg_id", "polarity", "q1_res", "q3_res", "ev")
 
 
 def _channel_columns(group_count: int) -> tuple[str, ...]:
-    return tuple(
-        f"Ch.({number}) {column}"
-        for number in range(1, group_count + 1)
-        for column in _CHANNEL_COLUMNS
-    )
+    return tuple(f"Ch.({number}) {column}" for number in range(1, group_count + 1) for column in _CHANNEL_COLUMNS)
 
 
 #: Every column except the concentration ladder, whose width varies.
@@ -70,9 +67,7 @@ def build_method_cod_rows(method: AcquisitionMethod) -> tuple[list[str], list[li
     ``event`` numbers the same compounds from 1.
     """
     events = build_event_layout(method)
-    group_count = max(
-        [len(event.channels) for event in events] + [_MIN_CHANNEL_GROUPS]
-    )
+    group_count = max([len(event.channels) for event in events] + [_MIN_CHANNEL_GROUPS])
     levels = method.calibration_levels_ng_per_ml
 
     header = [

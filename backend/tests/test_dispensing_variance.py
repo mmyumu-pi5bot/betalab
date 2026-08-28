@@ -1,4 +1,5 @@
 """Tests for dispensing/pipetting volume variance (Step 3 of manipulation-volume uncertainty)."""
+
 from __future__ import annotations
 
 import random
@@ -19,6 +20,7 @@ from app.services.physical_simulation_service import PhysicalSimulationService
 # ---------------------------------------------------------------------------
 # draw_dispensed_volume unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestDrawDispensedVolume:
     def test_zero_nominal_returns_zero(self) -> None:
@@ -57,6 +59,7 @@ class TestDrawDispensedVolume:
 # ---------------------------------------------------------------------------
 # Integration: add_liquid_to_tool stores nominal in volume_ml, true in true_volume_ml
 # ---------------------------------------------------------------------------
+
 
 def _make_service_and_tube() -> tuple[ExperimentRuntimeService, str, str]:
     """Return (service, exp_id, tube_tool_id) with a 50 mL centrifuge tube at station_1."""

@@ -112,9 +112,7 @@ def acknowledge_reception_mass_check(
     return handle_service_errors(
         lambda: AcknowledgeReceptionMassCheckService(experiment_service).run(
             experiment_id,
-            AcknowledgeReceptionMassCheckRequest(
-                entry_id=request.entry_id if request is not None else None
-            ),
+            AcknowledgeReceptionMassCheckRequest(entry_id=request.entry_id if request is not None else None),
         )
     )
 

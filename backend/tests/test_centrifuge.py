@@ -27,11 +27,7 @@ from app.services.experiment_service import ExperimentRuntimeService
 
 
 def _centrifuge_widget(service: ExperimentRuntimeService, experiment_id: str):
-    return next(
-        widget
-        for widget in service._require_experiment(experiment_id).workspace.widgets
-        if widget.id == "centrifuge"
-    )
+    return next(widget for widget in service._require_experiment(experiment_id).workspace.widgets if widget.id == "centrifuge")
 
 
 def _load_ready_tube(service: ExperimentRuntimeService, experiment_id: str) -> None:

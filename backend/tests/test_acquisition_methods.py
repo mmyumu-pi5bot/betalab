@@ -1,4 +1,5 @@
 """Tests for the LC-MS/MS acquisition method model, registry and read API."""
+
 from __future__ import annotations
 
 import pytest
@@ -52,15 +53,9 @@ class TestMrmReferenceCatalog:
         inside = MZ_MATCH_TOLERANCE / 2
         outside = MZ_MATCH_TOLERANCE + 1.0
 
-        assert find_reference_transition(
-            reference.q1_mz + inside, reference.q3_mz, reference.polarity
-        ) is not None
-        assert find_reference_transition(
-            reference.q1_mz + outside, reference.q3_mz, reference.polarity
-        ) is None
-        assert find_reference_transition(
-            reference.q1_mz, reference.q3_mz + outside, reference.polarity
-        ) is None
+        assert find_reference_transition(reference.q1_mz + inside, reference.q3_mz, reference.polarity) is not None
+        assert find_reference_transition(reference.q1_mz + outside, reference.q3_mz, reference.polarity) is None
+        assert find_reference_transition(reference.q1_mz, reference.q3_mz + outside, reference.polarity) is None
 
     def test_unknown_mass_pair_matches_nothing(self) -> None:
         assert find_reference_transition(999.9, 111.1, "positive") is None
@@ -110,17 +105,13 @@ class TestAcquisitionMethodRegistry:
 
     def test_built_in_transitions_all_address_a_real_reference_channel(self) -> None:
         for transition in APPLE_PESTICIDES_MRM_V1.transitions:
-            reference = find_reference_transition(
-                transition.q1_mz, transition.q3_mz, transition.polarity
-            )
+            reference = find_reference_transition(transition.q1_mz, transition.q3_mz, transition.polarity)
             assert reference is not None, transition.id
             assert reference.compound_id == transition.compound_id
 
     def test_analytes_reference_the_internal_standard_channel(self) -> None:
         analytes = [t for t in APPLE_PESTICIDES_MRM_V1.transitions if t.compound_kind == "analyte"]
-        istd = [
-            t for t in APPLE_PESTICIDES_MRM_V1.transitions if t.compound_kind == "internal_standard"
-        ]
+        istd = [t for t in APPLE_PESTICIDES_MRM_V1.transitions if t.compound_kind == "internal_standard"]
 
         assert analytes and istd
         assert all(t.internal_standard_id == INTERNAL_STANDARD_COMPOUND_ID for t in analytes)
@@ -165,9 +156,7 @@ class TestAcquisitionMethodRoutes:
         assert "transitions" not in summary
 
     def test_reads_the_full_method_detail(self) -> None:
-        response = TestClient(app).get(
-            f"/experiments/catalog/acquisition-methods/{APPLE_PESTICIDES_MRM_V1_ID}"
-        )
+        response = TestClient(app).get(f"/experiments/catalog/acquisition-methods/{APPLE_PESTICIDES_MRM_V1_ID}")
 
         assert response.status_code == 200
         payload = response.json()
@@ -178,9 +167,7 @@ class TestAcquisitionMethodRoutes:
         assert payload["liquid_chromatography"]["gradient"][0]["mobile_phase_b_percent"] == 5.0
         assert payload["ion_source"]["source_type"].startswith("Heated electrospray")
 
-        transition = next(
-            t for t in payload["transitions"] if t["id"] == "boscalid__quantifier"
-        )
+        transition = next(t for t in payload["transitions"] if t["id"] == "boscalid__quantifier")
         assert transition["compound_id"] == "boscalid"
         assert transition["role"] == "quantifier"
         assert transition["polarity"] == "positive"
