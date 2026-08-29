@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${BETALAB_BACKEND_IMAGE:-registry.mmyumu.fr/betalab-backend:0.1.0}
+    image: ${BETALAB_BACKEND_IMAGE:-registry.mmyumu.fr/betalab-backend:1.0.0}
     build:
       context: ./backend
     container_name: betalab-backend
@@ -14,7 +14,7 @@ services:
       - betalab_backend_data:/data
 
   frontend:
-    image: ${BETALAB_FRONTEND_IMAGE:-registry.mmyumu.fr/betalab-frontend:0.1.0}
+    image: ${BETALAB_FRONTEND_IMAGE:-registry.mmyumu.fr/betalab-frontend:1.0.0}
     build:
       context: ./frontend
       args:

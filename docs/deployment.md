@@ -23,8 +23,8 @@ Ce document ne couvre pas la configuration de ce Nginx externe.
 Copier `.env.example` vers `.env` puis adapter la valeur:
 
 ```env
-BETALAB_BACKEND_IMAGE=registry.mmyumu.fr/betalab-backend:0.1.0
-BETALAB_FRONTEND_IMAGE=registry.mmyumu.fr/betalab-frontend:0.1.0
+BETALAB_BACKEND_IMAGE=registry.mmyumu.fr/betalab-backend:1.0.0
+BETALAB_FRONTEND_IMAGE=registry.mmyumu.fr/betalab-frontend:1.0.0
 NEXT_PUBLIC_API_BASE_URL=https://ton-domaine/api
 BETALAB_CORS_ALLOWED_ORIGINS=https://ton-domaine
 ```
