@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.journal_codes import JournalCode
-from app.domain.models import Experiment
+from app.domain.models import Experiment, RackSlot, WorkbenchTool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
     find_rack_slot,
@@ -61,7 +61,10 @@ class RestoreTrashedToolToRackSlotRequest:
     rack_slot_id: str
 
 
-def _reachable_rack_vial(experiment: Experiment, rack_slot_id: str):
+def _reachable_rack_vial(
+    experiment: Experiment,
+    rack_slot_id: str,
+) -> tuple[RackSlot, WorkbenchTool]:
     """The vial in ``rack_slot_id``, provided a hand can still reach it.
 
     A rack sitting in the autosampler is behind the instrument door, so its caps

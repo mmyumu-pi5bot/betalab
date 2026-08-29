@@ -1,6 +1,7 @@
 import pytest
 
 from app.domain.journal_codes import JournalCode
+from app.domain.models import WorkbenchTool
 from app.services.domain_services.rack import (
     CloseRackToolRequest,
     CloseRackToolService,
@@ -12,9 +13,15 @@ from app.services.domain_services.rack import (
 from app.services.experiment_service import ExperimentRuntimeService
 
 
-def _rack_slot(service: ExperimentRuntimeService, exp_id: str, rack_slot_id: str = "rack_slot_1"):
+def _racked_vial(
+    service: ExperimentRuntimeService,
+    exp_id: str,
+    rack_slot_id: str = "rack_slot_1",
+) -> WorkbenchTool:
     experiment = service._require_experiment(exp_id)
-    return next(slot for slot in experiment.rack.slots if slot.id == rack_slot_id)
+    slot = next(slot for slot in experiment.rack.slots if slot.id == rack_slot_id)
+    assert slot.tool is not None
+    return slot.tool
 
 
 def _place_vial_in_rack(service: ExperimentRuntimeService, exp_id: str, rack_slot_id: str = "rack_slot_1") -> None:
@@ -29,12 +36,11 @@ class TestSealingAVialInTheRack:
         service = ExperimentRuntimeService()
         exp_id = service.create_experiment().id
         _place_vial_in_rack(service, exp_id)
-        assert _rack_slot(service, exp_id).tool.is_sealed is False
+        assert _racked_vial(service, exp_id).is_sealed is False
 
         CloseRackToolService(service).run(exp_id, CloseRackToolRequest(rack_slot_id="rack_slot_1"))
 
-        slot = _rack_slot(service, exp_id)
-        assert slot.tool.is_sealed is True
+        assert _racked_vial(service, exp_id).is_sealed is True
         experiment = service._require_experiment(exp_id)
         assert experiment.journal_entries[-1].code == JournalCode.TOOL_SEALED
 
@@ -46,7 +52,7 @@ class TestSealingAVialInTheRack:
 
         OpenRackToolService(service).run(exp_id, OpenRackToolRequest(rack_slot_id="rack_slot_1"))
 
-        assert _rack_slot(service, exp_id).tool.is_sealed is False
+        assert _racked_vial(service, exp_id).is_sealed is False
         experiment = service._require_experiment(exp_id)
         assert experiment.journal_entries[-1].code == JournalCode.TOOL_OPENED
 
