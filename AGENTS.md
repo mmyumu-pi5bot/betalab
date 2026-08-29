@@ -99,6 +99,8 @@ The affected `normalize*` functions are at the top of `frontend/src/lib/api.ts`.
 
 TDD is the default workflow: write the failing test first, then implement. Backend tests use `pytest`; name files `test_*.py` and test functions `test_*`. Keep coverage at or above the current backend baseline and add coverage for API routes when features touch HTTP behavior.
 
+`BETALAB_SIMULATION_SPEED` sets how many simulated seconds the backend spends per wall-clock second (default `1.0`, real time). The Playwright suite runs its backend at `10`, so a grind or a cryogenic chill no longer costs its real duration; override with `PW_SIMULATION_SPEED` when a spec needs real time. Everything still happens in order and passes through its intermediate states — only the wait shrinks.
+
 ### Trash Retention
 
 - Treat trash as retaining discarded entities by default.

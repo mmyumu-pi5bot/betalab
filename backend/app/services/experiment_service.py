@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, datetime
 
+from app.core.config import settings
 from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment, SequenceRun, new_id
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
@@ -26,10 +27,16 @@ class SequenceRunNotFoundError(KeyError):
 
 
 class ExperimentRuntimeService:
-    def __init__(self, repository: ExperimentRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: ExperimentRepository | None = None,
+        simulation_speed: float | None = None,
+    ) -> None:
         self._experiments: dict[str, Experiment] = {}
         self._repository = repository or InMemoryExperimentRepository()
         self._now_fn: Callable[[], datetime] = lambda: datetime.now(UTC)
+        resolved_speed = settings.simulation_speed if simulation_speed is None else simulation_speed
+        self._simulation_speed = resolved_speed if resolved_speed > 0 else 1.0
 
     def create_experiment(self, name: str = "Untitled experiment") -> ExperimentSchema:
         experiment = build_experiment(self._validate_experiment_name(name))
@@ -116,7 +123,10 @@ class ExperimentRuntimeService:
         if now.tzinfo is None:
             now = now.replace(tzinfo=UTC)
 
-        elapsed_ms = (now - experiment.last_simulation_at).total_seconds() * 1000.0
+        # Wall time buys simulated time at ``_simulation_speed``. The stamp below
+        # stays on the real clock, so a fast simulation runs ahead once, not
+        # further ahead on every read.
+        elapsed_ms = (now - experiment.last_simulation_at).total_seconds() * 1000.0 * self._simulation_speed
         if elapsed_ms <= 0:
             return False
 
