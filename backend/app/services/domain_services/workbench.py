@@ -13,7 +13,6 @@ from app.domain.models import (
     WorkbenchTool,
     new_id,
 )
-from app.domain.rules import can_tool_be_sealed
 from app.domain.spatula_rules import can_spatula_load_from_tool, can_spatula_pour_into_tool
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
@@ -42,6 +41,7 @@ from app.services.helpers.tool_liquids import (
     raise_if_quechers_unusable,
     remove_liquid_from_tool,
 )
+from app.services.helpers.tool_sealing import open_tool_in_slot, seal_tool_in_slot
 from app.services.helpers.workbench import (
     build_workbench_tool,
     find_produce_lot_in_slot,
@@ -52,9 +52,7 @@ from app.services.helpers.workbench import (
 )
 from app.services.journal_refs import liquid_ref, produce_ref, slot_ref, text_ref, tool_ref
 from app.services.journal_service import record_journal
-from app.services.physical_simulation_service import PhysicalSimulationService
 
-physical_simulation_service = PhysicalSimulationService()
 SPATULA_CAPACITY_G = 5.0
 
 
@@ -606,18 +604,7 @@ class CloseWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
     def _run(self, experiment: Experiment, request: WorkbenchSlotRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "sealing it")
-        if not can_tool_be_sealed(tool.tool_type):
-            raise ValueError(f"{tool.label} cannot be sealed.")
-
-        tool.is_sealed = True
-        tool.closure_fault = None
-        tool.internal_pressure_bar = max(tool.internal_pressure_bar, 1.0)
-        record_journal(
-            experiment,
-            JournalCode.TOOL_SEALED,
-            tool=tool_ref(tool),
-            location=slot_ref(slot),
-        )
+        seal_tool_in_slot(experiment, tool, slot)
 
 
 class OpenWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
@@ -627,32 +614,7 @@ class OpenWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):
     def _run(self, experiment: Experiment, request: WorkbenchSlotRequest) -> None:
         slot = find_workbench_slot(experiment.workbench, request.slot_id)
         tool = require_slot_tool(slot, "opening it")
-        if not can_tool_be_sealed(tool.tool_type):
-            raise ValueError(f"{tool.label} cannot be opened.")
-
-        vent_event = physical_simulation_service.vent_opened_tool(
-            tool,
-            material_states=experiment.produce_material_states,
-        )
-        tool.is_sealed = False
-        tool.closure_fault = None
-        if vent_event is not None and vent_event.lost_mass_g > 0:
-            record_journal(
-                experiment,
-                JournalCode.TOOL_VENTED,
-                tool=tool_ref(tool),
-                pressure=format_volume(vent_event.pressure_bar),
-                location=slot_ref(slot),
-                lost_mass=format_volume(vent_event.lost_mass_g),
-            )
-            return
-
-        record_journal(
-            experiment,
-            JournalCode.TOOL_OPENED,
-            tool=tool_ref(tool),
-            location=slot_ref(slot),
-        )
+        open_tool_in_slot(experiment, tool, slot)
 
 
 class LoadSpatulaFromWorkbenchToolService(WriteDomainService[WorkbenchSlotRequest]):

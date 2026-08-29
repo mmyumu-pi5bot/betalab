@@ -5162,6 +5162,35 @@ describe("LabScene", () => {
     expectToolMoveCommand("bench_tool_1", "rack", "rack_slot_1", "workbench_slot", "station_1");
   });
 
+  it("caps a vial from its rack slot card without unracking it", async () => {
+    vi.mocked(createExperiment).mockResolvedValue(
+      makeWorkbenchExperiment({
+        rackSlots: makeRackSlots([{ tool: makeTool({ isSealed: false }) }]),
+        slots: makeSlots(),
+        workspaceWidgets: makeWorkspaceWithRackVisible(),
+      }),
+    );
+    vi.mocked(sendExperimentCommand).mockResolvedValue(
+      makeWorkbenchExperiment({
+        rackSlots: makeRackSlots([{ tool: makeTool({ isSealed: true }) }]),
+        slots: makeSlots(),
+        workspaceWidgets: makeWorkspaceWithRackVisible(),
+      }),
+    );
+
+    render(<PesticideWorkbench />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close Autosampler vial" }));
+
+    expect(sendExperimentCommand).toHaveBeenCalledWith(
+      "experiment_pesticides",
+      "close_rack_tool",
+      { rack_slot_id: "rack_slot_1" },
+    );
+
+    expect(await screen.findByRole("button", { name: "Open Autosampler vial" })).toBeInTheDocument();
+  });
+
   it("moves a vial from the rack to another station through the generic drop system", async () => {
     vi.mocked(createExperiment).mockResolvedValue(
       makeWorkbenchExperiment({

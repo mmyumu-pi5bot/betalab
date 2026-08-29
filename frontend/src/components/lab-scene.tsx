@@ -62,7 +62,12 @@ import {
   CALIBRATION_STANDARD_VIAL_ITEM_ID,
   buildCalibrationLevelDraftFields,
 } from "@/lib/lab-workflow-catalog";
-import type { DebugToolPresetId, ToolbarCategory } from "@/types/workbench";
+import type {
+  BenchToolInstance,
+  DebugToolPresetId,
+  RackSlot,
+  ToolbarCategory,
+} from "@/types/workbench";
 
 type WidgetId = LabSceneWidgetId;
 
@@ -755,6 +760,16 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
   const rackOpenSlots = rackSlots.flatMap((slot, index) =>
     slot.tool && slot.tool.canSeal && !slot.tool.isSealed ? [index + 1] : [],
   );
+  // A cap can be seated or lifted where the vial stands. The instrument still
+  // refuses an open vial, so capping in place saves the round trip to the bench
+  // without hiding the mistake.
+  const handleToggleRackVialSeal = (rackSlot: RackSlot, tool: BenchToolInstance) => {
+    if (tool.isSealed) {
+      void experimentApi.rack.openTool({ rack_slot_id: rackSlot.id });
+      return;
+    }
+    void experimentApi.rack.closeTool({ rack_slot_id: rackSlot.id });
+  };
   const rackOccupiedSlotLiquids = Object.fromEntries(
     rackSlots.flatMap((slot, index) => (slot.tool ? [[index + 1, slot.tool.liquids] as const] : [])),
   );
@@ -826,6 +841,7 @@ export function LabScene({ experimentId, tutorialId }: LabSceneProps = {}) {
       experiment={state.experiment}
       rack={{
         getRackIllustrationSlotPosition,
+        handleToggleRackVialSeal,
         instrumentStatus,
         rackLoadedCount,
         rackOccupiedSlotLiquids,

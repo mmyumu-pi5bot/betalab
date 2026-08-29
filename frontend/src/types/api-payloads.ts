@@ -203,7 +203,11 @@ export type UpdateAnalyticalBalanceToolSampleLabelTextPayload = {
 
 // ── Rack ─────────────────────────────────────────────────────────────────────
 
+export type CloseRackToolPayload = { rack_slot_id: string };
+
 export type DiscardRackToolPayload = { rack_slot_id: string };
+
+export type OpenRackToolPayload = { rack_slot_id: string };
 
 export type MoveRackToolBetweenSlotsPayload = {
   source_rack_slot_id: string;

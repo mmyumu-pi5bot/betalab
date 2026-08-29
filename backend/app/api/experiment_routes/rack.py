@@ -8,10 +8,14 @@ from app.schemas.experiment import (
     TrashToolRestoreToWorkbenchSchema,
 )
 from app.services.domain_services.rack import (
+    CloseRackToolRequest,
+    CloseRackToolService,
     DiscardRackToolRequest,
     DiscardRackToolService,
     MoveRackToolBetweenSlotsRequest,
     MoveRackToolBetweenSlotsService,
+    OpenRackToolRequest,
+    OpenRackToolService,
     PlaceToolInRackSlotRequest,
     PlaceToolInRackSlotService,
     PlaceWorkbenchToolInRackSlotRequest,
@@ -104,6 +108,26 @@ def remove_rack_tool_to_workbench_slot(
                 rack_slot_id=find_rack_tool_slot(experiment_id, tool_id),
                 target_slot_id=request.target_slot_id,
             ),
+        )
+    )
+
+
+@router.post("/{experiment_id}/rack/tools/{tool_id}/close", response_model=ExperimentSchema)
+def close_rack_tool(experiment_id: str, tool_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: CloseRackToolService(experiment_service).run(
+            experiment_id,
+            CloseRackToolRequest(rack_slot_id=find_rack_tool_slot(experiment_id, tool_id)),
+        )
+    )
+
+
+@router.post("/{experiment_id}/rack/tools/{tool_id}/open", response_model=ExperimentSchema)
+def open_rack_tool(experiment_id: str, tool_id: str) -> ExperimentSchema:
+    return handle_service_errors(
+        lambda: OpenRackToolService(experiment_service).run(
+            experiment_id,
+            OpenRackToolRequest(rack_slot_id=find_rack_tool_slot(experiment_id, tool_id)),
         )
     )
 

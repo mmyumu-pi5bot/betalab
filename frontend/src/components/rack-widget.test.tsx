@@ -1,8 +1,9 @@
-import { createEvent, fireEvent, render, screen } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RackWidget } from "@/components/rack-widget";
 import { getRackIllustrationSlotPosition } from "@/lib/lab-scene-config";
+import type { BenchToolInstance, RackSlot } from "@/types/workbench";
 
 const rackGrabEdgeTestIds = [
   "autosampler-rack-drag-edge-top",
@@ -106,5 +107,138 @@ describe("RackWidget rack drag", () => {
 
     expect(onRackDragStart).not.toHaveBeenCalled();
     expect(screen.getByTestId("rack-load-status")).toHaveTextContent("Rack loaded in LC-MS/MS");
+  });
+});
+
+function makeVial(overrides: Partial<BenchToolInstance> = {}): BenchToolInstance {
+  return {
+    id: "vial_1",
+    toolId: "sample_vial_lcms",
+    label: "Autosampler vial",
+    subtitle: "Injection ready",
+    accent: "sky",
+    toolType: "sample_vial",
+    capacity_ml: 2,
+    canReceiveContents: true,
+    canReceiveLiquids: true,
+    canReceiveProduce: false,
+    canSeal: true,
+    isDraggable: true,
+    isSealed: true,
+    allowedDropTargets: ["rack_slot"],
+    liquids: [
+      {
+        id: "extract_1",
+        liquidId: "acetonitrile",
+        name: "Extract",
+        volume_ml: 1,
+        accent: "amber",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function makeRackSlot(slotIndex: number, tool: BenchToolInstance | null): RackSlot {
+  return {
+    id: `slot_${slotIndex + 1}`,
+    label: `P${slotIndex + 1}`,
+    tool,
+  };
+}
+
+describe("RackWidget slot cards", () => {
+  it("reads the calibration level off a racked vial without unracking it", () => {
+    const calibrationVial = makeVial({
+      id: "cal_vial_1",
+      toolId: "calibration_standard_vial",
+      label: "Calibration standard vial",
+      accent: "rose",
+      calibrationContext: { levelNgPerMl: 10, compoundIds: ["chlorpyrifos"] },
+    });
+
+    renderRackWidget({
+      loadedCount: 1,
+      rackSlots: [makeRackSlot(0, calibrationVial)],
+    });
+
+    const card = screen.getByTestId("rack-slot-summary-1");
+    expect(within(card).getByText("Calibration standard vial")).toBeInTheDocument();
+    expect(within(card).getByTestId("rack-slot-detail-1")).toHaveTextContent("10 ng/mL");
+    expect(within(card).getByTestId("rack-slot-tool-1")).toHaveTextContent("1.00 mL");
+  });
+
+  it("shows a tiny vial icon on every slot card and no temperature readout", () => {
+    renderRackWidget({
+      loadedCount: 1,
+      rackSlots: [makeRackSlot(0, makeVial())],
+    });
+
+    const card = screen.getByTestId("rack-slot-summary-1");
+    expect(within(card).getByTestId("rack-slot-icon-1")).toBeInTheDocument();
+    expect(within(card).queryByTestId("temperature-indicator-fill")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the written label when the vial carries no calibration level", () => {
+    const labelledVial = makeVial({
+      labels: [
+        {
+          id: "label_1",
+          labelKind: "lims",
+          text: "S-2026-0142",
+          sampleCode: "S-2026-0142",
+        },
+      ],
+    });
+
+    renderRackWidget({
+      loadedCount: 1,
+      rackSlots: [makeRackSlot(0, labelledVial)],
+    });
+
+    expect(screen.getByTestId("rack-slot-detail-1")).toHaveTextContent("S-2026-0142");
+  });
+});
+
+describe("RackWidget vial capping", () => {
+  it("caps and uncaps a vial from its slot card", () => {
+    const onToggleVialSeal = vi.fn();
+    const openVial = makeVial({ isSealed: false });
+
+    renderRackWidget({
+      loadedCount: 1,
+      onToggleVialSeal,
+      rackSlots: [makeRackSlot(0, openVial)],
+    });
+
+    const capButton = screen.getByRole("button", { name: "Close Autosampler vial" });
+    fireEvent.click(capButton);
+
+    expect(onToggleVialSeal).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "slot_1" }),
+      expect.objectContaining({ id: "vial_1" }),
+    );
+  });
+
+  it("offers to open a vial that is already capped", () => {
+    renderRackWidget({
+      loadedCount: 1,
+      onToggleVialSeal: vi.fn(),
+      rackSlots: [makeRackSlot(0, makeVial({ isSealed: true }))],
+    });
+
+    expect(screen.getByRole("button", { name: "Open Autosampler vial" })).toBeInTheDocument();
+  });
+
+  it("keeps the caps out of reach while the rack sits in the instrument", () => {
+    renderRackWidget({
+      dndDisabled: true,
+      isLoadedIntoInstrument: true,
+      loadedCount: 1,
+      onToggleVialSeal: vi.fn(),
+      rackSlots: [makeRackSlot(0, makeVial({ isSealed: true }))],
+    });
+
+    expect(screen.getByRole("button", { name: "Open Autosampler vial" })).toBeDisabled();
   });
 });

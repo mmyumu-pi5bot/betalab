@@ -1436,6 +1436,22 @@ export async function removeRackToolToWorkbenchSlot(experimentId: string, payloa
   });
 }
 
+export async function closeRackTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/rack/tools/${findRackToolId(experimentId, requireString(body, "rack_slot_id"))}/close`,
+  });
+}
+
+export async function openRackTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
+  const body = requirePayload(payload);
+  return sendMutationRequest(experimentId, {
+    method: "POST",
+    path: `/experiments/${experimentId}/rack/tools/${findRackToolId(experimentId, requireString(body, "rack_slot_id"))}/open`,
+  });
+}
+
 export async function discardRackTool(experimentId: string, payload: MutationPayload): Promise<Experiment> {
   const body = requirePayload(payload);
   return sendMutationRequest(experimentId, {

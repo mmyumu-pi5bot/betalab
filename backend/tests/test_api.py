@@ -1632,3 +1632,21 @@ def test_new_routes_return_expected_http_errors() -> None:
     assert invalid_state.status_code == 400
     assert invalid_state.json() == {"detail": "Unknown workbench tool"}
     assert invalid_shape.status_code == 422
+
+
+def test_rack_vial_caps_and_uncaps_over_http() -> None:
+    with TestClient(app) as client:
+        experiment_id = _create_experiment(client)
+
+        placed_in_rack = client.post(
+            f"/experiments/{experiment_id}/rack/slots/rack_slot_1/place-tool-from-palette",
+            json={"tool_id": "sample_vial_lcms"},
+        )
+        tool_id = placed_in_rack.json()["rack"]["slots"][0]["tool"]["id"]
+        closed = client.post(f"/experiments/{experiment_id}/rack/tools/{tool_id}/close")
+        opened = client.post(f"/experiments/{experiment_id}/rack/tools/{tool_id}/open")
+
+    assert closed.status_code == 200
+    assert closed.json()["rack"]["slots"][0]["tool"]["is_sealed"] is True
+    assert opened.status_code == 200
+    assert opened.json()["rack"]["slots"][0]["tool"]["is_sealed"] is False

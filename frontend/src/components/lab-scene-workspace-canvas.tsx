@@ -100,6 +100,7 @@ type LabSceneWorkspaceCanvasProps = {
   experiment: Experiment;
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
+    handleToggleRackVialSeal: (rackSlot: RackSlot, tool: BenchToolInstance) => void;
     instrumentStatus: "completed" | "idle" | "ready" | "running";
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
@@ -639,6 +640,7 @@ export function LabSceneWorkspaceCanvas({
                   onRackSlotDragOver={dnd.rack.handleRackSlotDragOver}
                   onRackSlotDrop={dnd.rack.handleRackSlotDrop}
                   onRackToolDragStart={dnd.rack.handleRackToolDragStart}
+                  onToggleVialSeal={rack.handleToggleRackVialSeal}
                   rackSlots={display.rackSlots}
                   slotCount={rack.rackSlotCount}
                 />

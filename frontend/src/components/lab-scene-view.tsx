@@ -92,6 +92,7 @@ type LabSceneViewProps = {
   };
   rack: {
     getRackIllustrationSlotPosition: (index: number) => { left: string; top: string };
+    handleToggleRackVialSeal: (rackSlot: RackSlot, tool: BenchToolInstance) => void;
     instrumentStatus: "completed" | "idle" | "ready" | "running";
     rackLoadedCount: number;
     rackOccupiedSlotLiquids: Record<number, BenchToolInstance["liquids"]>;
