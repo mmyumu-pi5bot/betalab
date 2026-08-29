@@ -586,8 +586,8 @@ l'allongent : douze minutes restent douze minutes qu'on surveille 6 ou 60
 canaux. Une séquence dure donc `nombre d'injections × runtime_s`.
 
 **Accélération.** Attendre douze minutes par fiole serait fidèle et injouable.
-Le même déroulé est rejoué à `ACQUISITION_TIME_ACCELERATION` (×60) : un run se
-regarde en ~12 s, une séquence de cinq fioles en ~1 min. Rien d'autre n'est
+Le même déroulé est rejoué à `ACQUISITION_TIME_ACCELERATION` (×90) : un run se
+regarde en ~8 s, une séquence de cinq fioles en ~40 s. Rien d'autre n'est
 compressé — les secondes instrument inscrites dans les traces restent vraies,
 seule l'attente réelle rétrécit.
 

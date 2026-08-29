@@ -23,10 +23,10 @@ from app.domain.models import Experiment, SequenceRun
 from app.services.journal_service import record_journal
 
 #: Instrument seconds elapsed per wall-clock second. A 12-minute run therefore
-#: takes about 12 seconds to watch, and the tutorial's two injections about 25.
+#: takes about 8 seconds to watch, and the tutorial's two injections about 16.
 #: That is long enough to see each chromatogram drawn — which is the point of
 #: watching at all — and short enough not to be an interruption.
-ACQUISITION_TIME_ACCELERATION = 60.0
+ACQUISITION_TIME_ACCELERATION = 90.0
 
 
 def is_sequence_complete(run: SequenceRun) -> bool:
