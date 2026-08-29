@@ -45,6 +45,8 @@ test.describe("Experiments home", () => {
     await mockWorkbenchApi(page, { savedExperiments: [savedExperiment] });
 
     await page.goto("/");
+    // Deleting lives behind the card's management menu, so the menu opens first.
+    await page.getByRole("button", { name: /^Manage / }).click();
     await page.getByRole("button", { name: "Delete" }).click();
 
     await expect(page.getByText("0 sessions")).toBeVisible();

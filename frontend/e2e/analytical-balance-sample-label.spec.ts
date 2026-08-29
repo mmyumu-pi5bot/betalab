@@ -91,7 +91,7 @@ test.describe("Analytical balance sample labels", () => {
 
     await page.getByLabel("Orchard / producer").fill("Verger Saint-Martin");
     await page.getByLabel("Harvest date").fill("2026-03-29");
-    await page.getByLabel("Indicative field mass (g)").fill("2500");
+    await page.getByLabel("Declared mass from bag label (g)").fill("2500");
     await page.getByLabel("Sample mass (g)").fill("10");
     await page.getByRole("button", { name: "Create LIMS record" }).click();
     await page.getByRole("button", { name: "Print label" }).click();

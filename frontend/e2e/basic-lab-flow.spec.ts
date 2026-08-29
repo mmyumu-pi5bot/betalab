@@ -98,7 +98,7 @@ test.describe("Basic lab flow", () => {
     const createLimsRecordButton = page.getByRole("button", { name: "Create LIMS record" });
     await page.getByLabel("Orchard / producer").fill("Verger Saint-Martin");
     await page.locator('input[type="date"]').fill("2026-03-29");
-    await page.getByLabel("Indicative field mass (g)").fill("2500");
+    await page.getByLabel("Declared mass from bag label (g)").fill("2500");
     await page.getByLabel("Sample mass (g)").fill("10");
     await expect(createLimsRecordButton).toBeEnabled();
     await createLimsRecordButton.evaluate((element) => {
