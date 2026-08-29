@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import find_workspace_widget, format_volume
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import tool_ref, widget_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 physical_simulation_service = PhysicalSimulationService()
 

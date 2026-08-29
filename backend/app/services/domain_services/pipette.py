@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import cast
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     Experiment,
     InjectionContext,
@@ -28,10 +29,9 @@ from app.services.helpers.tool_liquids import (
     raise_if_quechers_unusable,
     transfer_liquid_portion,
 )
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import tool_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 
 @dataclass(frozen=True, slots=True)

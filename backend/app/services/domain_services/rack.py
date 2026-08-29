@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
 from app.services.helpers.lookups import (
@@ -10,7 +11,6 @@ from app.services.helpers.lookups import (
     find_workbench_slot,
 )
 from app.services.helpers.workbench import build_workbench_tool
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import slot_ref, tool_ref
 from app.services.journal_service import record_journal
 

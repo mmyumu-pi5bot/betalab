@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.domain.dnd_contracts import DndEntityContract, get_dnd_contract, source_kind_to_drop_target_type
+from app.domain.journal_codes import JournalCode
 from app.domain.models import ContainerLabel, Experiment, TrashProduceLotEntry, TrashSampleLabelEntry, WorkbenchTool, new_id
 from app.services.domain_services.analytical_balance import AnalyticalBalanceServiceBase
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
@@ -23,6 +24,8 @@ from app.services.helpers.lookups import (
 )
 from app.services.helpers.produce_canonical import mark_surface_fractions_contaminated, sync_canonical_produce_model
 from app.services.helpers.workbench import build_workbench_tool, pop_tool_label, require_slot_tool
+from app.services.journal_refs import produce_ref, text_ref, tool_ref
+from app.services.journal_service import record_journal
 from app.services.transfer import (
     GrinderProduceLotSource,
     GrinderProduceLotTarget,
@@ -33,9 +36,6 @@ from app.services.transfer import (
     WorkbenchProduceLotTarget,
     WorkspaceProduceLotSource,
 )
-from app.domain.journal_codes import JournalCode
-from app.services.journal_refs import produce_ref, text_ref, tool_ref
-from app.services.journal_service import record_journal
 
 
 @dataclass(frozen=True, slots=True)

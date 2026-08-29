@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass
 
 from app.domain.dnd_rules import can_tool_be_discarded, can_tool_be_stored
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     Experiment,
     ProduceMaterialState,
@@ -49,10 +50,9 @@ from app.services.helpers.workbench import (
     pop_tool_label,
     require_slot_tool,
 )
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import liquid_ref, produce_ref, slot_ref, text_ref, tool_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 physical_simulation_service = PhysicalSimulationService()
 SPATULA_CAPACITY_G = 5.0

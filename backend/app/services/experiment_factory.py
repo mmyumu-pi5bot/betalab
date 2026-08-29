@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     AnalyticalBalanceState,
     Experiment,
@@ -18,7 +19,6 @@ from app.domain.models import (
     WorkspaceWidget,
     new_id,
 )
-from app.domain.journal_codes import JournalCode
 from app.services.journal_service import record_journal
 from app.services.received_sample_generation import build_received_sampling_bag
 

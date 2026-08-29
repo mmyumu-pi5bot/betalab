@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, datetime
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment, SequenceRun, new_id
 from app.schemas.experiment import ExperimentListEntrySchema, ExperimentSchema
 from app.services.domain_services.acquisition_clock import advance_sequence_runs
@@ -13,9 +14,7 @@ from app.services.experiment_factory import build_experiment
 from app.services.experiment_repository import ExperimentRepository, InMemoryExperimentRepository
 from app.services.helpers.lookups import find_experiment_tool
 from app.services.helpers.produce_canonical import sync_canonical_produce_model, sync_pesticide_material_states
-from app.services.journal_service import synchronize_journal_entries
-from app.domain.journal_codes import JournalCode
-from app.services.journal_service import record_journal
+from app.services.journal_service import record_journal, synchronize_journal_entries
 
 
 class ExperimentNotFoundError(KeyError):

@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass
 
 from app.domain.dnd_rules import get_tool_allowed_drop_targets
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.domain.rules import can_tool_be_sealed
 from app.domain.spatula_rules import can_spatula_load_from_tool, can_spatula_pour_into_tool
@@ -27,10 +28,9 @@ from app.services.helpers.produce_canonical import (
 )
 from app.services.helpers.tool_liquids import add_liquid_to_tool
 from app.services.helpers.workbench import build_workbench_tool
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import slot_ref, tool_ref, widget_ref, widget_type_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 _ANALYTICAL_BALANCE_MAX_G = 220.0
 _ANALYTICAL_BALANCE_TARGET_MIN_G = 9.8

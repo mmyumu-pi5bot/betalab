@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     Experiment,
     LimsReception,
@@ -17,10 +18,9 @@ from app.services.helpers.lookups import (
     find_workbench_slot,
     find_workspace_widget,
 )
-from app.services.received_sample_generation import resolve_received_bag_gross_mass_g
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import slot_ref, tool_ref
 from app.services.journal_service import record_journal
+from app.services.received_sample_generation import resolve_received_bag_gross_mass_g
 
 
 @dataclass(frozen=True, slots=True)

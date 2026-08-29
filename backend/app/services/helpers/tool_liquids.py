@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment, WorkbenchLiquid, WorkbenchTool, new_id
 from app.domain.rules import can_tool_accept_liquids, can_tool_receive_contents
 from app.domain.workbench_catalog import get_workbench_liquid_definition
 from app.services.helpers.lookups import format_volume, round_volume
 from app.services.helpers.produce_canonical import get_tool_remaining_fill_capacity_ml
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import liquid_id_ref, tool_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 QUECHERS_SALTS_ID = "quechers_salts"
 ISTD_SOLUTION_ID = "istd_solution"

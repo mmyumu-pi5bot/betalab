@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import tool_ref, widget_type_ref
 from app.services.journal_service import record_journal
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import Experiment, WorkbenchTool, WorkspaceWidget
 from app.domain.rules import can_tool_be_sealed
 from app.services.domain_services.base import ExperimentRuntime, WriteDomainService
@@ -14,10 +15,9 @@ from app.services.helpers.lookups import (
 )
 from app.services.helpers.produce_material_states import get_material_state_name
 from app.services.helpers.workbench import build_workbench_tool
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import slot_ref, tool_ref, widget_ref, widget_type_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
 
 _VORTEX_CYCLE_DURATION_MS = 3000.0
 physical_simulation_service = PhysicalSimulationService()

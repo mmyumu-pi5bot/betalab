@@ -18,8 +18,8 @@ to reveal each chromatogram as it is recorded.
 
 from __future__ import annotations
 
-from app.domain.models import Experiment, SequenceRun
 from app.domain.journal_codes import JournalCode
+from app.domain.models import Experiment, SequenceRun
 from app.services.journal_service import record_journal
 
 #: Instrument seconds elapsed per wall-clock second. A 12-minute run therefore

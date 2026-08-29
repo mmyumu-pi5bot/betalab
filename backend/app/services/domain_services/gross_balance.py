@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     EntityOrigin,
     Experiment,
@@ -25,14 +26,13 @@ from app.services.helpers.produce_canonical import (
     sync_canonical_produce_model,
 )
 from app.services.helpers.workbench import build_workbench_tool
+from app.services.journal_refs import produce_ref, text_ref, tool_ref, widget_ref, widget_type_ref
+from app.services.journal_service import record_journal
 from app.services.received_sample_generation import resolve_received_bag_gross_mass_g
 from app.services.transfer import (
     ProduceLotPlacement,
     ProduceLotRemoval,
 )
-from app.domain.journal_codes import JournalCode
-from app.services.journal_refs import produce_ref, text_ref, tool_ref, widget_ref, widget_type_ref
-from app.services.journal_service import record_journal
 
 _TARE_BY_TOOL_TYPE_G: dict[str, float] = {
     "volumetric_flask": 140,

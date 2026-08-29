@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.dnd_rules import can_tool_seal
+from app.domain.journal_codes import JournalCode
 from app.domain.models import (
     Experiment,
     ProduceFraction,
@@ -25,11 +26,10 @@ from app.services.helpers.produce_canonical import set_lot_fraction_temperatures
 from app.services.helpers.produce_material_states import set_material_state_name, update_material_state
 from app.services.helpers.tool_liquids import ACETONITRILE_ID
 from app.services.helpers.workbench import build_workbench_tool
-from app.services.physical_simulation_service import PhysicalSimulationService
-from app.services.transfer import GrinderProduceLotTarget, WorkbenchProduceLotTarget
-from app.domain.journal_codes import JournalCode
 from app.services.journal_refs import produce_ref, slot_ref, text_ref, tool_ref
 from app.services.journal_service import record_journal
+from app.services.physical_simulation_service import PhysicalSimulationService
+from app.services.transfer import GrinderProduceLotTarget, WorkbenchProduceLotTarget
 
 _physical_simulation_service = PhysicalSimulationService()
 
