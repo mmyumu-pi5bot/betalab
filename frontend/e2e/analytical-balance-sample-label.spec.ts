@@ -46,7 +46,7 @@ async function setupAnalyticalBalanceTube(page: Parameters<typeof test>[0]["page
 }
 
 test.describe("Analytical balance sample labels", () => {
-  test.setTimeout(180_000);
+  test.setTimeout(60_000);
 
   test("applies a sample label when dragged from the palette onto the staged tube card", async ({
     page,

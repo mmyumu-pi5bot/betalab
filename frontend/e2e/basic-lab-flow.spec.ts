@@ -45,7 +45,7 @@ async function waitForGrinderLotToReachStartTemperature(page: Page) {
       },
       {
         message: "expected grinder lot temperature to reach cryogenic start threshold",
-        timeout: 45_000,
+        timeout: 20_000,
       },
     )
     .toBeLessThanOrEqual(-20);
@@ -59,7 +59,10 @@ async function ensureWorkbenchToolIsOpen(page: Page, label: string) {
 }
 
 test.describe("Basic lab flow", () => {
-  test.setTimeout(240_000);
+  // The waits here are the simulated ones — a lot chilling to -20 C, a grinder
+  // cycle — and the suite's backend runs them at BETALAB_SIMULATION_SPEED. The
+  // budget below is what that leaves, with room for a loaded CI runner.
+  test.setTimeout(60_000);
 
   test("receives, registers, cuts, chills, grinds, and jars the incoming lot", async ({
     page,
@@ -175,7 +178,7 @@ test.describe("Basic lab flow", () => {
       timeout: 10_000,
     });
     await expect(page.getByTestId("grinder-lcd-status")).toHaveText("COMPLETE", {
-      timeout: 45_000,
+      timeout: 20_000,
     });
     await expect(page.getByText(/ground in Cryogenic grinder/i)).toBeVisible({
       timeout: 10_000,

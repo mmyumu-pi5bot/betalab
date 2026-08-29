@@ -37,7 +37,7 @@ async function ensureWorkbenchToolIsOpen(page: Page, label: string) {
 }
 
 test.describe("Debug powder fraction state", () => {
-  test.setTimeout(240_000);
+  test.setTimeout(60_000);
 
   test("keeps the source jar as ground after powder from the same lot becomes slurry in a tube", async ({
     page,
