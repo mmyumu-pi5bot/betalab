@@ -230,7 +230,7 @@ export function WorkbenchPanel({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-              Workbench
+              {t("workbench.title")}
             </p>
             <span
               aria-hidden="true"
@@ -416,7 +416,7 @@ export function WorkbenchPanel({
                       <div>
                         <p className="text-base font-semibold text-slate-950">{t("workbench.stationSurface")}</p>
                         <p className="mt-1 text-xs text-slate-600">
-                          Direct produce contact contaminates the lot.
+                          {t("workbench.produceContaminates")}
                         </p>
                       </div>
                       <div className="mt-3 space-y-2">
@@ -450,7 +450,7 @@ export function WorkbenchPanel({
                     <div className="flex min-h-56 flex-col items-center justify-center rounded-[1.4rem] border border-dashed border-slate-200 bg-slate-50/80 p-6 text-center 2xl:min-h-[20rem]">
                       <p className="text-sm font-semibold text-slate-900">{t("workbench.emptyStation")}</p>
                       <p className="mt-2 max-w-xs text-sm text-slate-600">
-                        Drop a workflow tool here to start building the bench.
+                        {t("workbench.dropToolHint")}
                       </p>
                     </div>
                   )}

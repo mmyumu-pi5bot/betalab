@@ -189,4 +189,7 @@ export const frLcms: Record<keyof typeof enLcms, string> = {
   "results.shownInViewer": "Cette séquence est affichée dans la visionneuse.",
   "results.viewer": "Visionneuse de données d'acquisition",
 
+  "results.noRunYet":
+    "Aucune séquence n'a encore été lancée — chargez le rack et démarrez une acquisition.",
+
 };

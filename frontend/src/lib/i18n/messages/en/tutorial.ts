@@ -845,4 +845,62 @@ export const enTutorial = {
   "guard.tare.continueLabel": "Keep the empty-tube tare",
   "guard.tare.leaveLabel": "Leave tutorial and tare anyway",
 
+  // Branch-specific coaching text: titles and explanations the coach picks
+  // between at run time, which the first localisation pass left inline.
+  "tutorial.getlimstutorialvalues.orchardName": "Tutorial Orchard",
+  "tutorial.getlimstutorialfieldpresentation.grossMassFallback": "the current",
+  "tutorial.getlimstutorialfieldpresentation.netMassFallback": "the calculated",
+  "tutorial.registersamplepresentation.grossMassFallback": "current",
+  "tutorial.registersamplepresentation.netMassFallback": "the net mass",
+  "tutorial.registersamplepresentation.hint5":
+    "Keep the bag on the balance while you deploy and complete the LIMS terminal.",
+  "tutorial.registersamplepresentation.hint6":
+    "After deploying the terminal, return the sample bag to the Gross balance before entering the LIMS data.",
+  "tutorial.registersamplepresentation.instruction5":
+    "Open the Produce basket, then drag the sample bag and drop it onto the Gross balance.",
+  "tutorial.registersamplepresentation.instruction6":
+    "Open the Trash, then drag the sample bag and drop it onto the Gross balance.",
+  "tutorial.registersamplepresentation.instruction7":
+    "Drag the sample bag from its workbench station and drop it onto the Gross balance.",
+  "tutorial.registersamplepresentation.instruction8":
+    "Locate the sample bag, then drag it and drop it onto the Gross balance.",
+  "tutorial.extractionequipmentpresentation.title4":
+    "Wait for vortex mixing",
+  "tutorial.extractionequipmentpresentation.title5":
+    "Wait for phase separation",
+  "tutorial.extractionequipmentpresentation.title6":
+    "Start the vortex cycle",
+  "tutorial.extractionequipmentpresentation.title7":
+    "Seal the extraction tube",
+  "tutorial.extractionequipmentpresentation.instruction5":
+    "Click the highlighted Start vortex button.",
+  "tutorial.extractionequipmentpresentation.instruction6":
+    "Click the highlighted Close button on the extraction tube before starting the mixer.",
+  "tutorial.samplevialpresentation.title5":
+    "Add more extract to the vial",
+  "tutorial.samplevialpresentation.title6":
+    "Transfer extract into the Autosampler vial",
+  "tutorial.samplevialpresentation.instruction6":
+    "The vial holds too little to be injected: the autosampler needle cannot reach the last 0.05 mL, so the run would record a flat baseline. Select the Micropipette again, then press and hold on the extraction tube to draw about 1.00 mL, and dispense it into the same vial.",
+  "tutorial.samplevialpresentation.instruction7":
+    "Click Micropipette in Actions, or press P. Then press and hold on the separated extraction tube until the pipette reads about 1.00 mL, and release.",
+  "tutorial.spentextractiontubepresentation.hint":
+    "Only this tube is lost. The ground sample is still in the storage jar, so a new 10 g test portion is all it takes to start the extraction over.",
+  "tutorial.analyticalweighingpresentation.title5":
+    "Deploy a replacement 50 mL tube",
+  "tutorial.analyticalweighingpresentation.title6":
+    "Deploy a 50 mL tube",
+  "tutorial.analyticalweighingpresentation.title7":
+    "Tare the replacement tube",
+  "tutorial.analyticalweighingpresentation.title8":
+    "Tare the tube",
+  "tutorial.analyticalweighingpresentation.instruction5":
+    "In Inventory, open Containers. Drag a fresh 50 mL centrifuge tube and drop it onto the Analytical balance. Do not recover the compromised powdered tube from the trash.",
+  "tutorial.analyticalweighingpresentation.instruction6":
+    "In Inventory, open Containers. Drag a 50 mL centrifuge tube and drop it onto the Analytical balance.",
+  "tutorial.analyticalweighingpresentation.instruction7":
+    "The spatula contains powder. Click and hold the tube on the Analytical balance until Net reaches about 10.000 g; release before 10.2 g.",
+  "tutorial.analyticalweighingpresentation.instruction8":
+    "Click the highlighted Powder spatula in Actions, or press S. Then click the powder in the HDPE container to load it.",
+
 } as const;

@@ -714,7 +714,7 @@ export function getLimsTutorialValues(experiment: Experiment): LimsTutorialValue
   const referenceDate = new Date(experiment.last_simulation_at);
   referenceDate.setUTCDate(referenceDate.getUTCDate() - 1);
   return {
-    orchardName: "Tutorial Orchard",
+    orchardName: translateNow("tutorial.getlimstutorialvalues.orchardName"),
     harvestDate: referenceDate.toISOString().slice(0, 10),
     indicativeMassG: Math.max(
       0,
@@ -811,9 +811,13 @@ export function getLimsTutorialFieldPresentation(
   field: LimsTutorialField,
 ): TutorialStepPresentation {
   const values = getLimsTutorialValues(experiment);
-  const grossMass = values.measuredGrossMassG?.toFixed(1) ?? "the current";
+  const grossMass =
+    values.measuredGrossMassG?.toFixed(1)
+    ?? translateNow("tutorial.getlimstutorialfieldpresentation.grossMassFallback");
   const packagingTareMass = values.packagingTareMassG.toFixed(1);
-  const netMass = values.measuredNetMassG?.toFixed(1) ?? "the calculated";
+  const netMass =
+    values.measuredNetMassG?.toFixed(1)
+    ?? translateNow("tutorial.getlimstutorialfieldpresentation.netMassFallback");
   if (field === "mass-summary") {
     return {
       title: translateNow("tutorial.getlimstutorialfieldpresentation.title"),
@@ -860,8 +864,8 @@ function registerSamplePresentation(experiment: Experiment): TutorialStepPresent
       title: translateNow("tutorial.registersamplepresentation.title"),
       instruction: translateNow("tutorial.registersamplepresentation.instruction"),
       hint: hasSampleBagOnGrossBalance(experiment)
-        ? "Keep the bag on the balance while you deploy and complete the LIMS terminal."
-        : "After deploying the terminal, return the sample bag to the Gross balance before entering the LIMS data.",
+        ? translateNow("tutorial.registersamplepresentation.hint5")
+        : translateNow("tutorial.registersamplepresentation.hint6"),
       action: { kind: "drag", label: translateNow("tutorial.registersamplepresentation.label") },
     };
   }
@@ -870,12 +874,12 @@ function registerSamplePresentation(experiment: Experiment): TutorialStepPresent
     const bagAnchor = sampleBagSourceAnchor(experiment);
     const sourceInstruction =
       bagAnchor === "basket-received-bag"
-        ? "Open the Produce basket, then drag the sample bag and drop it onto the Gross balance."
+        ? translateNow("tutorial.registersamplepresentation.instruction5")
         : bagAnchor.startsWith("trash-tool-")
-          ? "Open the Trash, then drag the sample bag and drop it onto the Gross balance."
+          ? translateNow("tutorial.registersamplepresentation.instruction6")
           : bagAnchor.startsWith("bench-tool-card-")
-            ? "Drag the sample bag from its workbench station and drop it onto the Gross balance."
-            : "Locate the sample bag, then drag it and drop it onto the Gross balance.";
+            ? translateNow("tutorial.registersamplepresentation.instruction7")
+            : translateNow("tutorial.registersamplepresentation.instruction8");
     return {
       title: translateNow("tutorial.registersamplepresentation.title2"),
       instruction: sourceInstruction,
@@ -889,7 +893,7 @@ function registerSamplePresentation(experiment: Experiment): TutorialStepPresent
     return {
       title: translateNow("tutorial.registersamplepresentation.title3"),
       instruction: translateNow("tutorial.registersamplepresentation.instruction2", { p0: values.orchardName, p1: values.harvestDate, p2: values.indicativeMassG }),
-      hint: translateNow("tutorial.registersamplepresentation.hint2", { p0: values.measuredGrossMassG?.toFixed(1) ?? "current", p1: values.measuredNetMassG?.toFixed(1) ?? "the net mass", p2: values.packagingTareMassG.toFixed(1) }),
+      hint: translateNow("tutorial.registersamplepresentation.hint2", { p0: values.measuredGrossMassG?.toFixed(1) ?? translateNow("tutorial.registersamplepresentation.grossMassFallback"), p1: values.measuredNetMassG?.toFixed(1) ?? translateNow("tutorial.registersamplepresentation.netMassFallback"), p2: values.packagingTareMassG.toFixed(1) }),
       action: { kind: "type", label: translateNow("tutorial.registersamplepresentation.label3") },
     };
   }
@@ -948,8 +952,9 @@ function extractionEquipmentTarget(
 function extractionEquipmentPresentation(
   experiment: Experiment,
   widgetId: "vortex" | "centrifuge",
-  equipmentName: "Vortex mixer" | "Centrifuge",
+  equipmentNameKey: MessageKey,
 ): Partial<TutorialStepPresentation> {
+  const equipmentName = translateNow(equipmentNameKey);
   if (!workspaceWidget(experiment, widgetId)?.isPresent) {
     return {
       title: translateNow("tutorial.extractionequipmentpresentation.title", { p0: equipmentName }),
@@ -970,17 +975,21 @@ function extractionEquipmentPresentation(
     (widgetId === "centrifuge" && (widget?.centrifugeRunRemainingMs ?? 0) > 0)
   ) {
     return {
-      title: widgetId === "vortex" ? "Wait for vortex mixing" : "Wait for phase separation",
+      title: widgetId === "vortex"
+        ? translateNow("tutorial.extractionequipmentpresentation.title4")
+        : translateNow("tutorial.extractionequipmentpresentation.title5"),
       instruction: translateNow("tutorial.extractionequipmentpresentation.instruction3"),
       action: { kind: "wait", label: translateNow("tutorial.extractionequipmentpresentation.label") },
     };
   }
   return widgetId === "vortex"
     ? {
-        title: tube?.isSealed ? "Start the vortex cycle" : "Seal the extraction tube",
+        title: tube?.isSealed
+          ? translateNow("tutorial.extractionequipmentpresentation.title6")
+          : translateNow("tutorial.extractionequipmentpresentation.title7"),
         instruction: tube?.isSealed
-          ? "Click the highlighted Start vortex button."
-          : "Click the highlighted Close button on the extraction tube before starting the mixer.",
+          ? translateNow("tutorial.extractionequipmentpresentation.instruction5")
+          : translateNow("tutorial.extractionequipmentpresentation.instruction6"),
         action: tube?.isSealed
           ? { kind: "click", label: translateNow("tutorial.extractionequipmentpresentation.label2") }
           : { kind: "click", label: translateNow("tutorial.extractionequipmentpresentation.label3") },
@@ -1052,21 +1061,21 @@ function sampleVialPresentation(experiment: Experiment): Partial<TutorialStepPre
         };
       }
       return {
-        title: shortVial ? "Add more extract to the vial" : "Transfer extract into the Autosampler vial",
+        title: shortVial
+          ? translateNow("tutorial.samplevialpresentation.title5")
+          : translateNow("tutorial.samplevialpresentation.title6"),
         instruction: translateNow("tutorial.samplevialpresentation.instruction4"),
         hint: translateNow("tutorial.samplevialpresentation.hint4"),
         action: { kind: "click", label: translateNow("tutorial.samplevialpresentation.label4") },
       };
     }
     return {
-      title: shortVial ? "Add more extract to the vial" : "Transfer extract into the Autosampler vial",
+      title: shortVial
+        ? translateNow("tutorial.samplevialpresentation.title5")
+        : translateNow("tutorial.samplevialpresentation.title6"),
       instruction: shortVial
-        ? "The vial holds too little to be injected: the autosampler needle cannot reach " +
-          "the last 0.05 mL, so the run would record a flat baseline. Select the " +
-          "Micropipette again, then press and hold on the extraction tube to draw about " +
-          "1.00 mL, and dispense it into the same vial."
-        : "Click Micropipette in Actions, or press P. Then press and hold on the separated " +
-          "extraction tube until the pipette reads about 1.00 mL, and release.",
+        ? translateNow("tutorial.samplevialpresentation.instruction6")
+        : translateNow("tutorial.samplevialpresentation.instruction7"),
       hint: translateNow("tutorial.samplevialpresentation.hint5"),
       action: shortVial
         ? { kind: "click", label: translateNow("tutorial.samplevialpresentation.label5") }
@@ -1365,9 +1374,7 @@ function spentExtractionTubePresentation(
   tube: BenchToolInstance,
 ): Partial<TutorialStepPresentation> {
   const faults = tube.quechersState?.faults ?? [];
-  const hint =
-    "Only this tube is lost. The ground sample is still in the storage jar, so a new " +
-    "10 g test portion is all it takes to start the extraction over.";
+  const hint = translateNow("tutorial.spentextractiontubepresentation.hint");
   const action: TutorialAction = { kind: "drag", label: translateNow("tutorial.spentextractiontubepresentation.label") };
 
   if (faults.includes("vortexed_open")) {
@@ -1483,11 +1490,11 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
     const isReplacingCompromisedTube = hasCompromisedAnalyticalTube(experiment);
     return {
       title: isReplacingCompromisedTube
-        ? "Deploy a replacement 50 mL tube"
-        : "Deploy a 50 mL tube",
+        ? translateNow("tutorial.analyticalweighingpresentation.title5")
+        : translateNow("tutorial.analyticalweighingpresentation.title6"),
       instruction: isReplacingCompromisedTube
-        ? "In Inventory, open Containers. Drag a fresh 50 mL centrifuge tube and drop it onto the Analytical balance. Do not recover the compromised powdered tube from the trash."
-        : "In Inventory, open Containers. Drag a 50 mL centrifuge tube and drop it onto the Analytical balance.",
+        ? translateNow("tutorial.analyticalweighingpresentation.instruction5")
+        : translateNow("tutorial.analyticalweighingpresentation.instruction6"),
     };
   }
   if (!toolIsInWidget(experiment, "analytical_balance", tube)) {
@@ -1499,8 +1506,8 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
   if (!analyticalTubeTareIsValid(experiment)) {
     return {
       title: hasCompromisedAnalyticalTube(experiment)
-        ? "Tare the replacement tube"
-        : "Tare the tube",
+        ? translateNow("tutorial.analyticalweighingpresentation.title7")
+        : translateNow("tutorial.analyticalweighingpresentation.title8"),
       instruction: translateNow("tutorial.analyticalweighingpresentation.instruction4"),
       action: { kind: "click", label: translateNow("tutorial.analyticalweighingpresentation.label2") },
     };
@@ -1508,8 +1515,8 @@ function analyticalWeighingPresentation(experiment: Experiment): Partial<Tutoria
   return {
     title: translateNow("tutorial.analyticalweighingpresentation.title4"),
     instruction: experiment.spatula.isLoaded
-      ? "The spatula contains powder. Click and hold the tube on the Analytical balance until Net reaches about 10.000 g; release before 10.2 g."
-      : "Click the highlighted Powder spatula in Actions, or press S. Then click the powder in the HDPE container to load it.",
+      ? translateNow("tutorial.analyticalweighingpresentation.instruction7")
+      : translateNow("tutorial.analyticalweighingpresentation.instruction8"),
     action: experiment.spatula.isLoaded
       ? { kind: "click", label: translateNow("tutorial.analyticalweighingpresentation.label3") }
       : { kind: "keyboard", label: translateNow("tutorial.analyticalweighingpresentation.label4") },
@@ -2398,7 +2405,7 @@ const steps: TutorialStep[] = [
       extractionEquipmentTarget(experiment, "vortex", "vortex_mixer_widget")),
     isSatisfied: hasVortexedExtraction,
     presentation: (experiment) =>
-      extractionEquipmentPresentation(experiment, "vortex", "Vortex mixer"),
+      extractionEquipmentPresentation(experiment, "vortex", "widget.vortex_mixer"),
   }),
   step({
     id: "store-vortex",
@@ -2425,7 +2432,7 @@ const steps: TutorialStep[] = [
       extractionEquipmentTarget(experiment, "centrifuge", "centrifuge_widget")),
     isSatisfied: hasSeparatedExtraction,
     presentation: (experiment) =>
-      extractionEquipmentPresentation(experiment, "centrifuge", "Centrifuge"),
+      extractionEquipmentPresentation(experiment, "centrifuge", "widget.centrifuge"),
   }),
   step({
     id: "prepare-sample-vial",

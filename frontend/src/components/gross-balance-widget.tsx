@@ -152,7 +152,7 @@ export function GrossBalanceWidget({
             </button>
             <div className="min-w-24 text-center">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
-                Offset
+                {t("grossBalance.offset")}
               </p>
               <p className="mt-1 font-mono text-lg">{displayOffsetG >= 0 ? `+${displayOffsetG}` : displayOffsetG} g</p>
             </div>
@@ -182,7 +182,7 @@ export function GrossBalanceWidget({
         <div className="min-h-24 rounded-[1rem] border border-dashed border-slate-300 bg-white/80 px-2 py-2">
           {stagedContent ?? (
             <div className="flex h-full min-h-20 items-center justify-center rounded-[0.85rem] bg-slate-50 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
-              Drop object here
+              {t("grossBalance.dropObject")}
             </div>
           )}
         </div>

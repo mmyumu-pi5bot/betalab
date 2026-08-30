@@ -3523,7 +3523,10 @@ describe("LabScene", () => {
       target: { value: "10.00" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Create LIMS record" }));
+    const createButton = screen.getByRole("button", { name: "Create LIMS record" });
+    expect(createButton).toBeEnabled();
+
+    fireEvent.click(createButton);
 
     await waitFor(() => {
       expect(sendExperimentCommand).toHaveBeenCalledWith(

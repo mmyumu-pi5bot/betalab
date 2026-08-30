@@ -289,7 +289,7 @@ export function BenchToolCard({
           hasFieldLabel ? (
             <div className="rounded-[0.95rem] border border-emerald-200 bg-emerald-50/70 px-2.5 py-2">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Field label
+                {t("toolCard.fieldLabel")}
               </p>
               <p className="mt-1 text-xs font-medium text-slate-900">{tool.fieldLabelText}</p>
             </div>
@@ -356,7 +356,7 @@ export function BenchToolCard({
         {tool.injectionContext && !tool.calibrationContext ? (
           <div className="mt-1 flex items-center justify-between rounded-[0.85rem] border border-sky-200 bg-sky-50 px-3 py-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-500">
-              Extrait
+              {t("toolCard.extract")}
             </span>
             <span className="text-xs font-semibold text-sky-700">
               {tool.injectionContext.sampleMassG.toFixed(1)} g
@@ -373,7 +373,7 @@ export function BenchToolCard({
         ) : produceLots.length > 0 || tool.liquids.length > 0 ? (
           <section className="space-y-1.5" aria-label={t("toolCard.declaredContents")}>
             <p className="px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Declared contents
+              {t("toolCard.declaredContents")}
             </p>
             <div className="space-y-0.5">
               {produceLots.map((produceLot) => (
@@ -444,7 +444,7 @@ function SeparatedPhasesPanel({
   return (
     <section aria-label={t("toolCard.separatedPhases")} className="space-y-1.5" data-testid="separated-phases">
       <p className="px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        Separated phases
+        {t("toolCard.separatedPhases")}
       </p>
       <div className="overflow-hidden rounded-[0.9rem] border border-slate-200">
         <div className="flex items-center justify-between gap-2 bg-amber-50 px-2.5 py-1.5">
@@ -452,7 +452,7 @@ function SeparatedPhasesPanel({
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400" />
             <span className="truncate text-xs font-semibold text-amber-900">{t("toolCard.supernatant")}</span>
             <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-700">
-              Pipette draws this
+              {t("toolCard.pipetteDrawsThis")}
             </span>
           </div>
           <span className="shrink-0 tabular-nums text-[11px] text-amber-700">
@@ -464,7 +464,7 @@ function SeparatedPhasesPanel({
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400" />
             <span className="truncate text-xs font-semibold text-slate-700">{t("toolCard.pellet")}</span>
             <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-              Left behind
+              {t("toolCard.leftBehind")}
             </span>
           </div>
           <span className="shrink-0 tabular-nums text-[11px] text-slate-500">

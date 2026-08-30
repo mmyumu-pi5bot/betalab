@@ -274,7 +274,7 @@ export function LcMsMsRunResults({
   if (latestRun === null) {
     return (
       <p className="py-3 text-center text-xs text-slate-400">
-        No sequence has been run yet — load the rack and launch an acquisition.
+        {t("results.noRunYet")}
       </p>
     );
   }

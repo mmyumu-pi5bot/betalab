@@ -347,4 +347,30 @@ export const frLab: Record<keyof typeof enLab, string> = {
   "illustration.grinder": "Illustration du broyeur cryogénique",
   "illustration.vortex": "Illustration de l'agitateur vortex",
 
+  // Libellés visibles restés en dur dans le JSX lors de la première passe
+  "draft.cancel": "Annuler",
+  "sampleLabel.sampleId": "Identifiant échantillon",
+  "grossBalance.offset": "Décalage",
+  "grossBalance.dropObject": "Déposez un objet ici",
+  "analyticalBalance.mass": "Masse",
+  "analyticalBalance.tare": "Tare",
+  "analyticalBalance.net": "Net",
+  "analyticalBalance.dropTube": "Déposez un tube de 50 mL ici",
+  "lims.terminal": "Terminal LIMS",
+  "lims.massCheckTitle": "Contrôle de masse à réception",
+  "lims.massCheckHint":
+    "La masse nette mesurée est la masse brute moins la tare connue du sachet.",
+  "lims.printedTicket": "Ticket imprimé",
+  "toolCard.fieldLabel": "Étiquette terrain",
+  "toolCard.extract": "Extrait",
+  "toolCard.pipetteDrawsThis": "Aspiré à la pipette",
+  "toolCard.leftBehind": "Laissé au fond",
+  "workbench.title": "Paillasse",
+  "workbench.produceContaminates": "Le contact direct avec la surface contamine le lot.",
+  "workbench.dropToolHint": "Déposez un outil ici pour commencer à équiper la paillasse.",
+  "workspace.looseMaterialOnPan": "Matière libre sur le plateau",
+  "instrument.unloadRack": "Retirer le rack du LC-MS/MS",
+  "rack.loadedInInstrument": "Rack chargé dans le LC-MS/MS",
+  "debug.palette": "Palette de debug",
+
 };

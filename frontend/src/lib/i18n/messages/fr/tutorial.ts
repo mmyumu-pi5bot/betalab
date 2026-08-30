@@ -847,4 +847,62 @@ export const frTutorial: Record<keyof typeof enTutorial, string> = {
   "guard.tare.continueLabel": "Conserver la tare du tube vide",
   "guard.tare.leaveLabel": "Quitter le tutoriel et tarer quand même",
 
+  // Textes d'accompagnement propres à une branche : titres et explications que
+  // le coach choisit à l'exécution, restés en dur lors de la première passe.
+  "tutorial.getlimstutorialvalues.orchardName": "Verger du tutoriel",
+  "tutorial.getlimstutorialfieldpresentation.grossMassFallback": "la masse actuelle",
+  "tutorial.getlimstutorialfieldpresentation.netMassFallback": "la masse calculée",
+  "tutorial.registersamplepresentation.grossMassFallback": "la valeur actuelle",
+  "tutorial.registersamplepresentation.netMassFallback": "la masse nette",
+  "tutorial.registersamplepresentation.hint5":
+    "Laissez le sachet sur la balance pendant que vous installez et complétez le terminal LIMS.",
+  "tutorial.registersamplepresentation.hint6":
+    "Une fois le terminal installé, reposez le sachet d'échantillon sur la balance de réception avant de saisir les données LIMS.",
+  "tutorial.registersamplepresentation.instruction5":
+    "Ouvrez le panier de fruits, puis glissez le sachet d'échantillon et déposez-le sur la balance de réception.",
+  "tutorial.registersamplepresentation.instruction6":
+    "Ouvrez la poubelle, puis glissez le sachet d'échantillon et déposez-le sur la balance de réception.",
+  "tutorial.registersamplepresentation.instruction7":
+    "Glissez le sachet d'échantillon depuis son poste de paillasse et déposez-le sur la balance de réception.",
+  "tutorial.registersamplepresentation.instruction8":
+    "Repérez le sachet d'échantillon, puis glissez-le et déposez-le sur la balance de réception.",
+  "tutorial.extractionequipmentpresentation.title4":
+    "Attendez la fin de l'agitation",
+  "tutorial.extractionequipmentpresentation.title5":
+    "Attendez la séparation des phases",
+  "tutorial.extractionequipmentpresentation.title6":
+    "Démarrez le cycle de vortex",
+  "tutorial.extractionequipmentpresentation.title7":
+    "Fermez le tube d'extraction",
+  "tutorial.extractionequipmentpresentation.instruction5":
+    "Cliquez sur le bouton Démarrer le vortex mis en évidence.",
+  "tutorial.extractionequipmentpresentation.instruction6":
+    "Cliquez sur le bouton Fermer mis en évidence sur le tube d'extraction avant de démarrer l'agitateur.",
+  "tutorial.samplevialpresentation.title5":
+    "Complétez le vial avec de l'extrait",
+  "tutorial.samplevialpresentation.title6":
+    "Transférez l'extrait dans le vial autosampler",
+  "tutorial.samplevialpresentation.instruction6":
+    "Le vial contient trop peu pour être injecté : l'aiguille de l'autosampler ne peut pas atteindre les 0,05 mL du fond, et la séquence n'enregistrerait qu'une ligne de base plate. Sélectionnez à nouveau la Micropipette, puis maintenez le clic sur le tube d'extraction pour aspirer environ 1,00 mL et distribuez-les dans le même vial.",
+  "tutorial.samplevialpresentation.instruction7":
+    "Cliquez sur Micropipette dans Actions, ou appuyez sur P. Maintenez ensuite le clic sur le tube d'extraction séparé jusqu'à ce que la pipette affiche environ 1,00 mL, puis relâchez.",
+  "tutorial.spentextractiontubepresentation.hint":
+    "Seul ce tube est perdu. L'échantillon broyé est toujours dans le bocal de stockage : une nouvelle prise d'essai de 10 g suffit pour recommencer l'extraction.",
+  "tutorial.analyticalweighingpresentation.title5":
+    "Sortez un tube de 50 mL de remplacement",
+  "tutorial.analyticalweighingpresentation.title6":
+    "Sortez un tube de 50 mL",
+  "tutorial.analyticalweighingpresentation.title7":
+    "Tarez le tube de remplacement",
+  "tutorial.analyticalweighingpresentation.title8":
+    "Tarez le tube",
+  "tutorial.analyticalweighingpresentation.instruction5":
+    "Dans l'Inventaire, ouvrez Contenants. Glissez un tube à centrifuger de 50 mL neuf et déposez-le sur la balance analytique. Ne récupérez pas le tube poudré compromis dans la poubelle.",
+  "tutorial.analyticalweighingpresentation.instruction6":
+    "Dans l'Inventaire, ouvrez Contenants. Glissez un tube à centrifuger de 50 mL et déposez-le sur la balance analytique.",
+  "tutorial.analyticalweighingpresentation.instruction7":
+    "La spatule contient de la poudre. Maintenez le clic sur le tube posé sur la balance analytique jusqu'à ce que le Net atteigne environ 10,000 g ; relâchez avant 10,2 g.",
+  "tutorial.analyticalweighingpresentation.instruction8":
+    "Cliquez sur la Spatule à poudre mise en évidence dans Actions, ou appuyez sur S. Cliquez ensuite sur la poudre dans le contenant PEHD pour la charger.",
+
 };

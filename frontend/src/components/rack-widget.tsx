@@ -275,7 +275,7 @@ export function RackWidget({
             className="text-center text-xs font-semibold text-slate-500"
             data-testid="rack-load-status"
           >
-            Rack loaded in LC-MS/MS
+            {t("rack.loadedInInstrument")}
           </p>
         ) : null}
       </div>

@@ -177,4 +177,7 @@ export const enLcms = {
   "results.shownInViewer": "Showing this run in the data viewer.",
   "results.viewer": "Acquisition data viewer",
 
+  "results.noRunYet":
+    "No sequence has been run yet — load the rack and launch an acquisition.",
+
 } as const;

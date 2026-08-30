@@ -62,6 +62,8 @@ describe("message catalogues", () => {
       "glossary.q1.term",
       "glossary.q3.term",
       "draft.volume",
+      "analyticalBalance.tare",
+      "analyticalBalance.net",
       "console.repetitions",
       "coach.pauseShort",
       "tutorial.item.tube",

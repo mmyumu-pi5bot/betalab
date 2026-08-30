@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
+
 type SampleIdentityLabelProps = {
   matrix?: string;
   receivedDate?: string | null;
@@ -23,6 +25,7 @@ export function SampleIdentityLabel({
   sampleCode,
   variant = "compact",
 }: SampleIdentityLabelProps) {
+  const t = useT();
   const barcodePattern = buildBarcodePattern(sampleCode);
   const isTicket = variant === "ticket";
 
@@ -48,7 +51,7 @@ export function SampleIdentityLabel({
       </div>
       <div className="mt-2 space-y-0.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-          Sample ID
+          {t("sampleLabel.sampleId")}
         </p>
         <p className="text-sm font-semibold text-slate-950">{sampleCode}</p>
         <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">

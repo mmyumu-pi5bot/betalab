@@ -57,7 +57,7 @@ export function AnalyticalBalanceWidget({
       <div className="space-y-3">
         <div className="rounded-[1.25rem] border border-slate-200 bg-slate-950 px-4 py-4 text-center">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-            Mass
+            {t("analyticalBalance.mass")}
           </p>
           <p
             className={`mt-2 font-mono text-3xl ${
@@ -78,12 +78,12 @@ export function AnalyticalBalanceWidget({
               data-tutorial-anchor="analytical-balance-tare"
               type="button"
             >
-              Tare
+              {t("analyticalBalance.tare")}
             </button>
           </div>
           <div className="mt-4 border-t border-emerald-500/20 pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
-              Net
+              {t("analyticalBalance.net")}
             </p>
             <p className={`mt-1 font-mono text-2xl ${isTargetExceeded ? "text-amber-300" : "text-emerald-100"}`}>
               {netText}
@@ -94,7 +94,7 @@ export function AnalyticalBalanceWidget({
         <div className="min-h-24 rounded-[1rem] border border-dashed border-slate-300 bg-white/80 px-2 py-2">
           {stagedContent ?? (
             <div className="flex h-full min-h-20 items-center justify-center rounded-[0.85rem] bg-slate-50 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
-              Drop 50 mL tube here
+              {t("analyticalBalance.dropTube")}
             </div>
           )}
         </div>

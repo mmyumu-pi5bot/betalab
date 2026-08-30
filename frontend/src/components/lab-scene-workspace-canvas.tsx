@@ -339,7 +339,7 @@ export function LabSceneWorkspaceCanvas({
       onDragStart={(event) => dnd.grossBalance.handleBalanceItemDragStart(event.dataTransfer)}
     >
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-        Loose material on pan
+        {t("workspace.looseMaterialOnPan")}
       </p>
       <ProduceLotCard
         dataTestId={`gross-balance-produce-${displayBalanceProduceLot.id}`}
@@ -723,7 +723,7 @@ export function LabSceneWorkspaceCanvas({
                         }}
                         type="button"
                       >
-                        Unload rack from LC-MS/MS
+                        {t("instrument.unloadRack")}
                       </button>
                     ) : null}
                   </div>

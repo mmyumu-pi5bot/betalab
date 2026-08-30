@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineQuantityInput } from "@/components/inline-quantity-input";
+import { useT } from "@/lib/i18n";
 import { TemperatureIndicator } from "@/components/temperature-indicator";
 
 //: The amount box of a dosing dialog. The tutorial coach retargets its spotlight
@@ -41,13 +42,14 @@ type DropDraftFormProps = Omit<DropDraftCardProps, "title"> & {
 };
 
 export function DropDraftForm({
-  confirmLabel = "Add",
+  confirmLabel,
   fields,
   onCancel,
   onChangeField,
   onConfirm,
   showCancel = false,
 }: DropDraftFormProps) {
+  const t = useT();
   return (
     <div className="space-y-3">
       {fields.map((field, fieldIndex) => (
@@ -99,7 +101,7 @@ export function DropDraftForm({
       <div className="flex justify-end gap-2">
         {showCancel ? (
           <button className="text-[11px] font-semibold text-slate-500" onClick={onCancel} type="button">
-            Cancel
+            {t("draft.cancel")}
           </button>
         ) : null}
         <button
@@ -108,7 +110,7 @@ export function DropDraftForm({
           onClick={onConfirm}
           type="button"
         >
-          {confirmLabel}
+          {confirmLabel ?? t("draft.add")}
         </button>
       </div>
     </div>
@@ -116,7 +118,7 @@ export function DropDraftForm({
 }
 
 export function DropDraftCard({
-  confirmLabel = "Add",
+  confirmLabel,
   fields,
   onCancel,
   onChangeField,

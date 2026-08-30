@@ -6,6 +6,7 @@ import { ProduceLotCard } from "@/components/produce-lot-card";
 import { ProduceLotStatusBadge } from "@/components/produce-lot-status-badge";
 import { LabAssetIcon } from "@/components/icons/lab-asset-icon";
 import { getDebugToolPresetPreview } from "@/lib/lab-scene-config";
+import { useT } from "@/lib/i18n";
 import type {
   DebugProducePresetId,
   ExperimentProduceLot,
@@ -32,6 +33,7 @@ export function DebugProducePalette({
   presets,
   toolPresets = [],
 }: DebugProducePaletteProps) {
+  const t = useT();
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
@@ -46,7 +48,7 @@ export function DebugProducePalette({
         type="button"
       >
         <span className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
-          Debug Palette
+          {t("debug.palette")}
         </span>
         <span
           aria-hidden="true"

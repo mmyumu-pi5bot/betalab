@@ -341,4 +341,30 @@ export const enLab = {
   "illustration.grinder": "Cryogenic grinder illustration",
   "illustration.vortex": "Vortex mixer illustration",
 
+  // Visible labels the first localisation pass left as JSX text nodes
+  "draft.cancel": "Cancel",
+  "sampleLabel.sampleId": "Sample ID",
+  "grossBalance.offset": "Offset",
+  "grossBalance.dropObject": "Drop object here",
+  "analyticalBalance.mass": "Mass",
+  "analyticalBalance.tare": "Tare",
+  "analyticalBalance.net": "Net",
+  "analyticalBalance.dropTube": "Drop 50 mL tube here",
+  "lims.terminal": "LIMS terminal",
+  "lims.massCheckTitle": "Reception mass check",
+  "lims.massCheckHint":
+    "Measured net mass is the gross mass minus the known bag tare.",
+  "lims.printedTicket": "Printed ticket",
+  "toolCard.fieldLabel": "Field label",
+  "toolCard.extract": "Extract",
+  "toolCard.pipetteDrawsThis": "Pipette draws this",
+  "toolCard.leftBehind": "Left behind",
+  "workbench.title": "Workbench",
+  "workbench.produceContaminates": "Direct produce contact contaminates the lot.",
+  "workbench.dropToolHint": "Drop a workflow tool here to start building the bench.",
+  "workspace.looseMaterialOnPan": "Loose material on pan",
+  "instrument.unloadRack": "Unload rack from LC-MS/MS",
+  "rack.loadedInInstrument": "Rack loaded in LC-MS/MS",
+  "debug.palette": "Debug Palette",
+
 } as const;
