@@ -7,7 +7,7 @@ ENV BETALAB_EXPERIMENTS_DB_PATH=/data/experiments.sqlite3
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir "uv>=0.13.4"
 
 COPY pyproject.toml uv.lock ./
 COPY app ./app
